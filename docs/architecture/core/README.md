@@ -1,10 +1,10 @@
 # Core
 
-Core will be Oa's native integration layer between [ADK](../adk/README.md) and
-[Chromium](../chromium/README.md). It will turn engine objects, commands and
-events into native interfaces that ADK can expose to Swift. Chromium C++ types
-and engine-specific lifetime rules will stay behind that boundary; the app will
-talk to ADK rather than Core directly.
+Core will be Oa's native integration layer between [DevKit](../devkit/README.md)
+and [Chromium](../chromium/README.md). It will turn engine objects, commands and
+events into native interfaces that DevKit can expose to Swift. Chromium C++
+types and engine-specific lifetime rules will stay behind that boundary; the app
+will talk to DevKit rather than Core directly.
 
 This chapter describes the intended integration architecture, not an implemented
 API or a claim that every lifetime and failure path has been settled. Core is a
@@ -16,7 +16,7 @@ The architecture has three parts.
 ## 1. Expose native application, context and page interfaces
 
 Core will adapt Chromium's browser infrastructure rather than duplicate it.
-The native interface will give ADK a small set of objects with explicit
+The native interface will give DevKit a small set of objects with explicit
 ownership, commands, state and events.
 
 | Interface | Responsibility in Core |
@@ -28,12 +28,12 @@ ownership, commands, state and events.
 | Requests and service adapters | Translate engine requests and results, retaining the context and completion state needed to finish or abandon an operation. |
 
 Objective-C and Objective-C++ adapters will form the native boundary to the C++
-engine. ADK will own Swift-facing types and error/event translation; Core will
-own the connection to the native engine object. Product tab placement, window
-presentation and saved app state will remain above both layers.
+engine. DevKit will own Swift-facing types and error/event translation; Core
+will own the connection to the native engine object. Product tab placement,
+window presentation and saved app state will remain above both layers.
 
 Configuration will follow the same separation. The app will choose product
-settings, ADK will translate them, and Core will pass them to the appropriate
+settings, DevKit will translate them, and Core will pass them to the appropriate
 engine owner. Each setting needs an explicit scope: application-wide, profile,
 page or renderer. A per-profile app model alone will not make an engine-global
 setting profile-local. A copied setting will also need a defined update path;
@@ -41,9 +41,9 @@ installation of an initial value is not ongoing observation.
 
 ## 2. Keep identity, ownership and view attachment separate
 
-A visible tab is not a single engine object. The app's tab identity, ADK page,
-Core adapter, Chromium `WebContents`, browser context and native view each have
-their own lifetime. Core's contracts will describe which objects an adapter
+A visible tab is not a single engine object. The app's tab identity, DevKit
+page, Core adapter, Chromium `WebContents`, browser context and native view each
+have their own lifetime. Core's contracts will describe which objects an adapter
 owns, which it observes and what remains valid after a change.
 
 | Transition | Contract Core must define |
@@ -57,7 +57,7 @@ owns, which it observes and what remains valid after a change.
 Moving a view between windows must not be treated as destroying its page.
 Conversely, retaining a page adapter must not imply that the underlying engine
 page can never change. Live state getters, subscriptions and saved app bindings
-will need separate refresh rules when the engine object is replaced. ADK will
+will need separate refresh rules when the engine object is replaced. DevKit will
 translate engine lifecycle states into its own explicit state model rather than
 expose untyped native values as Swift states.
 
@@ -75,7 +75,7 @@ substitute for cancelling work or releasing the engine's last owner.
 
 Not every upward call has the same meaning. Some report state, some ask the app
 for a decision, and others return the result of an asynchronous operation.
-Core and ADK will preserve those distinctions.
+Core and DevKit will preserve those distinctions.
 
 | Interaction | Core's integration responsibility |
 | --- | --- |
@@ -89,8 +89,8 @@ Core and ADK will preserve those distinctions.
 For example, a permission request will follow this path:
 
 1. Chromium creates a request for a particular page and browser context.
-2. Core retains the native request state and forwards it through ADK.
-3. The app presents the decision and returns an answer through ADK.
+2. Core retains the native request state and forwards it through DevKit.
+3. The app presents the decision and returns an answer through DevKit.
 4. Core checks that the request is still valid and delivers the answer to the
    engine, or follows the defined invalidation path.
 5. Core releases the request's completion state and associated observation.

@@ -1,16 +1,16 @@
 # Architecture
 
 This documentation describes how Oa will work: what each layer owns, how the
-layers communicate, and which design decisions remain open. The Chromium and
-Core chapters cover the engine and native integration; ADK and App/UI have
-scope notes ready for expansion.
+layers communicate, and which design decisions remain open. The Chromium, Core
+and DevKit chapters cover the engine, native integration and Swift interface;
+App/UI has scope notes ready for expansion.
 
 ## Four layers
 
 | Layer | Responsibility |
 | --- | --- |
 | [App/UI](app/README.md) | Product model, native presentation, windows and user decisions |
-| [ADK](adk/README.md) | Swift engine interface and translation between app and native engine |
+| [DevKit](devkit/README.md) | Swift engine interface and translation between app and native engine |
 | [Core](core/README.md) | Native adapters, ownership and integration with Chromium |
 | [Chromium](chromium/README.md) | Browser infrastructure, rendering, networking, services and engine extensions |
 

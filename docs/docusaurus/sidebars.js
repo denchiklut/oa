@@ -10,7 +10,7 @@ const sidebars = {
       link: { type: "doc", id: "architecture/README" },
       items: [
         { type: "doc", id: "architecture/app/README", label: "App/UI" },
-        { type: "doc", id: "architecture/adk/README", label: "ADK" },
+        { type: "doc", id: "architecture/devkit/README", label: "DevKit" },
         { type: "doc", id: "architecture/core/README", label: "Core" },
         { type: "doc", id: "architecture/chromium/README", label: "Chromium" },
       ],

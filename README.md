@@ -5,8 +5,8 @@ This repository currently contains the architecture, feature documentation and
 Chromium build setup. The native app and Core integration will be added separately.
 
 Start with the [architecture](docs/architecture/README.md). The
-current chapters document Chromium and Core, the native integration layer.
-App/UI and ADK have scope notes ready for expansion.
+current chapters document Chromium, Core's native integration and DevKit's Swift
+engine interface. App/UI has scope notes ready for expansion.
 
 ## Documentation site
 
