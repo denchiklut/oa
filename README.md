@@ -2,14 +2,17 @@
 
 Architecture documentation for an independent native macOS browser over Chromium.
 
-Start with the [system architecture](docs/system-architecture/README.md). The
+Start with the [architecture](docs/architecture/README.md). The
 current chapters document Chromium and Core, the native integration layer.
 App/UI and ADK have scope notes ready for expansion.
 
 ## Documentation site
 
 [Docusaurus](docs/docusaurus) builds the site from the Markdown chapters in
-`docs/system-architecture`. GitHub Actions publishes it to GitHub Pages.
+`docs/architecture` and the [features](docs/features/README.md)
+in `docs/features`. GitHub Actions automatically publishes it to GitHub Pages
+when changes to either documentation folder or the site configuration are pushed
+to `main`. The `Deploy docs` workflow can also be run manually.
 
 To preview locally with the Bun version specified in `docs/docusaurus/package.json`:
 

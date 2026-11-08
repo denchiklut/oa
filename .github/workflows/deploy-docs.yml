@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "docs/system-architecture/**"
+      - "docs/architecture/**"
+      - "docs/features/**"
       - "docs/docusaurus/**"
       - ".github/workflows/deploy-docs.yml"
   workflow_dispatch:
@@ -39,7 +40,7 @@ jobs:
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: docs/docusaurus/build
+          path: docs/docusaurus/dist
 
   deploy:
     needs: build

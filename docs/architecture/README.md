@@ -1,4 +1,4 @@
-# System architecture
+# Architecture
 
 This documentation describes how Oa will work: what each layer owns, how the
 layers communicate, and which design decisions remain open. The Chromium and

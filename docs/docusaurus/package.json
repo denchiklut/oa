@@ -4,8 +4,8 @@
   "packageManager": "bun@1.4.4",
   "scripts": {
     "start": "docusaurus start",
-    "build": "docusaurus build",
-    "serve": "docusaurus serve",
+    "build": "docusaurus build --out-dir dist",
+    "serve": "docusaurus serve --dir dist",
     "clear": "docusaurus clear"
   },
   "engines": {

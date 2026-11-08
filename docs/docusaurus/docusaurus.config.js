@@ -29,15 +29,15 @@ const config = {
       ({
         docs: {
           // Docs are read in place, so they still render on GitHub as before.
-          path: "../system-architecture",
-          include: ["**/README.md"],
+          path: "..",
+          include: ["architecture/**/README.md", "features/**/README.md"],
+          exclude: ["**/internals/**"],
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: ({ docPath }) => `${repoUrl}/edit/main/docs/system-architecture/${docPath}`,
+          editUrl: ({ docPath }) => `${repoUrl}/edit/main/docs/${docPath}`,
           showLastUpdateTime: true,
         },
         blog: false,
-        pages: false,
       }),
     ],
   ],
@@ -48,7 +48,11 @@ const config = {
       colorMode: { respectPrefersColorScheme: true },
       navbar: {
         title: "Oa",
-        items: [{ href: repoUrl, label: "GitHub", position: "right" }],
+        items: [
+          { to: "/architecture/", label: "Architecture", position: "left" },
+          { to: "/features/", label: "Features", position: "left" },
+          { href: repoUrl, label: "GitHub", position: "right" },
+        ],
       },
       footer: {
         style: "dark",
