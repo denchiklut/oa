@@ -11,7 +11,7 @@ Future chapters belong here when they explain how a user action becomes a
 product decision, how the app presents engine requests, or how app state survives
 relaunch. Chromium internals and native engine adapters belong below this layer.
 
-For OA, the intended rule is that the app owns product state and talks to
+For Oa, the intended rule is that the app owns product state and talks to
 the engine through ADK. Detailed state, persistence and presentation decisions
 will be documented in this chapter as they are made.
 
