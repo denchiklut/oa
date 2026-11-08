@@ -1,8 +1,4 @@
-# Local architecture implementation notes
-/docs/architecture/**/internals/
-
+.local/
 node_modules/
 dist/
-
-# macOS
 .DS_Store

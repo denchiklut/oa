@@ -1,6 +1,8 @@
 # Oa
 
-Architecture documentation for an independent native macOS browser over Chromium.
+Oa is an independent native macOS browser project built around Chromium.
+This repository currently contains the architecture, feature documentation and
+Chromium build setup. The native app and Core integration will be added separately.
 
 Start with the [architecture](docs/architecture/README.md). The
 current chapters document Chromium and Core, the native integration layer.
@@ -14,12 +16,19 @@ in `docs/features`. GitHub Actions automatically publishes it to GitHub Pages
 when changes to either documentation folder or the site configuration are pushed
 to `main`. The `Deploy docs` workflow can also be run manually.
 
-To preview locally with the Bun version specified in `docs/docusaurus/package.json`:
+## Build and run
+
+On an Apple silicon Mac with Xcode installed:
 
 ```sh
-cd docs/docusaurus
-bun install --frozen-lockfile
-bun run start
+scripts/build.sh
+scripts/run.sh
 ```
 
-Run `bun run build` from the same directory to generate the static site.
+The first command prepares and builds upstream Chromium. The first build takes
+about **3 hours** and downloads roughly **100 GB**. Later builds are
+incremental: small rebuilds can take seconds, while larger changes take longer.
+The second command launches the existing build.
+
+See [Contributing](CONTRIBUTING.md) for prerequisites and the separate
+documentation preview steps.

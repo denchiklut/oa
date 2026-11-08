@@ -31,7 +31,7 @@ const config = {
           // Docs are read in place, so they still render on GitHub as before.
           path: "..",
           include: ["architecture/**/README.md", "features/**/README.md"],
-          exclude: ["**/internals/**"],
+          exclude: ["**/.local/**"],
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
           editUrl: ({ docPath }) => `${repoUrl}/edit/main/docs/${docPath}`,
