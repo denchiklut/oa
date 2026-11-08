@@ -1,2 +1,5 @@
 # Local architecture implementation notes
 /docs/system-architecture/**/internals/
+
+# macOS
+.DS_Store
