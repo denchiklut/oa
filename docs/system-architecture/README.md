@@ -1,8 +1,9 @@
 # System architecture
 
 This documentation describes how Oa will work: what each layer owns, how the
-layers communicate, and which design decisions remain open. It starts with the
-Chromium layer and grows one layer at a time.
+layers communicate, and which design decisions remain open. The Chromium and
+Core chapters cover the engine and native integration; ADK and App/UI have
+scope notes ready for expansion.
 
 ## Four layers
 

@@ -1,7 +1,7 @@
 # App / UI
 
 **Status: scope only.** The detailed reference-architecture chapter has not been
-written. The current documentation work concentrates on Chromium.
+written. The Chromium and Core chapters cover the engine and native integration.
 
 This layer owns product state and presentation: Spaces, sidebar items, native
 windows, settings, routing decisions and saved application state. It consumes

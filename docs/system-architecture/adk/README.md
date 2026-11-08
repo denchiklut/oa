@@ -1,7 +1,7 @@
 # ADK
 
 **Status: scope only.** The detailed reference-architecture chapter has not been
-written. The current documentation work concentrates on Chromium.
+written. The Chromium and Core chapters cover the engine and native integration.
 
 This layer presents the engine to Swift callers. It translates native objects,
 identities, events, errors and replies into the interface used by the app.

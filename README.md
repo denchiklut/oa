@@ -2,9 +2,9 @@
 
 Architecture documentation for an independent native macOS browser over Chromium.
 
-Start with the [system architecture](docs/system-architecture/README.md). The current
-chapter documents Chromium; App/UI, ADK and the native integration layer have
-scope notes ready for expansion.
+Start with the [system architecture](docs/system-architecture/README.md). The
+current chapters document Chromium and Core, the native integration layer.
+App/UI and ADK have scope notes ready for expansion.
 
 ## Documentation site
 
