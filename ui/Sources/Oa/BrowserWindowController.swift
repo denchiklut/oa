@@ -4,18 +4,19 @@ import SwiftUI
 
 @MainActor
 final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
-    let id = UUID()
+    let model: WindowModel
     private let engine: any BrowserApplication
-    private let model: WindowModel
+    private let store: SidebarStore
     private let didClose: (BrowserWindowController) -> Void
 
     init(
-        engine: any BrowserApplication, context: any BrowserContext,
+        id: UUID, engine: any BrowserApplication, store: SidebarStore, spaceID: UUID,
         didClose: @escaping (BrowserWindowController) -> Void
     ) {
         self.engine = engine
+        self.store = store
         self.didClose = didClose
-        model = WindowModel(windowID: id, context: context)
+        model = WindowModel(id: id, engine: engine, store: store, spaceID: spaceID)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -38,8 +39,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func open(cascadingFrom previous: NSWindow?) {
         guard let window else { return }
-        engine.attachWindow(window, id: id)
-        model.newTab(URL(string: "https://www.wikipedia.org/")!)
+        engine.attachWindow(window, id: model.id)
+        store.addWindow(model)
         if let previous {
             window.setFrameTopLeftPoint(
                 window.cascadeTopLeft(from: NSPoint(x: previous.frame.minX, y: previous.frame.maxY)))
@@ -50,13 +51,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         observeTitle()
     }
 
-    func closeAllTabs() {
-        model.closeAll()
-    }
-
     private func observeTitle() {
         let title = withObservationTracking {
-            model.selectedTab?.title ?? ""
+            model.selectedTab?.displayTitle ?? ""
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeTitle() }
         }
@@ -69,7 +66,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowWillClose(_ notification: Notification) {
         model.dropAll()
-        engine.closeWindow(id: id)
+        store.removeWindow(model)
+        engine.closeWindow(id: model.id)
         didClose(self)
     }
 
@@ -81,10 +79,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func newTab(_ sender: Any?) { model.newTab() }
     @objc func selectNextTab(_ sender: Any?) { model.selectAdjacentTab(1) }
     @objc func selectPreviousTab(_ sender: Any?) { model.selectAdjacentTab(-1) }
+    @objc func togglePin(_ sender: Any?) { model.togglePin() }
+
+    @objc func newSpace(_ sender: Any?) {
+        if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
+    }
+
+    @objc func renameSpace(_ sender: Any?) {
+        guard let space = model.space, let name = NamePrompt.run("Rename Space", name: space.name) else { return }
+        model.renameSpace(space.id, to: name)
+    }
+
+    @objc func deleteSpace(_ sender: Any?) {
+        model.deleteSpace(model.selectedSpaceID)
+    }
 
     /// The selected tab, or the window when no tab is selected.
     @objc func closeTab(_ sender: Any?) {
-        if let tab = model.selectedTab { model.close(tab) } else { window?.performClose(sender) }
+        if let tabID = model.selectedTabID { model.close(tabID) } else { window?.performClose(sender) }
     }
 
     @objc func selectTab(_ sender: NSMenuItem) {
@@ -92,17 +104,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     private func tabIndex(for item: NSMenuItem) -> Int? {
-        let index = item.tag == MainMenu.lastTabTag ? model.tabs.count - 1 : item.tag - 1
-        return model.tabs.indices.contains(index) ? index : nil
+        let count = model.selectableTabs.count
+        let index = item.tag == MainMenu.lastTabTag ? count - 1 : item.tag - 1
+        return index >= 0 && index < count ? index : nil
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        switch item.action {
+        if item.action == #selector(togglePin(_:)) {
+            guard let tabID = model.selectedTabID else { return false }
+            item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"
+            return true
+        }
+        return switch item.action {
         case #selector(goBack(_:)): model.page?.canGoBack ?? false
         case #selector(goForward(_:)): model.page?.canGoForward ?? false
         case #selector(stopLoading(_:)): model.page?.isLoading ?? false
-        case #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)): !model.tabs.isEmpty
+        case #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)): !model.selectableTabs.isEmpty
         case #selector(selectTab(_:)): tabIndex(for: item) != nil
+        case #selector(deleteSpace(_:)): model.state.spaces.count > 1
         default: true
         }
     }

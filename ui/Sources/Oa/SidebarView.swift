@@ -7,13 +7,9 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(model.tabs) { tab in
-                        TabRow(tab: tab, selected: model.selectedTab === tab) {
-                            model.select(tab)
-                        } close: {
-                            model.close(tab)
-                        }
-                    }
+                    rows(model.pinnedTabs)
+                    if !model.pinnedTabs.isEmpty { Divider().padding(.vertical, 6) }
+                    rows(model.unpinnedTabs)
                 }
                 .padding(8)
             }
@@ -29,24 +25,91 @@ struct SidebarView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
+            Divider()
+            spaces
         }
         .frame(width: 220)
         .background(Color(nsColor: .windowBackgroundColor))
     }
+
+    private func rows(_ tabs: [SidebarTab]) -> some View {
+        ForEach(tabs) { tab in
+            TabRow(
+                title: tab.displayTitle, selected: model.selectedTabID == tab.id, loaded: model.pages[tab.id] != nil
+            ) {
+                model.select(tab.id)
+            } close: {
+                model.close(tab.id)
+            }
+        }
+    }
+
+    private var spaces: some View {
+        HStack(spacing: 4) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(model.state.spaces) { space in
+                        SpaceChip(name: space.name, selected: space.id == model.selectedSpaceID) {
+                            model.selectSpace(space.id)
+                        }
+                        .contextMenu {
+                            Button("Rename…") {
+                                if let name = NamePrompt.run("Rename Space", name: space.name) {
+                                    model.renameSpace(space.id, to: name)
+                                }
+                            }
+                            Button("Delete") { model.deleteSpace(space.id) }
+                                .disabled(model.state.spaces.count == 1)
+                        }
+                    }
+                }
+            }
+            Button {
+                if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .help("New Space")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+}
+
+private struct SpaceChip: View {
+    let name: String
+    let selected: Bool
+    let select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            Text(name)
+                .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(selected ? 0.12 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 private struct TabRow: View {
-    let tab: Tab
+    let title: String
     let selected: Bool
+    let loaded: Bool
     let select: () -> Void
     let close: () -> Void
     @State private var hovering = false
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(tab.title)
+            Text(title)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .foregroundStyle(loaded ? .primary : .secondary)
             Spacer(minLength: 0)
             if hovering || selected {
                 Button(action: close) {

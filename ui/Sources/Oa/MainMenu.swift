@@ -25,6 +25,8 @@ final class MainMenu {
         file.addItem(item("New Tab", #selector(BrowserWindowController.newTab(_:)), key: "t"))
         file.addItem(item("Open Location…", #selector(BrowserWindowController.openLocation(_:)), key: "l"))
         file.addItem(.separator())
+        file.addItem(item("Pin Tab", #selector(BrowserWindowController.togglePin(_:)), key: "d"))
+        file.addItem(.separator())
         file.addItem(item("Close Tab", #selector(BrowserWindowController.closeTab(_:)), key: "w"))
         file.addItem(
             item("Close Window", #selector(NSWindow.performClose(_:)), key: "w", modifiers: [.command, .shift]))
@@ -63,6 +65,11 @@ final class MainMenu {
         let last = item("Go to last Sidebar Item", #selector(BrowserWindowController.selectTab(_:)), key: "9")
         last.tag = MainMenu.lastTabTag
         tabs.addItem(last)
+
+        let spaces = submenu("Spaces", in: menu)
+        spaces.addItem(item("New Space…", #selector(BrowserWindowController.newSpace(_:))))
+        spaces.addItem(item("Rename Space…", #selector(BrowserWindowController.renameSpace(_:))))
+        spaces.addItem(item("Delete Space", #selector(BrowserWindowController.deleteSpace(_:))))
 
         let window = submenu("Window", in: menu)
         window.addItem(item("Minimize", #selector(NSWindow.performMiniaturize(_:)), key: "m"))
