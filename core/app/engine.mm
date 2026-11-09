@@ -113,6 +113,7 @@ class MainDelegate : public ChromeMainDelegate {
     State().running = false;
     PageImpl::CloseAll();
     WindowBrowser::CloseAll();
+    UnloadBrowserProfiles();
     runner->Shutdown();
     return exit_code;
   }

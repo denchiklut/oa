@@ -6,18 +6,18 @@
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_util.h"
-#include "base/functional/callback_helpers.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/delete_profile_helper.h"
-#include "chrome/browser/profiles/profile_attributes_storage.h"
-#include "chrome/browser/profiles/profile_metrics.h"
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_attributes_storage.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/profiles/profile_metrics.h"
 
 namespace oa {
 namespace {
@@ -57,8 +57,9 @@ void LoadBrowserProfile(const std::string& identifier,
     return;
   }
   entry.callbacks.push_back(std::move(ready));
-  if (!inserted)
+  if (!inserted) {
     return;
+  }
   auto* manager = g_browser_process->profile_manager();
   manager->CreateProfileAsync(
       ProfilePath(identifier),
@@ -77,8 +78,9 @@ void LoadBrowserProfile(const std::string& identifier,
             }
             entry.ready = true;
             auto callbacks = std::move(entry.callbacks);
-            for (auto& callback : callbacks)
+            for (auto& callback : callbacks) {
               std::move(callback).Run(profile);
+            }
           },
           identifier));
 }
@@ -117,5 +119,15 @@ void DeleteBrowserProfile(const std::string& identifier) {
   // if it can, else at the next launch (CleanUpDeletedProfiles).
   manager->GetDeleteProfileHelper().MaybeScheduleProfileForDeletion(
       path, base::DoNothing(), ProfileMetrics::DELETE_PROFILE_SETTINGS);
+}
+
+void UnloadBrowserProfiles() {
+  auto entries = std::move(Entries());
+  Entries().clear();
+  for (auto& [identifier, entry] : entries) {
+    for (auto& callback : entry.callbacks) {
+      std::move(callback).Run(nullptr);
+    }
+  }
 }
 }  // namespace oa
