@@ -7,6 +7,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     private let store: SidebarStore
     private var windows: [BrowserWindowController] = []
     private var mainMenu: MainMenu?
+    private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
     private static var current: ApplicationDelegate?
 
     static func start(engine: any BrowserApplication) {
@@ -47,6 +48,28 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func newWindow(_ sender: Any?) { openWindow() }
+    @objc func restoreData(_ sender: Any?) { restoreData.show() }
+
+    /// Quits and opens the bundle again once this process is gone, with the engine and data directory it was
+    /// given, as Arc does after a restore.
+    private static func relaunch() {
+        let environment = ProcessInfo.processInfo.environment
+        var open = ["open", "-n", Bundle.main.bundlePath]
+        for key in ["OA_DATA_DIRECTORY", "OA_ENGINE"] {
+            if let value = environment[key] { open += ["--env", "\(key)=\(value)"] }
+        }
+        let shell = Process()
+        shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+        shell.arguments =
+            [
+                "-c",
+                "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.1; done; exec \"$@\"",
+                "sh",
+            ]
+            + open
+        try? shell.run()
+        NSApplication.shared.terminate(nil)
+    }
 
     /// A new window opens on the key window's Space. A restored one brings its own selection.
     private func openWindow(restoring record: WindowRecord? = nil) {

@@ -193,6 +193,8 @@ struct SidebarState {
 
     func profile(_ id: UUID) -> SidebarProfile? { profiles.first { $0.id == id } }
 
+    var tabCount: Int { tree.items.values.filter { $0.tab != nil }.count }
+
     func space(_ id: UUID) -> SidebarSpace? { spaces.first { $0.id == id } }
 
     func space(containing tabID: UUID) -> SidebarSpace? {

@@ -85,6 +85,10 @@ final class MainMenu {
         window.addItem(item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:))))
         application.windowsMenu = window
 
+        let help = submenu("Help", in: menu)
+        help.addItem(item("Restore Data…", #selector(ApplicationDelegate.restoreData(_:))))
+        application.helpMenu = help
+
         application.mainMenu = menu
     }
 
