@@ -24,6 +24,7 @@ typedef NS_ENUM(NSInteger, OAPageOpenDisposition) {
     didOpenPage:(OAPage*)openedPage
       targetURL:(nullable NSURL*)targetURL
     disposition:(OAPageOpenDisposition)disposition;
+- (void)pageWantsActivation:(OAPage*)page;
 - (void)pageDidClose:(OAPage*)page;
 @end
 

@@ -15,6 +15,7 @@
 - (void)pageOpenedPage:(std::unique_ptr<oa::Page>)page
              targetURL:(const std::string&)url
            disposition:(oa::OpenDisposition)disposition;
+- (void)pageWantsActivation;
 - (void)pageClosed;
 @end
 
@@ -59,6 +60,7 @@ class PageObserverBridge : public oa::Page::Observer {
                 targetURL:target_url
               disposition:disposition];
   }
+  void OnPageWantsActivation() override { [page_ pageWantsActivation]; }
   void OnPageClosed() override { [page_ pageClosed]; }
 
  private:
@@ -205,6 +207,10 @@ class PageObserverBridge : public oa::Page::Observer {
           didOpenPage:opened
             targetURL:url.empty() ? nil : [NSURL URLWithString:ToNSString(url)]
           disposition:ToDisposition(disposition)];
+}
+
+- (void)pageWantsActivation {
+  [self.delegate pageWantsActivation:self];
 }
 
 - (void)pageClosed {

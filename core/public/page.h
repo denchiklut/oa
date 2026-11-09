@@ -27,6 +27,7 @@ class Page {
     virtual void OnPageOpenedPage(std::unique_ptr<Page> page,
                                   const std::string& target_url,
                                   OpenDisposition disposition) = 0;
+    virtual void OnPageWantsActivation() = 0;
     virtual void OnPageClosed() = 0;
 
    protected:

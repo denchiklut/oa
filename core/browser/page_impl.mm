@@ -407,7 +407,11 @@ content::WebContents* PageImpl::AddNewContents(
   return page;
 }
 
-void PageImpl::ActivateContents(content::WebContents* contents) {}
+void PageImpl::ActivateContents(content::WebContents* contents) {
+  if (observer_) {
+    observer_->OnPageWantsActivation();
+  }
+}
 
 void PageImpl::NavigationStateChanged(content::WebContents* source,
                                       content::InvalidateTypes changed_flags) {
