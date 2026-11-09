@@ -21,12 +21,12 @@ struct BrowserWindowView: View {
                 }
             }
         }
-        .onChange(of: model.page?.url) { _, url in
+        .onChange(of: model.address) { _, url in
             if !editing || address.isEmpty { address = url?.absoluteString ?? "" }
         }
         .onChange(of: model.selectedTabID) { _, _ in
-            address = model.page?.url?.absoluteString ?? ""
-            if model.page?.url == nil { addressFocused = true }
+            address = model.address?.absoluteString ?? ""
+            if model.address == nil { addressFocused = true }
         }
         .onChange(of: model.page?.id) { _, _ in
             DispatchQueue.main.async {
@@ -45,10 +45,10 @@ struct BrowserWindowView: View {
         }
         .onChange(of: addressFocused) { _, focused in
             editing = focused
-            if !focused { address = model.page?.url?.absoluteString ?? "" }
+            if !focused { address = model.address?.absoluteString ?? "" }
         }
         .onAppear {
-            address = model.page?.url?.absoluteString ?? ""
+            address = model.address?.absoluteString ?? ""
             if model.page == nil { addressFocused = true }
         }
     }

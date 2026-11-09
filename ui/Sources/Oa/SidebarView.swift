@@ -34,7 +34,7 @@ struct SidebarView: View {
 
     private func rows(_ tabs: [SidebarTab]) -> some View {
         ForEach(tabs) { tab in
-            TabRow(title: tab.displayTitle, selected: model.selectedTabID == tab.id) {
+            TabRow(title: model.title(for: tab), selected: model.selectedTabID == tab.id) {
                 model.select(tab.id)
             } close: {
                 model.close(tab.id)

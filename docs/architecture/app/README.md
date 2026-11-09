@@ -24,7 +24,9 @@ root. Tree nodes are containers, tabs, folders and split views; only containers
 and tabs are implemented. A tab entry takes its tab's ID, so pinning is a move
 to the end of the other section and the entry keeps its identity. A tab record
 saves a title and a URL. A live page writes both back; a pinned tab keeps its
-address and takes the title only.
+address and takes the title only while the page is at it. While the page is
+elsewhere the row reads "/ live title", as in Arc, and goes back to the pinned
+title once the page is gone.
 
 One `SidebarStore` holds the state and the open windows. Every change goes
 through `edit`, after which each window reconciles its selection and drops pages
@@ -51,11 +53,12 @@ can't be deleted.
 
 Only the only window selects a tab when it opens: the first unpinned, else the
 first pinned. A further window opens on the key window's Space with nothing
-selected and the address field focused. A selected tab without a page shows the
-window background; Arc shows Chromium's blank view there, which isn't worth
-copying. A sidebar row looks the same whether its page exists or not, as in Arc.
-Restoring each window's selected tab on relaunch is a deliberate difference:
-Arc restores no selection and opens its command bar.
+selected and the address field focused. A restored window comes back the same
+way, on its saved Space with nothing selected and no page, as Arc does. A
+selected tab without a page shows the window background and its saved URL in
+the address field; Arc shows Chromium's blank view and `about:blank` there,
+which isn't worth copying. A sidebar row looks the same whether its page exists
+or not, as in Arc, and a tab with no title yet reads "Untitled".
 
 ### Files
 
@@ -71,9 +74,9 @@ lists `rootIDs` and `items` in display order. Each item has `id`, optional
 agree, every item is reachable, and each profile and Space points at roots of
 the right kind.
 
-`windows.json` carries `version` and `windows`, each with `id`,
-`selectedSpaceID` and `selectedTabIDs` keyed by Space. Saved selections that no
-longer exist are pruned on restore. Window frames are not saved.
+`windows.json` carries `version` and `windows`, each with `id` and
+`selectedSpaceID`. A saved Space that no longer exists falls back to the first.
+Window frames are not saved.
 
 A file that can't be read or has a newer `version` is kept as it is and not
 written for the rest of the launch; the app runs on the default state in memory.

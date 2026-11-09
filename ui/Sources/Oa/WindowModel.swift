@@ -24,15 +24,13 @@ final class WindowModel {
     var selectedTabID: UUID? { selectedTabIDs[selectedSpaceID] }
     var selectedTab: SidebarTab? { selectedTabID.flatMap { state.tree.tab($0) } }
     var page: (any Page)? { selectedTabID.flatMap { pages[$0] } }
+    /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
+    var address: URL? { page?.url ?? selectedTab?.url }
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }
     var selectableTabs: [SidebarTab] { state.selectableTabs(in: selectedSpaceID) }
 
-    var record: WindowRecord {
-        WindowRecord(
-            id: id, selectedSpaceID: selectedSpaceID,
-            selectedTabIDs: Dictionary(uniqueKeysWithValues: selectedTabIDs.map { ($0.key.uuidString, $0.value) }))
-    }
+    var record: WindowRecord { WindowRecord(id: id, selectedSpaceID: selectedSpaceID) }
 
     init(id: UUID, engine: any BrowserApplication, store: SidebarStore, spaceID: UUID) {
         self.id = id
@@ -41,13 +39,18 @@ final class WindowModel {
         selectedSpaceID = spaceID
     }
 
+    /// As Arc: a restored window comes back on its Space with nothing selected and no page.
     func restore(_ record: WindowRecord) {
         if state.space(record.selectedSpaceID) != nil { selectedSpaceID = record.selectedSpaceID }
-        for (key, tabID) in record.selectedTabIDs {
-            guard let spaceID = UUID(uuidString: key), state.space(containing: tabID)?.id == spaceID else { continue }
-            selectedTabIDs[spaceID] = tabID
+        focusAddressField += 1
+    }
+
+    /// A pinned tab whose page has left its address reads "/ live title", as in Arc.
+    func title(for tab: SidebarTab) -> String {
+        guard state.isPinned(tab.id), let page = pages[tab.id], let url = page.url, !tab.isAt(url) else {
+            return tab.displayTitle
         }
-        if let tabID = selectedTabID { ensurePage(tabID) } else { focusAddressField += 1 }
+        return "/ " + (page.title.isEmpty ? url.host() ?? url.absoluteString : page.title)
     }
 
     /// Only the only window picks a tab: first unpinned, else first pinned. Another window starts empty.
@@ -70,7 +73,6 @@ final class WindowModel {
         if let current = selectedTabID, pages[current] != nil { previousTabID = current }
         selectedTabIDs[selectedSpaceID] = tabID
         ensurePage(tabID)
-        store.windowStateChanged()
     }
 
     /// Wraps at either end. With no selection, forward selects the first tab and backward the last.
@@ -188,7 +190,6 @@ final class WindowModel {
             selectedTabIDs[spaceID] = next
             if let next, spaceID == selectedSpaceID { ensurePage(next) }
         }
-        store.windowStateChanged()
     }
 
     /// The tab shown before, if its page is still live. An unpinned close falls back to the tab above, else below.

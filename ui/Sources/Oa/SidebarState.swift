@@ -21,7 +21,18 @@ struct SidebarTab: Identifiable, Hashable {
     var title = ""
     var url: URL?
 
-    var displayTitle: String { title.isEmpty ? url?.host() ?? "New Tab" : title }
+    var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
+
+    /// Whether `other` is this tab's saved address, ignoring a trailing slash on a bare host.
+    func isAt(_ other: URL?) -> Bool {
+        guard let url, let other else { return false }
+        return normalized(url) == normalized(other)
+    }
+
+    private func normalized(_ url: URL) -> String {
+        let text = url.absoluteString
+        return url.path().count <= 1 && text.hasSuffix("/") ? String(text.dropLast()) : text
+    }
 }
 
 /// A node of the sidebar tree. A tab entry takes its tab's ID, so moves keep identity.
@@ -221,12 +232,12 @@ struct SidebarState {
         tree.move(tabID, toEndOf: isPinned(tabID) ? space.unpinnedRootID : space.pinnedRootID)
     }
 
-    /// Write-back from a live page. A pinned tab keeps its address and takes the title only.
+    /// Write-back from a live page. A pinned tab keeps its address and takes the title only while the page is at it.
     mutating func setSavedPage(_ tabID: UUID, title: String, url: URL?) {
         let pinned = isPinned(tabID)
         tree.update(tabID) { item in
             guard var tab = item.tab else { return }
-            if !title.isEmpty { tab.title = title }
+            if !title.isEmpty, !pinned || tab.isAt(url) { tab.title = title }
             if let url, !pinned { tab.url = url }
             item.kind = .tab(tab)
         }
