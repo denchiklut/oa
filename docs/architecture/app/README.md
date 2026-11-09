@@ -112,7 +112,28 @@ Window frames are not saved.
 Adding a key with a default, as `archive` and `viewedAt` were, doesn't bump it;
 a change an older reader would misread does. A file that can't be read or has a
 newer `version` is kept as it is and not written for the rest of the launch; the
-app runs on the default state in memory. Backups and recovery copies are
-deferred.
+app runs on the default state in memory.
+
+Before the first overwrite of `sidebar.json` each launch, the bytes the launch
+started from go to a dated copy beside it, `sidebar.YYYY-MM-DD-HH-MM-SS-mmm.json`,
+stamped in local time with the save time they hold, as Arc names its copies; the
+same bytes found again at a later launch add nothing. Arc copies at quit instead,
+which holds the same state after a clean quit and nothing after a crash. The
+copies are pruned to Arc's documented tiers: the newest 10 of today, one a day
+for the 10 days before, one a week for the month before that, one a month for
+the year before that. `windows.json` has no copies, as Arc's Restore Data offers
+only the sidebar.
+
+Help ▸ Restore Data… lists the copies newest first, each with its date and time to
+the second and its tab and Space counts, and once one is chosen whether it can
+be read and a preview of its Spaces and tabs; Arc's rows carry only a short date
+and time, and its preview is one flat list of URLs. Restore asks for a
+confirmation that names the copy and the current sidebar; Arc asks nothing.
+Then, as Arc does, the current state is saved and kept as a copy, so the restore
+is undoable from the same list, the copy's bytes replace `sidebar.json`, nothing
+is saved after, and the app quits and opens itself again on the restored file.
+Windows come back as after any relaunch, on their Spaces with nothing selected;
+Arc comes back with one fresh window. A file that couldn't be read at launch is
+recovered the same way.
 
 Return to the [system overview](../README.md).
