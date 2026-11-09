@@ -4,7 +4,8 @@ Oa is an independent native macOS browser project built around Chromium.
 This repository contains the architecture and feature documentation, the Chromium
 build setup, and the first vertical slices through all four layers: native windows
 over a saved sidebar of Spaces with pinned and unpinned tabs, each a Chromium page
-created when first shown and moved to whichever window shows it, with a URL field,
+created when first shown and moved to whichever window shows it, its favicon in
+its row, with a URL field,
 back, forward, reload and stop, an Archive that closed tabs go to and come back
 from, dated copies of the sidebar that Help ▸ Restore Data brings back, and
 pages a page opens, kept as the engine made them and placed below their opener,

@@ -116,7 +116,13 @@ way, on its saved Space with nothing selected and no page, as Arc does. A
 selected tab without a page shows the window background and its saved URL in
 the address field; Arc shows Chromium's blank view and `about:blank` there,
 which isn't worth copying. A sidebar row looks the same whether its page exists
-or not, as in Arc, and a tab with no title yet reads "Untitled".
+or not, as in Arc, and a tab with no title yet reads "Untitled". The row starts
+with the favicon Chromium's favicon driver chose for the live page, wherever
+the page lives, else an empty tile, as Arc's rows do. Arc also shows the saved
+favicon of a tab without a page; that needs a favicon cache Oa doesn't keep
+yet, so such a row has the empty tile. The page also carries Chromium's
+security level for its visible URL, neutral, secure, warning or dangerous,
+which nothing shows yet.
 
 ### Files
 
@@ -137,7 +143,7 @@ right kind, and no archived tab is also in the tree.
 
 `windows.json` carries `version` and `windows`, each with `id` and
 `selectedSpaceID`. A saved Space that no longer exists falls back to the first.
-Window frames are not saved.
+Window frames are not saved. Favicons are not saved either.
 
 `version` is a format number, as Arc's own stores carry at their top level.
 Adding a key with a default, as `archive`, `viewedAt` and `openerID` were,

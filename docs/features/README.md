@@ -9,6 +9,7 @@ detailed behavior, acceptance criteria and prioritization come later.
 
 - **Arc ✅**: a documented or UI-observed Arc **macOS desktop** capability, not a
   runtime or service-availability guarantee. Explicitly retired features are separated below.
+- **Oa ✅**: implemented in Oa and verified on the live engine.
 - **Oa ☐**: unchecked and not yet assessed. Every Oa entry intentionally starts
   unchecked, regardless of any existing implementation; this is not a claim that
   the feature is missing.
@@ -219,7 +220,7 @@ Sources: Arc native Settings → Links and [2023 release notes][arc23].
 | Force Refresh | ✅ | ☐ |
 | Clear Cookies and Refresh | ✅ | ☐ |
 | Clear Cache and Refresh | ✅ | ☐ |
-| Live page titles, URLs, favicons and loading indicators | ✅ | ☐ |
+| Live page titles, URLs, favicons and loading indicators | ✅ | ✅ |
 | Find in page | ✅ | ☐ |
 | Page zoom | ✅ | ☐ |
 | Print and Save as PDF | ✅ | ☐ |
