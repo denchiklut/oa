@@ -296,6 +296,10 @@ void PageImpl::Activate() {
   }
 }
 
+void PageImpl::SetKeepsAddress(bool keeps_address) {
+  keeps_address_ = keeps_address;
+}
+
 void PageImpl::MoveToWindow(const std::string& window_id) {
   content::WebContents* contents = web_contents();
   if (!contents || !window_browser_) {

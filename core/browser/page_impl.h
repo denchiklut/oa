@@ -40,6 +40,7 @@ class PageImpl : public Page,
 
   void Rebind(content::WebContents* new_contents);
   void OnRemovedFromStrip();
+  bool keeps_address() const { return keeps_address_; }
 
   // Page:
   void SetObserver(Page::Observer* observer) override;
@@ -58,6 +59,7 @@ class PageImpl : public Page,
   void Reload() override;
   void Stop() override;
   void Activate() override;
+  void SetKeepsAddress(bool keeps_address) override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
   void Close() override;
@@ -119,6 +121,7 @@ class PageImpl : public Page,
   base::WeakPtr<WindowBrowser> window_browser_;
   raw_ptr<Page::Observer> observer_;
   bool closing_ = false;
+  bool keeps_address_ = false;
   double load_progress_ = 0;
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>

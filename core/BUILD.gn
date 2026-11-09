@@ -3,10 +3,14 @@
 source_set("oa") {
   sources = [
     "app/engine.mm",
+    "browser/browser_client.cc",
+    "browser/browser_client.h",
     "browser/forwarding_web_contents_delegate.cc",
     "browser/forwarding_web_contents_delegate.h",
     "browser/page_impl.h",
     "browser/page_impl.mm",
+    "browser/kept_address_throttle.cc",
+    "browser/kept_address_throttle.h",
     "browser/profile_services.cc",
     "browser/profile_services.h",
     "browser/ui/browser_window_impl.h",
