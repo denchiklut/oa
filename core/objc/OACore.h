@@ -48,7 +48,7 @@ typedef NS_ENUM(NSInteger, OAPageSecurityLevel) {
 // Nil until Chromium's favicon driver has an icon for the page.
 @property(nonatomic, readonly, nullable) NSImage* favicon;
 @property(nonatomic, readonly) OAPageSecurityLevel securityLevel;
-// Cross-origin link clicks open a new page instead of navigating this one.
+// Links to another host open a new page instead of navigating this one.
 @property(nonatomic) BOOL keepsAddress;
 - (instancetype)init NS_UNAVAILABLE;
 - (void)loadURL:(NSURL*)url;
