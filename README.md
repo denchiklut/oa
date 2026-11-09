@@ -5,8 +5,8 @@ This repository contains the architecture and feature documentation, the Chromiu
 build setup, and the first vertical slices through all four layers: native windows
 over a saved sidebar of Spaces with pinned and unpinned tabs, each a Chromium page
 created when first shown and moved to whichever window shows it, with a URL field,
-back, forward, reload and stop, and an Archive that closed tabs go to and come
-back from.
+back, forward, reload and stop, an Archive that closed tabs go to and come back
+from, and dated copies of the sidebar that Help ▸ Restore Data brings back.
 
 Start with the [architecture](docs/architecture/README.md). The
 current chapters document Chromium, Core's native integration and DevKit's Swift
