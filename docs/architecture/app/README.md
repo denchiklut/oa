@@ -123,11 +123,12 @@ navigation reaches the page's `OpenURLFromTab`, where one to another host
 becomes a new page, reported like any opened page, and the rest navigate in
 place. Hosts, not origins: Arc peeks `example.com` → `www.example.com` and
 navigates an http → https change in place. Script navigations without a
-gesture peek too, as Arc's do; a redirect to another host follows in place,
-since the decision is made once at the start. Arc keeps form submissions in
-place; Oa keeps POST forms in place but a GET form to another host peeks,
-because Chromium hands a GET form to the browser as a plain link. The port and
-Arc's exclusions for meeting-join links are untested.
+gesture peek too, as Arc's do; a server redirect to another host follows in
+place, since the decision is made once at the start. Form submissions, client
+redirects such as `location.replace` and blank loads never leave the renderer:
+Chromium's own check hands all of them over, and patch 0006 adds the
+exclusions Arc's renderer has. The port and Arc's exclusions for meeting-join
+links are untested.
 
 The Peek is a view in the window, not a window of its own, with Arc's measured
 geometry: its page is 80% of the content area's width by the height minus
