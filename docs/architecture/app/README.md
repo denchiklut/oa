@@ -51,9 +51,11 @@ can't be deleted.
 
 Only the only window selects a tab when it opens: the first unpinned, else the
 first pinned. A further window opens on the key window's Space with nothing
-selected and the address field focused. Product decision until the Arc research
-lands: a selected tab without a page shows the window background, and an
-unloaded tab's row is dimmed.
+selected and the address field focused. A selected tab without a page shows the
+window background; Arc shows Chromium's blank view there, which isn't worth
+copying. A sidebar row looks the same whether its page exists or not, as in Arc.
+Restoring each window's selected tab on relaunch is a deliberate difference:
+Arc restores no selection and opens its command bar.
 
 ### Files
 
