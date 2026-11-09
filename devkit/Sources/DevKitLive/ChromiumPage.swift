@@ -15,6 +15,9 @@ final class ChromiumPage: Page {
     private(set) var canGoForward = false
     private(set) var favicon: NSImage?
     private(set) var securityLevel = SecurityLevel.neutral
+    var keepsAddress = false {
+        didSet { page?.keepsAddress = keepsAddress }
+    }
     let events: AsyncStream<PageEvent>
 
     @ObservationIgnored private var page: CorePage?

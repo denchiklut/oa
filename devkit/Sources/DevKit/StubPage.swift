@@ -21,6 +21,7 @@ final class StubPage: Page {
         default: .neutral
         }
     }
+    var keepsAddress = false
     let events: AsyncStream<PageEvent>
 
     private var history: [URL] = []
@@ -88,7 +89,7 @@ final class StubPage: Page {
         continuation = nil
     }
 
-    func open(inBackground: Bool) {
+    func open(_ disposition: OpenDisposition) {
         guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
         StubPage.openedCount += 1
         components.path = "/opened-\(StubPage.openedCount)"
@@ -96,7 +97,23 @@ final class StubPage: Page {
         guard let target = components.url else { return }
         let opened = StubPage(id: UUID())
         opened.load(target)
-        continuation?.yield(.opened(opened, url: target, disposition: inBackground ? .backgroundTab : .foregroundTab))
+        continuation?.yield(.opened(opened, url: target, disposition: disposition))
+    }
+
+    func clickCrossOriginLink() {
+        guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        components.host = "other." + (components.host ?? "stub")
+        components.path = "/linked"
+        guard let target = components.url else { return }
+        guard keepsAddress else { return load(target) }
+        let opened = StubPage(id: UUID())
+        opened.load(target)
+        continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab))
+    }
+
+    func closeItself() {
+        continuation?.yield(.closed)
+        drop()
     }
 
     func askForFocus() {
@@ -174,10 +191,17 @@ private struct StubPageView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
             if page.url != nil {
-                HStack(spacing: 16) {
-                    Button("Open a page") { page.open(inBackground: false) }
-                    Button("Open in background") { page.open(inBackground: true) }
-                    Button("Ask for focus in 3 s") { page.askForFocus() }
+                VStack(spacing: 8) {
+                    HStack(spacing: 16) {
+                        Button("Open a page") { page.open(.foregroundTab) }
+                        Button("Open in background") { page.open(.backgroundTab) }
+                        Button("Shift-click a link") { page.open(.newWindow) }
+                    }
+                    HStack(spacing: 16) {
+                        Button("Click a cross-origin link") { page.clickCrossOriginLink() }
+                        Button("Ask for focus in 3 s") { page.askForFocus() }
+                        Button("Close itself") { page.closeItself() }
+                    }
                 }
                 .buttonStyle(.link)
                 .font(.system(size: 12))
