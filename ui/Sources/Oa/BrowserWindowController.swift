@@ -32,6 +32,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.contentViewController = content
         window.setContentSize(NSSize(width: 1100, height: 760))
         window.delegate = self
+        model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
     }
 
     @available(*, unavailable)

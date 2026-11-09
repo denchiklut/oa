@@ -7,7 +7,8 @@ over a saved sidebar of Spaces with pinned and unpinned tabs, each a Chromium pa
 created when first shown and moved to whichever window shows it, with a URL field,
 back, forward, reload and stop, an Archive that closed tabs go to and come back
 from, dated copies of the sidebar that Help ▸ Restore Data brings back, and
-pages a page opens, kept as the engine made them and placed below their opener.
+pages a page opens, kept as the engine made them and placed below their opener,
+which come forward when they ask to be shown.
 
 Start with the [architecture](docs/architecture/README.md). The
 current chapters document Chromium, Core's native integration and DevKit's Swift
