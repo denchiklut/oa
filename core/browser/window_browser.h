@@ -43,11 +43,7 @@ class WindowBrowser : public TabStripModelObserver {
   gfx::NativeWindow GetNativeWindow() const;
 
   bool Insert(std::unique_ptr<content::WebContents> contents);
-  // Takes the tab out of the strip for another window's. Null if it isn't
-  // here.
   std::unique_ptr<tabs::TabModel> Detach(content::WebContents* contents);
-  // Appends a tab detached from another strip, active only if the strip was
-  // empty. False if the Browser is closing.
   bool InsertDetached(std::unique_ptr<tabs::TabModel> tab);
   void Activate(content::WebContents* contents);
   bool Close(content::WebContents* contents);

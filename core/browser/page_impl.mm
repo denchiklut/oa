@@ -246,8 +246,7 @@ void PageImpl::Snapshot(SnapshotCallback callback) {
     callback(nullptr);
     return;
   }
-  // The whole page at its drawn size. The result can arrive on another
-  // sequence, so it comes back to this one.
+  // The result can arrive on another sequence.
   view->CopyFromSurface(
       gfx::Rect(), gfx::Size(), base::Seconds(2),
       base::BindPostTaskToCurrentDefault(base::BindOnce(

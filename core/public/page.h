@@ -8,8 +8,7 @@ namespace oa {
 
 class Page {
  public:
-  // Receives the page's last frame as an NSImage, or null if none could be
-  // copied. The image lives only for the call.
+  // The NSImage lives only for the call; null if nothing could be copied.
   using SnapshotCallback = std::function<void(void* ns_image)>;
 
   class Observer {
@@ -37,11 +36,10 @@ class Page {
   virtual void Reload() = 0;
   virtual void Stop() = 0;
   virtual void Activate() = 0;
-  // Moves the page into the Browser of the app's window `window_id`, keeping
-  // its WebContents, history and session ID. Nothing happens if it is there.
+  // The same tab, WebContents and history move; nothing happens if it is there.
   virtual void MoveToWindow(const std::string& window_id) = 0;
-  // Copies the page's last frame, for the window it left. Fails while the
-  // page has nothing drawn, for example when no window shows it.
+  // Fails while the page has nothing drawn, for example when no window shows
+  // it.
   virtual void Snapshot(SnapshotCallback callback) = 0;
   // Closes as the user would: unload handlers run and Chrome records the tab.
   virtual void Close() = 0;
