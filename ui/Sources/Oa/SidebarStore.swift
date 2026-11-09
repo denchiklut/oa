@@ -63,8 +63,22 @@ final class SidebarStore {
         scheduleSave()
     }
 
+    var backups: [SidebarBackup] { persistence.backups() }
+
+    func read(_ backup: SidebarBackup) throws -> SidebarState { try persistence.read(backup) }
+
+    /// The current state is saved and kept as a copy, then the backup's bytes replace the file and nothing is
+    /// saved after, so the relaunch starts from them.
+    func restore(_ backup: SidebarBackup) throws {
+        save()
+        try persistence.restore(backup)
+        pendingSave?.cancel()
+        frozen = true
+    }
+
     /// The last save before quitting; nothing is written after it.
     func saveAndFreeze() {
+        guard !frozen else { return }
         pendingSave?.cancel()
         save()
         frozen = true
