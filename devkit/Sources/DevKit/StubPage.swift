@@ -80,7 +80,6 @@ final class StubPage: Page {
         continuation = nil
     }
 
-    /// What a page's link or `window.open` does on the live engine: a page in the background, loading already.
     func open(inBackground: Bool) {
         guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
         StubPage.openedCount += 1

@@ -10,7 +10,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class OAPage;
 
-// How a page asked for another page to open.
 typedef NS_ENUM(NSInteger, OAPageOpenDisposition) {
   OAPageOpenDispositionForegroundTab,
   OAPageOpenDispositionBackgroundTab,
@@ -20,9 +19,7 @@ typedef NS_ENUM(NSInteger, OAPageOpenDisposition) {
 
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
-// The page opened another page, already a tab in its window with its opener
-// kept and its load started. `openedPage` has no delegate yet; releasing it
-// drops the page.
+// `openedPage` has no delegate yet; releasing it drops the page.
 - (void)page:(OAPage*)page
     didOpenPage:(OAPage*)openedPage
       targetURL:(nullable NSURL*)targetURL
