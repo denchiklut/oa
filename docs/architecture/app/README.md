@@ -115,13 +115,19 @@ can't pull the selection to itself from the background.
 A Peek shows a page over the window as part of the tab it was opened from, as
 Arc does: a pinned tab's cross-origin link clicks, `target=_blank` links,
 `window.open` calls and sized popups, and a Shift-click on a link in any tab,
-which Chromium reports as a new-window open. Same-origin clicks navigate the
+which Chromium reports as a new-window open. Same-host links navigate the
 pinned tab in place. The pinned tab's page is marked as keeping its address
-through DevKit, and Core redirects the click: a navigation throttle on a
-renderer-initiated, gestured, main-frame link navigation to another origin
-cancels it and opens the URL as a new page, reported like any opened page.
-Only clicks are redirected; a cross-origin `location` change from script still
-navigates the pinned page, which Arc wasn't tested for.
+through DevKit, and Core does what Arc does: it sets Chromium's renderer
+preference that hands every top-level navigation to the browser, so the
+navigation reaches the page's `OpenURLFromTab`, where one to another host
+becomes a new page, reported like any opened page, and the rest navigate in
+place. Hosts, not origins: Arc peeks `example.com` → `www.example.com` and
+navigates an http → https change in place. Script navigations without a
+gesture peek too, as Arc's do; a redirect to another host follows in place,
+since the decision is made once at the start. Arc keeps form submissions in
+place; Oa keeps POST forms in place but a GET form to another host peeks,
+because Chromium hands a GET form to the browser as a plain link. The port and
+Arc's exclusions for meeting-join links are untested.
 
 The Peek is a view in the window, not a window of its own, with Arc's measured
 geometry: its page is 80% of the content area's width by the height minus
