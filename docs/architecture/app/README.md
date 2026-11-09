@@ -35,21 +35,48 @@ title and URL change the state without scheduling a save; they ride on the next
 one, and on the save at quit.
 
 A `WindowModel` holds the window's selected Space, a selected tab per Space, a
-one-step previous tab, and the pages it created. A page exists only once its tab
-was shown in that window, and one live page exists per tab across windows: a
-window that shows a tab held by another window takes it over, the other window
-drops its page and shows an empty area until the page moves with a snapshot (an
-engine follow-up). Pages of Spaces not shown stay alive with their views
+one-step previous tab, and the pages it holds. A page exists only once its tab
+was shown in some window, and one live page exists per tab across windows. The
+page lives in the window that last showed its tab, as in Arc: a window that
+selects a tab held by another window takes the page over through DevKit's
+`move(toWindow:)`, which Core implements by detaching the tab from one Browser's
+strip and inserting it into the other's, without unload handlers or a closed-tab
+record. Before the page leaves, the window it leaves asks for its last frame
+(`snapshot()`, a copy of the compositor surface, possible only while the page
+draws there) and, while its sidebar still marks the tab selected, shows that
+frame frozen and dimmed to 0.57 over the window background with an empty toolbar
+strip. The page also moves to a window that shows its tab when the holding
+window selects another tab, when the showing window becomes key, and when the
+holding window closes. Pages of Spaces not shown stay alive with their views
 detached, so the engine sees them as hidden. Window close and quit drop pages
 without unload handlers; the records stay.
 
-Close Tab ⌘W on an unpinned tab removes the record and closes the page as the
-user would; the window returns to the previous tab if its page is live, else the
-tab above, else below. On a pinned tab the entry stays and the page is dropped;
-the window returns to the previous live tab, else shows nothing. A page the
-engine closes on its own is treated the same way. Pin Tab ⌘D toggles the
-section. Spaces have New, Rename and Delete without shortcuts; the last Space
-can't be deleted.
+Close Tab ⌘W reads "Archive Tab" on an unpinned tab, as in Arc: the record
+leaves the tree for the Archive with the time, its Space, how it was closed and
+its index, and the page, wherever it lives, closes as the user would. The window
+returns to the previous tab if its page is live, else the tab above, else below;
+another window that had the tab selected is left with no selection. On a pinned
+tab the item reads "Close Tab", the entry stays and the page is dropped; the
+window returns to the previous live tab, else shows nothing. A page the engine
+closes on its own is archived the same way. Pin Tab ⌘D toggles the section.
+Spaces have New, Rename and Delete without shortcuts; the last Space can't be
+deleted, and deleting one archives its tabs, pinned too, after a confirmation
+when it has any. Its Archive entries stay.
+
+The Archive is a sidebar mode, as in Arc: Archive ▸ View Archive… replaces the
+sidebar with one list across Spaces, grouped by day and newest first, each row
+with the title and the scheme-less URL, Restore and Delete on hover and in a
+context menu, and the page stays live beside it. Restore puts the tab back at the
+top of its Space's unpinned section, not selected, with its page made on first
+selection from the saved URL and no history; a tab whose Space is gone returns to
+the window's Space. File ▸ Restore Last Closed Tab ⇧⌘T brings the newest entry
+back at its old index, selected, switching the window to its Space. Archive ▸
+Clear Archive empties it after a confirmation. Each tab carries the time a
+window last selected it; a sweep at launch and every 15 minutes archives
+unpinned tabs idle for 12 hours, Arc's default, unless a window has them
+selected, and there is no setting to turn it off. Arc keeps a separate
+session-only ⇧⌘T stack with engine history and asks before archiving a page whose
+`beforeunload` wants to stay; both are follow-ups.
 
 Only the only window selects a tab when it opens: the first unpinned, else the
 first pinned. A further window opens on the key window's Space with nothing
@@ -66,13 +93,16 @@ or not, as in Arc, and a tab with no title yet reads "Untitled".
 folder, as sorted pretty JSON written atomically into a `0700` directory; a save
 with unchanged bytes is skipped.
 
-`sidebar.json` carries `version`, `profiles`, `spaces` and `tree`, where `tree`
-lists `rootIDs` and `items` in display order. Each item has `id`, optional
-`parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
-`splitView`, and for a container its `container` kind, for a tab its `title` and
-`url`. Loading validates the tree: roots are containers, parents and children
-agree, every item is reachable, and each profile and Space points at roots of
-the right kind.
+`sidebar.json` carries `version`, `profiles`, `spaces`, `tree` and `archive`,
+where `tree` lists `rootIDs` and `items` in display order. Each item has `id`,
+optional `parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
+`splitView`, and for a container its `container` kind, for a tab its `title`,
+`url` and `viewedAt`. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
+`archivedAt`, a `reason` of `manual` or `auto`, and `position`. Dates are ISO
+8601. A file without `archive` or `viewedAt` reads as an empty Archive and no
+stamps. Loading validates the tree: roots are containers, parents and children
+agree, every item is reachable, each profile and Space points at roots of the
+right kind, and no archived tab is also in the tree.
 
 `windows.json` carries `version` and `windows`, each with `id` and
 `selectedSpaceID`. A saved Space that no longer exists falls back to the first.
