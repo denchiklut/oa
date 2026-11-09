@@ -12,6 +12,9 @@
 - (oa::Page::Observer*)observer;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
+- (void)pageOpenedPage:(std::unique_ptr<oa::Page>)page
+             targetURL:(const std::string&)url
+           disposition:(oa::OpenDisposition)disposition;
 - (void)pageClosed;
 @end
 
@@ -32,10 +35,30 @@ NSString* ToNSString(const std::string& string) {
              ?: @"";
 }
 
+OAPageOpenDisposition ToDisposition(oa::OpenDisposition disposition) {
+  switch (disposition) {
+    case oa::OpenDisposition::kForegroundTab:
+      return OAPageOpenDispositionForegroundTab;
+    case oa::OpenDisposition::kBackgroundTab:
+      return OAPageOpenDispositionBackgroundTab;
+    case oa::OpenDisposition::kNewWindow:
+      return OAPageOpenDispositionNewWindow;
+    case oa::OpenDisposition::kPopup:
+      return OAPageOpenDispositionPopup;
+  }
+}
+
 class PageObserverBridge : public oa::Page::Observer {
  public:
   explicit PageObserverBridge(OAPage* page) : page_(page) {}
   void OnPageStateChanged() override { [page_ pageStateChanged]; }
+  void OnPageOpenedPage(std::unique_ptr<oa::Page> page,
+                        const std::string& target_url,
+                        oa::OpenDisposition disposition) override {
+    [page_ pageOpenedPage:std::move(page)
+                targetURL:target_url
+              disposition:disposition];
+  }
   void OnPageClosed() override { [page_ pageClosed]; }
 
  private:
@@ -69,6 +92,7 @@ class PageObserverBridge : public oa::Page::Observer {
 
 - (void)setPage:(std::unique_ptr<oa::Page>)page {
   _page = std::move(page);
+  _page->SetObserver(_observer.get());
 }
 
 - (nullable NSView*)view {
@@ -170,6 +194,17 @@ class PageObserverBridge : public oa::Page::Observer {
 
 - (void)pageStateChanged {
   [self.delegate pageDidChangeState:self];
+}
+
+- (void)pageOpenedPage:(std::unique_ptr<oa::Page>)page
+             targetURL:(const std::string&)url
+           disposition:(oa::OpenDisposition)disposition {
+  OAPage* opened = [[OAPage alloc] initWithDelegate:nil];
+  [opened setPage:std::move(page)];
+  [self.delegate page:self
+          didOpenPage:opened
+            targetURL:url.empty() ? nil : [NSURL URLWithString:ToNSString(url)]
+          disposition:ToDisposition(disposition)];
 }
 
 - (void)pageClosed {

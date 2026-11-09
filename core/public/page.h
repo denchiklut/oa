@@ -2,9 +2,18 @@
 #define OA_PUBLIC_PAGE_H_
 
 #include <functional>
+#include <memory>
 #include <string>
 
 namespace oa {
+
+// How a page asked for another page to open.
+enum class OpenDisposition {
+  kForegroundTab,
+  kBackgroundTab,
+  kNewWindow,
+  kPopup,
+};
 
 class Page {
  public:
@@ -14,6 +23,12 @@ class Page {
   class Observer {
    public:
     virtual void OnPageStateChanged() = 0;
+    // The page opened another page, already a background tab in this page's
+    // Browser with its load started, with its opener, session storage and
+    // POST data kept. The observer owns it; destroying it drops it.
+    virtual void OnPageOpenedPage(std::unique_ptr<Page> page,
+                                  const std::string& target_url,
+                                  OpenDisposition disposition) = 0;
     virtual void OnPageClosed() = 0;
 
    protected:
@@ -22,6 +37,9 @@ class Page {
 
   virtual ~Page() = default;
 
+  // A page another page opened gets its observer here; one made for the app
+  // has it from creation.
+  virtual void SetObserver(Observer* observer) = 0;
   virtual void* NativeView() const = 0;
   virtual std::string VisibleURL() const = 0;
   virtual std::string Title() const = 0;

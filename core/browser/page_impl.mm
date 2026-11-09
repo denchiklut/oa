@@ -15,12 +15,16 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tab_contents/tab_util.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
+#include "content/public/browser/frame_tree_node_id.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_widget_host_view.h"
+#include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/referrer.h"
 #include "oa/browser/window_browser.h"
@@ -49,6 +53,31 @@ class PageMarker : public base::SupportsUserData::Data {
 std::set<PageImpl*>& OpenPages() {
   static base::NoDestructor<std::set<PageImpl*>> pages;
   return *pages;
+}
+
+// False for dispositions that stay in the page or open nothing the app shows,
+// such as picture-in-picture.
+bool ToOpenDisposition(WindowOpenDisposition disposition,
+                       OpenDisposition* result) {
+  switch (disposition) {
+    case WindowOpenDisposition::NEW_FOREGROUND_TAB:
+    case WindowOpenDisposition::SINGLETON_TAB:
+    case WindowOpenDisposition::SWITCH_TO_TAB:
+      *result = OpenDisposition::kForegroundTab;
+      return true;
+    case WindowOpenDisposition::NEW_BACKGROUND_TAB:
+      *result = OpenDisposition::kBackgroundTab;
+      return true;
+    case WindowOpenDisposition::NEW_WINDOW:
+    case WindowOpenDisposition::OFF_THE_RECORD:
+      *result = OpenDisposition::kNewWindow;
+      return true;
+    case WindowOpenDisposition::NEW_POPUP:
+      *result = OpenDisposition::kPopup;
+      return true;
+    default:
+      return false;
+  }
 }
 
 }  // namespace
@@ -102,6 +131,19 @@ bool PageImpl::Insert(std::unique_ptr<content::WebContents> contents) {
   return true;
 }
 
+std::unique_ptr<PageImpl> PageImpl::Wrap(
+    std::unique_ptr<content::WebContents> contents) {
+  if (!window_browser_) {
+    return nullptr;
+  }
+  std::unique_ptr<PageImpl> page(
+      new PageImpl(window_browser_.get(), /*observer=*/nullptr));
+  if (!page->Insert(std::move(contents))) {
+    return nullptr;
+  }
+  return page;
+}
+
 void PageImpl::Bind(content::WebContents* contents) {
   set_inner(contents->GetDelegate());
   contents->SetDelegate(this);
@@ -133,6 +175,10 @@ void PageImpl::OnRemovedFromStrip() {
   }
   Unbind();
   NotifyClosed();
+}
+
+void PageImpl::SetObserver(Page::Observer* observer) {
+  observer_ = observer;
 }
 
 void* PageImpl::NativeView() const {
@@ -311,7 +357,32 @@ content::WebContents* PageImpl::OpenURLFromTab(
     return ForwardingWebContentsDelegate::OpenURLFromTab(source, params,
                                                          std::move(callback));
   }
-  return nullptr;
+  // A link opened elsewhere without a page made for it, such as a ⌘-click.
+  OpenDisposition disposition;
+  if (!observer_ || !window_browser_ ||
+      !ToOpenDisposition(params.disposition, &disposition)) {
+    return nullptr;
+  }
+  Profile* profile = window_browser_->browser()->GetProfile();
+  std::unique_ptr<PageImpl> opened =
+      Wrap(content::WebContents::Create(content::WebContents::CreateParams(
+          profile, tab_util::GetSiteInstanceForNewTab(profile, params.url))));
+  if (!opened) {
+    return nullptr;
+  }
+  content::WebContents* page = opened->web_contents();
+  content::NavigationController::LoadURLParams load(params);
+  // The request's frame is the source's; the new page loads in its own.
+  load.frame_tree_node_id = content::FrameTreeNodeId();
+  load.should_replace_current_entry = false;
+  base::WeakPtr<content::NavigationHandle> navigation =
+      page->GetController().LoadURLWithParams(load);
+  if (navigation && callback) {
+    std::move(callback).Run(*navigation);
+  }
+  observer_->OnPageOpenedPage(std::move(opened), params.url.spec(),
+                              disposition);
+  return page;
 }
 
 content::WebContents* PageImpl::AddNewContents(
@@ -322,10 +393,22 @@ content::WebContents* PageImpl::AddNewContents(
     const blink::mojom::WindowFeatures& window_features,
     bool user_gesture,
     bool* was_blocked) {
-  if (was_blocked) {
-    *was_blocked = true;
+  // Contents the page made, as with window.open(). Window features are
+  // ignored, as Arc does: the page becomes a tab whatever size it asked for.
+  OpenDisposition open_disposition;
+  if (!observer_ || !ToOpenDisposition(disposition, &open_disposition)) {
+    return nullptr;
   }
-  return nullptr;
+  content::WebContents* page = new_contents.get();
+  std::unique_ptr<PageImpl> opened = Wrap(std::move(new_contents));
+  if (!opened) {
+    return nullptr;
+  }
+  observer_->OnPageOpenedPage(
+      std::move(opened),
+      target_url.is_valid() ? target_url.spec() : std::string(),
+      open_disposition);
+  return page;
 }
 
 void PageImpl::ActivateContents(content::WebContents* contents) {}
@@ -347,9 +430,9 @@ void PageImpl::LoadingStateChanged(content::WebContents* source,
 }
 
 void PageImpl::CloseContents(content::WebContents* source) {
-  if (closing_) {
-    ForwardingWebContentsDelegate::CloseContents(source);
-  }
+  // The page closed itself, as with window.close(), or its unload handlers
+  // let a close through. Chrome closes the tab; the strip reports it closed.
+  ForwardingWebContentsDelegate::CloseContents(source);
 }
 
 content::JavaScriptDialogManager* PageImpl::GetJavaScriptDialogManager(
