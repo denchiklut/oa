@@ -1,0 +1,52 @@
+# OaCore: the engine side of Oa, linked into Chromium's framework by
+# chromium/patches, which also exports OACoreMain.
+source_set("oa") {
+  sources = [
+    "app/engine.mm",
+    "browser/forwarding_web_contents_delegate.cc",
+    "browser/forwarding_web_contents_delegate.h",
+    "browser/page_impl.h",
+    "browser/page_impl.mm",
+    "browser/profile_services.cc",
+    "browser/profile_services.h",
+    "browser/ui/browser_window_impl.h",
+    "browser/ui/browser_window_impl.mm",
+    "browser/ui/permission_prompt_impl.cc",
+    "browser/ui/permission_prompt_impl.h",
+    "browser/ui/side_panel_ui_impl.cc",
+    "browser/ui/side_panel_ui_impl.h",
+    "browser/window_browser.h",
+    "browser/window_browser.mm",
+    "objc/OACore.h",
+    "objc/OACore.mm",
+    "public/engine.h",
+    "public/page.h",
+  ]
+
+  # ChromeMainDelegate's sources live in //chrome:chrome_dll, which links this
+  # target; its headers aren't reachable through a GN dependency.
+  check_includes = false
+
+  deps = [
+    "//base",
+    "//chrome/browser",
+    "//chrome/browser:chrome_browser_application_mac",
+    "//chrome/browser/profiles:profile",
+    "//chrome/common",
+    "//chrome/common:buildflags",
+    "//components/input",
+    "//components/keep_alive_registry",
+    "//components/permissions",
+    "//components/security_interstitials/core",
+    "//components/web_modal",
+    "//content/public/app",
+    "//content/public/browser",
+    "//content/public/common",
+    "//third_party/blink/public/common",
+    "//ui/base",
+    "//ui/gfx",
+    "//url",
+  ]
+
+  frameworks = [ "AppKit.framework" ]
+}
