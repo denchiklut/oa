@@ -254,8 +254,10 @@ final class WindowModel {
         }
     }
 
-    /// The tab shown before, if its page is still live. An unpinned close falls back to the tab above, else below.
+    /// A tab with an opener hands over within its group, as in Arc. Otherwise the tab shown before, if its page is
+    /// still live; an unpinned close then falls back to the tab above, else below.
     private func nextSelection(closing tabID: UUID, pinned: Bool, in spaceID: UUID) -> UUID? {
+        if let successor = state.openerSuccessor(of: tabID) { return successor }
         if let previousTabID, previousTabID != tabID, pages[previousTabID] != nil,
             state.space(containing: previousTabID)?.id == spaceID
         {
@@ -330,8 +332,25 @@ final class WindowModel {
         pages[tabID] = page
         observe(page, for: tabID)
         events[tabID] = Task { [weak self] in
-            for await event in page.events where event == .closed { self?.pageEnded(tabID) }
+            for await event in page.events {
+                switch event {
+                case .opened(let opened, let url, let disposition):
+                    self?.place(opened, url: url, disposition: disposition, from: tabID)
+                case .closed:
+                    self?.pageEnded(tabID)
+                }
+            }
         }
+    }
+
+    /// A page this tab's page opened becomes a tab below it, as in Arc, selected unless it opened in the background.
+    /// Its page is live already, wherever it lands. With the opener gone, the page is dropped.
+    private func place(_ page: any Page, url: URL?, disposition: OpenDisposition, from openerID: UUID) {
+        guard let space = state.space(containing: openerID) else { return page.drop() }
+        let tab = SidebarTab(id: page.id, url: url, viewedAt: .now, openerID: openerID)
+        store.edit { $0.openTab(tab, from: openerID) }
+        install(page, for: tab.id)
+        if disposition != .backgroundTab, space.id == selectedSpaceID { select(tab.id) }
     }
 
     private func observe(_ page: any Page, for tabID: UUID) {
