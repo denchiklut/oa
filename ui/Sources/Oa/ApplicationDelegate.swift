@@ -39,7 +39,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        for window in windows { window.closePage() }
+        for window in windows { window.closeAllTabs() }
         engine.terminate()
         return .terminateLater
     }

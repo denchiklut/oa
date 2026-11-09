@@ -2,6 +2,8 @@ import AppKit
 
 @MainActor
 final class MainMenu {
+    static let lastTabTag = 9
+
     func install(in application: NSApplication) {
         let menu = NSMenu()
         let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa"
@@ -20,9 +22,12 @@ final class MainMenu {
 
         let file = submenu("File", in: menu)
         file.addItem(item("New Window", #selector(ApplicationDelegate.newWindow(_:)), key: "n"))
+        file.addItem(item("New Tab", #selector(BrowserWindowController.newTab(_:)), key: "t"))
         file.addItem(item("Open Location…", #selector(BrowserWindowController.openLocation(_:)), key: "l"))
         file.addItem(.separator())
-        file.addItem(item("Close Window", #selector(NSWindow.performClose(_:)), key: "w"))
+        file.addItem(item("Close Tab", #selector(BrowserWindowController.closeTab(_:)), key: "w"))
+        file.addItem(
+            item("Close Window", #selector(NSWindow.performClose(_:)), key: "w", modifiers: [.command, .shift]))
 
         let edit = submenu("Edit", in: menu)
         edit.addItem(item("Undo", Selector(("undo:")), key: "z"))
@@ -40,6 +45,24 @@ final class MainMenu {
         let history = submenu("History", in: menu)
         history.addItem(item("Back", #selector(BrowserWindowController.goBack(_:)), key: "["))
         history.addItem(item("Forward", #selector(BrowserWindowController.goForward(_:)), key: "]"))
+
+        let tabs = submenu("Tabs", in: menu)
+        let next = #selector(BrowserWindowController.selectNextTab(_:))
+        let previous = #selector(BrowserWindowController.selectPreviousTab(_:))
+        tabs.addItem(item("Next Tab", next, key: "}"))
+        tabs.addItem(item("Next Tab (Alternate)", next, key: "\u{F701}", modifiers: [.command, .option]))
+        tabs.addItem(item("Previous Tab", previous, key: "{"))
+        tabs.addItem(item("Previous Tab (Alternate)", previous, key: "\u{F700}", modifiers: [.command, .option]))
+        tabs.addItem(.separator())
+        for position in 1..<MainMenu.lastTabTag {
+            let go = item(
+                "Go to Sidebar Item \(position)", #selector(BrowserWindowController.selectTab(_:)), key: "\(position)")
+            go.tag = position
+            tabs.addItem(go)
+        }
+        let last = item("Go to last Sidebar Item", #selector(BrowserWindowController.selectTab(_:)), key: "9")
+        last.tag = MainMenu.lastTabTag
+        tabs.addItem(last)
 
         let window = submenu("Window", in: menu)
         window.addItem(item("Minimize", #selector(NSWindow.performMiniaturize(_:)), key: "m"))
