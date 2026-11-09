@@ -36,6 +36,9 @@ public protocol Page: AnyObject, Observable {
     var loadProgress: Double { get }
     var canGoBack: Bool { get }
     var canGoForward: Bool { get }
+    /// The icon the engine's favicon driver chose for the page, nil until it has one.
+    var favicon: NSImage? { get }
+    var securityLevel: SecurityLevel { get }
     /// Attach it only while the page is shown: a view outside a window is hidden to the engine.
     var view: NSView { get }
     var events: AsyncStream<PageEvent> { get }
@@ -72,4 +75,12 @@ public enum OpenDisposition: Sendable, Equatable {
     case backgroundTab
     case newWindow
     case popup
+}
+
+/// Chromium's security level for the page's visible URL.
+public enum SecurityLevel: Sendable, Equatable {
+    case neutral
+    case secure
+    case warning
+    case dangerous
 }

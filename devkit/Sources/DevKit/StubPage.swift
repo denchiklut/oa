@@ -13,6 +13,14 @@ final class StubPage: Page {
     private(set) var loadProgress = 1.0
     var canGoBack: Bool { position > 0 }
     var canGoForward: Bool { position < history.count - 1 }
+    private(set) var favicon: NSImage?
+    var securityLevel: SecurityLevel {
+        switch url?.scheme {
+        case "https": .secure
+        case "http": .warning
+        default: .neutral
+        }
+    }
     let events: AsyncStream<PageEvent>
 
     private var history: [URL] = []
@@ -117,7 +125,10 @@ final class StubPage: Page {
     private func finishLoading() {
         load?.cancel()
         load = nil
-        if let url { title = StubPage.title(for: url) }
+        if let url {
+            title = StubPage.title(for: url)
+            favicon = StubPage.icon(for: url)
+        }
         isLoading = false
         loadProgress = 1
     }
@@ -127,6 +138,24 @@ final class StubPage: Page {
     private static func title(for url: URL) -> String {
         guard let host = url.host()?.replacingOccurrences(of: "www.", with: "") else { return url.absoluteString }
         return url.path().count > 1 ? host + url.path() : host
+    }
+
+    private static func icon(for url: URL) -> NSImage {
+        let host = url.host()?.replacingOccurrences(of: "www.", with: "") ?? "?"
+        let hue = Double(host.unicodeScalars.reduce(0) { ($0 * 31 + Int($1.value)) % 360 }) / 360
+        let letter = String(host.prefix(1)).uppercased()
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.boldSystemFont(ofSize: 10), .foregroundColor: NSColor.white,
+        ]
+        return NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in
+            NSColor(hue: hue, saturation: 0.5, brightness: 0.7, alpha: 1).setFill()
+            NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3).fill()
+            let size = letter.size(withAttributes: attributes)
+            letter.draw(
+                at: NSPoint(x: (rect.width - size.width) / 2, y: (rect.height - size.height) / 2),
+                withAttributes: attributes)
+            return true
+        }
     }
 }
 

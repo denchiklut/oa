@@ -25,6 +25,8 @@ import AppKit
     var loadProgress: Double { get }
     var canGoBack: Bool { get }
     var canGoForward: Bool { get }
+    var favicon: NSImage? { get }
+    var securityLevel: Int { get }
     @objc(loadURL:) func load(_ url: URL)
     func goBack()
     func goForward()
