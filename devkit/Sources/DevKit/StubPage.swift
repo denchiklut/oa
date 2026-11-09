@@ -59,6 +59,20 @@ final class StubPage: Page {
 
     func activate() {}
 
+    /// The placeholder view shows wherever the app puts it, so nothing moves.
+    func move(toWindow windowID: UUID) {}
+
+    func snapshot() async -> NSImage? {
+        let view = hostingView
+        guard view.bounds.width > 0, view.bounds.height > 0,
+            let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+        else { return nil }
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        let image = NSImage(size: view.bounds.size)
+        image.addRepresentation(bitmap)
+        return image
+    }
+
     func close() { drop() }
 
     func drop() {
