@@ -34,9 +34,7 @@ struct SidebarView: View {
 
     private func rows(_ tabs: [SidebarTab]) -> some View {
         ForEach(tabs) { tab in
-            TabRow(
-                title: tab.displayTitle, selected: model.selectedTabID == tab.id, loaded: model.pages[tab.id] != nil
-            ) {
+            TabRow(title: tab.displayTitle, selected: model.selectedTabID == tab.id) {
                 model.select(tab.id)
             } close: {
                 model.close(tab.id)
@@ -99,7 +97,6 @@ private struct SpaceChip: View {
 private struct TabRow: View {
     let title: String
     let selected: Bool
-    let loaded: Bool
     let select: () -> Void
     let close: () -> Void
     @State private var hovering = false
@@ -109,7 +106,6 @@ private struct TabRow: View {
             Text(title)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .foregroundStyle(loaded ? .primary : .secondary)
             Spacer(minLength: 0)
             if hovering || selected {
                 Button(action: close) {
