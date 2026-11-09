@@ -78,6 +78,27 @@ selected, and there is no setting to turn it off. Arc keeps a separate
 session-only ⇧⌘T stack with engine history and asks before archiving a page whose
 `beforeunload` wants to stay; both are follow-ups.
 
+A page a page opens, with a `target=_blank` link, `window.open` or a ⌘-click,
+keeps the page the engine made for it, so `window.opener`, session storage and a
+POST's data survive: Core inserts it into the opener's Browser in the background
+and DevKit reports it on the opener's page as an event carrying a ready handle,
+the target URL and the disposition. The app makes a tab for it that takes the
+page's ID and records the opener, and places it as Arc does: after the opener's
+last descendant in the unpinned section, or at the top of that section when the
+opener is pinned, where Arc's ⌘-click lands; Arc opens a pinned tab's foreground
+links in a Peek, which Oa doesn't have yet. A foreground open, every
+`window.open` and a popup that asked for a size included, selects the tab when
+the opener's Space is the one shown; a ⌘-click or middle click leaves the
+selection and the page loads in the background. Arc hosts sized popups as plain
+tabs too, so there is no popup window. A page that closes itself, as after an
+OAuth sign-in, is archived like a ⌘W, and the next selection follows the opener
+as in Arc: the next tab below with the same opener, else the one above, else the
+opener, before the previous tab. The row shows Chromium's URL-derived title until
+the page has one, and the address field the URL at once. Chromium's popup blocker
+stays on with its default setting and no indicator; Arc lets no-gesture opens
+through from the visible page, which isn't copied. `window.focus()` and a named
+target reusing its tab don't select the tab yet.
+
 Only the only window selects a tab when it opens: the first unpinned, else the
 first pinned. A further window opens on the key window's Space with nothing
 selected and the address field focused. A restored window comes back the same
@@ -97,10 +118,10 @@ with unchanged bytes is skipped.
 where `tree` lists `rootIDs` and `items` in display order. Each item has `id`,
 optional `parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
 `splitView`, and for a container its `container` kind, for a tab its `title`,
-`url` and `viewedAt`. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
+`url`, `viewedAt` and `openerID`, the tab whose page opened it. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
 `archivedAt`, a `reason` of `manual` or `auto`, and `position`. Dates are ISO
-8601. A file without `archive` or `viewedAt` reads as an empty Archive and no
-stamps. Loading validates the tree: roots are containers, parents and children
+8601. A file without `archive`, `viewedAt` or `openerID` reads as an empty Archive, no
+stamps and no openers. Loading validates the tree: roots are containers, parents and children
 agree, every item is reachable, each profile and Space points at roots of the
 right kind, and no archived tab is also in the tree.
 
@@ -109,7 +130,8 @@ right kind, and no archived tab is also in the tree.
 Window frames are not saved.
 
 `version` is a format number, as Arc's own stores carry at their top level.
-Adding a key with a default, as `archive` and `viewedAt` were, doesn't bump it;
+Adding a key with a default, as `archive`, `viewedAt` and `openerID` were,
+doesn't bump it;
 a change an older reader would misread does. A file that can't be read or has a
 newer `version` is kept as it is and not written for the rest of the launch; the
 app runs on the default state in memory.

@@ -6,7 +6,8 @@ build setup, and the first vertical slices through all four layers: native windo
 over a saved sidebar of Spaces with pinned and unpinned tabs, each a Chromium page
 created when first shown and moved to whichever window shows it, with a URL field,
 back, forward, reload and stop, an Archive that closed tabs go to and come back
-from, and dated copies of the sidebar that Help ▸ Restore Data brings back.
+from, dated copies of the sidebar that Help ▸ Restore Data brings back, and
+pages a page opens, kept as the engine made them and placed below their opener.
 
 Start with the [architecture](docs/architecture/README.md). The
 current chapters document Chromium, Core's native integration and DevKit's Swift
