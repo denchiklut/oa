@@ -1,7 +1,7 @@
 # Contributing
 
-Start with the Chromium engine. These scripts currently build upstream Chromium;
-Oa’s native app and Core integration will be added separately.
+The app, DevKit, Core and the Chromium build live in this repository. UI work
+runs on the stub engine and needs no Chromium checkout.
 
 ## Build and run
 
@@ -23,7 +23,8 @@ at `/Applications/Xcode.app`. Open Xcode once to finish its setup.
 
    The first build takes about **3 hours** and downloads roughly **100 GB**.
    The exact time depends on your Mac and connection. The script downloads the
-   tools and pinned Chromium source, then compiles it.
+   tools and pinned Chromium source, links `core/` into the checkout as
+   `src/oa`, applies `chromium/patches` on the `oa-patches` branch, then compiles.
 
    **Later builds are incremental:** they reuse the downloaded source and existing
    build output. Small rebuilds can take seconds; larger changes, clean builds and
@@ -35,8 +36,13 @@ at `/Applications/Xcode.app`. Open Xcode once to finish its setup.
    scripts/run.sh
    ```
 
-   You should see a Chromium browser window. Running does not rebuild anything.
-   Run the build command again after changing engine code or build configuration.
+   This builds the Swift app, assembles `.build/native/Oa.app` around the
+   Chromium build and opens it. You should see a native window with a page in it.
+   Run the build command again after changing `core/` or the patches. Use
+   `OA_DATA_DIRECTORY=/tmp/oa-dev scripts/run.sh` for a separate data directory.
+
+   Without a Chromium build, `scripts/run.sh --stub` runs the app on placeholder
+   pages, which is enough for most UI work.
 
 The checkout, build output and separate development profile live in
 `.local/chromium/` inside your Oa checkout. Each project keeps its own
@@ -44,6 +50,17 @@ Chromium build, so your existing `~/chromium` setup is unaffected.
 
 `scripts/build.sh --check` checks prerequisites without downloading or building.
 The Chromium version and build flags are in `chromium/`.
+
+## Change Chromium
+
+Code goes in `core/` (`//oa`) whenever it can. A change to Chromium itself is a
+commit on the `oa-patches` branch in `.local/chromium/src`, exported with
+`scripts/patches.sh export` into `chromium/patches/`, which you commit here.
+`scripts/patches.sh status` shows whether the checkout matches the series. After
+a Chromium update, rerun `scripts/generate_forwarding_delegate.py`.
+
+Swift is formatted with `swift format --in-place --recursive ui devkit`; C++ in
+`core/` follows Chromium style (`git cl format` in the checkout).
 
 ## Edit the documentation
 
