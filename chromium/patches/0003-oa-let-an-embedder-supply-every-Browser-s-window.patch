@@ -1,0 +1,65 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Wed, 4 Nov 2026 18:04:31 -0700
+Subject: [PATCH] oa: let an embedder supply every Browser's window
+
+Adds BrowserWindow::SetFactoryForEmbedder(). Once a factory is set, BrowserWindow::CreateBrowserWindow() returns the factory's window for every Browser, including the ones Chrome creates itself, so Chrome's views are never built. BrowserWindowCreateParams::window can't do this: Browser's constructor allows it only in tests, and it covers only the Browsers the embedder creates.
+---
+ chrome/browser/ui/browser_window.h               | 11 +++++++++++
+ .../ui/views/frame/browser_window_factory.cc     | 16 ++++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/chrome/browser/ui/browser_window.h b/chrome/browser/ui/browser_window.h
+index 3b0e66f8a95dc0518c74122eec1baab5717c3028..e2ebd9ec3b9bd283cd943b839bafc2d2f3e8db1c 100644
+--- a/chrome/browser/ui/browser_window.h
++++ b/chrome/browser/ui/browser_window.h
+@@ -428,6 +428,17 @@ class BrowserWindow : public ui::BaseWindow {
+                       bool user_gesture,
+                       bool in_tab_dragging);
+ 
++  // For an embedder that brings its own window. Once a factory is set,
++  // CreateBrowserWindow() returns its window for every Browser, including the
++  // ones Chrome creates itself, and never builds Chrome's views. Call it before
++  // the first Browser is created.
++  using EmbedderFactory =
++      std::unique_ptr<BrowserWindow, BrowserWindowDeleter> (*)(
++          BrowserWindowInterface* browser,
++          bool user_gesture,
++          bool in_tab_dragging);
++  static void SetFactoryForEmbedder(EmbedderFactory factory);
++
+   virtual void ShowAvatarBubbleFromAvatarButton(bool is_source_accelerator) = 0;
+ 
+   // Shows User Happiness Tracking Survey's dialog after the survey associated
+diff --git a/chrome/browser/ui/views/frame/browser_window_factory.cc b/chrome/browser/ui/views/frame/browser_window_factory.cc
+index ad579aa818666d92ca6f5446c8251b4e841c0b1b..3e8143a90f5e553b06f5f32096d7544dec34c04c 100644
+--- a/chrome/browser/ui/views/frame/browser_window_factory.cc
++++ b/chrome/browser/ui/views/frame/browser_window_factory.cc
+@@ -27,11 +27,27 @@
+ #include "chromeos/components/kiosk/kiosk_utils.h"
+ #endif
+ 
++namespace {
++
++// Set by BrowserWindow::SetFactoryForEmbedder().
++BrowserWindow::EmbedderFactory g_embedder_factory = nullptr;
++
++}  // namespace
++
++// static
++void BrowserWindow::SetFactoryForEmbedder(EmbedderFactory factory) {
++  g_embedder_factory = factory;
++}
++
+ // static
+ std::unique_ptr<BrowserWindow, BrowserWindowDeleter>
+ BrowserWindow::CreateBrowserWindow(BrowserWindowInterface* browser,
+                                    bool user_gesture,
+                                    bool in_tab_dragging) {
++  if (g_embedder_factory) {
++    return g_embedder_factory(browser, user_gesture, in_tab_dragging);
++  }
++
+   if (webui_browser::IsWebUIBrowserEnabled() &&
+       browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL) {
+     return std::unique_ptr<BrowserWindow, BrowserWindowDeleter>(

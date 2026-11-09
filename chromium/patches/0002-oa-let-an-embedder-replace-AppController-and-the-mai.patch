@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Wed, 4 Nov 2026 00:54:57 -0700
+Subject: [PATCH] oa: let an embedder replace AppController and the main menu
+
+Adds ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder(). After it, PreCreateThreads creates neither AppController nor Chrome's main menu, and DidEndMainMessageLoop doesn't message AppController, so NSApp's delegate stays the embedder's.
+---
+ chrome/browser/chrome_browser_main_mac.h  |  6 ++++++
+ chrome/browser/chrome_browser_main_mac.mm | 15 +++++++++++++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/chrome/browser/chrome_browser_main_mac.h b/chrome/browser/chrome_browser_main_mac.h
+index 35bec6d86b33bf4be8df95f962a5398784db44fe..861dcd997c415a78006b0a172b0ceb0cf4acba0d 100644
+--- a/chrome/browser/chrome_browser_main_mac.h
++++ b/chrome/browser/chrome_browser_main_mac.h
+@@ -37,6 +37,12 @@ class ChromeBrowserMainPartsMac : public ChromeBrowserMainPartsPosix {
+   // loop has ended. The embedder must be sure to call this.
+   static void DidEndMainMessageLoop();
+ 
++  // For an embedder that brings its own NSApplicationDelegate, main menu and
++  // quit handling. Call it before the browser starts: Chrome then creates
++  // neither AppController nor its main menu, so NSApp's delegate stays the
++  // embedder's.
++  static void DisableAppControllerForEmbedder();
++
+  private:
+   // Records mac related metrics. Some metrics are recorded on startup, some
+   // are recorded later in response to an events.
+diff --git a/chrome/browser/chrome_browser_main_mac.mm b/chrome/browser/chrome_browser_main_mac.mm
+index b269f1610a55d31aa58beab694fa7cbb214b58d1..23a0d7892ed78a4dd358982a97816af4ab039e66 100644
+--- a/chrome/browser/chrome_browser_main_mac.mm
++++ b/chrome/browser/chrome_browser_main_mac.mm
+@@ -54,6 +54,9 @@
+ 
+ namespace {
+ 
++// Set by DisableAppControllerForEmbedder().
++bool g_app_controller_disabled = false;
++
+ base::FilePath GetBundlePath() {
+   if (!base::apple::AmIBundled()) {
+     return base::FilePath();
+@@ -154,6 +157,10 @@
+     return ret;
+   }
+ 
++  if (g_app_controller_disabled) {
++    return content::RESULT_CODE_NORMAL_EXIT;
++  }
++
+   // Create the app delegate by requesting the shared AppController.
+   CHECK_EQ(nil, NSApp.delegate);
+   AppController* app_controller = AppController.sharedController;
+@@ -182,5 +189,13 @@
+ }
+ 
+ void ChromeBrowserMainPartsMac::DidEndMainMessageLoop() {
++  if (g_app_controller_disabled) {
++    return;
++  }
+   [AppController.sharedController didEndMainMessageLoop];
+ }
++
++// static
++void ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder() {
++  g_app_controller_disabled = true;
++}

@@ -2,20 +2,17 @@
 # Prepare the pinned upstream Chromium checkout and build it incrementally.
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-chromium_root="$repo_root/.local/chromium"
+# shellcheck source=lib/chromium.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/chromium.sh"
 check_only=false
-
-log() { printf '==> %s\n' "$*"; }
-die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 case "${1:-}" in
   -h|--help)
     cat <<'HELP'
 Usage: scripts/build.sh [--check]
 
-Download Chromium and its tools on the first run, then build incrementally.
---check checks prerequisites without downloading, building or changing files.
+Download Chromium and its tools on the first run, link core/ as src/oa, apply chromium/patches,
+then build incrementally. --check checks prerequisites without downloading, building or changing files.
 The checkout and build output are stored in .local/chromium inside this repository.
 HELP
     exit 0
@@ -30,10 +27,6 @@ esac
   die "this setup currently supports Apple silicon Macs"
 [[ "$chromium_root" != *[[:space:]]* ]] ||
   die "Chromium requires a checkout path without spaces"
-version="$(tr -d '[:space:]' < "$repo_root/chromium/VERSION")"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "invalid chromium/VERSION"
-
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 [[ -d "$DEVELOPER_DIR" ]] || die "install Xcode at /Applications/Xcode.app, or set DEVELOPER_DIR"
 xcodebuild -version >/dev/null 2>&1 ||
   die "open Xcode and finish its first-launch setup, then retry"
@@ -75,8 +68,6 @@ if [[ ! -d "$chromium_root/depot_tools/.git" ]]; then
   log "Downloading Chromium's build tools"
   git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$chromium_root/depot_tools"
 fi
-export PATH="$chromium_root/depot_tools:$PATH"
-export DEPOT_TOOLS_METRICS=0
 cd "$chromium_root"
 
 saved_version=''
@@ -86,14 +77,8 @@ if [[ -f .oa-synced-revision ]]; then
 fi
 if [[ "$saved_version" != "$version" || ! -d src/.git ]]; then
   if [[ -d src/.git ]]; then
-    [[ -z "$(git -C src status --porcelain --untracked-files=no)" ]] ||
-      die "Chromium has local edits. Save them before changing or resuming the pinned checkout"
-    if [[ -n "$saved_commit" ]]; then
-      [[ "$(git -C src rev-parse HEAD)" == "$saved_commit" ]] ||
-        die "Chromium has local commits. Preserve them before updating the pinned version"
-    elif git -C src symbolic-ref --quiet HEAD >/dev/null; then
-      die "Chromium is on a local branch; preserve it before resuming checkout setup"
-    fi
+    require_clean_tree
+    git -C src checkout --quiet --detach
   fi
   log "Downloading Chromium $version and its dependencies; the first download can take hours"
   gclient config --managed --name=src https://chromium.googlesource.com/chromium/src.git
@@ -104,7 +89,9 @@ fi
 
 git -C src merge-base --is-ancestor "$saved_commit" HEAD ||
   die "this checkout is no longer based on the recorded Chromium revision"
-cd src
+link_core
+apply_patches
+cd "$chromium_src"
 mkdir -p out/Release
 if ! cmp -s "$repo_root/chromium/args.gn" out/Release/args.gn || [[ ! -f out/Release/build.ninja ]]; then
   cp "$repo_root/chromium/args.gn" out/Release/args.gn

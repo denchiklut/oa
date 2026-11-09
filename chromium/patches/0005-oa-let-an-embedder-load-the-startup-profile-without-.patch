@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Sun, 8 Nov 2026 17:19:55 -0700
+Subject: [PATCH] oa: let an embedder load the startup profile without a window
+
+Adds StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder(). Once set, ShouldLoadProfileWithoutWindow() returns true, so startup, a later command line and the silent-launch checks all skip opening a Browser, without --no-startup-window and its background-mode keep-alives.
+---
+ .../ui/startup/startup_browser_creator.cc     | 21 +++++++++++++++++--
+ .../ui/startup/startup_browser_creator.h      |  5 +++++
+ 2 files changed, 24 insertions(+), 2 deletions(-)
+
+diff --git a/chrome/browser/ui/startup/startup_browser_creator.cc b/chrome/browser/ui/startup/startup_browser_creator.cc
+index 49f777ff63d99301b0b2beea91edeb322464b9fd..4019e107e4ea821be3db3f9beea974b630fb7543 100644
+--- a/chrome/browser/ui/startup/startup_browser_creator.cc
++++ b/chrome/browser/ui/startup/startup_browser_creator.cc
+@@ -1026,9 +1026,25 @@ void StartupBrowserCreator::RegisterProfilePrefs(PrefRegistrySimple* registry) {
+ #endif  // BUILDFLAG(IS_WIN) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ }
+ 
++namespace {
++
++// Set by StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder().
++bool g_load_profile_without_window_for_embedder = false;
++
++}  // namespace
++
++// static
++void StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder() {
++  g_load_profile_without_window_for_embedder = true;
++}
++
+ // static
+ bool StartupBrowserCreator::ShouldLoadProfileWithoutWindow(
+     const base::CommandLine& command_line) {
++  if (g_load_profile_without_window_for_embedder) {
++    return true;
++  }
++
+   // Don't open any browser windows if the command line indicates "background
+   // mode".
+   if (command_line.HasSwitch(switches::kNoStartupWindow)) {
+@@ -1202,8 +1218,9 @@ bool StartupBrowserCreator::ProcessCmdLineImpl(
+   }
+ #endif  //  !BUILDFLAG(IS_CHROMEOS)
+ 
+-  // If --no-startup-window is specified then do not open a new window.
+-  if (command_line.HasSwitch(switches::kNoStartupWindow)) {
++  // If --no-startup-window is specified, or an embedder opens its own windows,
++  // then do not open a new window.
++  if (ShouldLoadProfileWithoutWindow(command_line)) {
+     silent_launch = true;
+   }
+ 
+diff --git a/chrome/browser/ui/startup/startup_browser_creator.h b/chrome/browser/ui/startup/startup_browser_creator.h
+index b76429d95ebc3800e2fc7a2117c6279008d33989..97b0d930727d852b925d6b8c4a34a56984012b69 100644
+--- a/chrome/browser/ui/startup/startup_browser_creator.h
++++ b/chrome/browser/ui/startup/startup_browser_creator.h
+@@ -174,6 +174,11 @@ class StartupBrowserCreator {
+   static bool ShouldLoadProfileWithoutWindow(
+       const base::CommandLine& command_line);
+ 
++  // For an embedder that opens its own windows. Startup then loads the profile
++  // and launches silently, as --no-startup-window does, for this and any later
++  // command line. Call it before the browser starts.
++  static void SetLoadProfileWithoutWindowForEmbedder();
++
+  private:
+   friend class StartupBrowserCreatorActivationTest;
+   friend class StartupBrowserCreatorImpl;
