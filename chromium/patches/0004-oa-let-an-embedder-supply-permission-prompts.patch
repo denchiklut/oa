@@ -1,0 +1,65 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Wed, 4 Nov 2026 18:27:42 -0700
+Subject: [PATCH] oa: let an embedder supply permission prompts
+
+Adds SetPermissionPromptFactoryForEmbedder(). Once a factory is set, CreatePermissionPrompt() returns the factory's prompt for every permission request instead of Chrome's Views prompts. Chrome's prompts expect a BrowserView and a LocationBarView; an embedder whose Browsers have neither crashes when a page asks for a permission.
+---
+ .../browser/ui/permission_bubble/permission_prompt.h | 10 ++++++++++
+ .../views/permissions/permission_prompt_factory.cc   | 12 ++++++++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/chrome/browser/ui/permission_bubble/permission_prompt.h b/chrome/browser/ui/permission_bubble/permission_prompt.h
+index 6e9bba3c993b0c3c3ce71851b45e4316c5673d77..03cc819815bfb408b115eb3f55acebc1feb35d6f 100644
+--- a/chrome/browser/ui/permission_bubble/permission_prompt.h
++++ b/chrome/browser/ui/permission_bubble/permission_prompt.h
+@@ -17,6 +17,16 @@ std::unique_ptr<permissions::PermissionPrompt> CreatePermissionPrompt(
+     content::WebContents* web_contents,
+     permissions::PermissionPrompt::Delegate* delegate);
+ 
++// For an embedder that brings its own permission UI. Once a factory is set,
++// CreatePermissionPrompt() returns the factory's prompt for every request and
++// never builds Chrome's views. Call it before the browser starts.
++using EmbedderPermissionPromptFactory =
++    std::unique_ptr<permissions::PermissionPrompt> (*)(
++        content::WebContents* web_contents,
++        permissions::PermissionPrompt::Delegate* delegate);
++void SetPermissionPromptFactoryForEmbedder(
++    EmbedderPermissionPromptFactory factory);
++
+ // Factory function to create content scrim for permission prompts for chrome.
+ std::unique_ptr<
+     permissions::EmbeddedPermissionPromptFlowModel::PromptContentScrim>
+diff --git a/chrome/browser/ui/views/permissions/permission_prompt_factory.cc b/chrome/browser/ui/views/permissions/permission_prompt_factory.cc
+index 12bb0ac5fb39cbf8c67bf38586a84708e05f7cb7..ef42a2c8c8b4ea1b7e139721858bbaae70ccc8df 100644
+--- a/chrome/browser/ui/views/permissions/permission_prompt_factory.cc
++++ b/chrome/browser/ui/views/permissions/permission_prompt_factory.cc
+@@ -46,6 +46,9 @@
+ 
+ namespace {
+ 
++// Set by SetPermissionPromptFactoryForEmbedder().
++EmbedderPermissionPromptFactory g_embedder_factory = nullptr;
++
+ BrowserWindowInterface* GetBrowser(content::WebContents* web_contents) {
+   tabs::TabInterface* tab =
+       web_contents ? tabs::TabInterface::MaybeGetFromContents(web_contents)
+@@ -289,9 +292,18 @@ bool ShouldShowPermissionPromptEvenIfOmniboxEditedOrEmpty(
+   return false;
+ }
+ 
++void SetPermissionPromptFactoryForEmbedder(
++    EmbedderPermissionPromptFactory factory) {
++  g_embedder_factory = factory;
++}
++
+ std::unique_ptr<permissions::PermissionPrompt> CreatePermissionPrompt(
+     content::WebContents* web_contents,
+     permissions::PermissionPrompt::Delegate* delegate) {
++  if (g_embedder_factory) {
++    return g_embedder_factory(web_contents, delegate);
++  }
++
+   if (delegate->ShouldDropCurrentRequestIfCannotShowQuietly() &&
+       IsFullScreenMode(web_contents)) {
+     return nullptr;
