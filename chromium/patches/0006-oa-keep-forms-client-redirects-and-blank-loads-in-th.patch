@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Mon, 9 Nov 2026 15:48:54 -0700
+Subject: [PATCH] oa: keep forms, client redirects and blank loads in the
+ renderer when the browser handles top-level requests
+
+---
+ content/renderer/render_frame_impl.cc | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/content/renderer/render_frame_impl.cc b/content/renderer/render_frame_impl.cc
+index 1348b5a6bc592553901ebc748d3ebee1c3fcfc05..5f2edff15c3fb2a2e28817e8067c5311ec56edc5 100644
+--- a/content/renderer/render_frame_impl.cc
++++ b/content/renderer/render_frame_impl.cc
+@@ -5726,10 +5726,15 @@ void RenderFrameImpl::BeginNavigation(
+   }
+ 
+   // If the browser is interested, then give it a chance to look at the request.
++  // Form submissions, client redirects to HTTP(S) and empty or about:blank
++  // loads stay here, so an embedder that routes links sees only those.
+   if (IsTopLevelNavigation(frame_) &&
+       GetWebView()
+           ->GetRendererPreferences()
+-          .browser_handles_all_top_level_requests) {
++          .browser_handles_all_top_level_requests &&
++      !url.is_empty() && !url.IsAboutBlank() &&
++      info->navigation_type != blink::kWebNavigationTypeFormSubmitted &&
++      !(info->is_client_redirect && url.SchemeIsHTTPOrHTTPS())) {
+     OpenURL(std::move(info));
+     return;  // Suppress the load here.
+   }
