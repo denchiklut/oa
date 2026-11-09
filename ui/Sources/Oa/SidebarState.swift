@@ -20,6 +20,8 @@ struct SidebarTab: Identifiable, Hashable {
     let id: UUID
     var title = ""
     var url: URL?
+    /// When a window last selected it; auto-archive measures from here.
+    var viewedAt: Date?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
 
@@ -32,6 +34,30 @@ struct SidebarTab: Identifiable, Hashable {
     private func normalized(_ url: URL) -> String {
         let text = url.absoluteString
         return url.path().count <= 1 && text.hasSuffix("/") ? String(text.dropLast()) : text
+    }
+}
+
+/// A tab that left the sidebar. It keeps its Space, which may be gone, and its place for Restore Last Closed Tab.
+struct SidebarArchivedTab: Identifiable, Hashable, Codable {
+    enum Reason: String, Codable { case manual, auto }
+
+    let id: UUID
+    var title: String
+    var url: URL?
+    let spaceID: UUID
+    let archivedAt: Date
+    let reason: Reason
+    /// Its index in the unpinned section; nil for a pinned tab archived with its Space.
+    let position: Int?
+
+    var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
+
+    /// The URL without its scheme, as Arc's Archive shows it.
+    var address: String {
+        guard let url else { return "" }
+        var text = url.absoluteString
+        if let scheme = url.scheme { text = String(text.dropFirst(scheme.count + 3)) }
+        return text.hasSuffix("/") ? String(text.dropLast()) : text
     }
 }
 
@@ -102,11 +128,15 @@ struct SidebarTree {
     }
 
     mutating func append(_ item: SidebarItem, to parentID: UUID) {
-        guard items[parentID] != nil else { return }
+        insert(item, into: parentID, at: items[parentID]?.childIDs.count ?? 0)
+    }
+
+    mutating func insert(_ item: SidebarItem, into parentID: UUID, at index: Int) {
+        guard let parent = items[parentID] else { return }
         var item = item
         item.parentID = parentID
         items[item.id] = item
-        items[parentID]?.childIDs.append(item.id)
+        items[parentID]?.childIDs.insert(item.id, at: min(max(index, 0), parent.childIDs.count))
     }
 
     /// Removes the item and everything under it. Returns its position in its parent.
@@ -147,9 +177,14 @@ struct SidebarTree {
 
 /// The app's source of truth for the sidebar. Windows hold selection only.
 struct SidebarState {
+    /// Arc's default; unpinned tabs idle this long are archived, and there is no off.
+    static let autoArchiveAge: TimeInterval = 12 * 60 * 60
+
     var profiles: [SidebarProfile] = []
     var spaces: [SidebarSpace] = []
     var tree = SidebarTree()
+    /// Oldest first.
+    var archive: [SidebarArchivedTab] = []
 
     static func initial() -> SidebarState {
         var state = SidebarState()
@@ -209,9 +244,10 @@ struct SidebarState {
         spaces[index].name = name
     }
 
-    /// The last Space stays.
-    mutating func removeSpace(_ id: UUID) {
+    /// The last Space stays. Its tabs, pinned too, go to the Archive, as in Arc; its entries stay.
+    mutating func removeSpace(_ id: UUID, at date: Date = .now) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == id }) else { return }
+        for tab in selectableTabs(in: id) { archiveTab(tab.id, reason: .manual, at: date) }
         let space = spaces.remove(at: index)
         tree.removeRoot(space.pinnedRootID)
         tree.removeRoot(space.unpinnedRootID)
@@ -222,8 +258,64 @@ struct SidebarState {
         tree.append(SidebarItem(id: tab.id, kind: .tab(tab)), to: space.unpinnedRootID)
     }
 
-    mutating func removeTab(_ id: UUID) {
+    mutating func archiveTab(_ id: UUID, reason: SidebarArchivedTab.Reason, at date: Date = .now) {
+        guard let space = space(containing: id), let tab = tree.tab(id) else { return }
+        let position = isPinned(id) ? nil : tree[space.unpinnedRootID]?.childIDs.firstIndex(of: id)
         tree.remove(id)
+        archive.append(
+            SidebarArchivedTab(
+                id: id, title: tab.title, url: tab.url, spaceID: space.id, archivedAt: date, reason: reason,
+                position: position))
+    }
+
+    /// Back into its Space's unpinned section, at the top or at its old index; into `fallbackSpaceID` when its
+    /// Space is gone. Returns the Space it went to.
+    @discardableResult
+    mutating func restoreArchived(_ id: UUID, in fallbackSpaceID: UUID, toOldPosition: Bool) -> UUID? {
+        guard let index = archive.firstIndex(where: { $0.id == id }) else { return nil }
+        let entry = archive.remove(at: index)
+        guard let space = space(entry.spaceID) ?? space(fallbackSpaceID) else { return nil }
+        let tab = SidebarTab(id: entry.id, title: entry.title, url: entry.url, viewedAt: .now)
+        tree.insert(
+            SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID,
+            at: toOldPosition ? entry.position ?? 0 : 0)
+        return space.id
+    }
+
+    mutating func removeArchived(_ id: UUID) {
+        archive.removeAll { $0.id == id }
+    }
+
+    mutating func clearArchive() {
+        archive.removeAll()
+    }
+
+    mutating func markViewed(_ tabID: UUID, at date: Date = .now) {
+        tree.update(tabID) { item in
+            guard var tab = item.tab else { return }
+            tab.viewedAt = date
+            item.kind = .tab(tab)
+        }
+    }
+
+    /// Unpinned tabs not viewed for 12 h go to the Archive. Tabs in `shown`, and tabs without a stamp yet, are
+    /// stamped instead. Returns whether anything was archived.
+    @discardableResult
+    mutating func autoArchive(shown: Set<UUID>, at now: Date = .now) -> Bool {
+        var archived = false
+        for space in spaces {
+            for tab in tabs(in: space.id, pinned: false) {
+                if let viewedAt = tab.viewedAt, !shown.contains(tab.id),
+                    now.timeIntervalSince(viewedAt) > SidebarState.autoArchiveAge
+                {
+                    archiveTab(tab.id, reason: .auto, at: now)
+                    archived = true
+                } else if tab.viewedAt == nil || shown.contains(tab.id) {
+                    markViewed(tab.id, at: now)
+                }
+            }
+        }
+        return archived
     }
 
     /// A move to the end of the other section.

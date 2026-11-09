@@ -28,6 +28,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let saved = store.savedWindows
         if saved.isEmpty { openWindow() } else { saved.forEach { openWindow(restoring: $0) } }
+        store.startAutoArchive()
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 

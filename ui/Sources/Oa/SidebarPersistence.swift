@@ -9,10 +9,15 @@ final class SidebarPersistence {
     private let windowsURL: URL
     private var written: [URL: Data] = [:]
     private var disabled: Set<URL> = []
-    private let decoder = JSONDecoder()
+    private let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        encoder.dateEncodingStrategy = .iso8601
         return encoder
     }()
 
