@@ -27,6 +27,11 @@ struct BrowserWindowView: View {
                 }
             }
         }
+        .overlay {
+            if let peek = model.peek {
+                PeekView(model: model, page: peek, sidebarWidth: model.showingArchive ? 0 : SidebarView.width)
+            }
+        }
         .onChange(of: model.address) { _, url in
             if !editing || address.isEmpty { address = url?.absoluteString ?? "" }
         }
@@ -41,7 +46,7 @@ struct BrowserWindowView: View {
                     addressFocused = true
                 } else {
                     addressFocused = false
-                    page.activate()
+                    (model.peek ?? page).activate()
                 }
             }
         }
@@ -120,7 +125,7 @@ private struct PlaceholderView: View {
     }
 }
 
-private struct PageHostView: NSViewRepresentable {
+struct PageHostView: NSViewRepresentable {
     let view: NSView
 
     func makeNSView(context: Context) -> NSView { Container() }

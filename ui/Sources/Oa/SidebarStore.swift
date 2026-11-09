@@ -1,3 +1,4 @@
+import DevKit
 import Foundation
 import Observation
 
@@ -32,6 +33,11 @@ final class SidebarStore {
 
     func markViewed(_ tabID: UUID) {
         state.markViewed(tabID)
+    }
+
+    /// From a reconcile or a window closing, where an edit can't be nested; the save rides on the enclosing one.
+    func archivePage(_ page: any Page, in spaceID: UUID) {
+        state.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID)
     }
 
     func startAutoArchive() {

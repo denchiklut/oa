@@ -72,6 +72,8 @@ final class MainMenu {
         let last = item("Go to last Sidebar Item", #selector(BrowserWindowController.selectTab(_:)), key: "9")
         last.tag = MainMenu.lastTabTag
         tabs.addItem(last)
+        tabs.addItem(.separator())
+        tabs.addItem(item("Expand Peek", #selector(BrowserWindowController.expandPeek(_:)), key: "o"))
 
         let spaces = submenu("Spaces", in: menu)
         spaces.addItem(item("New Space…", #selector(BrowserWindowController.newSpace(_:))))

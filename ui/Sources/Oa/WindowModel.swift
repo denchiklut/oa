@@ -14,7 +14,12 @@ final class WindowModel {
     private(set) var pages: [UUID: any Page] = [:]
     /// Last frames of pages that left for another window while their tab stayed selected here.
     private(set) var placeholders: [UUID: NSImage] = [:]
-    private(set) var showingArchive = false
+    /// Pages shown over the window as Arc's Peek: by the tab they were opened from, whose state they are, or by
+    /// the Archive entry they show.
+    private(set) var peeks: [UUID: any Page] = [:]
+    private(set) var showingArchive = false {
+        didSet { if !showingArchive { closeArchivePeek() } }
+    }
     var focusAddressField = 0
     @ObservationIgnored var bringToFront: () -> Void = {}
     @ObservationIgnored private let engine: any BrowserApplication
@@ -22,6 +27,7 @@ final class WindowModel {
     @ObservationIgnored private var previousTabID: UUID?
     @ObservationIgnored private var pendingURLs: [UUID: URL] = [:]
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
+    private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
     var space: SidebarSpace? { state.space(selectedSpaceID) }
@@ -29,6 +35,10 @@ final class WindowModel {
     var selectedTab: SidebarTab? { selectedTabID.flatMap { state.tree.tab($0) } }
     var page: (any Page)? { selectedTabID.flatMap { pages[$0] } }
     var placeholder: NSImage? { page == nil ? selectedTabID.flatMap { placeholders[$0] } : nil }
+    var peek: (any Page)? { peekOwnerID.flatMap { peeks[$0] } }
+    /// What the toolbar commands act on: the Peek while one is shown.
+    var frontPage: (any Page)? { peek ?? page }
+    private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
     /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
     var address: URL? { page?.url ?? selectedTab?.url }
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
@@ -156,6 +166,55 @@ final class WindowModel {
         store.edit { $0.restoreArchived(id, in: selectedSpaceID, toOldPosition: false) }
     }
 
+    /// As Arc: the row's page in a Peek over the list, from the saved URL with no history; the entry stays.
+    func peekArchived(_ entryID: UUID) {
+        guard let entry = state.archive.first(where: { $0.id == entryID }), let url = entry.url,
+            let profileID = (state.space(entry.spaceID) ?? space)?.profileID
+        else { return }
+        closeArchivePeek()
+        archivePeekID = entryID
+        let context = engine.browserContext(id: profileID)
+        Task { [weak self, id] in
+            guard let page = await context.makePage(id: entryID, windowID: id), let self else { return }
+            guard showingArchive, archivePeekID == entryID else { return page.drop() }
+            peeks[entryID] = page
+            listen(to: page, for: entryID)
+            page.load(url)
+        }
+    }
+
+    /// Expand: an opened Peek becomes a selected tab after its opener's earlier children, as Arc does; an Archive
+    /// Peek's entry leaves the Archive for the top of the shown Space.
+    func expandPeek() {
+        guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
+        var tab = SidebarTab(id: page.id, title: page.title, url: page.url, viewedAt: .now)
+        if ownerID == archivePeekID {
+            archivePeekID = nil
+            store.edit {
+                $0.removeArchived(ownerID)
+                $0.insertTab(tab, atTopOf: selectedSpaceID)
+            }
+        } else {
+            tab.openerID = ownerID
+            store.edit { $0.openTab(tab, from: ownerID) }
+        }
+        install(page, for: tab.id)
+        select(tab.id)
+    }
+
+    /// ✕, the backdrop and ⌘W: an opened Peek's page is archived under its tab's Space, as Arc does; an Archive
+    /// Peek keeps its entry.
+    func closePeek() {
+        guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
+        if ownerID == archivePeekID {
+            archivePeekID = nil
+        } else if let spaceID = state.space(containing: ownerID)?.id {
+            store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
+        }
+        page.close()
+        self.page?.activate()
+    }
+
     func restoreLastClosed() {
         guard let entry = state.archive.last else { return }
         var spaceID: UUID?
@@ -209,11 +268,17 @@ final class WindowModel {
         for tabID in Array(pages.keys) {
             guard let page = release(tabID) else { continue }
             if let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }) {
-                heir.adopt(page, for: tabID)
+                heir.adopt(page, for: tabID, from: self)
             } else {
                 page.drop()
             }
         }
+        for (ownerID, page) in peeks {
+            if ownerID != archivePeekID { store.archivePage(page, in: spaceID(ofPeekOwner: ownerID)) }
+            page.drop()
+        }
+        peeks = [:]
+        archivePeekID = nil
         creating = [:]
     }
 
@@ -226,6 +291,10 @@ final class WindowModel {
         return pages.removeValue(forKey: tabID)
     }
 
+    func releasePeek(_ tabID: UUID) -> (any Page)? {
+        peeks.removeValue(forKey: tabID)
+    }
+
     /// After a state edit: selections, placeholders and pages of tabs or Spaces that are gone go too.
     func reconcile() {
         if space == nil, let first = state.spaces.first { selectedSpaceID = first.id }
@@ -233,6 +302,14 @@ final class WindowModel {
             selectedTabIDs.removeValue(forKey: spaceID)
         }
         for tabID in Array(pages.keys) where state.tree.tab(tabID) == nil { release(tabID)?.drop() }
+        for (tabID, page) in pages where page.keepsAddress != state.isPinned(tabID) {
+            page.keepsAddress = state.isPinned(tabID)
+        }
+        for (ownerID, page) in peeks where ownerID != archivePeekID && state.tree.tab(ownerID) == nil {
+            peeks[ownerID] = nil
+            store.archivePage(page, in: spaceID(ofPeekOwner: ownerID))
+            page.close()
+        }
         for tabID in Array(creating.keys) where state.tree.tab(tabID) == nil { release(tabID) }
         for tabID in Array(placeholders.keys) where state.tree.tab(tabID) == nil { placeholders[tabID] = nil }
         if let previousTabID, state.tree.tab(previousTabID) == nil { self.previousTabID = nil }
@@ -240,6 +317,16 @@ final class WindowModel {
 
     private func shows(_ tabID: UUID) -> Bool {
         selectedTabID == tabID && pages[tabID] == nil
+    }
+
+    private func spaceID(ofPeekOwner ownerID: UUID) -> UUID {
+        state.space(containing: ownerID)?.id ?? state.archive.last { $0.id == ownerID }?.spaceID ?? selectedSpaceID
+    }
+
+    private func closeArchivePeek() {
+        guard let entryID = archivePeekID else { return }
+        archivePeekID = nil
+        peeks.removeValue(forKey: entryID)?.close()
     }
 
     private func end(_ tabID: UUID, _ finish: (any Page, Bool) -> Void) {
@@ -283,7 +370,7 @@ final class WindowModel {
                 guard let self, creating[tabID] == token else { return }
                 creating.removeValue(forKey: tabID)
                 guard let page = holder.release(tabID) else { return }
-                adopt(page, for: tabID)
+                adopt(page, for: tabID, from: holder)
                 holder.keepFrameLater(of: page, for: tabID)
             }
             return
@@ -306,11 +393,16 @@ final class WindowModel {
     private func handOff(_ tabID: UUID) {
         guard let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }), let page = release(tabID)
         else { return }
-        heir.adopt(page, for: tabID)
+        heir.adopt(page, for: tabID, from: self)
     }
 
-    private func adopt(_ page: any Page, for tabID: UUID) {
+    /// The tab's Peek, its state, comes along.
+    private func adopt(_ page: any Page, for tabID: UUID, from holder: WindowModel) {
         page.move(toWindow: id)
+        if let peek = holder.releasePeek(tabID) {
+            peek.move(toWindow: id)
+            peeks[tabID] = peek
+        }
         placeholders[tabID] = nil
         install(page, for: tabID)
     }
@@ -334,6 +426,7 @@ final class WindowModel {
 
     private func install(_ page: any Page, for tabID: UUID) {
         pages[tabID] = page
+        page.keepsAddress = state.isPinned(tabID)
         observe(page, for: tabID)
     }
 
@@ -342,29 +435,76 @@ final class WindowModel {
         let store = store
         Task {
             for await event in page.events {
-                store.windows.first { $0.pages[tabID] != nil }?.handle(event, for: tabID)
+                store.windows.first { $0.holds(tabID) }?.handle(event, for: tabID)
             }
         }
     }
 
-    private func handle(_ event: PageEvent, for tabID: UUID) {
+    private func holds(_ pageID: UUID) -> Bool {
+        pages[pageID] != nil || peekOwner(of: pageID) != nil
+    }
+
+    private func peekOwner(of pageID: UUID) -> UUID? {
+        peeks.first { $0.value.id == pageID }?.key
+    }
+
+    private func handle(_ event: PageEvent, for pageID: UUID) {
+        if let ownerID = peekOwner(of: pageID) {
+            switch event {
+            case .opened(let opened, let url, let disposition):
+                place(opened, url: url, disposition: disposition, from: ownerID, insidePeek: true)
+            case .wantsActivation:
+                if ownerID != archivePeekID { show(ownerID) } else { bringToFront() }
+            case .closed:
+                peeks[ownerID] = nil
+                if ownerID == archivePeekID { archivePeekID = nil }
+                page?.activate()
+            }
+            return
+        }
         switch event {
         case .opened(let opened, let url, let disposition):
-            place(opened, url: url, disposition: disposition, from: tabID)
+            place(opened, url: url, disposition: disposition, from: pageID, insidePeek: false)
         case .wantsActivation:
-            show(tabID)
+            show(pageID)
         case .closed:
-            pageEnded(tabID)
+            pageEnded(pageID)
         }
     }
 
-    private func place(_ page: any Page, url: URL?, disposition: OpenDisposition, from openerID: UUID) {
-        guard let space = state.space(containing: openerID) else { return page.drop() }
+    /// As Arc: a Shift-click from any tab, which the engine reports as a new window, and a pinned tab's foreground
+    /// opens show a Peek; a Peek's own opens become tabs of its tab; the rest go below the opener. A page from an
+    /// Archive Peek has no tab to join, so it goes to the top of the shown Space.
+    private func place(
+        _ page: any Page, url: URL?, disposition: OpenDisposition, from openerID: UUID, insidePeek: Bool
+    ) {
+        guard let space = state.space(containing: openerID) else {
+            guard insidePeek, openerID == archivePeekID else { return page.drop() }
+            let tab = SidebarTab(id: page.id, url: url, viewedAt: .now)
+            store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
+            install(page, for: tab.id)
+            listen(to: page, for: tab.id)
+            return select(tab.id)
+        }
+        let background = disposition == .backgroundTab
+        if !insidePeek, disposition == .newWindow || (!background && state.isPinned(openerID)) {
+            return peek(page, from: openerID)
+        }
         let tab = SidebarTab(id: page.id, url: url, viewedAt: .now, openerID: openerID)
         store.edit { $0.openTab(tab, from: openerID) }
         install(page, for: tab.id)
         listen(to: page, for: tab.id)
-        if disposition != .backgroundTab, space.id == selectedSpaceID { select(tab.id) }
+        if !background, space.id == selectedSpaceID { select(tab.id) }
+    }
+
+    /// A tab has one Peek: a new one takes the place of the current one, which closes as with ✕.
+    private func peek(_ page: any Page, from openerID: UUID) {
+        if let current = peeks[openerID], let spaceID = state.space(containing: openerID)?.id {
+            store.edit { $0.archivePage(id: current.id, title: current.title, url: current.url, in: spaceID) }
+            current.close()
+        }
+        peeks[openerID] = page
+        listen(to: page, for: page.id)
     }
 
     /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown.

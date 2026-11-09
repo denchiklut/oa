@@ -54,11 +54,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     private func observeTitle() {
         let title = withObservationTracking {
-            model.selectedTab.map(model.title(for:)) ?? ""
+            _ = model.peek
+            return model.selectedTab.map(model.title(for:)) ?? ""
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeTitle() }
         }
-        window?.title = title.isEmpty ? "Oa" : title
+        window?.title = model.peek != nil ? model.space?.name ?? "Oa" : title.isEmpty ? "Oa" : title
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
@@ -73,10 +74,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         didClose(self)
     }
 
-    @objc func goBack(_ sender: Any?) { model.page?.goBack() }
-    @objc func goForward(_ sender: Any?) { model.page?.goForward() }
-    @objc func reload(_ sender: Any?) { model.page?.reload() }
-    @objc func stopLoading(_ sender: Any?) { model.page?.stopLoading() }
+    @objc func goBack(_ sender: Any?) { model.frontPage?.goBack() }
+    @objc func goForward(_ sender: Any?) { model.frontPage?.goForward() }
+    @objc func reload(_ sender: Any?) { model.frontPage?.reload() }
+    @objc func stopLoading(_ sender: Any?) { model.frontPage?.stopLoading() }
+    @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
     @objc func openLocation(_ sender: Any?) { model.focusAddressField += 1 }
     @objc func newTab(_ sender: Any?) { model.newTab() }
     @objc func selectNextTab(_ sender: Any?) { model.selectAdjacentTab(1) }
@@ -108,9 +110,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if alert.runModal() == .alertFirstButtonReturn { model.clearArchive() }
     }
 
-    /// The selected tab, or the window when no tab is selected.
+    /// The Peek when one is shown, else the selected tab, else the window.
     @objc func closeTab(_ sender: Any?) {
-        if let tabID = model.selectedTabID { model.close(tabID) } else { window?.performClose(sender) }
+        if model.peek != nil {
+            model.closePeek()
+        } else if let tabID = model.selectedTabID {
+            model.close(tabID)
+        } else {
+            window?.performClose(sender)
+        }
     }
 
     @objc func selectTab(_ sender: NSMenuItem) {
@@ -131,13 +139,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         if item.action == #selector(closeTab(_:)) {
             let archives = model.selectedTabID.map { !model.state.isPinned($0) } ?? false
-            item.title = archives ? "Archive Tab" : "Close Tab"
+            item.title = model.peek != nil ? "Close Peek" : archives ? "Archive Tab" : "Close Tab"
             return true
         }
         return switch item.action {
-        case #selector(goBack(_:)): model.page?.canGoBack ?? false
-        case #selector(goForward(_:)): model.page?.canGoForward ?? false
-        case #selector(stopLoading(_:)): model.page?.isLoading ?? false
+        case #selector(goBack(_:)): model.frontPage?.canGoBack ?? false
+        case #selector(goForward(_:)): model.frontPage?.canGoForward ?? false
+        case #selector(stopLoading(_:)): model.frontPage?.isLoading ?? false
+        case #selector(expandPeek(_:)): model.peek != nil
         case #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)): !model.selectableTabs.isEmpty
         case #selector(selectTab(_:)): tabIndex(for: item) != nil
         case #selector(deleteSpace(_:)): model.state.spaces.count > 1
