@@ -312,7 +312,7 @@ void PageImpl::SetKeepsAddress(bool keeps_address) {
 }
 
 // Hosts, not origins: Arc peeks example.com → www.example.com and navigates
-// an http → https change in place. POST forms stay in place.
+// an http → https change in place.
 bool PageImpl::KeepsAddressAgainst(const content::OpenURLParams& params) const {
   if (!keeps_address_ || !params.is_renderer_initiated || params.post_data ||
       ui::PageTransitionCoreTypeIs(params.transition,
