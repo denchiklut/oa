@@ -1,6 +1,9 @@
+import DevKit
 import SwiftUI
 
 struct SidebarView: View {
+    static let width: CGFloat = 220
+
     let model: WindowModel
 
     var body: some View {
@@ -11,7 +14,7 @@ struct SidebarView: View {
                 tabs
             }
         }
-        .frame(width: 220)
+        .frame(width: Self.width)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -19,9 +22,9 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    rows(model.pinnedTabs)
+                    ForEach(model.pinnedTabs) { TabRow(model: model, tab: $0) }
                     if !model.pinnedTabs.isEmpty { Divider().padding(.vertical, 6) }
-                    rows(model.unpinnedTabs)
+                    ForEach(model.unpinnedTabs) { TabRow(model: model, tab: $0) }
                 }
                 .padding(8)
             }
@@ -39,17 +42,6 @@ struct SidebarView: View {
             .foregroundStyle(.secondary)
             Divider()
             spaces
-        }
-    }
-
-    private func rows(_ tabs: [SidebarTab]) -> some View {
-        ForEach(tabs) { tab in
-            TabRow(title: model.title(for: tab), icon: model.favicon(for: tab), selected: model.selectedTabID == tab.id)
-            {
-                model.select(tab.id)
-            } close: {
-                model.close(tab.id)
-            }
         }
     }
 
@@ -122,6 +114,8 @@ private struct ArchiveView: View {
                             .padding(.bottom, 2)
                         ForEach(group.entries) { entry in
                             ArchiveRow(entry: entry) {
+                                model.peekArchived(entry.id)
+                            } restore: {
                                 model.restoreArchived(entry.id)
                             } delete: {
                                 model.deleteArchived(entry.id)
@@ -154,6 +148,7 @@ private struct ArchiveView: View {
 
 private struct ArchiveRow: View {
     let entry: SidebarArchivedTab
+    let peek: () -> Void
     let restore: () -> Void
     let delete: () -> Void
     @State private var hovering = false
@@ -194,7 +189,7 @@ private struct ArchiveRow: View {
         .padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(hovering ? 0.06 : 0)))
         .contentShape(Rectangle())
-        .onTapGesture(perform: restore)
+        .onTapGesture(perform: peek)
         .onHover { hovering = $0 }
         .contextMenu {
             Button("Restore", action: restore)
@@ -237,30 +232,43 @@ private struct SpaceChip: View {
     }
 }
 
+/// Reads the model itself, so a change to its tab's page, Peek or selection re-renders the row alone.
 private struct TabRow: View {
-    let title: String
-    let icon: NSImage?
-    let selected: Bool
-    let select: () -> Void
-    let close: () -> Void
+    let model: WindowModel
+    let tab: SidebarTab
     @State private var hovering = false
 
     var body: some View {
+        let selected = model.selectedTabID == tab.id
         HStack(spacing: 6) {
             Group {
-                if let icon {
+                if let icon = model.favicon(for: tab) {
                     Image(nsImage: icon).resizable().interpolation(.high)
                 } else {
                     RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.1))
                 }
             }
             .frame(width: 16, height: 16)
-            Text(title)
+            Text(model.title(for: tab))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
+            if let peek = model.peeks[tab.id] {
+                Group {
+                    if let favicon = peek.favicon {
+                        Image(nsImage: favicon).resizable().interpolation(.high)
+                    } else {
+                        RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.1))
+                    }
+                }
+                .frame(width: 12, height: 12)
+                .padding(2)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.08)))
+            }
             if hovering || selected {
-                Button(action: close) {
+                Button {
+                    model.close(tab.id)
+                } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .bold))
                         .frame(width: 16, height: 16)
@@ -276,7 +284,7 @@ private struct TabRow: View {
                 .fill(Color.primary.opacity(selected ? 0.12 : hovering ? 0.06 : 0))
         )
         .contentShape(Rectangle())
-        .onTapGesture(perform: select)
+        .onTapGesture { model.select(tab.id) }
         .onHover { hovering = $0 }
     }
 }

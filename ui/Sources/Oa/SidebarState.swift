@@ -259,20 +259,23 @@ struct SidebarState {
         tree.append(SidebarItem(id: tab.id, kind: .tab(tab)), to: space.unpinnedRootID)
     }
 
-    /// As Arc: after the opener's last descendant, or at the top of the unpinned section for a pinned opener.
+    /// As Arc: after the opener's last descendant; a pinned opener's group sits at the top of the unpinned section.
     mutating func openTab(_ tab: SidebarTab, from openerID: UUID) {
         guard let space = space(containing: openerID) else { return }
         let siblings = tree[space.unpinnedRootID]?.childIDs ?? []
-        var index = 0
-        if let opener = siblings.firstIndex(of: openerID) {
-            var group: Set<UUID> = [openerID]
-            index = opener + 1
-            while index < siblings.count, let parent = tree.tab(siblings[index])?.openerID, group.contains(parent) {
-                group.insert(siblings[index])
-                index += 1
-            }
+        var group: Set<UUID> = [openerID]
+        var index = siblings.firstIndex(of: openerID).map { $0 + 1 } ?? 0
+        while index < siblings.count, let parent = tree.tab(siblings[index])?.openerID, group.contains(parent) {
+            group.insert(siblings[index])
+            index += 1
         }
         tree.insert(SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID, at: index)
+    }
+
+    /// Where an Archive Peek's Expand lands, as in Arc.
+    mutating func insertTab(_ tab: SidebarTab, atTopOf spaceID: UUID) {
+        guard let space = space(spaceID) else { return }
+        tree.insert(SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID, at: 0)
     }
 
     /// As Arc: the next tab below with the same opener, else the nearest above, else the opener.
@@ -293,6 +296,13 @@ struct SidebarState {
             SidebarArchivedTab(
                 id: id, title: tab.title, url: tab.url, spaceID: space.id, archivedAt: date, reason: reason,
                 position: position))
+    }
+
+    /// A page without a row, a Peek's. No position, so it restores at the top of the section.
+    mutating func archivePage(id: UUID, title: String, url: URL?, in spaceID: UUID, at date: Date = .now) {
+        archive.append(
+            SidebarArchivedTab(
+                id: id, title: title, url: url, spaceID: spaceID, archivedAt: date, reason: .manual, position: nil))
     }
 
     /// Into `fallbackSpaceID` when its Space is gone. Returns the Space it went to.
