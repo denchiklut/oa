@@ -51,6 +51,8 @@ class PageImpl : public Page,
   void Reload() override;
   void Stop() override;
   void Activate() override;
+  void MoveToWindow(const std::string& window_id) override;
+  void Snapshot(SnapshotCallback callback) override;
   void Close() override;
   void Drop() override;
 

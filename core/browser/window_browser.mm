@@ -17,6 +17,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
+#include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "content/public/browser/web_contents.h"
 #include "oa/browser/page_impl.h"
@@ -153,6 +154,27 @@ bool WindowBrowser::Insert(std::unique_ptr<content::WebContents> contents) {
   params.user_gesture = false;
   Navigate(&params);
   return params.navigated_or_inserted_contents != nullptr;
+}
+
+std::unique_ptr<tabs::TabModel> WindowBrowser::Detach(
+    content::WebContents* contents) {
+  TabStripModel* model = browser_->GetTabStripModel();
+  const int index = model->GetIndexOfWebContents(contents);
+  if (index == TabStripModel::kNoTab) {
+    return nullptr;
+  }
+  return model->DetachTabAtForInsertion(index);
+}
+
+bool WindowBrowser::InsertDetached(std::unique_ptr<tabs::TabModel> tab) {
+  if (closing_) {
+    return false;
+  }
+  TabStripModel* model = browser_->GetTabStripModel();
+  model->InsertDetachedTabAt(
+      model->count(), std::move(tab),
+      model->empty() ? AddTabTypes::ADD_ACTIVE : AddTabTypes::ADD_NONE);
+  return true;
 }
 
 void WindowBrowser::Activate(content::WebContents* contents) {
