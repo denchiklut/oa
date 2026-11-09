@@ -201,10 +201,10 @@ see [sidebar previews](#sidebar-previews-and-integrations).
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Peek interactive webpage overlay | ✅ | ☐ |
-| Cross-site links from Favorites/Pinned tabs open Peek | ✅ | ☐ |
-| Shift-click links to open Peek | ✅ | ☐ |
-| Expand a Peek into a tab | ✅ | ☐ |
+| Peek interactive webpage overlay | ✅ | ✅ |
+| Cross-site links from Favorites/Pinned tabs open Peek | ✅ | ✅ |
+| Shift-click links to open Peek | ✅ | ✅ |
+| Expand a Peek into a tab | ✅ | ✅ |
 | Add a Peek to Split View | ✅ | ☐ |
 | Reopen a closed Peek † | ✅ | ☐ |
 | Open Easels in Peek † | ✅ | ☐ |
