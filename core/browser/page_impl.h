@@ -6,6 +6,9 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
+#include "components/favicon/core/favicon_driver.h"
+#include "components/favicon/core/favicon_driver_observer.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "oa/browser/forwarding_web_contents_delegate.h"
 #include "oa/public/page.h"
@@ -23,7 +26,8 @@ class WindowBrowser;
 // delegate in front of the Browser's.
 class PageImpl : public Page,
                  public ForwardingWebContentsDelegate,
-                 public content::WebContentsObserver {
+                 public content::WebContentsObserver,
+                 public favicon::FaviconDriverObserver {
  public:
   static std::unique_ptr<PageImpl> Create(WindowBrowser* window_browser,
                                           Page::Observer* observer);
@@ -46,6 +50,8 @@ class PageImpl : public Page,
   double LoadProgress() const override;
   bool CanGoBack() const override;
   bool CanGoForward() const override;
+  void* Favicon() const override;
+  SecurityLevel GetSecurityLevel() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -89,7 +95,15 @@ class PageImpl : public Page,
       content::NavigationHandle* navigation_handle) override;
   void LoadProgressChanged(double progress) override;
   void TitleWasSet(content::NavigationEntry* entry) override;
+  void DidChangeVisibleSecurityState() override;
   void WebContentsDestroyed() override;
+
+  // favicon::FaviconDriverObserver:
+  void OnFaviconUpdated(favicon::FaviconDriver* favicon_driver,
+                        NotificationIconType notification_icon_type,
+                        const GURL& icon_url,
+                        bool icon_url_changed,
+                        const gfx::Image& image) override;
 
  private:
   PageImpl(WindowBrowser* window_browser, Page::Observer* observer);
@@ -106,6 +120,9 @@ class PageImpl : public Page,
   raw_ptr<Page::Observer> observer_;
   bool closing_ = false;
   double load_progress_ = 0;
+  base::ScopedObservation<favicon::FaviconDriver,
+                          favicon::FaviconDriverObserver>
+      favicon_observation_{this};
   base::WeakPtrFactory<PageImpl> weak_factory_{this};
 };
 

@@ -17,6 +17,13 @@ typedef NS_ENUM(NSInteger, OAPageOpenDisposition) {
   OAPageOpenDispositionPopup,
 };
 
+typedef NS_ENUM(NSInteger, OAPageSecurityLevel) {
+  OAPageSecurityLevelNeutral,
+  OAPageSecurityLevelSecure,
+  OAPageSecurityLevelWarning,
+  OAPageSecurityLevelDangerous,
+};
+
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
 // `openedPage` has no delegate yet; releasing it drops the page.
@@ -38,6 +45,9 @@ typedef NS_ENUM(NSInteger, OAPageOpenDisposition) {
 @property(nonatomic, readonly) double loadProgress;
 @property(nonatomic, readonly) BOOL canGoBack;
 @property(nonatomic, readonly) BOOL canGoForward;
+// Nil until Chromium's favicon driver has an icon for the page.
+@property(nonatomic, readonly, nullable) NSImage* favicon;
+@property(nonatomic, readonly) OAPageSecurityLevel securityLevel;
 - (instancetype)init NS_UNAVAILABLE;
 - (void)loadURL:(NSURL*)url;
 - (void)goBack;

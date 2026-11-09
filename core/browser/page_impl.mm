@@ -15,9 +15,12 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ssl/chrome_security_state_util.h"
 #include "chrome/browser/tab_contents/tab_util.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
+#include "components/favicon/content/content_favicon_driver.h"
+#include "components/security_state/core/security_state.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/frame_tree_node_id.h"
 #include "content/public/browser/navigation_controller.h"
@@ -34,6 +37,7 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/image/image.h"
 #include "url/gurl.h"
 
 namespace oa {
@@ -146,9 +150,14 @@ void PageImpl::Bind(content::WebContents* contents) {
   set_inner(contents->GetDelegate());
   contents->SetDelegate(this);
   Observe(contents);
+  favicon_observation_.Reset();
+  if (auto* driver = favicon::ContentFaviconDriver::FromWebContents(contents)) {
+    favicon_observation_.Observe(driver);
+  }
 }
 
 void PageImpl::Unbind() {
+  favicon_observation_.Reset();
   if (content::WebContents* contents = web_contents()) {
     contents->RemoveUserData(kPageMarkerKey);
     if (contents->GetDelegate() == this) {
@@ -210,6 +219,33 @@ bool PageImpl::CanGoBack() const {
 
 bool PageImpl::CanGoForward() const {
   return web_contents() && web_contents()->GetController().CanGoForward();
+}
+
+void* PageImpl::Favicon() const {
+  auto* driver =
+      web_contents()
+          ? favicon::ContentFaviconDriver::FromWebContents(web_contents())
+          : nullptr;
+  if (!driver || !driver->FaviconIsValid()) {
+    return nullptr;
+  }
+  return (__bridge void*)driver->GetFavicon().ToNSImage();
+}
+
+SecurityLevel PageImpl::GetSecurityLevel() const {
+  if (!web_contents()) {
+    return SecurityLevel::kNeutral;
+  }
+  switch (chrome_security_state::GetSecurityLevel(web_contents())) {
+    case security_state::SECURE:
+      return SecurityLevel::kSecure;
+    case security_state::WARNING:
+      return SecurityLevel::kWarning;
+    case security_state::DANGEROUS:
+      return SecurityLevel::kDangerous;
+    default:
+      return SecurityLevel::kNeutral;
+  }
 }
 
 void PageImpl::Load(const std::string& url) {
@@ -462,7 +498,20 @@ void PageImpl::TitleWasSet(content::NavigationEntry* entry) {
   NotifyStateChanged();
 }
 
+void PageImpl::DidChangeVisibleSecurityState() {
+  NotifyStateChanged();
+}
+
+void PageImpl::OnFaviconUpdated(favicon::FaviconDriver* favicon_driver,
+                                NotificationIconType notification_icon_type,
+                                const GURL& icon_url,
+                                bool icon_url_changed,
+                                const gfx::Image& image) {
+  NotifyStateChanged();
+}
+
 void PageImpl::WebContentsDestroyed() {
+  favicon_observation_.Reset();
   set_inner(nullptr);
   if (closing_) {
     OpenPages().erase(this);
