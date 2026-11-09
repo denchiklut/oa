@@ -21,6 +21,8 @@ struct SidebarTab: Identifiable, Hashable {
     var title = ""
     var url: URL?
     var viewedAt: Date?
+    /// The tab whose page opened this one. Kept after that tab is gone, as Arc keeps its grouping.
+    var openerID: UUID?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
 
@@ -255,6 +257,34 @@ struct SidebarState {
     mutating func appendTab(_ tab: SidebarTab, in spaceID: UUID) {
         guard let space = space(spaceID) else { return }
         tree.append(SidebarItem(id: tab.id, kind: .tab(tab)), to: space.unpinnedRootID)
+    }
+
+    /// A tab a page opened, placed as Arc places it: after the opener's last descendant in the unpinned section,
+    /// or at the top of that section when the opener is pinned.
+    mutating func openTab(_ tab: SidebarTab, from openerID: UUID) {
+        guard let space = space(containing: openerID) else { return }
+        let siblings = tree[space.unpinnedRootID]?.childIDs ?? []
+        var index = 0
+        if let opener = siblings.firstIndex(of: openerID) {
+            var group: Set<UUID> = [openerID]
+            index = opener + 1
+            while index < siblings.count, let parent = tree.tab(siblings[index])?.openerID, group.contains(parent) {
+                group.insert(siblings[index])
+                index += 1
+            }
+        }
+        tree.insert(SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID, at: index)
+    }
+
+    /// What Arc selects when a tab with an opener closes: the next tab below with the same opener, else the nearest
+    /// above, else the opener itself while it is in the Space.
+    func openerSuccessor(of tabID: UUID) -> UUID? {
+        guard let openerID = tree.tab(tabID)?.openerID, let space = space(containing: tabID) else { return nil }
+        let tabs = selectableTabs(in: space.id)
+        guard let index = tabs.firstIndex(where: { $0.id == tabID }) else { return nil }
+        if let below = tabs[(index + 1)...].first(where: { $0.openerID == openerID }) { return below.id }
+        if let above = tabs[..<index].last(where: { $0.openerID == openerID }) { return above.id }
+        return tabs.contains { $0.id == openerID } ? openerID : nil
     }
 
     mutating func archiveTab(_ id: UUID, reason: SidebarArchivedTab.Reason, at date: Date = .now) {
