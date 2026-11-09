@@ -44,7 +44,8 @@ struct SidebarView: View {
 
     private func rows(_ tabs: [SidebarTab]) -> some View {
         ForEach(tabs) { tab in
-            TabRow(title: model.title(for: tab), selected: model.selectedTabID == tab.id) {
+            TabRow(title: model.title(for: tab), icon: model.favicon(for: tab), selected: model.selectedTabID == tab.id)
+            {
                 model.select(tab.id)
             } close: {
                 model.close(tab.id)
@@ -238,6 +239,7 @@ private struct SpaceChip: View {
 
 private struct TabRow: View {
     let title: String
+    let icon: NSImage?
     let selected: Bool
     let select: () -> Void
     let close: () -> Void
@@ -245,6 +247,14 @@ private struct TabRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            Group {
+                if let icon {
+                    Image(nsImage: icon).resizable().interpolation(.high)
+                } else {
+                    RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.1))
+                }
+            }
+            .frame(width: 16, height: 16)
             Text(title)
                 .lineLimit(1)
                 .truncationMode(.tail)

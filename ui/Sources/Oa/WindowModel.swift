@@ -58,6 +58,10 @@ final class WindowModel {
         return "/ " + (page.title.isEmpty ? url.host() ?? url.absoluteString : page.title)
     }
 
+    func favicon(for tab: SidebarTab) -> NSImage? {
+        (pages[tab.id] ?? store.windows.lazy.compactMap { $0.pages[tab.id] }.first)?.favicon
+    }
+
     /// Only the only window picks a tab: first unpinned, else first pinned. Another window starts empty.
     func showFirst(isOnlyWindow: Bool) {
         if isOnlyWindow, let first = state.firstTabID(in: selectedSpaceID) {
