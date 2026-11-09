@@ -85,6 +85,8 @@ bool PageImpl::Insert(std::unique_ptr<content::WebContents> contents) {
   if (!window_browser_ || !window_browser_->Insert(std::move(contents))) {
     return false;
   }
+  // Hidden until its view first joins a window, as Chrome's background tabs.
+  page->WasHidden();
   Bind(page);
   OpenPages().insert(this);
   return true;
