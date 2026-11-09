@@ -56,7 +56,19 @@ public protocol Page: AnyObject, Observable {
     func drop()
 }
 
-public enum PageEvent: Sendable, Equatable {
+public enum PageEvent {
+    /// The page opened another page. The engine made it in this page's window with its opener, session storage and
+    /// any POST data kept, and started its load. The app installs it under a tab that takes its `id`, or drops it.
+    /// `url` is where it goes; nil when not known.
+    case opened(any Page, url: URL?, disposition: OpenDisposition)
     /// The engine closed the page without the app asking.
     case closed
+}
+
+/// How a page asked for another page to open.
+public enum OpenDisposition: Sendable, Equatable {
+    case foregroundTab
+    case backgroundTab
+    case newWindow
+    case popup
 }

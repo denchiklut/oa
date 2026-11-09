@@ -28,6 +28,7 @@ final class ChromiumPage: Page {
         self.delegate = delegate
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
         delegate.content = self
+        page.delegate = delegate
         stateChanged()
     }
 
@@ -67,6 +68,11 @@ final class ChromiumPage: Page {
         if page.canGoBack != canGoBack { canGoBack = page.canGoBack }
         if page.canGoForward != canGoForward { canGoForward = page.canGoForward }
         updateHostedView()
+    }
+
+    fileprivate func opened(_ page: CorePage, url: URL?, disposition: Int) {
+        let opened = ChromiumPage(id: UUID(), page: page, delegate: PageDelegate())
+        continuation.yield(.opened(opened, url: url, disposition: OpenDisposition(core: disposition)))
     }
 
     fileprivate func closed() {
@@ -109,5 +115,22 @@ final class PageDelegate: NSObject, CorePageDelegate {
     weak var content: ChromiumPage?
 
     func pageDidChangeState(_ page: CorePage) { content?.stateChanged() }
+
+    func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int) {
+        content?.opened(openedPage, url: targetURL, disposition: disposition)
+    }
+
     func pageDidClose(_ page: CorePage) { content?.closed() }
+}
+
+extension OpenDisposition {
+    /// `OAPageOpenDisposition` in `core/objc/OACore.h`.
+    init(core: Int) {
+        switch core {
+        case 1: self = .backgroundTab
+        case 2: self = .newWindow
+        case 3: self = .popup
+        default: self = .foregroundTab
+        }
+    }
 }

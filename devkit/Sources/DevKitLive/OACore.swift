@@ -39,6 +39,8 @@ import AppKit
 
 @MainActor @objc protocol CorePageDelegate: NSObjectProtocol {
     @objc(pageDidChangeState:) func pageDidChangeState(_ page: CorePage)
+    @objc(page:didOpenPage:targetURL:disposition:)
+    func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int)
     @objc(pageDidClose:) func pageDidClose(_ page: CorePage)
 }
 

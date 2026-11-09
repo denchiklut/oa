@@ -80,6 +80,18 @@ final class StubPage: Page {
         continuation = nil
     }
 
+    /// What a page's link or `window.open` does on the live engine: a page in the background, loading already.
+    func open(inBackground: Bool) {
+        guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        StubPage.openedCount += 1
+        components.path = "/opened-\(StubPage.openedCount)"
+        components.query = nil
+        guard let target = components.url else { return }
+        let opened = StubPage(id: UUID())
+        opened.load(target)
+        continuation?.yield(.opened(opened, url: target, disposition: inBackground ? .backgroundTab : .foregroundTab))
+    }
+
     private func show(_ url: URL) {
         self.url = url
         startLoading()
@@ -104,8 +116,11 @@ final class StubPage: Page {
         loadProgress = 1
     }
 
+    private static var openedCount = 0
+
     private static func title(for url: URL) -> String {
-        url.host()?.replacingOccurrences(of: "www.", with: "") ?? url.absoluteString
+        guard let host = url.host()?.replacingOccurrences(of: "www.", with: "") else { return url.absoluteString }
+        return url.path().count > 1 ? host + url.path() : host
     }
 }
 
@@ -123,6 +138,15 @@ private struct StubPageView: View {
             Text("Stub engine")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+            if page.url != nil {
+                HStack(spacing: 16) {
+                    Button("Open a page") { page.open(inBackground: false) }
+                    Button("Open in background") { page.open(inBackground: true) }
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 12))
+                .padding(.top, 8)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .textBackgroundColor))
