@@ -53,7 +53,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     private func observeTitle() {
         let title = withObservationTracking {
-            model.selectedTab?.displayTitle ?? ""
+            model.selectedTab.map(model.title(for:)) ?? ""
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeTitle() }
         }

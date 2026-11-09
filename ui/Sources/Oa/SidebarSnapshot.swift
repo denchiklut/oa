@@ -132,7 +132,6 @@ extension SidebarState {
 struct WindowRecord: Codable {
     let id: UUID
     var selectedSpaceID: UUID
-    var selectedTabIDs: [String: UUID]
 }
 
 struct WindowsSnapshot: Codable {
