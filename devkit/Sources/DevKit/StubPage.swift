@@ -91,6 +91,13 @@ final class StubPage: Page {
         continuation?.yield(.opened(opened, url: target, disposition: inBackground ? .backgroundTab : .foregroundTab))
     }
 
+    func askForFocus() {
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.continuation?.yield(.wantsActivation)
+        }
+    }
+
     private func show(_ url: URL) {
         self.url = url
         startLoading()
@@ -141,6 +148,7 @@ private struct StubPageView: View {
                 HStack(spacing: 16) {
                     Button("Open a page") { page.open(inBackground: false) }
                     Button("Open in background") { page.open(inBackground: true) }
+                    Button("Ask for focus in 3 s") { page.askForFocus() }
                 }
                 .buttonStyle(.link)
                 .font(.system(size: 12))

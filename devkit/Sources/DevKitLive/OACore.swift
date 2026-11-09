@@ -41,6 +41,7 @@ import AppKit
     @objc(pageDidChangeState:) func pageDidChangeState(_ page: CorePage)
     @objc(page:didOpenPage:targetURL:disposition:)
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int)
+    @objc(pageWantsActivation:) func pageWantsActivation(_ page: CorePage)
     @objc(pageDidClose:) func pageDidClose(_ page: CorePage)
 }
 
