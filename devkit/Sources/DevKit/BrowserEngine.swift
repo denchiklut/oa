@@ -39,7 +39,7 @@ public protocol Page: AnyObject, Observable {
     /// The icon the engine's favicon driver chose for the page, nil until it has one.
     var favicon: NSImage? { get }
     var securityLevel: SecurityLevel { get }
-    /// A page that keeps its address, as a pinned tab does: a cross-origin link click opens a new page instead of
+    /// A page that keeps its address, as a pinned tab does: a link to another host opens a new page instead of
     /// navigating this one.
     var keepsAddress: Bool { get set }
     /// Attach it only while the page is shown: a view outside a window is hidden to the engine.

@@ -198,7 +198,7 @@ private struct StubPageView: View {
                         Button("Shift-click a link") { page.open(.newWindow) }
                     }
                     HStack(spacing: 16) {
-                        Button("Click a cross-origin link") { page.clickCrossOriginLink() }
+                        Button("Click a link to another host") { page.clickCrossOriginLink() }
                         Button("Ask for focus in 3 s") { page.askForFocus() }
                         Button("Close itself") { page.closeItself() }
                     }
