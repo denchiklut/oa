@@ -20,7 +20,6 @@ struct SidebarTab: Identifiable, Hashable {
     let id: UUID
     var title = ""
     var url: URL?
-    /// When a window last selected it; auto-archive measures from here.
     var viewedAt: Date?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
@@ -37,7 +36,6 @@ struct SidebarTab: Identifiable, Hashable {
     }
 }
 
-/// A tab that left the sidebar. It keeps its Space, which may be gone, and its place for Restore Last Closed Tab.
 struct SidebarArchivedTab: Identifiable, Hashable, Codable {
     enum Reason: String, Codable { case manual, auto }
 
@@ -52,7 +50,6 @@ struct SidebarArchivedTab: Identifiable, Hashable, Codable {
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
 
-    /// The URL without its scheme, as Arc's Archive shows it.
     var address: String {
         guard let url else { return "" }
         var text = url.absoluteString
@@ -244,7 +241,7 @@ struct SidebarState {
         spaces[index].name = name
     }
 
-    /// The last Space stays. Its tabs, pinned too, go to the Archive, as in Arc; its entries stay.
+    /// The last Space stays.
     mutating func removeSpace(_ id: UUID, at date: Date = .now) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == id }) else { return }
         for tab in selectableTabs(in: id) { archiveTab(tab.id, reason: .manual, at: date) }
@@ -268,8 +265,7 @@ struct SidebarState {
                 position: position))
     }
 
-    /// Back into its Space's unpinned section, at the top or at its old index; into `fallbackSpaceID` when its
-    /// Space is gone. Returns the Space it went to.
+    /// Into `fallbackSpaceID` when its Space is gone. Returns the Space it went to.
     @discardableResult
     mutating func restoreArchived(_ id: UUID, in fallbackSpaceID: UUID, toOldPosition: Bool) -> UUID? {
         guard let index = archive.firstIndex(where: { $0.id == id }) else { return nil }
@@ -298,8 +294,7 @@ struct SidebarState {
         }
     }
 
-    /// Unpinned tabs not viewed for 12 h go to the Archive. Tabs in `shown`, and tabs without a stamp yet, are
-    /// stamped instead. Returns whether anything was archived.
+    /// Tabs in `shown`, and tabs without a stamp yet, are stamped instead of archived.
     @discardableResult
     mutating func autoArchive(shown: Set<UUID>, at now: Date = .now) -> Bool {
         var archived = false

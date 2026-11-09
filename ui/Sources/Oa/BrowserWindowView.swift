@@ -102,8 +102,8 @@ struct BrowserWindowView: View {
     }
 }
 
-/// A page another window holds: its last frame here, frozen and dimmed over the window background, as in Arc.
 private struct PlaceholderView: View {
+    /// Measured in Arc: a placeholder keeps about 57% of its page's contrast.
     static let snapshotOpacity = 0.57
 
     let image: NSImage

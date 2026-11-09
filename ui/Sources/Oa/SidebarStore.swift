@@ -34,7 +34,6 @@ final class SidebarStore {
         state.markViewed(tabID)
     }
 
-    /// Sweeps now and every 15 minutes. A tab selected in a window counts as viewed.
     func startAutoArchive() {
         sweep = Task { [weak self] in
             while let self, !Task.isCancelled {

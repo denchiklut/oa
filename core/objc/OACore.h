@@ -32,11 +32,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)reload;
 - (void)stopLoading;
 - (void)activate;
-// Moves the page into the Browser of the app's window `identifier`, keeping
-// its history and session ID.
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
-// Calls `completion` with the page's last frame, or nil while it has nothing
-// drawn, for example when no window shows it.
+// Nil while the page has nothing drawn, for example when no window shows it.
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable image))completion;
 - (void)close;
 - (void)drop;

@@ -85,7 +85,6 @@ struct SidebarView: View {
     }
 }
 
-/// Arc's Archive: one list across Spaces, grouped by day, newest first, in place of the sidebar.
 private struct ArchiveView: View {
     let model: WindowModel
 
@@ -205,7 +204,6 @@ private struct ArchiveRow: View {
 
 @MainActor
 enum SpaceDeletion {
-    /// Arc asks only when the Space has tabs, since they all go to the Archive.
     static func confirm(_ space: SidebarSpace, in model: WindowModel) {
         if !model.state.selectableTabs(in: space.id).isEmpty {
             let alert = NSAlert()

@@ -12,7 +12,7 @@ final class WindowModel {
     private(set) var selectedSpaceID: UUID
     private(set) var selectedTabIDs: [UUID: UUID] = [:]
     private(set) var pages: [UUID: any Page] = [:]
-    /// The last frame of a page that left for another window while its tab stayed selected here, as in Arc.
+    /// Last frames of pages that left for another window while their tab stayed selected here.
     private(set) var placeholders: [UUID: NSImage] = [:]
     private(set) var showingArchive = false
     var focusAddressField = 0
@@ -108,7 +108,7 @@ final class WindowModel {
         store.windowStateChanged()
     }
 
-    /// The window became key: a selected tab whose page another window holds takes it back, as in Arc.
+    /// On becoming key, the selected tab takes its page back from the window that holds it.
     func showSelected() {
         guard let tabID = selectedTabID, pages[tabID] == nil,
             store.windows.contains(where: { $0 !== self && $0.pages[tabID] != nil })
@@ -127,8 +127,7 @@ final class WindowModel {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }
 
-    /// The Space's tabs go to the Archive and their pages are dropped in every window. This window moves to the
-    /// neighbor above, else below.
+    /// Pages of the Space's tabs are dropped in every window. This window moves to the neighbor above, else below.
     func deleteSpace(_ spaceID: UUID) {
         let spaces = state.spaces
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == spaceID }) else { return }
@@ -149,12 +148,10 @@ final class WindowModel {
         showingArchive = false
     }
 
-    /// Restore from the Archive, as Arc: back at the top of its Space's unpinned section, not selected.
     func restoreArchived(_ id: UUID) {
         store.edit { $0.restoreArchived(id, in: selectedSpaceID, toOldPosition: false) }
     }
 
-    /// ⇧⌘T, as Arc: the newest entry comes back at its old index in its Space, selected.
     func restoreLastClosed() {
         guard let entry = state.archive.last else { return }
         var spaceID: UUID?
@@ -238,7 +235,6 @@ final class WindowModel {
         if let previousTabID, state.tree.tab(previousTabID) == nil { self.previousTabID = nil }
     }
 
-    /// Whether the tab is selected in the Space this window shows, with no page of its own here.
     private func shows(_ tabID: UUID) -> Bool {
         selectedTabID == tabID && pages[tabID] == nil
     }
@@ -301,7 +297,6 @@ final class WindowModel {
         }
     }
 
-    /// The page this window stopped showing goes live in a window that shows its tab, as in Arc.
     private func handOff(_ tabID: UUID) {
         guard let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }), let page = release(tabID)
         else { return }
@@ -314,14 +309,12 @@ final class WindowModel {
         install(page, for: tabID)
     }
 
-    /// Before the page leaves for another window: while this one shows its tab, it keeps the page's last frame.
-    /// The frame can only be copied while the page draws here.
+    /// Before the page leaves: the frame can only be copied while the page still draws here.
     private func keepFrame(_ tabID: UUID) async {
         guard selectedTabID == tabID, let page = pages[tabID], let image = await page.snapshot() else { return }
         placeholders[tabID] = image
     }
 
-    /// A page with nothing to copy before it left is asked again once it draws in the other window.
     private func keepFrameLater(of page: any Page, for tabID: UUID) {
         guard placeholders[tabID] == nil else { return }
         Task { [weak self] in
