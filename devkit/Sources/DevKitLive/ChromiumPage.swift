@@ -13,6 +13,8 @@ final class ChromiumPage: Page {
     private(set) var loadProgress = 0.0
     private(set) var canGoBack = false
     private(set) var canGoForward = false
+    private(set) var favicon: NSImage?
+    private(set) var securityLevel = SecurityLevel.neutral
     let events: AsyncStream<PageEvent>
 
     @ObservationIgnored private var page: CorePage?
@@ -67,6 +69,10 @@ final class ChromiumPage: Page {
         if progress != loadProgress { loadProgress = progress }
         if page.canGoBack != canGoBack { canGoBack = page.canGoBack }
         if page.canGoForward != canGoForward { canGoForward = page.canGoForward }
+        let favicon = page.favicon
+        if favicon !== self.favicon { self.favicon = favicon }
+        let level = SecurityLevel(core: page.securityLevel)
+        if level != securityLevel { securityLevel = level }
         updateHostedView()
     }
 
@@ -127,6 +133,18 @@ final class PageDelegate: NSObject, CorePageDelegate {
     func pageWantsActivation(_ page: CorePage) { content?.wantsActivation() }
 
     func pageDidClose(_ page: CorePage) { content?.closed() }
+}
+
+extension SecurityLevel {
+    /// `OAPageSecurityLevel` in `core/objc/OACore.h`.
+    init(core: Int) {
+        switch core {
+        case 1: self = .secure
+        case 2: self = .warning
+        case 3: self = .dangerous
+        default: self = .neutral
+        }
+    }
 }
 
 extension OpenDisposition {
