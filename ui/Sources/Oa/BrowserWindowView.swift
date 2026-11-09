@@ -128,10 +128,13 @@ private struct PlaceholderView: View {
 struct PageHostView: NSViewRepresentable {
     let view: NSView
 
-    func makeNSView(context: Context) -> NSView { Container() }
+    func makeNSView(context: Context) -> Container { Container() }
 
-    func updateNSView(_ container: NSView, context: Context) {
-        guard view.superview !== container else { return }
+    /// A host updated with the view it already placed leaves it alone: another host may have taken it since, as
+    /// the window's does on Expand, and SwiftUI still updates the Peek's host on its way out.
+    func updateNSView(_ container: Container, context: Context) {
+        guard container.hosted !== view else { return }
+        container.hosted = view
         container.subviews.forEach { $0.removeFromSuperview() }
         view.removeFromSuperview()
         view.translatesAutoresizingMaskIntoConstraints = true
@@ -140,7 +143,9 @@ struct PageHostView: NSViewRepresentable {
         container.addSubview(view)
     }
 
-    private final class Container: NSView {
+    final class Container: NSView {
+        weak var hosted: NSView?
+
         override var isFlipped: Bool { true }
 
         override func layout() {
