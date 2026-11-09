@@ -3,10 +3,8 @@ import DevKit
 
 @MainActor
 final class ApplicationDelegate: NSObject, NSApplicationDelegate {
-    /// Slice 1 uses one profile; the profile list and its UI come later.
-    static let defaultContextID = UUID(uuidString: "6B0F3E1A-0A5C-4F7B-9C1D-0A0A0A0A0A01")!
-
     private let engine: any BrowserApplication
+    private let store: SidebarStore
     private var windows: [BrowserWindowController] = []
     private var mainMenu: MainMenu?
     private static var current: ApplicationDelegate?
@@ -24,10 +22,12 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
 
     private init(engine: any BrowserApplication) {
         self.engine = engine
+        store = SidebarStore(directory: AppEngine.dataDirectory)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        openWindow()
+        let saved = store.savedWindows
+        if saved.isEmpty { openWindow() } else { saved.forEach { openWindow(restoring: $0) } }
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
@@ -39,20 +39,30 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        for window in windows { window.closeAllTabs() }
+        store.saveAndFreeze()
+        for window in windows { window.model.dropAll() }
         engine.terminate()
         return .terminateLater
     }
 
     @objc func newWindow(_ sender: Any?) { openWindow() }
 
-    private func openWindow() {
-        let context = engine.browserContext(id: Self.defaultContextID)
-        let controller = BrowserWindowController(engine: engine, context: context) { [weak self] closed in
+    /// A new window opens on the key window's Space. A restored one brings its own selection.
+    private func openWindow(restoring record: WindowRecord? = nil) {
+        let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
+        let spaceID = key?.model.selectedSpaceID ?? store.state.spaces[0].id
+        let controller = BrowserWindowController(
+            id: record?.id ?? UUID(), engine: engine, store: store, spaceID: spaceID
+        ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
         }
         let previous = windows.last?.window
         windows.append(controller)
         controller.open(cascadingFrom: previous)
+        if let record {
+            controller.model.restore(record)
+        } else {
+            controller.model.showFirst(isOnlyWindow: windows.count == 1)
+        }
     }
 }

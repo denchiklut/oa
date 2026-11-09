@@ -24,7 +24,7 @@ struct BrowserWindowView: View {
         .onChange(of: model.page?.url) { _, url in
             if !editing || address.isEmpty { address = url?.absoluteString ?? "" }
         }
-        .onChange(of: model.selectedTab?.id) { _, _ in
+        .onChange(of: model.selectedTabID) { _, _ in
             address = model.page?.url?.absoluteString ?? ""
             if model.page?.url == nil { addressFocused = true }
         }
@@ -47,7 +47,10 @@ struct BrowserWindowView: View {
             editing = focused
             if !focused { address = model.page?.url?.absoluteString ?? "" }
         }
-        .onAppear { address = model.page?.url?.absoluteString ?? "" }
+        .onAppear {
+            address = model.page?.url?.absoluteString ?? ""
+            if model.page == nil { addressFocused = true }
+        }
     }
 
     private var toolbar: some View {
