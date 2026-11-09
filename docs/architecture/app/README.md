@@ -100,12 +100,14 @@ through from the visible page, which isn't copied.
 
 A page that asks to be shown, with `window.focus()` from its opener or by a
 `window.open` that reuses it as a named target, is reported by DevKit as an
-event on that page, and the window holding the page selects its tab when the
-tab's Space is the one shown. Arc selects the reused named tab; whether it
-switches Spaces for a tab elsewhere is unknown, so Oa doesn't: a request for a
-tab in a Space not shown is ignored, as a new page's selection is. Chromium
-grants the request only to a caller with a recent gesture or to the page's
-opener, so a page can't pull the selection to itself from the background.
+event on that page. The window holding the page selects its tab, switching to
+the tab's Space when another is shown, and comes to the front, as Arc does: it
+switches Spaces for both calls and raises the window that already shows a
+reused named tab rather than showing the page twice. Arc does nothing for a
+`window.focus()` on a tab already shown; the engine reports both calls the
+same way, so Oa raises the window for that too. Chromium grants the request
+only to a caller with a recent gesture or to the page's opener, so a page
+can't pull the selection to itself from the background.
 
 Only the only window selects a tab when it opens: the first unpinned, else the
 first pinned. A further window opens on the key window's Space with nothing
