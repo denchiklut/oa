@@ -14,6 +14,13 @@ enum class OpenDisposition {
   kPopup,
 };
 
+enum class SecurityLevel {
+  kNeutral,
+  kSecure,
+  kWarning,
+  kDangerous,
+};
+
 class Page {
  public:
   // The NSImage lives only for the call; null if nothing could be copied.
@@ -44,6 +51,9 @@ class Page {
   virtual double LoadProgress() const = 0;
   virtual bool CanGoBack() const = 0;
   virtual bool CanGoForward() const = 0;
+  // An NSImage, held by the tab while it keeps the icon; null until it has one.
+  virtual void* Favicon() const = 0;
+  virtual SecurityLevel GetSecurityLevel() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;

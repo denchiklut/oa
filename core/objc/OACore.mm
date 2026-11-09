@@ -49,6 +49,19 @@ OAPageOpenDisposition ToDisposition(oa::OpenDisposition disposition) {
   }
 }
 
+OAPageSecurityLevel ToSecurityLevel(oa::SecurityLevel level) {
+  switch (level) {
+    case oa::SecurityLevel::kNeutral:
+      return OAPageSecurityLevelNeutral;
+    case oa::SecurityLevel::kSecure:
+      return OAPageSecurityLevelSecure;
+    case oa::SecurityLevel::kWarning:
+      return OAPageSecurityLevelWarning;
+    case oa::SecurityLevel::kDangerous:
+      return OAPageSecurityLevelDangerous;
+  }
+}
+
 class PageObserverBridge : public oa::Page::Observer {
  public:
   explicit PageObserverBridge(OAPage* page) : page_(page) {}
@@ -128,6 +141,16 @@ class PageObserverBridge : public oa::Page::Observer {
 
 - (BOOL)canGoForward {
   return _page && _page->CanGoForward();
+}
+
+- (nullable NSImage*)favicon {
+  void* image = _page ? _page->Favicon() : nullptr;
+  return image ? (__bridge NSImage*)image : nil;
+}
+
+- (OAPageSecurityLevel)securityLevel {
+  return _page ? ToSecurityLevel(_page->GetSecurityLevel())
+               : OAPageSecurityLevelNeutral;
 }
 
 - (void)loadURL:(NSURL*)url {
