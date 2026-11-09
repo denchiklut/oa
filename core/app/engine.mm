@@ -28,6 +28,7 @@
 #include "chrome/browser/ui/toasts/toast_features.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/profiler/main_thread_stack_sampling_profiler.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/lens/lens_features.h"
@@ -35,6 +36,7 @@
 #include "content/public/app/content_main.h"
 #include "content/public/browser/browser_main_runner.h"
 #include "content/public/common/main_function_params.h"
+#include "oa/browser/browser_client.h"
 #include "oa/browser/page_impl.h"
 #include "oa/browser/profile_services.h"
 #include "oa/browser/ui/browser_window_impl.h"
@@ -89,6 +91,15 @@ class MainDelegate : public ChromeMainDelegate {
   using ChromeMainDelegate::ChromeMainDelegate;
 
  protected:
+  // ChromeMainDelegate's own body, with Oa's client in Chrome's place.
+  content::ContentBrowserClient* CreateContentBrowserClient() override {
+    chrome_content_browser_client_ = std::make_unique<BrowserClient>();
+    CHECK(sampling_profiler_);
+    chrome_content_browser_client_->SetSamplingProfiler(
+        std::move(sampling_profiler_));
+    return chrome_content_browser_client_.get();
+  }
+
   std::variant<int, content::MainFunctionParams> RunProcess(
       const std::string& process_type,
       content::MainFunctionParams main_function_params) override {

@@ -85,6 +85,7 @@ class PageObserverBridge : public oa::Page::Observer {
 @implementation OAPage {
   std::unique_ptr<PageObserverBridge> _observer;
   std::unique_ptr<oa::Page> _page;
+  BOOL _keepsAddress;
 }
 
 @synthesize delegate = _delegate;
@@ -108,6 +109,18 @@ class PageObserverBridge : public oa::Page::Observer {
 - (void)setPage:(std::unique_ptr<oa::Page>)page {
   _page = std::move(page);
   _page->SetObserver(_observer.get());
+  _page->SetKeepsAddress(_keepsAddress);
+}
+
+- (BOOL)keepsAddress {
+  return _keepsAddress;
+}
+
+- (void)setKeepsAddress:(BOOL)keepsAddress {
+  _keepsAddress = keepsAddress;
+  if (_page) {
+    _page->SetKeepsAddress(keepsAddress);
+  }
 }
 
 - (nullable NSView*)view {
