@@ -40,7 +40,6 @@ class PageImpl : public Page,
 
   void Rebind(content::WebContents* new_contents);
   void OnRemovedFromStrip();
-  bool keeps_address() const { return keeps_address_; }
 
   // Page:
   void SetObserver(Page::Observer* observer) override;
@@ -114,6 +113,7 @@ class PageImpl : public Page,
   std::unique_ptr<PageImpl> Wrap(
       std::unique_ptr<content::WebContents> contents);
   void Bind(content::WebContents* contents);
+  bool KeepsAddressAgainst(const content::OpenURLParams& params) const;
   void Unbind();
   void NotifyStateChanged();
   void NotifyClosed();

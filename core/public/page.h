@@ -61,7 +61,7 @@ class Page {
   virtual void Reload() = 0;
   virtual void Stop() = 0;
   virtual void Activate() = 0;
-  // As a pinned tab: a cross-origin link click opens a new page, reported
+  // As a pinned tab: a link to another host opens a new page, reported
   // through the observer, instead of navigating this one.
   virtual void SetKeepsAddress(bool keeps_address) = 0;
   // The same tab, WebContents and history move; nothing happens if it is there.

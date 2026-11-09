@@ -32,6 +32,7 @@
 #include "content/public/common/referrer.h"
 #include "oa/browser/window_browser.h"
 #include "skia/ext/skia_utils_mac.h"
+#include "third_party/blink/public/common/renderer_preferences/renderer_preferences.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
@@ -149,6 +150,9 @@ std::unique_ptr<PageImpl> PageImpl::Wrap(
 void PageImpl::Bind(content::WebContents* contents) {
   set_inner(contents->GetDelegate());
   contents->SetDelegate(this);
+  contents->GetMutableRendererPrefs()->browser_handles_all_top_level_requests =
+      keeps_address_;
+  contents->SyncRendererPrefs();
   Observe(contents);
   favicon_observation_.Reset();
   if (auto* driver = favicon::ContentFaviconDriver::FromWebContents(contents)) {
@@ -296,8 +300,28 @@ void PageImpl::Activate() {
   }
 }
 
+// As Arc: the renderer hands every top-level navigation to the browser, which
+// then sends a link to another host to a new page from OpenURLFromTab.
 void PageImpl::SetKeepsAddress(bool keeps_address) {
   keeps_address_ = keeps_address;
+  if (content::WebContents* contents = web_contents()) {
+    contents->GetMutableRendererPrefs()
+        ->browser_handles_all_top_level_requests = keeps_address;
+    contents->SyncRendererPrefs();
+  }
+}
+
+// Hosts, not origins: Arc peeks example.com → www.example.com and navigates
+// an http → https change in place. POST forms stay in place.
+bool PageImpl::KeepsAddressAgainst(const content::OpenURLParams& params) const {
+  if (!keeps_address_ || !params.is_renderer_initiated || params.post_data ||
+      ui::PageTransitionCoreTypeIs(params.transition,
+                                   ui::PAGE_TRANSITION_FORM_SUBMIT) ||
+      !params.url.SchemeIsHTTPOrHTTPS()) {
+    return false;
+  }
+  const GURL& current = web_contents()->GetLastCommittedURL();
+  return current.SchemeIsHTTPOrHTTPS() && current.host() != params.url.host();
 }
 
 void PageImpl::MoveToWindow(const std::string& window_id) {
@@ -391,13 +415,17 @@ content::WebContents* PageImpl::OpenURLFromTab(
     content::WebContents* source,
     const content::OpenURLParams& params,
     base::OnceCallback<void(content::NavigationHandle&)> callback) {
-  if (params.disposition == WindowOpenDisposition::CURRENT_TAB) {
-    return ForwardingWebContentsDelegate::OpenURLFromTab(source, params,
-                                                         std::move(callback));
-  }
   OpenDisposition disposition;
-  if (!observer_ || !window_browser_ ||
-      !ToOpenDisposition(params.disposition, &disposition)) {
+  if (params.disposition == WindowOpenDisposition::CURRENT_TAB) {
+    if (!KeepsAddressAgainst(params)) {
+      return ForwardingWebContentsDelegate::OpenURLFromTab(source, params,
+                                                           std::move(callback));
+    }
+    disposition = OpenDisposition::kForegroundTab;
+  } else if (!ToOpenDisposition(params.disposition, &disposition)) {
+    return nullptr;
+  }
+  if (!observer_ || !window_browser_) {
     return nullptr;
   }
   Profile* profile = window_browser_->browser()->GetProfile();
