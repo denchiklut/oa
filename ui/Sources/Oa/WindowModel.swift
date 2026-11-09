@@ -16,12 +16,12 @@ final class WindowModel {
     private(set) var placeholders: [UUID: NSImage] = [:]
     private(set) var showingArchive = false
     var focusAddressField = 0
+    @ObservationIgnored var bringToFront: () -> Void = {}
     @ObservationIgnored private let engine: any BrowserApplication
     @ObservationIgnored private let store: SidebarStore
     @ObservationIgnored private var previousTabID: UUID?
     @ObservationIgnored private var pendingURLs: [UUID: URL] = [:]
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
-    @ObservationIgnored private var events: [UUID: Task<Void, Never>] = [:]
 
     var state: SidebarState { store.state }
     var space: SidebarSpace? { state.space(selectedSpaceID) }
@@ -216,7 +216,6 @@ final class WindowModel {
     /// Lets go of the page for `tabID` without ending it. Another window takes it over this way.
     @discardableResult
     func release(_ tabID: UUID) -> (any Page)? {
-        events.removeValue(forKey: tabID)?.cancel()
         creating.removeValue(forKey: tabID)
         pendingURLs.removeValue(forKey: tabID)
         if previousTabID == tabID { previousTabID = nil }
@@ -295,6 +294,7 @@ final class WindowModel {
             guard creating[tabID] == token, let tab = state.tree.tab(tabID) else { return page.drop() }
             creating.removeValue(forKey: tabID)
             install(page, for: tabID)
+            listen(to: page, for: tabID)
             if let url = pendingURLs.removeValue(forKey: tabID) ?? tab.url { page.load(url) }
         }
     }
@@ -331,15 +331,26 @@ final class WindowModel {
     private func install(_ page: any Page, for tabID: UUID) {
         pages[tabID] = page
         observe(page, for: tabID)
-        events[tabID] = Task { [weak self] in
+    }
+
+    /// The stream has one consumer, so a page gets one loop for its life, delivering to whichever window holds it.
+    private func listen(to page: any Page, for tabID: UUID) {
+        let store = store
+        Task {
             for await event in page.events {
-                switch event {
-                case .opened(let opened, let url, let disposition):
-                    self?.place(opened, url: url, disposition: disposition, from: tabID)
-                case .closed:
-                    self?.pageEnded(tabID)
-                }
+                store.windows.first { $0.pages[tabID] != nil }?.handle(event, for: tabID)
             }
+        }
+    }
+
+    private func handle(_ event: PageEvent, for tabID: UUID) {
+        switch event {
+        case .opened(let opened, let url, let disposition):
+            place(opened, url: url, disposition: disposition, from: tabID)
+        case .wantsActivation:
+            show(tabID)
+        case .closed:
+            pageEnded(tabID)
         }
     }
 
@@ -348,7 +359,22 @@ final class WindowModel {
         let tab = SidebarTab(id: page.id, url: url, viewedAt: .now, openerID: openerID)
         store.edit { $0.openTab(tab, from: openerID) }
         install(page, for: tab.id)
+        listen(to: page, for: tab.id)
         if disposition != .backgroundTab, space.id == selectedSpaceID { select(tab.id) }
+    }
+
+    /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown.
+    private func show(_ tabID: UUID) {
+        guard let spaceID = state.space(containing: tabID)?.id else { return }
+        if spaceID != selectedSpaceID {
+            showingArchive = false
+            selectedTabIDs[spaceID] = tabID
+            selectSpace(spaceID)
+            store.markViewed(tabID)
+        } else {
+            select(tabID)
+        }
+        bringToFront()
     }
 
     private func observe(_ page: any Page, for tabID: UUID) {
