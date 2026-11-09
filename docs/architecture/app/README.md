@@ -108,8 +108,11 @@ right kind, and no archived tab is also in the tree.
 `selectedSpaceID`. A saved Space that no longer exists falls back to the first.
 Window frames are not saved.
 
-A file that can't be read or has a newer `version` is kept as it is and not
-written for the rest of the launch; the app runs on the default state in memory.
-Backups and recovery copies are deferred.
+`version` is a format number, as Arc's own stores carry at their top level.
+Adding a key with a default, as `archive` and `viewedAt` were, doesn't bump it;
+a change an older reader would misread does. A file that can't be read or has a
+newer `version` is kept as it is and not written for the rest of the launch; the
+app runs on the default state in memory. Backups and recovery copies are
+deferred.
 
 Return to the [system overview](../README.md).
