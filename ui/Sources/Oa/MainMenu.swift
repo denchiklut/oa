@@ -30,6 +30,10 @@ final class MainMenu {
         file.addItem(item("Close Tab", #selector(BrowserWindowController.closeTab(_:)), key: "w"))
         file.addItem(
             item("Close Window", #selector(NSWindow.performClose(_:)), key: "w", modifiers: [.command, .shift]))
+        file.addItem(
+            item(
+                "Restore Last Closed Tab", #selector(BrowserWindowController.restoreLastClosed(_:)), key: "t",
+                modifiers: [.command, .shift]))
 
         let edit = submenu("Edit", in: menu)
         edit.addItem(item("Undo", Selector(("undo:")), key: "z"))
@@ -44,9 +48,12 @@ final class MainMenu {
         view.addItem(item("Reload Page", #selector(BrowserWindowController.reload(_:)), key: "r"))
         view.addItem(item("Stop Loading", #selector(BrowserWindowController.stopLoading(_:)), key: "."))
 
-        let history = submenu("History", in: menu)
-        history.addItem(item("Back", #selector(BrowserWindowController.goBack(_:)), key: "["))
-        history.addItem(item("Forward", #selector(BrowserWindowController.goForward(_:)), key: "]"))
+        let archive = submenu("Archive", in: menu)
+        archive.addItem(item("Back", #selector(BrowserWindowController.goBack(_:)), key: "["))
+        archive.addItem(item("Forward", #selector(BrowserWindowController.goForward(_:)), key: "]"))
+        archive.addItem(.separator())
+        archive.addItem(item("View Archive…", #selector(BrowserWindowController.viewArchive(_:))))
+        archive.addItem(item("Clear Archive", #selector(BrowserWindowController.clearArchive(_:))))
 
         let tabs = submenu("Tabs", in: menu)
         let next = #selector(BrowserWindowController.selectNextTab(_:))

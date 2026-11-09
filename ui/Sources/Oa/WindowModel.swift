@@ -1,9 +1,10 @@
+import AppKit
 import DevKit
 import Foundation
 import Observation
 
 /// A window's selection over the shared sidebar state, and the pages it holds. A page exists only once the
-/// tab was shown here; one live page per tab across windows.
+/// tab was shown here; one live page per tab across windows, and it moves to the window that shows the tab.
 @MainActor
 @Observable
 final class WindowModel {
@@ -11,6 +12,9 @@ final class WindowModel {
     private(set) var selectedSpaceID: UUID
     private(set) var selectedTabIDs: [UUID: UUID] = [:]
     private(set) var pages: [UUID: any Page] = [:]
+    /// The last frame of a page that left for another window while its tab stayed selected here, as in Arc.
+    private(set) var placeholders: [UUID: NSImage] = [:]
+    private(set) var showingArchive = false
     var focusAddressField = 0
     @ObservationIgnored private let engine: any BrowserApplication
     @ObservationIgnored private let store: SidebarStore
@@ -24,6 +28,7 @@ final class WindowModel {
     var selectedTabID: UUID? { selectedTabIDs[selectedSpaceID] }
     var selectedTab: SidebarTab? { selectedTabID.flatMap { state.tree.tab($0) } }
     var page: (any Page)? { selectedTabID.flatMap { pages[$0] } }
+    var placeholder: NSImage? { page == nil ? selectedTabID.flatMap { placeholders[$0] } : nil }
     /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
     var address: URL? { page?.url ?? selectedTab?.url }
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
@@ -63,15 +68,21 @@ final class WindowModel {
     }
 
     func newTab(_ url: URL? = nil) {
-        let tab = SidebarTab(id: UUID(), url: url)
+        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
         store.edit { $0.appendTab(tab, in: selectedSpaceID) }
         select(tab.id)
     }
 
     func select(_ tabID: UUID) {
         guard state.space(containing: tabID)?.id == selectedSpaceID, selectedTabID != tabID else { return }
-        if let current = selectedTabID, pages[current] != nil { previousTabID = current }
+        showingArchive = false
+        if let current = selectedTabID {
+            if pages[current] != nil { previousTabID = current }
+            placeholders[current] = nil
+            handOff(current)
+        }
         selectedTabIDs[selectedSpaceID] = tabID
+        store.markViewed(tabID)
         ensurePage(tabID)
     }
 
@@ -97,6 +108,14 @@ final class WindowModel {
         store.windowStateChanged()
     }
 
+    /// The window became key: a selected tab whose page another window holds takes it back, as in Arc.
+    func showSelected() {
+        guard let tabID = selectedTabID, pages[tabID] == nil,
+            store.windows.contains(where: { $0 !== self && $0.pages[tabID] != nil })
+        else { return }
+        ensurePage(tabID)
+    }
+
     func addSpace(named name: String) {
         guard let profileID = space?.profileID else { return }
         var created: SidebarSpace?
@@ -108,7 +127,8 @@ final class WindowModel {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }
 
-    /// Pages of the Space's tabs are dropped in every window. This window moves to the neighbor above, else below.
+    /// The Space's tabs go to the Archive and their pages are dropped in every window. This window moves to the
+    /// neighbor above, else below.
     func deleteSpace(_ spaceID: UUID) {
         let spaces = state.spaces
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == spaceID }) else { return }
@@ -119,6 +139,37 @@ final class WindowModel {
     func togglePin() {
         guard let tabID = selectedTabID else { return }
         store.edit { $0.togglePin(tabID) }
+    }
+
+    func viewArchive() {
+        showingArchive = true
+    }
+
+    func exitArchive() {
+        showingArchive = false
+    }
+
+    /// Restore from the Archive, as Arc: back at the top of its Space's unpinned section, not selected.
+    func restoreArchived(_ id: UUID) {
+        store.edit { $0.restoreArchived(id, in: selectedSpaceID, toOldPosition: false) }
+    }
+
+    /// ⇧⌘T, as Arc: the newest entry comes back at its old index in its Space, selected.
+    func restoreLastClosed() {
+        guard let entry = state.archive.last else { return }
+        var spaceID: UUID?
+        store.edit { spaceID = $0.restoreArchived(entry.id, in: selectedSpaceID, toOldPosition: true) }
+        guard let spaceID else { return }
+        selectSpace(spaceID)
+        select(entry.id)
+    }
+
+    func deleteArchived(_ id: UUID) {
+        store.edit { $0.removeArchived(id) }
+    }
+
+    func clearArchive() {
+        store.edit { $0.clearArchive() }
     }
 
     /// Typed input: a URL as typed, a host, or a search. Search fallback is a product decision for slice 1.
@@ -145,15 +196,23 @@ final class WindowModel {
         }
     }
 
-    /// ⌘W. An unpinned tab goes with its page closed as the user would; a pinned one keeps its entry and drops
-    /// its page.
+    /// ⌘W. An unpinned tab is archived and its page, wherever it lives, closed as the user would; a pinned one
+    /// keeps its entry and drops its page.
     func close(_ tabID: UUID) {
         end(tabID) { page, pinned in pinned ? page.drop() : page.close() }
     }
 
-    /// Window close and quit: no unload handlers, the records stay.
+    /// Window close and quit: a page whose tab another window shows moves there; the rest are dropped without
+    /// unload handlers. The records stay.
     func dropAll() {
-        for tabID in Array(pages.keys) { release(tabID)?.drop() }
+        for tabID in Array(pages.keys) {
+            guard let page = release(tabID) else { continue }
+            if let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }) {
+                heir.adopt(page, for: tabID)
+            } else {
+                page.drop()
+            }
+        }
         creating = [:]
     }
 
@@ -167,7 +226,7 @@ final class WindowModel {
         return pages.removeValue(forKey: tabID)
     }
 
-    /// After a state edit: selections and pages of tabs or Spaces that are gone go too.
+    /// After a state edit: selections, placeholders and pages of tabs or Spaces that are gone go too.
     func reconcile() {
         if space == nil, let first = state.spaces.first { selectedSpaceID = first.id }
         for (spaceID, tabID) in selectedTabIDs where state.space(containing: tabID)?.id != spaceID {
@@ -175,7 +234,13 @@ final class WindowModel {
         }
         for tabID in Array(pages.keys) where state.tree.tab(tabID) == nil { release(tabID)?.drop() }
         for tabID in Array(creating.keys) where state.tree.tab(tabID) == nil { release(tabID) }
+        for tabID in Array(placeholders.keys) where state.tree.tab(tabID) == nil { placeholders[tabID] = nil }
         if let previousTabID, state.tree.tab(previousTabID) == nil { self.previousTabID = nil }
+    }
+
+    /// Whether the tab is selected in the Space this window shows, with no page of its own here.
+    private func shows(_ tabID: UUID) -> Bool {
+        selectedTabID == tabID && pages[tabID] == nil
     }
 
     private func end(_ tabID: UUID, _ finish: (any Page, Bool) -> Void) {
@@ -183,8 +248,9 @@ final class WindowModel {
         let pinned = state.isPinned(tabID)
         let wasSelected = selectedTabIDs[spaceID] == tabID
         let next = wasSelected ? nextSelection(closing: tabID, pinned: pinned, in: spaceID) : nil
-        let page = release(tabID)
-        if !pinned { store.edit { $0.removeTab(tabID) } }
+        let page = store.windows.compactMap { $0.release(tabID) }.first
+        for window in store.windows { window.placeholders[tabID] = nil }
+        if !pinned { store.edit { $0.archiveTab(tabID, reason: .manual) } }
         if let page { finish(page, pinned) }
         if wasSelected {
             selectedTabIDs[spaceID] = next
@@ -205,24 +271,73 @@ final class WindowModel {
         return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : nil
     }
 
-    /// Creates the page for a shown tab, taking it over from a window that holds it.
+    /// Takes the page over from the window that holds it, else creates it.
     private func ensurePage(_ tabID: UUID) {
         guard pages[tabID] == nil, creating[tabID] == nil else { return }
-        for window in store.windows where window !== self { window.release(tabID)?.drop() }
-        guard let space = state.space(containing: tabID), let profile = state.profile(space.profileID) else { return }
-        let context = engine.browserContext(id: profile.id)
         let token = UUID()
         creating[tabID] = token
+        if let holder = store.windows.first(where: { $0 !== self && $0.pages[tabID] != nil }) {
+            Task { [weak self] in
+                await holder.keepFrame(tabID)
+                guard let self, creating[tabID] == token else { return }
+                creating.removeValue(forKey: tabID)
+                guard let page = holder.release(tabID) else { return }
+                adopt(page, for: tabID)
+                holder.keepFrameLater(of: page, for: tabID)
+            }
+            return
+        }
+        guard let space = state.space(containing: tabID), let profile = state.profile(space.profileID) else {
+            creating.removeValue(forKey: tabID)
+            return
+        }
+        let context = engine.browserContext(id: profile.id)
         Task { [weak self, id] in
             guard let page = await context.makePage(id: tabID, windowID: id), let self else { return }
             guard creating[tabID] == token, let tab = state.tree.tab(tabID) else { return page.drop() }
             creating.removeValue(forKey: tabID)
-            pages[tabID] = page
+            install(page, for: tabID)
             if let url = pendingURLs.removeValue(forKey: tabID) ?? tab.url { page.load(url) }
-            observe(page, for: tabID)
-            events[tabID] = Task { [weak self] in
-                for await event in page.events where event == .closed { self?.pageEnded(tabID) }
+        }
+    }
+
+    /// The page this window stopped showing goes live in a window that shows its tab, as in Arc.
+    private func handOff(_ tabID: UUID) {
+        guard let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }), let page = release(tabID)
+        else { return }
+        heir.adopt(page, for: tabID)
+    }
+
+    private func adopt(_ page: any Page, for tabID: UUID) {
+        page.move(toWindow: id)
+        placeholders[tabID] = nil
+        install(page, for: tabID)
+    }
+
+    /// Before the page leaves for another window: while this one shows its tab, it keeps the page's last frame.
+    /// The frame can only be copied while the page draws here.
+    private func keepFrame(_ tabID: UUID) async {
+        guard selectedTabID == tabID, let page = pages[tabID], let image = await page.snapshot() else { return }
+        placeholders[tabID] = image
+    }
+
+    /// A page with nothing to copy before it left is asked again once it draws in the other window.
+    private func keepFrameLater(of page: any Page, for tabID: UUID) {
+        guard placeholders[tabID] == nil else { return }
+        Task { [weak self] in
+            for _ in 0..<2 {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, placeholders[tabID] == nil, selectedTabID == tabID, pages[tabID] == nil else { return }
+                if let image = await page.snapshot() { placeholders[tabID] = image }
             }
+        }
+    }
+
+    private func install(_ page: any Page, for tabID: UUID) {
+        pages[tabID] = page
+        observe(page, for: tabID)
+        events[tabID] = Task { [weak self] in
+            for await event in page.events where event == .closed { self?.pageEnded(tabID) }
         }
     }
 

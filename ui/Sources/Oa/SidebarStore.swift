@@ -11,6 +11,7 @@ final class SidebarStore {
     @ObservationIgnored let savedWindows: [WindowRecord]
     @ObservationIgnored private let persistence: SidebarPersistence
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
+    @ObservationIgnored private var sweep: Task<Void, Never>?
     @ObservationIgnored private var frozen = false
 
     init(directory: URL) {
@@ -27,6 +28,26 @@ final class SidebarStore {
 
     func setSavedPage(_ tabID: UUID, title: String, url: URL?) {
         state.setSavedPage(tabID, title: title, url: url)
+    }
+
+    func markViewed(_ tabID: UUID) {
+        state.markViewed(tabID)
+    }
+
+    /// Sweeps now and every 15 minutes. A tab selected in a window counts as viewed.
+    func startAutoArchive() {
+        sweep = Task { [weak self] in
+            while let self, !Task.isCancelled {
+                autoArchive()
+                try? await Task.sleep(for: .seconds(15 * 60))
+            }
+        }
+    }
+
+    private func autoArchive() {
+        guard state.autoArchive(shown: Set(windows.compactMap(\.selectedTabID))) else { return }
+        for window in windows { window.reconcile() }
+        scheduleSave()
     }
 
     func addWindow(_ window: WindowModel) {

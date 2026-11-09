@@ -17,6 +17,18 @@ struct SidebarSnapshot: Codable {
     var profiles: [SidebarProfile]
     var spaces: [SidebarSpace]
     var tree: Tree
+    var archive: [SidebarArchivedTab]
+
+    private enum Key: String, CodingKey { case version, profiles, spaces, tree, archive }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: Key.self)
+        version = try values.decode(Int.self, forKey: .version)
+        profiles = try values.decode([SidebarProfile].self, forKey: .profiles)
+        spaces = try values.decode([SidebarSpace].self, forKey: .spaces)
+        tree = try values.decode(Tree.self, forKey: .tree)
+        archive = try values.decodeIfPresent([SidebarArchivedTab].self, forKey: .archive) ?? []
+    }
 
     struct Tree: Codable {
         var rootIDs: [UUID]
@@ -29,7 +41,7 @@ struct SidebarSnapshot: Codable {
         var childIDs: [UUID]
         var kind: SidebarItem.Kind
 
-        private enum Key: String, CodingKey { case id, parentID, childIDs, type, title, url, container }
+        private enum Key: String, CodingKey { case id, parentID, childIDs, type, title, url, viewedAt, container }
 
         init(_ item: SidebarItem) {
             id = item.id
@@ -49,7 +61,10 @@ struct SidebarSnapshot: Codable {
             switch try values.decode(String.self, forKey: .type) {
             case "container": kind = .container(try values.decode(SidebarItem.Container.self, forKey: .container))
             case "tab":
-                kind = .tab(SidebarTab(id: id, title: title, url: try values.decodeIfPresent(URL.self, forKey: .url)))
+                kind = .tab(
+                    SidebarTab(
+                        id: id, title: title, url: try values.decodeIfPresent(URL.self, forKey: .url),
+                        viewedAt: try values.decodeIfPresent(Date.self, forKey: .viewedAt)))
             case "folder": kind = .folder(title: title)
             case "splitView": kind = .splitView
             case let type:
@@ -71,6 +86,7 @@ struct SidebarSnapshot: Codable {
                 try values.encode("tab", forKey: .type)
                 try values.encode(tab.title, forKey: .title)
                 try values.encodeIfPresent(tab.url, forKey: .url)
+                try values.encodeIfPresent(tab.viewedAt, forKey: .viewedAt)
             case .folder(let title):
                 try values.encode("folder", forKey: .type)
                 try values.encode(title, forKey: .title)
@@ -87,11 +103,13 @@ struct SidebarSnapshot: Codable {
             (state.tree[rootID].map { [$0] } ?? []) + state.tree.descendants(of: rootID)
         }
         tree = Tree(rootIDs: state.tree.rootIDs, items: items.map(Item.init))
+        archive = state.archive
     }
 
     func state() throws -> SidebarState {
         let state = SidebarState(
-            profiles: profiles, spaces: spaces, tree: SidebarTree(rootIDs: tree.rootIDs, items: tree.items.map(\.item)))
+            profiles: profiles, spaces: spaces, tree: SidebarTree(rootIDs: tree.rootIDs, items: tree.items.map(\.item)),
+            archive: archive)
         try state.validate()
         return state
     }
@@ -115,6 +133,7 @@ extension SidebarState {
             try visit(rootID, parent: nil)
         }
         try check(visited.count == tree.items.count, "unreachable items")
+        for entry in archive { try check(tree[entry.id] == nil, "archived tab \(entry.id) is also in the tree") }
         for profile in profiles {
             try check(tree.rootIDs.contains(profile.favoritesRootID), "profile \(profile.id) has no favorites root")
             try check(tree[profile.favoritesRootID]?.container == .favorites, "bad favorites root for \(profile.id)")

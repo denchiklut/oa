@@ -12,12 +12,18 @@ struct BrowserWindowView: View {
             SidebarView(model: model)
             Divider()
             VStack(spacing: 0) {
-                toolbar
-                Divider()
-                if let page = model.page {
-                    PageHostView(view: page.view)
+                if let placeholder = model.placeholder {
+                    toolbar.hidden()
+                    Divider()
+                    PlaceholderView(image: placeholder)
                 } else {
-                    Color(nsColor: .windowBackgroundColor)
+                    toolbar
+                    Divider()
+                    if let page = model.page {
+                        PageHostView(view: page.view)
+                    } else {
+                        Color(nsColor: .windowBackgroundColor)
+                    }
                 }
             }
         }
@@ -96,6 +102,24 @@ struct BrowserWindowView: View {
     }
 }
 
+/// A page another window holds: its last frame here, frozen and dimmed over the window background, as in Arc.
+private struct PlaceholderView: View {
+    static let snapshotOpacity = 0.57
+
+    let image: NSImage
+
+    var body: some View {
+        Color(nsColor: .windowBackgroundColor)
+            .overlay(alignment: .top) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .opacity(Self.snapshotOpacity)
+            }
+            .clipped()
+    }
+}
+
 private struct PageHostView: NSViewRepresentable {
     let view: NSView
 
@@ -104,6 +128,7 @@ private struct PageHostView: NSViewRepresentable {
     func updateNSView(_ container: NSView, context: Context) {
         guard view.superview !== container else { return }
         container.subviews.forEach { $0.removeFromSuperview() }
+        view.removeFromSuperview()
         view.translatesAutoresizingMaskIntoConstraints = true
         view.frame = container.bounds
         view.autoresizingMask = [.width, .height]
@@ -112,5 +137,10 @@ private struct PageHostView: NSViewRepresentable {
 
     private final class Container: NSView {
         override var isFlipped: Bool { true }
+
+        override func layout() {
+            super.layout()
+            subviews.forEach { $0.frame = bounds }
+        }
     }
 }

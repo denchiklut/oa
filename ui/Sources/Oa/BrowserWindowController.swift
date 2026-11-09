@@ -61,6 +61,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        model.showSelected()
         model.page?.activate()
     }
 
@@ -91,7 +92,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     @objc func deleteSpace(_ sender: Any?) {
-        model.deleteSpace(model.selectedSpaceID)
+        if let space = model.space { SpaceDeletion.confirm(space, in: model) }
+    }
+
+    @objc func viewArchive(_ sender: Any?) { model.viewArchive() }
+    @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
+
+    @objc func clearArchive(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "Clear the Archive?"
+        alert.informativeText = "Every archived tab is removed. This can't be undone."
+        alert.addButton(withTitle: "Clear")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn { model.clearArchive() }
     }
 
     /// The selected tab, or the window when no tab is selected.
@@ -115,6 +128,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"
             return true
         }
+        if item.action == #selector(closeTab(_:)) {
+            let archives = model.selectedTabID.map { !model.state.isPinned($0) } ?? false
+            item.title = archives ? "Archive Tab" : "Close Tab"
+            return true
+        }
         return switch item.action {
         case #selector(goBack(_:)): model.page?.canGoBack ?? false
         case #selector(goForward(_:)): model.page?.canGoForward ?? false
@@ -122,6 +140,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)): !model.selectableTabs.isEmpty
         case #selector(selectTab(_:)): tabIndex(for: item) != nil
         case #selector(deleteSpace(_:)): model.state.spaces.count > 1
+        case #selector(restoreLastClosed(_:)), #selector(clearArchive(_:)): !model.state.archive.isEmpty
         default: true
         }
     }
