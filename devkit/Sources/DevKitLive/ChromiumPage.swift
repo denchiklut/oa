@@ -75,6 +75,10 @@ final class ChromiumPage: Page {
         continuation.yield(.opened(opened, url: url, disposition: OpenDisposition(core: disposition)))
     }
 
+    fileprivate func wantsActivation() {
+        if page != nil { continuation.yield(.wantsActivation) }
+    }
+
     fileprivate func closed() {
         guard page != nil else { return }
         continuation.yield(.closed)
@@ -119,6 +123,8 @@ final class PageDelegate: NSObject, CorePageDelegate {
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int) {
         content?.opened(openedPage, url: targetURL, disposition: disposition)
     }
+
+    func pageWantsActivation(_ page: CorePage) { content?.wantsActivation() }
 
     func pageDidClose(_ page: CorePage) { content?.closed() }
 }

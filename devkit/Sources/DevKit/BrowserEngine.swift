@@ -60,6 +60,9 @@ public enum PageEvent {
     /// The page opened another page, live in this page's window with its opener kept. The app installs it under a
     /// tab that takes its `id`, or drops it.
     case opened(any Page, url: URL?, disposition: OpenDisposition)
+    /// The page asked to be shown, as `window.focus()` and a `window.open` reusing a named page do. The app selects
+    /// its tab or ignores it.
+    case wantsActivation
     /// The engine closed the page without the app asking.
     case closed
 }
