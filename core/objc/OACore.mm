@@ -140,6 +140,22 @@ class PageObserverBridge : public oa::Page::Observer {
   }
 }
 
+- (void)moveToWindowWithIdentifier:(NSString*)identifier {
+  if (_page) {
+    _page->MoveToWindow(identifier.UTF8String ?: "");
+  }
+}
+
+- (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable))completion {
+  if (!_page) {
+    completion(nil);
+    return;
+  }
+  void (^handler)(NSImage* _Nullable) = [completion copy];
+  _page->Snapshot(
+      [handler](void* image) { handler((__bridge NSImage*)image); });
+}
+
 - (void)close {
   if (_page) {
     _page->Close();

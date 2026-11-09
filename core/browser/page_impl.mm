@@ -6,20 +6,30 @@
 #include <utility>
 #include <vector>
 
+#include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/no_destructor.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/supports_user_data.h"
+#include "base/task/bind_post_task.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/tabs/tab_model.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/referrer.h"
 #include "oa/browser/window_browser.h"
+#include "skia/ext/skia_utils_mac.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
 
 namespace oa {
@@ -204,6 +214,53 @@ void PageImpl::Activate() {
   if (window.isKeyWindow) {
     web_contents()->Focus();
   }
+}
+
+void PageImpl::MoveToWindow(const std::string& window_id) {
+  content::WebContents* contents = web_contents();
+  if (!contents || !window_browser_) {
+    return;
+  }
+  WindowBrowser* target = WindowBrowser::GetOrCreate(
+      window_id, window_browser_->browser()->GetProfile());
+  if (!target || target == window_browser_.get()) {
+    return;
+  }
+  // The same tab moves, so its WebContents, history, tab helpers and session
+  // ID stay. Leaving the strip clears its delegate; the new Browser's goes in
+  // on insertion, and this page's goes in front of it again.
+  std::unique_ptr<tabs::TabModel> tab = window_browser_->Detach(contents);
+  if (!tab) {
+    return;
+  }
+  set_inner(nullptr);
+  window_browser_ = target->GetWeakPtr();
+  target->InsertDetached(std::move(tab));
+  Bind(contents);
+}
+
+void PageImpl::Snapshot(SnapshotCallback callback) {
+  content::RenderWidgetHostView* view =
+      web_contents() ? web_contents()->GetRenderWidgetHostView() : nullptr;
+  if (!view || !view->IsSurfaceAvailableForCopy()) {
+    callback(nullptr);
+    return;
+  }
+  // The whole page at its drawn size. The result can arrive on another
+  // sequence, so it comes back to this one.
+  view->CopyFromSurface(
+      gfx::Rect(), gfx::Size(), base::Seconds(2),
+      base::BindPostTaskToCurrentDefault(base::BindOnce(
+          [](SnapshotCallback callback,
+             const content::CopyFromSurfaceResult& result) {
+            if (!result.has_value() || result->bitmap.drawsNothing()) {
+              callback(nullptr);
+              return;
+            }
+            NSImage* image = skia::SkBitmapToNSImage(result->bitmap);
+            callback((__bridge void*)image);
+          },
+          std::move(callback))));
 }
 
 void PageImpl::Close() {
