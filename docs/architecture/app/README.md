@@ -69,7 +69,8 @@ with the title and the scheme-less URL, Restore and Delete on hover and in a
 context menu, and the page stays live beside it. Restore puts the tab back at the
 top of its Space's unpinned section, not selected, with its page made on first
 selection from the saved URL and no history; a tab whose Space is gone returns to
-the window's Space. File ▸ Restore Last Closed Tab ⇧⌘T brings the newest entry
+the window's Space. Clicking the row itself shows the page in a Peek over the
+list, below. File ▸ Restore Last Closed Tab ⇧⌘T brings the newest entry
 back at its old index, selected, switching the window to its Space. Archive ▸
 Clear Archive empties it after a confirmation. Each tab carries the time a
 window last selected it; a sweep at launch and every 15 minutes archives
@@ -84,12 +85,12 @@ POST's data survive: Core inserts it into the opener's Browser in the background
 and DevKit reports it on the opener's page as an event carrying a ready handle,
 the target URL and the disposition. The app makes a tab for it that takes the
 page's ID and records the opener, and places it as Arc does: after the opener's
-last descendant in the unpinned section, or at the top of that section when the
-opener is pinned, where Arc's ⌘-click lands; Arc opens a pinned tab's foreground
-links in a Peek, which Oa doesn't have yet. A foreground open, every
+last descendant in the unpinned section, where a pinned opener's group sits at
+the top. A foreground open, every
 `window.open` and a popup that asked for a size included, selects the tab when
 the opener's Space is the one shown; a ⌘-click or middle click leaves the
-selection and the page loads in the background. Arc hosts sized popups as plain
+selection and the page loads in the background. A pinned tab's foreground opens
+and a Shift-click from any tab go to a Peek instead, below. Arc hosts sized popups as plain
 tabs too, so there is no popup window. A page that closes itself, as after an
 OAuth sign-in, is archived like a ⌘W, and the next selection follows the opener
 as in Arc: the next tab below with the same opener, else the one above, else the
@@ -108,6 +109,57 @@ reused named tab rather than showing the page twice. Arc does nothing for a
 same way, so Oa raises the window for that too. Chromium grants the request
 only to a caller with a recent gesture or to the page's opener, so a page
 can't pull the selection to itself from the background.
+
+## Peek
+
+A Peek shows a page over the window as part of the tab it was opened from, as
+Arc does: a pinned tab's cross-origin link clicks, `target=_blank` links,
+`window.open` calls and sized popups, and a Shift-click on a link in any tab,
+which Chromium reports as a new-window open. Same-origin clicks navigate the
+pinned tab in place. The pinned tab's page is marked as keeping its address
+through DevKit, and Core redirects the click: a navigation throttle on a
+renderer-initiated, gestured, main-frame link navigation to another origin
+cancels it and opens the URL as a new page, reported like any opened page.
+Only clicks are redirected; a cross-origin `location` change from script still
+navigates the pinned page, which Arc wasn't tested for.
+
+The Peek is a view in the window, not a window of its own, with Arc's measured
+geometry: its page is 80% of the content area's width by the height minus
+56 pt, under a 33 pt toolbar with back, forward, reload or stop and the
+scheme-less URL with the host in bold, centered 11 pt from the top, with
+rounded corners and a shadow, over a dim of about a fifth. ✕ and Expand sit
+outside its top-right corner. The sidebar stays live under the dim, the opener's
+row carries the Peek page's favicon as a badge, the window title reads the Space
+name while a Peek shows, and keyboard focus goes to the Peek page. Selecting
+another tab or Space hides the Peek and keeps its page alive; reselecting the
+opener shows it again. The page's history is its own. Back, Forward, Reload and
+Stop act on the Peek while it shows; ⌘W closes it and Tabs ▸ Expand Peek ⌘O
+expands it, Arc's two shortcuts for it; Esc does nothing, as in Arc. ⌘L,
+New Tab, Pin Tab and tab switching keep acting on the window beneath, Oa's own
+choice: Arc's ⌘L opens its command bar prefilled with the Peek's URL, which Oa
+doesn't have.
+
+Inside a Peek, plain links navigate the Peek. `target=_blank` and `window.open`
+make a selected tab after the opener's earlier children, which hides the Peek
+until the opener is reselected; a ⌘-click makes a background tab there and
+leaves the Peek up. A Shift-click inside a Peek makes a tab too, Oa's own
+choice. Expand makes the Peek's page a selected tab after the opener's earlier
+children, the same live page with no reload. ✕, a click on the backdrop and ⌘W
+archive the page under the tab's Space, as do archiving the opener, closing
+the window and quitting; a page that closes itself leaves no entry. A tab has
+one Peek: a new request while one is up closes the current one as ✕ would,
+Oa's own choice. The entry has no position, so it restores at the top of the
+unpinned section, also Oa's own: Arc's entries carry no visible position.
+Nothing about a Peek is saved, so none survives a relaunch, as in Arc.
+
+Clicking an Archive row shows the entry's page in a Peek over the list, made
+from the saved URL with no history, centered over the whole window as Arc does
+over its Library; the entry stays. Its Expand removes the entry and puts the
+tab, selected, at the top of the unpinned section of the Space the window
+shows, as Arc does. Closing it, or leaving the Archive view, closes the page and
+keeps the entry; leaving the view is Oa's own choice. A page such a Peek opens
+has no tab to join, so it goes to the top of the shown Space, Oa's own choice.
+Arc's Favorites, Split View button and copy-link icon don't exist in Oa yet.
 
 Only the only window selects a tab when it opens: the first unpinned, else the
 first pinned. A further window opens on the key window's Space with nothing

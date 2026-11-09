@@ -9,7 +9,9 @@ its row, with a URL field,
 back, forward, reload and stop, an Archive that closed tabs go to and come back
 from, dated copies of the sidebar that Help ▸ Restore Data brings back, and
 pages a page opens, kept as the engine made them and placed below their opener,
-which come forward when they ask to be shown.
+which come forward when they ask to be shown, and Peeks: a pinned tab's
+cross-origin links and any Shift-clicked link open over the window, to be
+expanded into a tab or closed into the Archive.
 
 Start with the [architecture](docs/architecture/README.md). The
 current chapters document Chromium, Core's native integration and DevKit's Swift
