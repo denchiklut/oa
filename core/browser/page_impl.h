@@ -38,6 +38,7 @@ class PageImpl : public Page,
   void OnRemovedFromStrip();
 
   // Page:
+  void SetObserver(Page::Observer* observer) override;
   void* NativeView() const override;
   std::string VisibleURL() const override;
   std::string Title() const override;
@@ -94,6 +95,9 @@ class PageImpl : public Page,
   PageImpl(WindowBrowser* window_browser, Page::Observer* observer);
 
   bool Insert(std::unique_ptr<content::WebContents> contents);
+  // Makes `contents`, which this page opened, a page of this page's Browser.
+  std::unique_ptr<PageImpl> Wrap(
+      std::unique_ptr<content::WebContents> contents);
   void Bind(content::WebContents* contents);
   void Unbind();
   void NotifyStateChanged();
