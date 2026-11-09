@@ -8,22 +8,35 @@ struct BrowserWindowView: View {
     @FocusState private var addressFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            toolbar
+        HStack(spacing: 0) {
+            SidebarView(model: model)
             Divider()
-            if let page = model.page {
-                PageHostView(view: page.view)
-            } else {
-                Color(nsColor: .windowBackgroundColor)
+            VStack(spacing: 0) {
+                toolbar
+                Divider()
+                if let page = model.page {
+                    PageHostView(view: page.view)
+                } else {
+                    Color(nsColor: .windowBackgroundColor)
+                }
             }
         }
         .onChange(of: model.page?.url) { _, url in
             if !editing || address.isEmpty { address = url?.absoluteString ?? "" }
         }
+        .onChange(of: model.selectedTab?.id) { _, _ in
+            address = model.page?.url?.absoluteString ?? ""
+            if model.page?.url == nil { addressFocused = true }
+        }
         .onChange(of: model.page?.id) { _, _ in
             DispatchQueue.main.async {
-                addressFocused = false
-                model.page?.activate()
+                guard let page = model.page else { return }
+                if page.url == nil {
+                    addressFocused = true
+                } else {
+                    addressFocused = false
+                    page.activate()
+                }
             }
         }
         .onChange(of: model.focusAddressField) { _, _ in

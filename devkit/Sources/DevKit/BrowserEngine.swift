@@ -36,6 +36,7 @@ public protocol Page: AnyObject, Observable {
     var loadProgress: Double { get }
     var canGoBack: Bool { get }
     var canGoForward: Bool { get }
+    /// Attach it only while the page is shown: a view outside a window is hidden to the engine.
     var view: NSView { get }
     var events: AsyncStream<PageEvent> { get }
 
