@@ -37,6 +37,14 @@ final class ChromiumPage: Page {
     func reload() { page?.reload() }
     func stopLoading() { page?.stopLoading() }
     func activate() { page?.activate() }
+    func move(toWindow windowID: UUID) { page?.move(toWindowIdentifier: windowID.uuidString) }
+
+    func snapshot() async -> NSImage? {
+        guard let page else { return nil }
+        return await withCheckedContinuation { continuation in
+            page.snapshot { continuation.resume(returning: $0) }
+        }
+    }
 
     func close() {
         page?.close()

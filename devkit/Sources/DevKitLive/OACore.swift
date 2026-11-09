@@ -31,6 +31,8 @@ import AppKit
     func reload()
     func stopLoading()
     func activate()
+    @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
+    @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
     func close()
     func drop()
 }

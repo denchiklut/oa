@@ -46,6 +46,10 @@ public protocol Page: AnyObject, Observable {
     func reload()
     func stopLoading()
     func activate()
+    /// Moves the live page into another of the app's windows. History and the engine's tab identity stay.
+    func move(toWindow windowID: UUID)
+    /// The page's last frame, for a window it left. Nil while it has nothing drawn.
+    func snapshot() async -> NSImage?
     /// Closes as the user would: unload handlers run. Events end.
     func close()
     /// Ends the page without unload handlers. Events end.
