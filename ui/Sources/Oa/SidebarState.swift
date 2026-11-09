@@ -21,7 +21,7 @@ struct SidebarTab: Identifiable, Hashable {
     var title = ""
     var url: URL?
     var viewedAt: Date?
-    /// The tab whose page opened this one. Kept after that tab is gone, as Arc keeps its grouping.
+    /// Kept after the opener is gone, as Arc keeps its grouping.
     var openerID: UUID?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
@@ -259,8 +259,7 @@ struct SidebarState {
         tree.append(SidebarItem(id: tab.id, kind: .tab(tab)), to: space.unpinnedRootID)
     }
 
-    /// A tab a page opened, placed as Arc places it: after the opener's last descendant in the unpinned section,
-    /// or at the top of that section when the opener is pinned.
+    /// As Arc: after the opener's last descendant, or at the top of the unpinned section for a pinned opener.
     mutating func openTab(_ tab: SidebarTab, from openerID: UUID) {
         guard let space = space(containing: openerID) else { return }
         let siblings = tree[space.unpinnedRootID]?.childIDs ?? []
@@ -276,8 +275,7 @@ struct SidebarState {
         tree.insert(SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID, at: index)
     }
 
-    /// What Arc selects when a tab with an opener closes: the next tab below with the same opener, else the nearest
-    /// above, else the opener itself while it is in the Space.
+    /// As Arc: the next tab below with the same opener, else the nearest above, else the opener.
     func openerSuccessor(of tabID: UUID) -> UUID? {
         guard let openerID = tree.tab(tabID)?.openerID, let space = space(containing: tabID) else { return nil }
         let tabs = selectableTabs(in: space.id)

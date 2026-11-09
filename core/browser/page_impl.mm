@@ -55,8 +55,6 @@ std::set<PageImpl*>& OpenPages() {
   return *pages;
 }
 
-// False for dispositions that stay in the page or open nothing the app shows,
-// such as picture-in-picture.
 bool ToOpenDisposition(WindowOpenDisposition disposition,
                        OpenDisposition* result) {
   switch (disposition) {
@@ -357,7 +355,6 @@ content::WebContents* PageImpl::OpenURLFromTab(
     return ForwardingWebContentsDelegate::OpenURLFromTab(source, params,
                                                          std::move(callback));
   }
-  // A link opened elsewhere without a page made for it, such as a ⌘-click.
   OpenDisposition disposition;
   if (!observer_ || !window_browser_ ||
       !ToOpenDisposition(params.disposition, &disposition)) {
@@ -393,8 +390,7 @@ content::WebContents* PageImpl::AddNewContents(
     const blink::mojom::WindowFeatures& window_features,
     bool user_gesture,
     bool* was_blocked) {
-  // Contents the page made, as with window.open(). Window features are
-  // ignored, as Arc does: the page becomes a tab whatever size it asked for.
+  // Window features are ignored, as Arc does.
   OpenDisposition open_disposition;
   if (!observer_ || !ToOpenDisposition(disposition, &open_disposition)) {
     return nullptr;
@@ -430,8 +426,6 @@ void PageImpl::LoadingStateChanged(content::WebContents* source,
 }
 
 void PageImpl::CloseContents(content::WebContents* source) {
-  // The page closed itself, as with window.close(), or its unload handlers
-  // let a close through. Chrome closes the tab; the strip reports it closed.
   ForwardingWebContentsDelegate::CloseContents(source);
 }
 

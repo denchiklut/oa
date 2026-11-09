@@ -254,8 +254,8 @@ final class WindowModel {
         }
     }
 
-    /// A tab with an opener hands over within its group, as in Arc. Otherwise the tab shown before, if its page is
-    /// still live; an unpinned close then falls back to the tab above, else below.
+    /// The opener's group first, as in Arc; else the tab shown before, if its page is still live; an unpinned close
+    /// then falls back to the tab above, else below.
     private func nextSelection(closing tabID: UUID, pinned: Bool, in spaceID: UUID) -> UUID? {
         if let successor = state.openerSuccessor(of: tabID) { return successor }
         if let previousTabID, previousTabID != tabID, pages[previousTabID] != nil,
@@ -343,8 +343,6 @@ final class WindowModel {
         }
     }
 
-    /// A page this tab's page opened becomes a tab below it, as in Arc, selected unless it opened in the background.
-    /// Its page is live already, wherever it lands. With the opener gone, the page is dropped.
     private func place(_ page: any Page, url: URL?, disposition: OpenDisposition, from openerID: UUID) {
         guard let space = state.space(containing: openerID) else { return page.drop() }
         let tab = SidebarTab(id: page.id, url: url, viewedAt: .now, openerID: openerID)

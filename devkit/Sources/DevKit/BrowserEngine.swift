@@ -57,15 +57,13 @@ public protocol Page: AnyObject, Observable {
 }
 
 public enum PageEvent {
-    /// The page opened another page. The engine made it in this page's window with its opener, session storage and
-    /// any POST data kept, and started its load. The app installs it under a tab that takes its `id`, or drops it.
-    /// `url` is where it goes; nil when not known.
+    /// The page opened another page, live in this page's window with its opener kept. The app installs it under a
+    /// tab that takes its `id`, or drops it.
     case opened(any Page, url: URL?, disposition: OpenDisposition)
     /// The engine closed the page without the app asking.
     case closed
 }
 
-/// How a page asked for another page to open.
 public enum OpenDisposition: Sendable, Equatable {
     case foregroundTab
     case backgroundTab
