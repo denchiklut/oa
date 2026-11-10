@@ -7,3 +7,5 @@ blink_symbol_level = 0
 v8_symbol_level = 0
 proprietary_codecs = false
 ffmpeg_branding = "Chromium"
+dcheck_always_on = false
+enable_dangling_raw_ptr_checks = true

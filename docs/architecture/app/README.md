@@ -190,6 +190,11 @@ page there; Oa does the same through a Chromium seam like the one for
 permission prompts, since Chrome's sad tab wants a BrowserView and aborts
 without one. The words on the page are Oa's own.
 
+The engine is built without DCHECKs, as Arc ships. A Blink assertion that is
+wrong for a valid layout killed renderers on real pages, and Chromium has
+thousands more like it; `chromium/args.gn` turns them off and keeps the
+dangling-pointer detector on explicitly, since its default follows DCHECKs.
+
 ## Favorites
 
 A profile's Favorites are tabs in its favorites root, shown as a grid of tiles
