@@ -42,6 +42,10 @@ class PageImpl : public Page,
   void OnRemovedFromStrip();
   // From the sad tab Chrome creates for the dead renderer.
   void SetCrash(Crash crash);
+  // From the dialog views Chrome's managers create for this page.
+  void RunDialog(const Dialog& dialog, DialogReply reply);
+  void DismissDialog(const Dialog& dialog);
+  base::WeakPtr<PageImpl> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
   // Page:
   void SetObserver(Page::Observer* observer) override;
@@ -87,14 +91,14 @@ class PageImpl : public Page,
   void LoadingStateChanged(content::WebContents* source,
                            bool should_show_loading_ui) override;
   void CloseContents(content::WebContents* source) override;
-  content::JavaScriptDialogManager* GetJavaScriptDialogManager(
-      content::WebContents* source) override;
   bool HandleContextMenu(content::RenderFrameHost& render_frame_host,
                          const content::ContextMenuParams& params) override;
   bool CanEnterFullscreenModeForTab(
       content::RenderFrameHost* requesting_frame) override;
 
   // content::WebContentsObserver:
+  using ForwardingWebContentsDelegate::BeforeUnloadFired;
+  void BeforeUnloadFired(bool proceed) override;
   void RenderFrameCreated(content::RenderFrameHost* render_frame_host) override;
   void DidFinishNavigation(
       content::NavigationHandle* navigation_handle) override;
@@ -126,6 +130,8 @@ class PageImpl : public Page,
   raw_ptr<Page::Observer> observer_;
   bool closing_ = false;
   bool keeps_address_ = false;
+  int dialogs_shown_ = 0;
+  bool suppress_dialogs_ = false;
   double load_progress_ = 0;
   Crash crash_ = Crash::kNone;
   base::ScopedObservation<favicon::FaviconDriver,

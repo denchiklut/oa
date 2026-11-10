@@ -38,6 +38,7 @@
 #include "oa/browser/page_impl.h"
 #include "oa/browser/profile_services.h"
 #include "oa/browser/ui/browser_window_impl.h"
+#include "oa/browser/ui/javascript_dialog_impl.h"
 #include "oa/browser/ui/permission_prompt_impl.h"
 #include "oa/browser/ui/sad_tab_impl.h"
 #include "oa/browser/window_browser.h"
@@ -106,6 +107,8 @@ class MainDelegate : public ChromeMainDelegate {
       State().keep_alive.reset();
       return exit_code;
     }
+    // After Chrome's PreProfileInit installed its Cocoa factory.
+    InstallJavaScriptDialogFactories();
     State().running = true;
     if (State().ready) {
       State().ready(State().ready_context.get());

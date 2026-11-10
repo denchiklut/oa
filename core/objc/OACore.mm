@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "base/memory/raw_ptr.h"
 #include "oa/public/engine.h"
@@ -10,6 +11,9 @@
 @interface OAPage ()
 - (instancetype)initWithDelegate:(nullable id<OAPageDelegate>)delegate;
 - (oa::Page::Observer*)observer;
+- (void)pageDialog:(const oa::Dialog&)dialog reply:(oa::Page::DialogReply)reply;
+- (void)pageDialogDismissed:(const oa::Dialog&)dialog;
+- (void)pageCloseCancelled;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
 - (void)pageOpenedPage:(std::unique_ptr<oa::Page>)page
@@ -87,17 +91,83 @@ class PageObserverBridge : public oa::Page::Observer {
               disposition:disposition];
   }
   void OnPageWantsActivation() override { [page_ pageWantsActivation]; }
+  void OnPageDialog(const oa::Dialog& dialog,
+                    oa::Page::DialogReply reply) override {
+    [page_ pageDialog:dialog reply:std::move(reply)];
+  }
+  void OnPageDialogDismissed(const oa::Dialog& dialog) override {
+    [page_ pageDialogDismissed:dialog];
+  }
+  void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
   void OnPageClosed() override { [page_ pageClosed]; }
 
  private:
   __weak OAPage* page_;
 };
 
+OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
+  switch (kind) {
+    case oa::Dialog::Kind::kAlert:
+      return OAPageDialogKindAlert;
+    case oa::Dialog::Kind::kConfirm:
+      return OAPageDialogKindConfirm;
+    case oa::Dialog::Kind::kPrompt:
+      return OAPageDialogKindPrompt;
+    case oa::Dialog::Kind::kBeforeUnload:
+      return OAPageDialogKindBeforeUnload;
+  }
+}
+
 }  // namespace
+
+@interface OAPageDialog ()
+- (instancetype)initWithDialog:(const oa::Dialog&)dialog
+                         reply:(oa::Page::DialogReply)reply;
+@end
+
+@implementation OAPageDialog {
+  oa::Page::DialogReply _reply;
+}
+
+@synthesize kind = _kind;
+@synthesize title = _title;
+@synthesize message = _message;
+@synthesize defaultText = _defaultText;
+@synthesize reload = _reload;
+@synthesize offersSuppression = _offersSuppression;
+
+- (instancetype)initWithDialog:(const oa::Dialog&)dialog
+                         reply:(oa::Page::DialogReply)reply {
+  if ((self = [super init])) {
+    _kind = ToDialogKind(dialog.kind);
+    _title = ToNSString(dialog.title);
+    _message = ToNSString(dialog.message);
+    _defaultText = ToNSString(dialog.default_text);
+    _reload = dialog.is_reload;
+    _offersSuppression = dialog.offers_suppression;
+    _reply = std::move(reply);
+  }
+  return self;
+}
+
+- (void)acceptWithText:(nullable NSString*)text suppress:(BOOL)suppress {
+  if (oa::Page::DialogReply reply = std::exchange(_reply, nullptr)) {
+    reply(true, text.UTF8String ?: "", suppress);
+  }
+}
+
+- (void)cancelWithSuppress:(BOOL)suppress {
+  if (oa::Page::DialogReply reply = std::exchange(_reply, nullptr)) {
+    reply(false, std::string(), suppress);
+  }
+}
+
+@end
 
 @implementation OAPage {
   std::unique_ptr<PageObserverBridge> _observer;
   std::unique_ptr<oa::Page> _page;
+  NSMutableDictionary<NSNumber*, OAPageDialog*>* _dialogs;
   BOOL _keepsAddress;
 }
 
@@ -107,6 +177,7 @@ class PageObserverBridge : public oa::Page::Observer {
   if ((self = [super init])) {
     _delegate = delegate;
     _observer = std::make_unique<PageObserverBridge>(self);
+    _dialogs = [[NSMutableDictionary alloc] init];
   }
   return self;
 }
@@ -264,6 +335,29 @@ class PageObserverBridge : public oa::Page::Observer {
 
 - (void)pageWantsActivation {
   [self.delegate pageWantsActivation:self];
+}
+
+- (void)pageDialog:(const oa::Dialog&)dialog
+             reply:(oa::Page::DialogReply)reply {
+  NSNumber* key = @(dialog.id);
+  OAPageDialog* shown = [[OAPageDialog alloc] initWithDialog:dialog
+                                                       reply:std::move(reply)];
+  _dialogs[key] = shown;
+  [self.delegate page:self didRequestDialog:shown];
+}
+
+- (void)pageDialogDismissed:(const oa::Dialog&)dialog {
+  NSNumber* key = @(dialog.id);
+  OAPageDialog* shown = _dialogs[key];
+  if (!shown) {
+    return;
+  }
+  [_dialogs removeObjectForKey:key];
+  [self.delegate page:self didDismissDialog:shown];
+}
+
+- (void)pageCloseCancelled {
+  [self.delegate pageDidCancelClose:self];
 }
 
 - (void)pageClosed {
