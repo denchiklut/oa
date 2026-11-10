@@ -23,6 +23,8 @@ struct SidebarTab: Identifiable, Hashable {
     var viewedAt: Date?
     /// Kept after the opener is gone, as Arc keeps its grouping.
     var openerID: UUID?
+    /// The page's last favicon as PNG, shown while the tab has no page, as Arc shows it.
+    var favicon: Data?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
 
@@ -243,9 +245,14 @@ struct SidebarState {
         return tree.tabs(under: pinned ? space.pinnedRootID : space.unpinnedRootID)
     }
 
-    /// Pinned then unpinned: the order of the sidebar and of ⌘1–⌘9.
-    func selectableTabs(in spaceID: UUID) -> [SidebarTab] {
+    /// The Space's own tabs, pinned then unpinned.
+    func tabs(in spaceID: UUID) -> [SidebarTab] {
         tabs(in: spaceID, pinned: true) + tabs(in: spaceID, pinned: false)
+    }
+
+    /// Favorites, pinned, then unpinned: the order of the sidebar and of ⌘1–⌘9, as in Arc.
+    func selectableTabs(in spaceID: UUID) -> [SidebarTab] {
+        favorites(for: spaceID) + tabs(in: spaceID)
     }
 
     func firstTabID(in spaceID: UUID) -> UUID? {
@@ -278,7 +285,7 @@ struct SidebarState {
     /// The last Space stays.
     mutating func removeSpace(_ id: UUID, at date: Date = .now) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == id }) else { return }
-        for tab in selectableTabs(in: id) { archiveTab(tab.id, reason: .manual, at: date) }
+        for tab in tabs(in: id) { archiveTab(tab.id, reason: .manual, at: date) }
         let space = spaces.remove(at: index)
         tree.removeRoot(space.pinnedRootID)
         tree.removeRoot(space.unpinnedRootID)
@@ -401,6 +408,14 @@ struct SidebarState {
     mutating func unfavoriteTab(_ tabID: UUID, in spaceID: UUID) {
         guard isFavorite(tabID), let space = space(spaceID) else { return }
         tree.move(tabID, into: space.unpinnedRootID, at: 0)
+    }
+
+    mutating func setSavedFavicon(_ tabID: UUID, _ favicon: Data) {
+        tree.update(tabID) { item in
+            guard var tab = item.tab, tab.favicon != favicon else { return }
+            tab.favicon = favicon
+            item.kind = .tab(tab)
+        }
     }
 
     /// Write-back from a live page. A tab that keeps its address takes the title only while the page is at it.

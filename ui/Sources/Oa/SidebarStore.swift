@@ -31,6 +31,10 @@ final class SidebarStore {
         state.setSavedPage(tabID, title: title, url: url)
     }
 
+    func setSavedFavicon(_ tabID: UUID, _ favicon: Data) {
+        state.setSavedFavicon(tabID, favicon)
+    }
+
     func markViewed(_ tabID: UUID) {
         state.markViewed(tabID)
     }
