@@ -74,8 +74,10 @@ final class WindowModel {
     /// The live page's favicon, wherever the page lives, else the saved one, as Arc shows it.
     func favicon(for tab: SidebarTab) -> NSImage? {
         (pages[tab.id] ?? store.windows.lazy.compactMap { $0.pages[tab.id] }.first)?.favicon
-            ?? tab.favicon.flatMap { NSImage(data: $0) }
+            ?? store.savedFavicon(tab.id)
     }
+
+    func savedFavicon(_ id: UUID) -> NSImage? { store.savedFavicon(id) }
 
     /// Only the only window picks a tab: first unpinned, else first pinned. Another window starts empty.
     func showFirst(isOnlyWindow: Bool) {
@@ -580,7 +582,7 @@ final class WindowModel {
             Task { @MainActor [weak self] in
                 guard let self, let page = pages[tabID], ObjectIdentifier(page) == identity else { return }
                 store.setSavedPage(tabID, title: page.title, url: page.url)
-                if let favicon = page.favicon?.pngData { store.setSavedFavicon(tabID, favicon) }
+                if let favicon = page.favicon { store.setSavedFavicon(tabID, favicon) }
                 observe(page, for: tabID)
             }
         }
@@ -594,11 +596,5 @@ final class WindowModel {
             return deselect(tabID)
         }
         end(tabID) { _, _ in }
-    }
-}
-
-extension NSImage {
-    fileprivate var pngData: Data? {
-        tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
     }
 }

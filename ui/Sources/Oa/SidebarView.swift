@@ -117,7 +117,7 @@ private struct ArchiveView: View {
                             .padding(.top, 8)
                             .padding(.bottom, 2)
                         ForEach(group.entries) { entry in
-                            ArchiveRow(entry: entry) {
+                            ArchiveRow(entry: entry, icon: model.savedFavicon(entry.id)) {
                                 model.peekArchived(entry.id)
                             } restore: {
                                 model.restoreArchived(entry.id)
@@ -152,6 +152,7 @@ private struct ArchiveView: View {
 
 private struct ArchiveRow: View {
     let entry: SidebarArchivedTab
+    let icon: NSImage?
     let peek: () -> Void
     let restore: () -> Void
     let delete: () -> Void
@@ -159,6 +160,14 @@ private struct ArchiveRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            Group {
+                if let icon {
+                    Image(nsImage: icon).resizable().interpolation(.high)
+                } else {
+                    RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.1))
+                }
+            }
+            .frame(width: 16, height: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.displayTitle)
                     .lineLimit(1)

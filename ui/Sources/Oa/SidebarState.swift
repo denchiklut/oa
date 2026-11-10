@@ -23,8 +23,6 @@ struct SidebarTab: Identifiable, Hashable {
     var viewedAt: Date?
     /// Kept after the opener is gone, as Arc keeps its grouping.
     var openerID: UUID?
-    /// The page's last favicon as PNG, shown while the tab has no page, as Arc shows it.
-    var favicon: Data?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
 
@@ -408,14 +406,6 @@ struct SidebarState {
     mutating func unfavoriteTab(_ tabID: UUID, in spaceID: UUID) {
         guard isFavorite(tabID), let space = space(spaceID) else { return }
         tree.move(tabID, into: space.unpinnedRootID, at: 0)
-    }
-
-    mutating func setSavedFavicon(_ tabID: UUID, _ favicon: Data) {
-        tree.update(tabID) { item in
-            guard var tab = item.tab, tab.favicon != favicon else { return }
-            tab.favicon = favicon
-            item.kind = .tab(tab)
-        }
     }
 
     /// Write-back from a live page. A tab that keeps its address takes the title only while the page is at it.
