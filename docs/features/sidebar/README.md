@@ -42,9 +42,11 @@ strip. The page also moves to a window that shows its tab when the holding
 window selects another tab, when the showing window becomes key, and when the
 holding window closes. Pages of Spaces not shown stay alive with their views
 detached, so the engine sees them as hidden. Window close and quit drop pages
-without unload handlers; the records stay. Arc asks "Leave site?" per armed page
-at quit and when the last window closes, and a Cancel keeps Arc running; a
-follow-up.
+without unload handlers, except a page whose tab another window shows, which
+moves there; the records stay. Arc hands every page a closing window holds to a
+surviving window first, with no prompt, and only then asks "Leave site?" per
+armed page for what is left, which is the last window and quit, where a Cancel
+keeps Arc running; a follow-up.
 
 Close Tab ⌘W reads "Archive Tab" on an unpinned tab, as in Arc: the page,
 wherever it lives, closes as the user would, and once it reports closed the
