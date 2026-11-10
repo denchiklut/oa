@@ -23,10 +23,10 @@ A profile owns a favorites root; a Space owns a pinned root and an unpinned
 root. Tree nodes are containers, tabs, folders and split views; only containers
 and tabs are implemented. A tab entry takes its tab's ID, so pinning is a move
 to the end of the other section and the entry keeps its identity. A tab record
-saves a title and a URL. A live page writes both back; a pinned tab keeps its
-address and takes the title only while the page is at it. While the page is
-elsewhere the row reads "/ live title", as in Arc, and goes back to the pinned
-title once the page is gone.
+saves a title and a URL. A live page writes both back; a pinned tab or a
+Favorite keeps its address and takes the title only while the page is at it.
+While the page is elsewhere a pinned row reads "/ live title", as in Arc, and
+goes back to the pinned title once the page is gone.
 
 One `SidebarStore` holds the state and the open windows. Every change goes
 through `edit`, after which each window reconciles its selection and drops pages
@@ -166,7 +166,7 @@ tab, selected, at the top of the unpinned section of the Space the window
 shows, as Arc does. Closing it, or leaving the Archive view, closes the page and
 keeps the entry; leaving the view is Oa's own choice. A page such a Peek opens
 has no tab to join, so it goes to the top of the shown Space, Oa's own choice.
-Arc's Favorites, Split View button and copy-link icon don't exist in Oa yet.
+Arc's Split View button and copy-link icon don't exist in Oa yet.
 
 Only the only window selects a tab when it opens: the first unpinned, else the
 first pinned. A further window opens on the key window's Space with nothing
@@ -183,6 +183,52 @@ yet, so such a row has the empty tile. The page also carries Chromium's
 security level for its visible URL, neutral, secure, warning or dangerous,
 which nothing shows yet.
 
+## Favorites
+
+A profile's Favorites are tabs in its favorites root, shown as a grid of tiles
+at the top of the sidebar in every Space of the profile, as Arc does. The grid
+has Arc's measured shape: 47 pt tiles with 8 pt gaps filling the row, the
+column count from the tile count (⌈n / 4⌉ rows, ⌈n / rows⌉ columns), the last
+row left-aligned, and each tile a favicon and nothing else, no title and no
+tooltip. A tile whose tab has no page shows the first letter of its host, Oa's
+own: Arc shows the saved favicon, which needs the favicon cache Oa doesn't keep
+yet. The selected tile has a lighter fill; Arc tints it from the favicon, which
+isn't copied. While the Favorite's Peek shows, the tile carries the Peek page's
+favicon on its top-right corner. With no Favorites the grid is one dashed empty
+tile to drop on, Oa's own; Arc's empty grid wasn't observed.
+
+A tab becomes a Favorite by dragging its row into the grid, where it lands
+before the tile it is dropped on or at the end when dropped beside the tiles,
+as Arc inserts at the drop position, or by Tabs ▸ Favorite Tab, which appends,
+standing in for Arc's command-bar command; Arc's row menu has no such item and
+neither has Oa. Tiles move by the same drag. The tile's Remove Favorite
+archives the tab under no Space with its page closed and leaves nothing
+selected, as Arc does; Tabs ▸ Unfavorite Tab makes it a tab of the shown Space,
+at the top of the unpinned section, the position Oa's own. Favorites are never
+auto-archived, and deleting a Space leaves them.
+
+A click selects the Favorite and shows its one live page, made from the saved
+URL on the first selection as for any tab; the page serves every Space of the
+profile and every window, moving as other pages do. Selection is per Space, as
+in Arc: each Space remembers which Favorite it showed, and a Space switch shows
+the other Space's own selection or nothing. A Favorite keeps its address like a
+pinned tab: same-host links navigate it in place and it stays at the new
+address across selections, while the window title and the address field read
+the live page. Cross-host links and the rest open a Peek, which hides and
+returns with the Favorite across a Space switch, and whose ✕, ⌘W, backdrop
+click and the window's close archive it under no Space, as Arc files a
+Favorite's Peek under no Space chip; its Expand and its `target=_blank` tabs go
+to the top of the shown Space's unpinned section, after earlier children. Close
+Tab ⌘W on a Favorite only deselects it, returning to the previous live tab, and
+when the page has left the saved URL it first reloads that URL in the
+background, as Arc does; the page stays alive. A page that ends on its own
+leaves the tile without one. Closing a Space's last tab falls back to the first
+Favorite when no earlier tab is live, Oa's own. New windows and new Spaces start
+with nothing selected, as in Arc. ⌘1–⌘9 and Next and Previous Tab still count
+pinned then unpinned tabs; Arc's ⌘1 goes to the first Favorite, which the hotkey
+work will match. Whether Arc reopens a navigated Favorite at its saved URL
+after a relaunch is unknown; Oa saves only the Favorite's address, so it does.
+
 ### Files
 
 `sidebar.json` and `windows.json` live in the data directory beside Chromium's
@@ -194,7 +240,8 @@ where `tree` lists `rootIDs` and `items` in display order. Each item has `id`,
 optional `parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
 `splitView`, and for a container its `container` kind, for a tab its `title`,
 `url`, `viewedAt` and `openerID`, the tab whose page opened it. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
-`archivedAt`, a `reason` of `manual` or `auto`, and `position`. Dates are ISO
+absent for a Favorite and a Favorite's Peek, `archivedAt`, a `reason` of
+`manual` or `auto`, and `position`. Dates are ISO
 8601. A file without `archive`, `viewedAt` or `openerID` reads as an empty Archive, no
 stamps and no openers. Loading validates the tree: roots are containers, parents and children
 agree, every item is reachable, each profile and Space points at roots of the
