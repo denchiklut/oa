@@ -40,6 +40,8 @@ class PageImpl : public Page,
 
   void Rebind(content::WebContents* new_contents);
   void OnRemovedFromStrip();
+  // From the sad tab Chrome creates for the dead renderer.
+  void SetCrash(Crash crash);
 
   // Page:
   void SetObserver(Page::Observer* observer) override;
@@ -52,6 +54,7 @@ class PageImpl : public Page,
   bool CanGoForward() const override;
   void* Favicon() const override;
   SecurityLevel GetSecurityLevel() const override;
+  Crash GetCrash() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -92,6 +95,7 @@ class PageImpl : public Page,
       content::RenderFrameHost* requesting_frame) override;
 
   // content::WebContentsObserver:
+  void RenderFrameCreated(content::RenderFrameHost* render_frame_host) override;
   void DidFinishNavigation(
       content::NavigationHandle* navigation_handle) override;
   void LoadProgressChanged(double progress) override;
@@ -123,6 +127,7 @@ class PageImpl : public Page,
   bool closing_ = false;
   bool keeps_address_ = false;
   double load_progress_ = 0;
+  Crash crash_ = Crash::kNone;
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>
       favicon_observation_{this};

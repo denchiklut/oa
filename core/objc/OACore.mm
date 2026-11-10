@@ -62,6 +62,19 @@ OAPageSecurityLevel ToSecurityLevel(oa::SecurityLevel level) {
   }
 }
 
+OAPageCrash ToCrash(oa::Crash crash) {
+  switch (crash) {
+    case oa::Crash::kNone:
+      return OAPageCrashNone;
+    case oa::Crash::kCrashed:
+      return OAPageCrashCrashed;
+    case oa::Crash::kKilled:
+      return OAPageCrashKilled;
+    case oa::Crash::kOutOfMemory:
+      return OAPageCrashOutOfMemory;
+  }
+}
+
 class PageObserverBridge : public oa::Page::Observer {
  public:
   explicit PageObserverBridge(OAPage* page) : page_(page) {}
@@ -164,6 +177,10 @@ class PageObserverBridge : public oa::Page::Observer {
 - (OAPageSecurityLevel)securityLevel {
   return _page ? ToSecurityLevel(_page->GetSecurityLevel())
                : OAPageSecurityLevelNeutral;
+}
+
+- (OAPageCrash)crash {
+  return _page ? ToCrash(_page->GetCrash()) : OAPageCrashNone;
 }
 
 - (void)loadURL:(NSURL*)url {
