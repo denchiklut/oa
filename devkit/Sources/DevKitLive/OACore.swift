@@ -27,7 +27,6 @@ import AppKit
     var canGoForward: Bool { get }
     var favicon: NSImage? { get }
     var securityLevel: Int { get }
-    var crash: Int { get }
     var keepsAddress: Bool { get set }
     @objc(loadURL:) func load(_ url: URL)
     func goBack()
@@ -57,6 +56,8 @@ import AppKit
     @objc(page:didOpenPage:targetURL:disposition:)
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int)
     @objc(pageWantsActivation:) func pageWantsActivation(_ page: CorePage)
+    @objc(page:rendererGone:) func page(_ page: CorePage, rendererGone exit: Int)
+    @objc(pageRendererReady:) func pageRendererReady(_ page: CorePage)
     @objc(page:didRequestDialog:) func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog)
     @objc(page:didDismissDialog:) func page(_ page: CorePage, didDismissDialog dialog: CorePageDialog)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
