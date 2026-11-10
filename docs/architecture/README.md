@@ -1,9 +1,9 @@
 # Architecture
 
 This documentation describes how Oa will work: what each layer owns, how the
-layers communicate, and which design decisions remain open. The Chromium, Core
-and DevKit chapters cover the engine, native integration and Swift interface;
-App/UI has scope notes ready for expansion.
+layers communicate, and which design decisions remain open. The App/UI, DevKit, Core and Chromium
+chapters cover product state and native presentation, the Swift engine interface,
+native integration and browser infrastructure.
 
 ## Four layers
 
