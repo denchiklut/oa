@@ -111,6 +111,13 @@ final class StubPage: Page {
         continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab))
     }
 
+    func followLink() {
+        guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+        components.path = "/followed"
+        components.query = nil
+        if let target = components.url { load(target) }
+    }
+
     func closeItself() {
         continuation?.yield(.closed)
         drop()
@@ -198,6 +205,7 @@ private struct StubPageView: View {
                         Button("Shift-click a link") { page.open(.newWindow) }
                     }
                     HStack(spacing: 16) {
+                        Button("Follow a link on this host") { page.followLink() }
                         Button("Click a link to another host") { page.clickCrossOriginLink() }
                         Button("Ask for focus in 3 s") { page.askForFocus() }
                         Button("Close itself") { page.closeItself() }
