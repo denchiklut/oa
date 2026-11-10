@@ -428,7 +428,7 @@ final class WindowModel {
     private func nextSelection(closing tabID: UUID, pinned: Bool, in spaceID: UUID) -> UUID? {
         if let successor = state.openerSuccessor(of: tabID) { return successor }
         if let previousTabID, previousTabID != tabID, pages[previousTabID] != nil,
-            state.space(containing: previousTabID)?.id == spaceID
+            state.isSelectable(previousTabID, in: spaceID)
         {
             return previousTabID
         }
