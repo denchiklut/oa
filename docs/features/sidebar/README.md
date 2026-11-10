@@ -136,10 +136,12 @@ which nothing shows yet.
 A page whose renderer has died, crashed, killed or out of memory, shows a
 native crashed page with a Reload button in place of the engine's view, in the
 window and in a Peek, until a reload starts a new renderer. Arc replaces
-Chrome's sad tab in its engine, reports the death to its app and draws its own
-page there; Oa does the same through a Chromium seam like the one for
-permission prompts, since Chrome's sad tab wants a BrowserView and aborts
-without one. The words on the page are Oa's own.
+Chrome's sad tab in its engine, which reports only that the renderer is gone and
+later that a new one is ready; its app keeps the crashed state and draws its own
+page. Oa does the same: Core reports both events, DevKit keeps the state, and a
+Chromium seam like the one for permission prompts stands in for Chrome's sad
+tab, which wants a BrowserView and aborts without one. The words on the page
+are Oa's own.
 
 A page's `alert`, `confirm`, `prompt` and "Leave site?" show as Arc shows them:
 one panel centred on the window over a scrim that covers sidebar, toolbar and
