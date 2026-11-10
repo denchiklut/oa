@@ -55,7 +55,7 @@ that every online integration still works.
 | Vertical sidebar | ✅ | ☐ |
 | Hide/reveal and resize the sidebar | ✅ | ☐ |
 | Optional top toolbar | ✅ | ☐ |
-| Favorites | ✅ | ☐ |
+| Favorites | ✅ | ✅ |
 | Pinned tabs | ✅ | ☐ |
 | Ordinary / Today tabs | ✅ | ☐ |
 | Rename and duplicate tabs | ✅ | ☐ |
