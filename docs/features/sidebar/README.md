@@ -42,19 +42,29 @@ strip. The page also moves to a window that shows its tab when the holding
 window selects another tab, when the showing window becomes key, and when the
 holding window closes. Pages of Spaces not shown stay alive with their views
 detached, so the engine sees them as hidden. Window close and quit drop pages
-without unload handlers; the records stay.
+without unload handlers; the records stay. Arc asks "Leave site?" per armed page
+at quit and when the last window closes, and a Cancel keeps Arc running; a
+follow-up.
 
-Close Tab ⌘W reads "Archive Tab" on an unpinned tab, as in Arc: the record
-leaves the tree for the Archive with the time, its Space, how it was closed and
-its index, and the page, wherever it lives, closes as the user would. The window
-returns to the previous tab if its page is live, else the tab above, else below;
-another window that had the tab selected is left with no selection. On a pinned
-tab the item reads "Close Tab", the entry stays and the page is dropped; the
-window returns to the previous live tab, else shows nothing. A page the engine
-closes on its own is archived the same way. Pin Tab ⌘D toggles the section.
-Spaces have New, Rename and Delete without shortcuts; the last Space can't be
-deleted, and deleting one archives its tabs, pinned too, after a confirmation
-when it has any. Its Archive entries stay.
+Close Tab ⌘W reads "Archive Tab" on an unpinned tab, as in Arc: the page,
+wherever it lives, closes as the user would, and once it reports closed the
+record leaves the tree for the Archive with the time, its Space, how it was
+closed and its index. A page whose `beforeunload` handler wants to stay asks
+first with "Leave site?" and a Cancel keeps page, row and selection, as Arc
+does; the row's hover ✕ on another tab brings that tab forward while it asks,
+as Arc selects it first. A tab without a live page is archived at once. The
+window returns to the previous tab if its page is live, else the tab above, else
+below; another window that had the tab selected is left with no selection. On a
+pinned tab the item reads "Close Tab", the entry stays and the page is dropped
+without unload handlers, Oa's own choice. A page the engine closes on its own is
+archived the same way. Pin Tab ⌘D toggles the section. Spaces have New, Rename
+and Delete without shortcuts; the last Space can't be deleted. Deleting one asks
+"Delete your Space?" when it has tabs, then closes its live pages one at a time
+in sidebar order, Oa's own order where Arc's is unknown, selecting each so a
+"Leave site?" shows over it; a Cancel keeps the Space with every row, as in
+Arc, with the pages already closed staying closed. When every page is gone the
+tabs are archived, pinned too, and the window moves to the neighbor Space. Its
+Archive entries stay.
 
 The Archive is a sidebar mode, as in Arc: Archive ▸ View Archive… replaces the
 sidebar with one list across Spaces, grouped by day and newest first, each row
@@ -68,9 +78,11 @@ back at its old index, selected, switching the window to its Space. Archive ▸
 Clear Archive empties it after a confirmation. Each tab carries the time a
 window last selected it; a sweep at launch and every 15 minutes archives
 unpinned tabs idle for 12 hours, Arc's default, unless a window has them
-selected, and there is no setting to turn it off. Arc keeps a separate
-session-only ⇧⌘T stack with engine history and asks before archiving a page whose
-`beforeunload` wants to stay; both are follow-ups.
+selected, and there is no setting to turn it off. A due tab with a live page is
+closed as the user would, so a `beforeunload` handler can keep it; a kept tab
+counts as viewed now and is not asked again for another 12 hours, Oa's own rule,
+after Arc's idle unload, which never prompts. Arc keeps a separate session-only
+⇧⌘T stack with engine history; a follow-up.
 
 A page a page opens, with a `target=_blank` link, `window.open` or a ⌘-click,
 keeps the page the engine made for it, so `window.opener`, session storage and a
@@ -126,6 +138,25 @@ Chrome's sad tab in its engine, reports the death to its app and draws its own
 page there; Oa does the same through a Chromium seam like the one for
 permission prompts, since Chrome's sad tab wants a BrowserView and aborts
 without one. The words on the page are Oa's own.
+
+A page's `alert`, `confirm`, `prompt` and "Leave site?" show as Arc shows them:
+one panel centred on the window over a scrim that covers sidebar, toolbar and
+page alike, with Chrome's words, "host says" above the message, OK and Cancel, a
+prompt field with its default text selected, and "Reload site?" for a reload.
+Enter accepts and Esc cancels; Esc does nothing to an alert. The window's own
+commands wait while the panel is up, other windows and quit stay usable. Chrome's
+dialog managers keep their policy: an `alert` from a page that is hidden or in a
+window that is not key returns at once and its panel waits until the page is
+shown in a key window, a hidden `confirm` or `prompt` is cancelled at once, a
+navigation or a tab switch under a dialog dismisses it, and a page that is the
+Browser's active tab behind a tab with no page keeps its alert waiting, an Oa
+quirk. From a page's seventh dialog on the panel offers "Don't show this again",
+which answers that page's later dialogs unasked for the rest of its life, as
+Arc's does. Arc replaces Chrome's two dialog views in its engine and draws the
+panel in its app; Oa does the same through `SetNativeDialogFactory` for the
+app-modal view and patch 0008 for the tab-modal one, both reaching the page's
+observer with a reply to call once and a dismissal when the engine closes the
+dialog. The panel's colours follow the system appearance, Oa's own; Arc's is dark.
 
 The engine is built without DCHECKs, as Arc ships. A Blink assertion that is
 wrong for a valid layout killed renderers on real pages, and Chromium has

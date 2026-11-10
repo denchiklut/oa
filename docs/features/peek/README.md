@@ -42,11 +42,13 @@ make a selected tab after the opener's earlier children, which hides the Peek
 until the opener is reselected; a ⌘-click makes a background tab there and
 leaves the Peek up. A Shift-click inside a Peek makes a tab too, Oa's own
 choice. Expand makes the Peek's page a selected tab after the opener's earlier
-children, the same live page with no reload. ✕, a click on the backdrop and ⌘W
-archive the page under the tab's Space, as do archiving the opener, closing
+children, the same live page with no reload, and asks nothing. ✕, a click on
+the backdrop and ⌘W close the page as the user would, so a `beforeunload`
+handler can keep the Peek with "Leave site?" over it, as Arc does, and archive
+it under the tab's Space once it is gone, as do archiving the opener, closing
 the window and quitting; a page that closes itself leaves no entry. A tab has
-one Peek: a new request while one is up closes the current one as ✕ would,
-Oa's own choice. The entry has no position, so it restores at the top of the
+one Peek: a new request while one is up closes the current one as ✕ would and
+archives it at once, Oa's own choice. The entry has no position, so it restores at the top of the
 unpinned section, also Oa's own: Arc's entries carry no visible position.
 Nothing about a Peek is saved, so none survives a relaunch, as in Arc.
 
