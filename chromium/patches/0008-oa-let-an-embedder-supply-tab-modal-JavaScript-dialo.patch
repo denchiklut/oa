@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 10 Nov 2026 07:36:09 -0700
+Subject: [PATCH] oa: let an embedder supply tab-modal JavaScript dialogs
+
+Adds JavaScriptTabModalDialogManagerDelegateDesktop::SetViewFactoryForEmbedder(). Once a factory is set, CreateNewDialog() returns the factory's dialog for every alert, confirm and prompt instead of Chrome's JavaScriptTabModalDialogViewViews, which is shown as a web-modal dialog anchored to the BrowserView; an embedder whose Browsers have none gets no dialog, or a crash. The app-modal factory needs no patch: AppModalDialogManager::SetNativeDialogFactory is public.
+---
+ ...ab_modal_dialog_manager_delegate_desktop.h | 16 ++++++++++++++
+ .../javascript_tab_modal_dialog_view_views.cc | 21 +++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+
+diff --git a/chrome/browser/ui/javascript_dialogs/javascript_tab_modal_dialog_manager_delegate_desktop.h b/chrome/browser/ui/javascript_dialogs/javascript_tab_modal_dialog_manager_delegate_desktop.h
+index f79f821725cce25bfce9da412407fb4dbf6d3057..f24eb9ebde719a6bc19016b7e2a5301ff8c4d872 100644
+--- a/chrome/browser/ui/javascript_dialogs/javascript_tab_modal_dialog_manager_delegate_desktop.h
++++ b/chrome/browser/ui/javascript_dialogs/javascript_tab_modal_dialog_manager_delegate_desktop.h
+@@ -22,6 +22,22 @@ class JavaScriptTabModalDialogManagerDelegateDesktop
+       public BrowserCollectionObserver,
+       public TabStripModelObserver {
+  public:
++  // For an embedder that draws its own dialogs. Once a factory is set,
++  // CreateNewDialog() returns the factory's dialog for every request and never
++  // builds Chrome's view, which needs a BrowserView. Call it before the
++  // browser starts.
++  using EmbedderViewFactory = base::WeakPtr<
++      javascript_dialogs::TabModalDialogView> (*)(
++      content::WebContents* parent_web_contents,
++      content::WebContents* alerting_web_contents,
++      const std::u16string& title,
++      content::JavaScriptDialogType dialog_type,
++      const std::u16string& message_text,
++      const std::u16string& default_prompt_text,
++      content::JavaScriptDialogManager::DialogClosedCallback dialog_callback,
++      base::OnceClosure dialog_closed_callback);
++  static void SetViewFactoryForEmbedder(EmbedderViewFactory factory);
++
+   explicit JavaScriptTabModalDialogManagerDelegateDesktop(
+       content::WebContents* web_contents);
+ 
+diff --git a/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc b/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc
+index 7c39cff1a24b7eb55ba5611dd06205e12b295a55..50205e6ebade5e1354e1f93ca70490e0d2e3db4c 100644
+--- a/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc
++++ b/chrome/browser/ui/views/javascript_tab_modal_dialog_view_views.cc
+@@ -23,6 +23,15 @@
+ #include "ui/views/controls/textfield/textfield.h"
+ #include "ui/views/layout/fill_layout.h"
+ 
++namespace {
++
++// Set by JavaScriptTabModalDialogManagerDelegateDesktop::
++// SetViewFactoryForEmbedder().
++JavaScriptTabModalDialogManagerDelegateDesktop::EmbedderViewFactory
++    g_embedder_factory = nullptr;
++
++}  // namespace
++
+ JavaScriptTabModalDialogViewViews::~JavaScriptTabModalDialogViewViews() =
+     default;
+ 
+@@ -163,6 +172,12 @@ JavaScriptTabModalDialogViewViews::CreateAlertDialogForTesting(
+ BEGIN_METADATA(JavaScriptTabModalDialogViewViews)
+ END_METADATA
+ 
++// static
++void JavaScriptTabModalDialogManagerDelegateDesktop::SetViewFactoryForEmbedder(
++    EmbedderViewFactory factory) {
++  g_embedder_factory = factory;
++}
++
+ // Creates a new JS dialog. Note the two callbacks; |dialog_callback| is for
+ // user responses, while |dialog_force_closed_callback| is for when Views
+ // forces the dialog closed without a user reply.
+@@ -175,6 +190,12 @@ JavaScriptTabModalDialogManagerDelegateDesktop::CreateNewDialog(
+     const std::u16string& default_prompt_text,
+     content::JavaScriptDialogManager::DialogClosedCallback dialog_callback,
+     base::OnceClosure dialog_force_closed_callback) {
++  if (g_embedder_factory) {
++    return g_embedder_factory(web_contents_, alerting_web_contents, title,
++                              dialog_type, message_text, default_prompt_text,
++                              std::move(dialog_callback),
++                              std::move(dialog_force_closed_callback));
++  }
+   return (new JavaScriptTabModalDialogViewViews(
+               web_contents_, alerting_web_contents, title, dialog_type,
+               message_text, default_prompt_text, std::move(dialog_callback),
