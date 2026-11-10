@@ -1,3 +1,4 @@
+import AppKit
 import DevKit
 import Foundation
 import Observation
@@ -11,12 +12,14 @@ final class SidebarStore {
     @ObservationIgnored private(set) var windows: [WindowModel] = []
     @ObservationIgnored let savedWindows: [WindowRecord]
     @ObservationIgnored private let persistence: SidebarPersistence
+    @ObservationIgnored private let favicons: FaviconCache
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
     @ObservationIgnored private var sweep: Task<Void, Never>?
     @ObservationIgnored private var frozen = false
 
     init(directory: URL) {
         persistence = SidebarPersistence(directory: directory)
+        favicons = FaviconCache(directory: directory)
         state = persistence.loadSidebar() ?? .initial()
         savedWindows = persistence.loadWindows()
     }
@@ -31,8 +34,13 @@ final class SidebarStore {
         state.setSavedPage(tabID, title: title, url: url)
     }
 
-    func setSavedFavicon(_ tabID: UUID, _ favicon: Data) {
-        state.setSavedFavicon(tabID, favicon)
+    /// The last favicon a tab's page showed, for a tab or Archive entry without a page.
+    func savedFavicon(_ id: UUID) -> NSImage? {
+        favicons.image(for: id)
+    }
+
+    func setSavedFavicon(_ tabID: UUID, _ favicon: NSImage) {
+        favicons.set(favicon, for: tabID)
     }
 
     func markViewed(_ tabID: UUID) {
@@ -106,5 +114,6 @@ final class SidebarStore {
 
     private func save() {
         persistence.save(state, windows: windows.map(\.record))
+        favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
     }
 }
