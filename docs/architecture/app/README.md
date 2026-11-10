@@ -177,9 +177,8 @@ the address field; Arc shows Chromium's blank view and `about:blank` there,
 which isn't worth copying. A sidebar row looks the same whether its page exists
 or not, as in Arc, and a tab with no title yet reads "Untitled". The row starts
 with the favicon Chromium's favicon driver chose for the live page, wherever
-the page lives, else an empty tile, as Arc's rows do. Arc also shows the saved
-favicon of a tab without a page; that needs a favicon cache Oa doesn't keep
-yet, so such a row has the empty tile. The page also carries Chromium's
+the page lives, else the favicon the tab's page last showed, saved with the
+tab as Arc shows it after a relaunch, else an empty tile. The page also carries Chromium's
 security level for its visible URL, neutral, secure, warning or dangerous,
 which nothing shows yet.
 
@@ -190,9 +189,9 @@ at the top of the sidebar in every Space of the profile, as Arc does. The grid
 has Arc's measured shape: 47 pt tiles with 8 pt gaps filling the row, the
 column count from the tile count (⌈n / 4⌉ rows, ⌈n / rows⌉ columns), the last
 row left-aligned, and each tile a favicon and nothing else, no title and no
-tooltip. A tile whose tab has no page shows the first letter of its host, Oa's
-own: Arc shows the saved favicon, which needs the favicon cache Oa doesn't keep
-yet. The selected tile has a lighter fill; Arc tints it from the favicon, which
+tooltip. A tile whose tab has no page shows its saved favicon, as in Arc, and
+the first letter of its host when its page never showed one, Oa's own. The
+selected tile has a lighter fill; Arc tints it from the favicon, which
 isn't copied. While the Favorite's Peek shows, the tile carries the Peek page's
 favicon on its top-right corner. With no Favorites the grid is one dashed empty
 tile to drop on, Oa's own; Arc's empty grid wasn't observed.
@@ -203,9 +202,11 @@ as Arc inserts at the drop position, or by Tabs ▸ Favorite Tab, which appends,
 standing in for Arc's command-bar command; Arc's row menu has no such item and
 neither has Oa. Tiles move by the same drag. The tile's Remove Favorite
 archives the tab under no Space with its page closed and leaves nothing
-selected, as Arc does; Tabs ▸ Unfavorite Tab makes it a tab of the shown Space,
-at the top of the unpinned section, the position Oa's own. Favorites are never
-auto-archived, and deleting a Space leaves them.
+selected, as Arc does. Tabs ▸ Unfavorite Tab, the tile's Unfavorite and a tile
+dropped on the tab list make it a tab of the shown Space at the top of the
+unpinned section; Arc has the command, the tile item, the drop and the position
+are Oa's own. Favorites are never auto-archived, and deleting a Space leaves
+them.
 
 A click selects the Favorite and shows its one live page, made from the saved
 URL on the first selection as for any tab; the page serves every Space of the
@@ -224,9 +225,9 @@ when the page has left the saved URL it first reloads that URL in the
 background, as Arc does; the page stays alive. A page that ends on its own
 leaves the tile without one. Closing a Space's last tab falls back to the first
 Favorite when no earlier tab is live, Oa's own. New windows and new Spaces start
-with nothing selected, as in Arc. ⌘1–⌘9 and Next and Previous Tab still count
-pinned then unpinned tabs; Arc's ⌘1 goes to the first Favorite, which the hotkey
-work will match. Whether Arc reopens a navigated Favorite at its saved URL
+with nothing selected, as in Arc. ⌘1–⌘9 count Favorites first, then pinned,
+then unpinned, as Arc does, and Next and Previous Tab cycle through the same
+list. Whether Arc reopens a navigated Favorite at its saved URL
 after a relaunch is unknown; Oa saves only the Favorite's address, so it does.
 
 ### Files
@@ -239,7 +240,8 @@ with unchanged bytes is skipped.
 where `tree` lists `rootIDs` and `items` in display order. Each item has `id`,
 optional `parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
 `splitView`, and for a container its `container` kind, for a tab its `title`,
-`url`, `viewedAt` and `openerID`, the tab whose page opened it. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
+`url`, `viewedAt`, `openerID`, the tab whose page opened it, and `favicon`, the
+last one its page showed as base64 PNG. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
 absent for a Favorite and a Favorite's Peek, `archivedAt`, a `reason` of
 `manual` or `auto`, and `position`. Dates are ISO
 8601. A file without `archive`, `viewedAt` or `openerID` reads as an empty Archive, no
@@ -249,7 +251,7 @@ right kind, and no archived tab is also in the tree.
 
 `windows.json` carries `version` and `windows`, each with `id` and
 `selectedSpaceID`. A saved Space that no longer exists falls back to the first.
-Window frames are not saved. Favicons are not saved either.
+Window frames are not saved.
 
 `version` is a format number, as Arc's own stores carry at their top level.
 Adding a key with a default, as `archive`, `viewedAt` and `openerID` were,
