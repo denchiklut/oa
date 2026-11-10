@@ -71,8 +71,10 @@ final class WindowModel {
         return state.isFavorite(tab.id) ? live : "/ " + live
     }
 
+    /// The live page's favicon, wherever the page lives, else the saved one, as Arc shows it.
     func favicon(for tab: SidebarTab) -> NSImage? {
         (pages[tab.id] ?? store.windows.lazy.compactMap { $0.pages[tab.id] }.first)?.favicon
+            ?? tab.favicon.flatMap { NSImage(data: $0) }
     }
 
     /// Only the only window picks a tab: first unpinned, else first pinned. Another window starts empty.
@@ -159,13 +161,12 @@ final class WindowModel {
 
     func toggleFavorite() {
         guard let tabID = selectedTabID else { return }
-        store.edit { state in
-            if state.isFavorite(tabID) {
-                state.unfavoriteTab(tabID, in: selectedSpaceID)
-            } else {
-                state.favoriteTab(tabID)
-            }
-        }
+        if state.isFavorite(tabID) { unfavorite(tabID) } else { favorite(tabID, at: nil) }
+    }
+
+    /// The tile's Unfavorite and a tile dropped on the tab list, Oa's own ways to Arc's command-bar Unfavorite Tab.
+    func unfavorite(_ tabID: UUID) {
+        store.edit { $0.unfavoriteTab(tabID, in: selectedSpaceID) }
     }
 
     /// A drop on the grid: a row joins it at the index, a tile moves there.
@@ -390,8 +391,8 @@ final class WindowModel {
     }
 
     /// The opener's group first, as in Arc; else the tab shown before, if its page is still live; an unpinned close
-    /// then falls back to the tab above, else below, else the first Favorite, Oa's own: Arc's choice for a Space
-    /// with no earlier selection is unknown.
+    /// then falls back to the tab above, Favorites counted first, else below; Arc's choice for a Space with no
+    /// earlier selection is unknown.
     private func nextSelection(closing tabID: UUID, pinned: Bool, in spaceID: UUID) -> UUID? {
         if let successor = state.openerSuccessor(of: tabID) { return successor }
         if let previousTabID, previousTabID != tabID, pages[previousTabID] != nil,
@@ -402,7 +403,7 @@ final class WindowModel {
         guard !pinned else { return nil }
         let tabs = state.selectableTabs(in: spaceID)
         guard let index = tabs.firstIndex(where: { $0.id == tabID }) else { return nil }
-        return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : state.favorites(for: spaceID).first?.id
+        return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : nil
     }
 
     /// Takes the page over from the window that holds it, else creates it.
@@ -574,10 +575,12 @@ final class WindowModel {
         withObservationTracking {
             _ = page.title
             _ = page.url
+            _ = page.favicon
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, let page = pages[tabID], ObjectIdentifier(page) == identity else { return }
                 store.setSavedPage(tabID, title: page.title, url: page.url)
+                if let favicon = page.favicon?.pngData { store.setSavedFavicon(tabID, favicon) }
                 observe(page, for: tabID)
             }
         }
@@ -591,5 +594,11 @@ final class WindowModel {
             return deselect(tabID)
         }
         end(tabID) { _, _ in }
+    }
+}
+
+extension NSImage {
+    fileprivate var pngData: Data? {
+        tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
     }
 }

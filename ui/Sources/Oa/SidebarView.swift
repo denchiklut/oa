@@ -31,6 +31,7 @@ struct SidebarView: View {
                 }
                 .padding(8)
             }
+            .onDrop(of: [.plainText], delegate: TabDrop { model.unfavorite($0) })
             Divider()
             Button {
                 model.newTab()
@@ -204,7 +205,7 @@ private struct ArchiveRow: View {
 @MainActor
 enum SpaceDeletion {
     static func confirm(_ space: SidebarSpace, in model: WindowModel) {
-        if !model.state.selectableTabs(in: space.id).isEmpty {
+        if !model.state.tabs(in: space.id).isEmpty {
             let alert = NSAlert()
             alert.messageText = "Delete your “\(space.name)” Space?"
             alert.informativeText = "This will archive all the tabs inside it."
@@ -258,14 +259,14 @@ private struct FavoritesGrid: View {
                     let indices = (row * columns)..<min((row + 1) * columns, favorites.count)
                     ForEach(Array(indices), id: \.self) { index in
                         FavoriteTile(model: model, tab: favorites[index], width: width)
-                            .onDrop(of: [.plainText], delegate: TabDrop(model: model, index: index))
+                            .onDrop(of: [.plainText], delegate: TabDrop { model.favorite($0, at: index) })
                     }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onDrop(of: [.plainText], delegate: TabDrop(model: model, index: nil))
+        .onDrop(of: [.plainText], delegate: TabDrop { model.favorite($0, at: nil) })
     }
 }
 
@@ -290,11 +291,12 @@ private struct FavoriteTile: View {
             .onDrag { NSItemProvider(object: tab.id.uuidString as NSString) }
             .contextMenu {
                 if selected { Button("Close Tab") { model.close(tab.id) } }
+                Button("Unfavorite") { model.unfavorite(tab.id) }
                 Button("Remove Favorite") { model.removeFavorite(tab.id) }
             }
     }
 
-    /// The host's first letter stands in where Arc shows the saved favicon: Oa keeps none for a page it hasn't made.
+    /// The host's first letter stands in for a tab whose page never showed a favicon.
     @ViewBuilder private var icon: some View {
         if let icon = model.favicon(for: tab) {
             Image(nsImage: icon).resizable().interpolation(.high)
@@ -306,15 +308,15 @@ private struct FavoriteTile: View {
     }
 }
 
+/// A dragged tab's ID arrives as text; the drop decides where it goes.
 private struct TabDrop: DropDelegate {
-    let model: WindowModel
-    let index: Int?
+    let drop: @MainActor @Sendable (UUID) -> Void
 
     func performDrop(info: DropInfo) -> Bool {
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
         _ = provider.loadObject(ofClass: NSString.self) { text, _ in
             guard let id = (text as? NSString).flatMap({ UUID(uuidString: String($0)) }) else { return }
-            Task { @MainActor in model.favorite(id, at: index) }
+            Task { @MainActor in drop(id) }
         }
         return true
     }
