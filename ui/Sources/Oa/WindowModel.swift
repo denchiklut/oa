@@ -530,7 +530,12 @@ final class WindowModel {
     private func handle(_ event: PageEvent, for pageID: UUID) {
         switch event {
         case .dialog(let dialog):
-            return dialogs[pageID, default: []].append(dialog)
+            dialogs[pageID, default: []].append(dialog)
+            if let ownerID = peekOwner(of: pageID), state.tree.tab(ownerID) == nil, archivePeekID != ownerID {
+                showingArchive = true
+                archivePeekID = ownerID
+            }
+            return
         case .dialogDismissed(let dialog):
             return forget(dialog)
         case .closeCancelled:
@@ -662,6 +667,8 @@ final class WindowModel {
             for window in store.windows { window.placeholders[tabID] = nil }
             if reason != nil { store.edit { $0.archiveTab(tabID, reason: .manual) } }
             deselect(tabID)
+        } else if let deleting = store.deletingSpace, state.space(containing: tabID)?.id == deleting.id {
+            release(tabID)
         } else {
             end(tabID, reason: reason ?? .manual) { _, _ in }
         }
