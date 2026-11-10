@@ -36,7 +36,7 @@ final class SidebarStore {
     }
 
     /// From a reconcile or a window closing, where an edit can't be nested; the save rides on the enclosing one.
-    func archivePage(_ page: any Page, in spaceID: UUID) {
+    func archivePage(_ page: any Page, in spaceID: UUID?) {
         state.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID)
     }
 

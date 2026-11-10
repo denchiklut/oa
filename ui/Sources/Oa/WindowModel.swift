@@ -41,6 +41,7 @@ final class WindowModel {
     private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
     /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
     var address: URL? { page?.url ?? selectedTab?.url }
+    var favorites: [SidebarTab] { state.favorites(for: selectedSpaceID) }
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }
     var selectableTabs: [SidebarTab] { state.selectableTabs(in: selectedSpaceID) }
@@ -60,12 +61,14 @@ final class WindowModel {
         focusAddressField += 1
     }
 
-    /// A pinned tab whose page has left its address reads "/ live title", as in Arc.
+    /// A pinned tab whose page has left its address reads "/ live title", as in Arc; a Favorite, whose tile has no
+    /// text, gives the window the live title as Arc's does.
     func title(for tab: SidebarTab) -> String {
-        guard state.isPinned(tab.id), let page = pages[tab.id], let url = page.url, !tab.isAt(url) else {
+        guard state.keepsAddress(tab.id), let page = pages[tab.id], let url = page.url, !tab.isAt(url) else {
             return tab.displayTitle
         }
-        return "/ " + (page.title.isEmpty ? url.host() ?? url.absoluteString : page.title)
+        let live = page.title.isEmpty ? url.host() ?? url.absoluteString : page.title
+        return state.isFavorite(tab.id) ? live : "/ " + live
     }
 
     func favicon(for tab: SidebarTab) -> NSImage? {
@@ -88,7 +91,7 @@ final class WindowModel {
     }
 
     func select(_ tabID: UUID) {
-        guard state.space(containing: tabID)?.id == selectedSpaceID, selectedTabID != tabID else { return }
+        guard state.isSelectable(tabID, in: selectedSpaceID), selectedTabID != tabID else { return }
         showingArchive = false
         if let current = selectedTabID {
             if pages[current] != nil { previousTabID = current }
@@ -154,6 +157,31 @@ final class WindowModel {
         store.edit { $0.togglePin(tabID) }
     }
 
+    func toggleFavorite() {
+        guard let tabID = selectedTabID else { return }
+        store.edit { state in
+            if state.isFavorite(tabID) {
+                state.unfavoriteTab(tabID, in: selectedSpaceID)
+            } else {
+                state.favoriteTab(tabID)
+            }
+        }
+    }
+
+    /// A drop on the grid: a row joins it at the index, a tile moves there.
+    func favorite(_ tabID: UUID, at index: Int?) {
+        store.edit { $0.favoriteTab(tabID, at: index) }
+    }
+
+    /// Remove Favorite: archived under no Space with its page closed, and nothing selected in its place, as Arc does.
+    func removeFavorite(_ tabID: UUID) {
+        guard state.isFavorite(tabID) else { return }
+        let page = store.windows.compactMap { $0.release(tabID) }.first
+        for window in store.windows { window.placeholders[tabID] = nil }
+        store.edit { $0.archiveTab(tabID, reason: .manual) }
+        page?.close()
+    }
+
     func viewArchive() {
         showingArchive = true
     }
@@ -169,7 +197,7 @@ final class WindowModel {
     /// As Arc: the row's page in a Peek over the list, from the saved URL with no history; the entry stays.
     func peekArchived(_ entryID: UUID) {
         guard let entry = state.archive.first(where: { $0.id == entryID }), let url = entry.url,
-            let profileID = (state.space(entry.spaceID) ?? space)?.profileID
+            let profileID = (entry.spaceID.flatMap { state.space($0) } ?? space)?.profileID
         else { return }
         closeArchivePeek()
         archivePeekID = entryID
@@ -196,7 +224,7 @@ final class WindowModel {
             }
         } else {
             tab.openerID = ownerID
-            store.edit { $0.openTab(tab, from: ownerID) }
+            store.edit { $0.openTab(tab, from: ownerID, in: selectedSpaceID) }
         }
         install(page, for: tab.id)
         select(tab.id)
@@ -208,7 +236,8 @@ final class WindowModel {
         guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
         if ownerID == archivePeekID {
             archivePeekID = nil
-        } else if let spaceID = state.space(containing: ownerID)?.id {
+        } else {
+            let spaceID = state.space(containing: ownerID)?.id
             store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
         }
         page.close()
@@ -257,8 +286,15 @@ final class WindowModel {
     }
 
     /// ⌘W. An unpinned tab is archived and its page, wherever it lives, closed as the user would; a pinned one
-    /// keeps its entry and drops its page.
+    /// keeps its entry and drops its page; a Favorite is only deselected, its page reloading the saved URL in the
+    /// background when it has left it, as Arc does.
     func close(_ tabID: UUID) {
+        if state.isFavorite(tabID) {
+            if let tab = state.tree.tab(tabID), let url = tab.url, let page = pages[tabID], !tab.isAt(page.url) {
+                page.load(url)
+            }
+            return deselect(tabID)
+        }
         end(tabID) { page, pinned in pinned ? page.drop() : page.close() }
     }
 
@@ -298,12 +334,12 @@ final class WindowModel {
     /// After a state edit: selections, placeholders and pages of tabs or Spaces that are gone go too.
     func reconcile() {
         if space == nil, let first = state.spaces.first { selectedSpaceID = first.id }
-        for (spaceID, tabID) in selectedTabIDs where state.space(containing: tabID)?.id != spaceID {
+        for (spaceID, tabID) in selectedTabIDs where !state.isSelectable(tabID, in: spaceID) {
             selectedTabIDs.removeValue(forKey: spaceID)
         }
         for tabID in Array(pages.keys) where state.tree.tab(tabID) == nil { release(tabID)?.drop() }
-        for (tabID, page) in pages where page.keepsAddress != state.isPinned(tabID) {
-            page.keepsAddress = state.isPinned(tabID)
+        for (tabID, page) in pages where page.keepsAddress != state.keepsAddress(tabID) {
+            page.keepsAddress = state.keepsAddress(tabID)
         }
         for (ownerID, page) in peeks where ownerID != archivePeekID && state.tree.tab(ownerID) == nil {
             peeks[ownerID] = nil
@@ -319,8 +355,10 @@ final class WindowModel {
         selectedTabID == tabID && pages[tabID] == nil
     }
 
-    private func spaceID(ofPeekOwner ownerID: UUID) -> UUID {
-        state.space(containing: ownerID)?.id ?? state.archive.last { $0.id == ownerID }?.spaceID ?? selectedSpaceID
+    private func spaceID(ofPeekOwner ownerID: UUID) -> UUID? {
+        if state.tree.tab(ownerID) != nil { return state.space(containing: ownerID)?.id }
+        if let entry = state.archive.last(where: { $0.id == ownerID }) { return entry.spaceID }
+        return selectedSpaceID
     }
 
     private func closeArchivePeek() {
@@ -344,8 +382,16 @@ final class WindowModel {
         }
     }
 
+    /// A Favorite's page stays as it is, hidden, as Arc keeps it.
+    private func deselect(_ tabID: UUID) {
+        guard selectedTabID == tabID else { return }
+        selectedTabIDs[selectedSpaceID] = nextSelection(closing: tabID, pinned: true, in: selectedSpaceID)
+        if let next = selectedTabID { ensurePage(next) }
+    }
+
     /// The opener's group first, as in Arc; else the tab shown before, if its page is still live; an unpinned close
-    /// then falls back to the tab above, else below.
+    /// then falls back to the tab above, else below, else the first Favorite, Oa's own: Arc's choice for a Space
+    /// with no earlier selection is unknown.
     private func nextSelection(closing tabID: UUID, pinned: Bool, in spaceID: UUID) -> UUID? {
         if let successor = state.openerSuccessor(of: tabID) { return successor }
         if let previousTabID, previousTabID != tabID, pages[previousTabID] != nil,
@@ -356,7 +402,7 @@ final class WindowModel {
         guard !pinned else { return nil }
         let tabs = state.selectableTabs(in: spaceID)
         guard let index = tabs.firstIndex(where: { $0.id == tabID }) else { return nil }
-        return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : nil
+        return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : state.favorites(for: spaceID).first?.id
     }
 
     /// Takes the page over from the window that holds it, else creates it.
@@ -375,7 +421,7 @@ final class WindowModel {
             }
             return
         }
-        guard let space = state.space(containing: tabID), let profile = state.profile(space.profileID) else {
+        guard let profile = state.profile(containing: tabID) else {
             creating.removeValue(forKey: tabID)
             return
         }
@@ -426,7 +472,7 @@ final class WindowModel {
 
     private func install(_ page: any Page, for tabID: UUID) {
         pages[tabID] = page
-        page.keepsAddress = state.isPinned(tabID)
+        page.keepsAddress = state.keepsAddress(tabID)
         observe(page, for: tabID)
     }
 
@@ -472,13 +518,13 @@ final class WindowModel {
         }
     }
 
-    /// As Arc: a Shift-click from any tab, which the engine reports as a new window, and a pinned tab's foreground
-    /// opens show a Peek; a Peek's own opens become tabs of its tab; the rest go below the opener. A page from an
-    /// Archive Peek has no tab to join, so it goes to the top of the shown Space.
+    /// As Arc: a Shift-click from any tab, which the engine reports as a new window, and the foreground opens of a
+    /// tab that keeps its address show a Peek; a Peek's own opens become tabs of its tab; the rest go below the
+    /// opener. A page from an Archive Peek has no tab to join, so it goes to the top of the shown Space.
     private func place(
         _ page: any Page, url: URL?, disposition: OpenDisposition, from openerID: UUID, insidePeek: Bool
     ) {
-        guard let space = state.space(containing: openerID) else {
+        guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
             let tab = SidebarTab(id: page.id, url: url, viewedAt: .now)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
@@ -487,19 +533,20 @@ final class WindowModel {
             return select(tab.id)
         }
         let background = disposition == .backgroundTab
-        if !insidePeek, disposition == .newWindow || (!background && state.isPinned(openerID)) {
+        if !insidePeek, disposition == .newWindow || (!background && state.keepsAddress(openerID)) {
             return peek(page, from: openerID)
         }
         let tab = SidebarTab(id: page.id, url: url, viewedAt: .now, openerID: openerID)
-        store.edit { $0.openTab(tab, from: openerID) }
+        store.edit { $0.openTab(tab, from: openerID, in: selectedSpaceID) }
         install(page, for: tab.id)
         listen(to: page, for: tab.id)
-        if !background, space.id == selectedSpaceID { select(tab.id) }
+        if !background, state.isSelectable(tab.id, in: selectedSpaceID) { select(tab.id) }
     }
 
     /// A tab has one Peek: a new one takes the place of the current one, which closes as with ✕.
     private func peek(_ page: any Page, from openerID: UUID) {
-        if let current = peeks[openerID], let spaceID = state.space(containing: openerID)?.id {
+        if let current = peeks[openerID] {
+            let spaceID = state.space(containing: openerID)?.id
             store.edit { $0.archivePage(id: current.id, title: current.title, url: current.url, in: spaceID) }
             current.close()
         }
@@ -509,7 +556,8 @@ final class WindowModel {
 
     /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown.
     private func show(_ tabID: UUID) {
-        guard let spaceID = state.space(containing: tabID)?.id else { return }
+        let spaceID = state.space(containing: tabID)?.id ?? selectedSpaceID
+        guard state.isSelectable(tabID, in: spaceID) else { return }
         if spaceID != selectedSpaceID {
             showingArchive = false
             selectedTabIDs[spaceID] = tabID
@@ -535,8 +583,13 @@ final class WindowModel {
         }
     }
 
+    /// A Favorite's page that ends leaves the tile, as a pinned tab's leaves its row.
     private func pageEnded(_ tabID: UUID) {
         guard pages[tabID] != nil else { return }
+        if state.isFavorite(tabID) {
+            release(tabID)
+            return deselect(tabID)
+        }
         end(tabID) { _, _ in }
     }
 }

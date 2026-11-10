@@ -73,6 +73,8 @@ final class MainMenu {
         last.tag = MainMenu.lastTabTag
         tabs.addItem(last)
         tabs.addItem(.separator())
+        tabs.addItem(item("Favorite Tab", #selector(BrowserWindowController.toggleFavorite(_:))))
+        tabs.addItem(.separator())
         tabs.addItem(item("Expand Peek", #selector(BrowserWindowController.expandPeek(_:)), key: "o"))
 
         let spaces = submenu("Spaces", in: menu)

@@ -1,5 +1,6 @@
 import DevKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SidebarView: View {
     static let width: CGFloat = 220
@@ -20,6 +21,8 @@ struct SidebarView: View {
 
     private var tabs: some View {
         VStack(spacing: 0) {
+            FavoritesGrid(model: model)
+                .padding(8)
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(model.pinnedTabs) { TabRow(model: model, tab: $0) }
@@ -232,6 +235,109 @@ private struct SpaceChip: View {
     }
 }
 
+/// Arc's grid as measured: 47 pt tiles with 8 pt gaps filling the row, columns from the count as
+/// `rows = ⌈n / 4⌉`, `cols = ⌈n / rows⌉`, the last row left-aligned, a favicon and nothing else. A row dropped on a
+/// tile joins the grid before it, one dropped beside the tiles is appended; tiles move the same way.
+private struct FavoritesGrid: View {
+    let model: WindowModel
+
+    var body: some View {
+        let favorites = model.favorites
+        let rows = max(1, (favorites.count + 3) / 4)
+        let columns = max(1, (favorites.count + rows - 1) / rows)
+        let width = (SidebarView.width - 16 - CGFloat(columns - 1) * 8) / CGFloat(columns)
+        VStack(alignment: .leading, spacing: 8) {
+            if favorites.isEmpty {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
+                    .foregroundStyle(.quaternary)
+                    .frame(width: 47, height: 47)
+            }
+            ForEach(0..<rows, id: \.self) { row in
+                HStack(spacing: 8) {
+                    let indices = (row * columns)..<min((row + 1) * columns, favorites.count)
+                    ForEach(Array(indices), id: \.self) { index in
+                        FavoriteTile(model: model, tab: favorites[index], width: width)
+                            .onDrop(of: [.plainText], delegate: TabDrop(model: model, index: index))
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onDrop(of: [.plainText], delegate: TabDrop(model: model, index: nil))
+    }
+}
+
+private struct FavoriteTile: View {
+    let model: WindowModel
+    let tab: SidebarTab
+    let width: CGFloat
+    @State private var hovering = false
+
+    var body: some View {
+        let selected = model.selectedTabID == tab.id
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color.primary.opacity(selected ? 0.14 : hovering ? 0.08 : 0.05))
+            .frame(width: width, height: 47)
+            .overlay { icon.frame(width: 16, height: 16) }
+            .overlay(alignment: .topTrailing) {
+                if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon).offset(x: 5, y: -5) }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { model.select(tab.id) }
+            .onHover { hovering = $0 }
+            .onDrag { NSItemProvider(object: tab.id.uuidString as NSString) }
+            .contextMenu {
+                if selected { Button("Close Tab") { model.close(tab.id) } }
+                Button("Remove Favorite") { model.removeFavorite(tab.id) }
+            }
+    }
+
+    /// The host's first letter stands in where Arc shows the saved favicon: Oa keeps none for a page it hasn't made.
+    @ViewBuilder private var icon: some View {
+        if let icon = model.favicon(for: tab) {
+            Image(nsImage: icon).resizable().interpolation(.high)
+        } else {
+            Text(String(tab.url?.host()?.replacingOccurrences(of: "www.", with: "").prefix(1) ?? "").uppercased())
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct TabDrop: DropDelegate {
+    let model: WindowModel
+    let index: Int?
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
+        _ = provider.loadObject(ofClass: NSString.self) { text, _ in
+            guard let id = (text as? NSString).flatMap({ UUID(uuidString: String($0)) }) else { return }
+            Task { @MainActor in model.favorite(id, at: index) }
+        }
+        return true
+    }
+}
+
+private struct PeekBadge: View {
+    let favicon: NSImage?
+
+    var body: some View {
+        Group {
+            if let favicon {
+                Image(nsImage: favicon).resizable().interpolation(.high)
+            } else {
+                RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.1))
+            }
+        }
+        .frame(width: 12, height: 12)
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 4).fill(Color(nsColor: .windowBackgroundColor)))
+        .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.08)))
+    }
+}
+
 /// Reads the model itself, so a change to its tab's page, Peek or selection re-renders the row alone.
 private struct TabRow: View {
     let model: WindowModel
@@ -253,18 +359,7 @@ private struct TabRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
-            if let peek = model.peeks[tab.id] {
-                Group {
-                    if let favicon = peek.favicon {
-                        Image(nsImage: favicon).resizable().interpolation(.high)
-                    } else {
-                        RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.1))
-                    }
-                }
-                .frame(width: 12, height: 12)
-                .padding(2)
-                .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.08)))
-            }
+            if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon) }
             if hovering || selected {
                 Button {
                     model.close(tab.id)
@@ -286,5 +381,6 @@ private struct TabRow: View {
         .contentShape(Rectangle())
         .onTapGesture { model.select(tab.id) }
         .onHover { hovering = $0 }
+        .onDrag { NSItemProvider(object: tab.id.uuidString as NSString) }
     }
 }
