@@ -21,6 +21,7 @@ final class StubPage: Page {
         default: .neutral
         }
     }
+    private(set) var crash: PageCrash?
     var keepsAddress = false
     let events: AsyncStream<PageEvent>
 
@@ -118,6 +119,12 @@ final class StubPage: Page {
         if let target = components.url { load(target) }
     }
 
+    func crashRenderer() {
+        load?.cancel()
+        isLoading = false
+        crash = .crashed
+    }
+
     func closeItself() {
         continuation?.yield(.closed)
         drop()
@@ -137,6 +144,7 @@ final class StubPage: Page {
 
     private func startLoading() {
         load?.cancel()
+        crash = nil
         isLoading = true
         loadProgress = 0.1
         load = Task { [weak self] in
@@ -208,6 +216,7 @@ private struct StubPageView: View {
                         Button("Follow a link on this host") { page.followLink() }
                         Button("Click a link to another host") { page.clickCrossOriginLink() }
                         Button("Ask for focus in 3 s") { page.askForFocus() }
+                        Button("Crash the renderer") { page.crashRenderer() }
                         Button("Close itself") { page.closeItself() }
                     }
                 }
