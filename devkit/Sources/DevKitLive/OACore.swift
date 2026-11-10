@@ -41,11 +41,25 @@ import AppKit
     func drop()
 }
 
+@MainActor @objc protocol CorePageDialog: NSObjectProtocol {
+    var kind: Int { get }
+    var title: String { get }
+    var message: String { get }
+    var defaultText: String { get }
+    var isReload: Bool { get }
+    var offersSuppression: Bool { get }
+    @objc(acceptWithText:suppress:) func accept(text: String?, suppress: Bool)
+    @objc(cancelWithSuppress:) func cancel(suppress: Bool)
+}
+
 @MainActor @objc protocol CorePageDelegate: NSObjectProtocol {
     @objc(pageDidChangeState:) func pageDidChangeState(_ page: CorePage)
     @objc(page:didOpenPage:targetURL:disposition:)
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int)
     @objc(pageWantsActivation:) func pageWantsActivation(_ page: CorePage)
+    @objc(page:didRequestDialog:) func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog)
+    @objc(page:didDismissDialog:) func page(_ page: CorePage, didDismissDialog dialog: CorePageDialog)
+    @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
     @objc(pageDidClose:) func pageDidClose(_ page: CorePage)
 }
 

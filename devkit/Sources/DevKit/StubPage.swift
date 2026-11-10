@@ -23,15 +23,21 @@ final class StubPage: Page {
     }
     private(set) var crash: PageCrash?
     var keepsAddress = false
+    /// A `beforeunload` handler that wants to stay, as a page with unsaved changes.
+    var asksBeforeClosing = false
     let events: AsyncStream<PageEvent>
 
     private var history: [URL] = []
     private var position = -1
     @ObservationIgnored private var load: Task<Void, Never>?
     @ObservationIgnored private var continuation: AsyncStream<PageEvent>.Continuation?
+    @ObservationIgnored private var dialogsShown = 0
+    @ObservationIgnored private var suppressesDialogs = false
+    @ObservationIgnored private var pendingDialog: PageDialog?
     @ObservationIgnored private lazy var hostingView: NSView = {
-        let view = NSHostingView(rootView: StubPageView(page: self))
+        let view = StubHostingView(rootView: StubPageView(page: self))
         view.sizingOptions = []
+        view.movedToWindow = { [weak self] in self?.showPendingDialog() }
         return view
     }()
 
@@ -62,7 +68,11 @@ final class StubPage: Page {
     }
 
     func reload() {
-        if url != nil { startLoading() }
+        guard url != nil else { return }
+        guard asksBeforeClosing else { return startLoading() }
+        ask(.beforeUnload(isReload: true), title: "Reload site?") { [weak self] accepted in
+            if accepted { self?.startLoading() }
+        }
     }
 
     func stopLoading() { finishLoading() }
@@ -82,7 +92,12 @@ final class StubPage: Page {
         return image
     }
 
-    func close() { drop() }
+    func close() {
+        guard asksBeforeClosing else { return closeItself() }
+        ask(.beforeUnload(isReload: false), title: "Leave site?") { [weak self] accepted in
+            if accepted { self?.closeItself() } else { self?.continuation?.yield(.closeCancelled) }
+        }
+    }
 
     func drop() {
         load?.cancel()
@@ -128,6 +143,52 @@ final class StubPage: Page {
     func closeItself() {
         continuation?.yield(.closed)
         drop()
+    }
+
+    func alert() { ask(.alert, message: "Hello from the stub page") { _ in } }
+
+    func confirm() { ask(.confirm, message: "Leave the stub page?") { _ in } }
+
+    func prompt() { ask(.prompt(defaultText: "default text"), message: "What is your name?") { _ in } }
+
+    /// As Chrome and Arc: an alert from a hidden page returns at once and its panel waits for the page to be shown.
+    func alertLater() {
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.ask(.alert, message: "Delayed alert") { _ in }
+        }
+    }
+
+    private func ask(
+        _ kind: PageDialog.Kind, title: String? = nil, message: String = "Changes you made may not be saved.",
+        reply: @escaping (Bool) -> Void
+    ) {
+        if suppressesDialogs {
+            return reply(
+                kind == .alert || kind == .beforeUnload(isReload: true) || kind == .beforeUnload(isReload: false))
+        }
+        dialogsShown += 1
+        let host = url?.host().map { "\($0) says" } ?? ""
+        let dialog = PageDialog(
+            kind: kind, title: title ?? host, message: message,
+            offersSuppression: kind != .beforeUnload(isReload: false) && kind != .beforeUnload(isReload: true)
+                && dialogsShown >= 7
+        ) { [weak self] accepted, _, suppress in
+            if suppress { self?.suppressesDialogs = true }
+            reply(accepted)
+        }
+        guard hostingView.window != nil else {
+            guard kind == .alert else { return reply(false) }
+            pendingDialog = dialog
+            return
+        }
+        continuation?.yield(.dialog(dialog))
+    }
+
+    private func showPendingDialog() {
+        guard hostingView.window != nil, let dialog = pendingDialog else { return }
+        pendingDialog = nil
+        continuation?.yield(.dialog(dialog))
     }
 
     func askForFocus() {
@@ -191,6 +252,15 @@ final class StubPage: Page {
     }
 }
 
+private final class StubHostingView: NSHostingView<StubPageView> {
+    var movedToWindow: () -> Void = {}
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        movedToWindow()
+    }
+}
+
 private struct StubPageView: View {
     let page: StubPage
 
@@ -218,6 +288,14 @@ private struct StubPageView: View {
                         Button("Ask for focus in 3 s") { page.askForFocus() }
                         Button("Crash the renderer") { page.crashRenderer() }
                         Button("Close itself") { page.closeItself() }
+                    }
+                    HStack(spacing: 16) {
+                        Button("Alert") { page.alert() }
+                        Button("Confirm") { page.confirm() }
+                        Button("Prompt") { page.prompt() }
+                        Button("Alert in 3 s") { page.alertLater() }
+                        Toggle("Ask before closing", isOn: Bindable(page).asksBeforeClosing)
+                            .toggleStyle(.checkbox)
                     }
                 }
                 .buttonStyle(.link)

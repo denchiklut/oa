@@ -58,7 +58,7 @@ public protocol Page: AnyObject, Observable {
     func move(toWindow windowID: UUID)
     /// The page's last frame, for a window it left. Nil while it has nothing drawn.
     func snapshot() async -> NSImage?
-    /// Closes as the user would: unload handlers run. Events end.
+    /// Closes as the user would: unload handlers run, and `closed` or `closeCancelled` follows.
     func close()
     /// Ends the page without unload handlers. Events end.
     func drop()
@@ -71,8 +71,54 @@ public enum PageEvent {
     /// The page asked to be shown, as `window.focus()` and a `window.open` reusing a named page do. The app selects
     /// its tab or ignores it.
     case wantsActivation
-    /// The engine closed the page without the app asking.
+    /// The page asked for a dialog; the app shows it and answers it once.
+    case dialog(PageDialog)
+    /// The engine closed the dialog: a navigation, a tab switch, a close. No answer is expected.
+    case dialogDismissed(PageDialog)
+    /// A `beforeunload` handler kept the page after `close()`.
+    case closeCancelled
+    /// The page is gone, after `close()` or without the app asking.
     case closed
+}
+
+/// What a page asked with `alert`, `confirm`, `prompt` or a `beforeunload` handler.
+@MainActor
+public final class PageDialog {
+    public enum Kind: Equatable {
+        case alert
+        case confirm
+        case prompt(defaultText: String)
+        case beforeUnload(isReload: Bool)
+    }
+
+    public let kind: Kind
+    /// Chrome's line above the message: "host says", empty for `beforeUnload`.
+    public let title: String
+    public let message: String
+    /// From the page's seventh dialog on, as Arc offers it; `suppress` answers the page's later dialogs unasked.
+    public let offersSuppression: Bool
+    private var reply: ((Bool, String, Bool) -> Void)?
+
+    public init(
+        kind: Kind, title: String, message: String, offersSuppression: Bool = false,
+        reply: @escaping (_ accepted: Bool, _ text: String, _ suppress: Bool) -> Void
+    ) {
+        self.kind = kind
+        self.title = title
+        self.message = message
+        self.offersSuppression = offersSuppression
+        self.reply = reply
+    }
+
+    public func accept(text: String = "", suppress: Bool = false) {
+        reply?(true, text, suppress)
+        reply = nil
+    }
+
+    public func cancel(suppress: Bool = false) {
+        reply?(false, "", suppress)
+        reply = nil
+    }
 }
 
 public enum OpenDisposition: Sendable, Equatable {
