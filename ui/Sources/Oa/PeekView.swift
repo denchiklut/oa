@@ -35,7 +35,7 @@ struct PeekView: View {
         VStack(spacing: 0) {
             toolbar.frame(height: 33)
             Divider()
-            PageHostView(view: page.view)
+            PageContentView(page: page)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .top) {
