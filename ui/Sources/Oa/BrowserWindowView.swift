@@ -20,7 +20,7 @@ struct BrowserWindowView: View {
                     toolbar
                     Divider()
                     if let page = model.page {
-                        PageHostView(view: page.view)
+                        PageContentView(page: page)
                     } else {
                         Color(nsColor: .windowBackgroundColor)
                     }
