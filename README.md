@@ -16,8 +16,8 @@ of tiles at the top of the sidebar in every one of its Spaces, which keep their
 address and peek like pinned tabs.
 
 Start with the [architecture](docs/architecture/README.md). The
-chapters cover App/UI product state and native presentation, DevKit's Swift
-engine interface, Core's native integration and Chromium. The App/UI chapter
+chapters cover UI product state and native presentation, DevKit's Swift
+engine interface, Core's native integration and Chromium. The UI chapter
 also records the current product slices.
 
 ## Documentation site

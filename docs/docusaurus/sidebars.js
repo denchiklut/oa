@@ -9,7 +9,7 @@ const sidebars = {
       collapsed: false,
       link: { type: "doc", id: "architecture/README" },
       items: [
-        { type: "doc", id: "architecture/app/README", label: "App/UI" },
+        { type: "doc", id: "architecture/ui/README", label: "UI" },
         { type: "doc", id: "architecture/devkit/README", label: "DevKit" },
         { type: "doc", id: "architecture/core/README", label: "Core" },
         { type: "doc", id: "architecture/chromium/README", label: "Chromium" },

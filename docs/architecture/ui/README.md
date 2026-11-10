@@ -1,6 +1,6 @@
-# App / UI
+# UI
 
-App/UI will own Oa's product model, native windows and presentation. It will
+UI will own Oa's product model, native windows and presentation. It will
 turn user input and engine events into product decisions, keep shared data
 consistent across windows, and save the application state needed at relaunch.
 It will use [DevKit](../devkit/README.md) for pages and engine services;
@@ -21,7 +21,7 @@ where they appear, and what a window has selected. An engine page will be a
 resource associated with that model, with its own creation and release rules.
 A saved tab can exist without a live page.
 
-| Owner | Responsibility in App/UI |
+| Owner | Responsibility in UI |
 | --- | --- |
 | Application composition | Select the live or stub DevKit adapter, construct shared services, install menus and coordinate launch, restoration and quit. |
 | Shared product data | Hold profiles, Spaces, Favorites, sidebar entries, folders, splits and Archive records with stable identities and valid relationships. |
@@ -110,7 +110,7 @@ retain its request while the UI is open and end it on answer, dismissal or
 invalidation. Scheduled UI work cannot supply an answer after an immediate
 decision's deadline.
 
-| Product flow | Contract App/UI must define |
+| Product flow | Contract UI must define |
 | --- | --- |
 | Navigation and new pages | Resolve the source and destination, choose tab or overlay placement, preserve opener information and answer the original decision. |
 | Permissions, dialogs and downloads | Select the presenter and allowed answers, keep the request associated with its page or context, and handle cancellation or expiry. |
