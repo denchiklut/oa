@@ -93,7 +93,8 @@ final class ChromiumPage: Page {
         let dialog = PageDialog(
             kind: .init(core: core), title: core.title, message: core.message,
             offersSuppression: core.offersSuppression
-        ) { accepted, text, suppress in
+        ) { [weak self] accepted, text, suppress in
+            self?.dialogs.removeValue(forKey: ObjectIdentifier(core))
             accepted ? core.accept(text: text, suppress: suppress) : core.cancel(suppress: suppress)
         }
         dialogs[ObjectIdentifier(core)] = dialog
