@@ -21,6 +21,10 @@ const sidebars = {
       collapsed: false,
       items: [
         { type: "doc", id: "features/README", label: "Arc and Oa feature inventory" },
+        { type: "doc", id: "features/sidebar/README", label: "Sidebar state" },
+        { type: "doc", id: "features/peek/README", label: "Peek" },
+        { type: "doc", id: "features/favorites/README", label: "Favorites" },
+        { type: "doc", id: "features/saved-state/README", label: "Saved state and recovery" },
       ],
     },
   ],
