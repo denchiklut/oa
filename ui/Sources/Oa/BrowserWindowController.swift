@@ -84,6 +84,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func selectNextTab(_ sender: Any?) { model.selectAdjacentTab(1) }
     @objc func selectPreviousTab(_ sender: Any?) { model.selectAdjacentTab(-1) }
     @objc func togglePin(_ sender: Any?) { model.togglePin() }
+    @objc func toggleFavorite(_ sender: Any?) { model.toggleFavorite() }
 
     @objc func newSpace(_ sender: Any?) {
         if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
@@ -133,12 +134,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(togglePin(_:)) {
-            guard let tabID = model.selectedTabID else { return false }
+            guard let tabID = model.selectedTabID, !model.state.isFavorite(tabID) else { return false }
             item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"
             return true
         }
+        if item.action == #selector(toggleFavorite(_:)) {
+            guard let tabID = model.selectedTabID else { return false }
+            item.title = model.state.isFavorite(tabID) ? "Unfavorite Tab" : "Favorite Tab"
+            return true
+        }
         if item.action == #selector(closeTab(_:)) {
-            let archives = model.selectedTabID.map { !model.state.isPinned($0) } ?? false
+            let archives = model.selectedTabID.map { !model.state.keepsAddress($0) } ?? false
             item.title = model.peek != nil ? "Close Peek" : archives ? "Archive Tab" : "Close Tab"
             return true
         }

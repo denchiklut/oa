@@ -44,10 +44,11 @@ struct SidebarArchivedTab: Identifiable, Hashable, Codable {
     let id: UUID
     var title: String
     var url: URL?
-    let spaceID: UUID
+    /// Nil for a Favorite's, which belongs to the profile: Arc files them under no Space.
+    let spaceID: UUID?
     let archivedAt: Date
     let reason: Reason
-    /// Its index in the unpinned section; nil for a pinned tab archived with its Space.
+    /// Its index in the unpinned section; nil for a pinned tab archived with its Space, and for a Favorite.
     let position: Int?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
@@ -146,11 +147,15 @@ struct SidebarTree {
         return index
     }
 
-    mutating func move(_ id: UUID, toEndOf parentID: UUID) {
-        guard items[id] != nil, items[parentID] != nil else { return }
-        detach(id)
+    /// Appends when `index` is nil.
+    mutating func move(_ id: UUID, into parentID: UUID, at index: Int? = nil) {
+        guard let oldParentID = items[id]?.parentID, items[parentID] != nil else { return }
+        let from = detach(id) ?? 0
+        var at = index ?? Int.max
+        if oldParentID == parentID, from < at { at -= 1 }
         items[id]?.parentID = parentID
-        items[parentID]?.childIDs.append(id)
+        let count = items[parentID]?.childIDs.count ?? 0
+        items[parentID]?.childIDs.insert(id, at: min(max(at, 0), count))
     }
 
     mutating func update(_ id: UUID, _ change: (inout SidebarItem) -> Void) {
@@ -208,6 +213,31 @@ struct SidebarState {
         space(containing: tabID)?.pinnedRootID == tree.rootID(of: tabID)
     }
 
+    func isFavorite(_ tabID: UUID) -> Bool {
+        guard let rootID = tree.rootID(of: tabID) else { return false }
+        return profiles.contains { $0.favoritesRootID == rootID }
+    }
+
+    /// Pinned tabs and Favorites keep their saved address, as in Arc.
+    func keepsAddress(_ tabID: UUID) -> Bool { isPinned(tabID) || isFavorite(tabID) }
+
+    func profile(containing tabID: UUID) -> SidebarProfile? {
+        guard tree.tab(tabID) != nil, let rootID = tree.rootID(of: tabID) else { return nil }
+        return profiles.first { $0.favoritesRootID == rootID }
+            ?? space(containing: tabID).flatMap { profile($0.profileID) }
+    }
+
+    /// The Space's profile's Favorites, shown in every Space of the profile as Arc does.
+    func favorites(for spaceID: UUID) -> [SidebarTab] {
+        guard let space = space(spaceID), let profile = profile(space.profileID) else { return [] }
+        return tree.tabs(under: profile.favoritesRootID)
+    }
+
+    /// A window on `spaceID` can select the Space's own tabs and its profile's Favorites.
+    func isSelectable(_ tabID: UUID, in spaceID: UUID) -> Bool {
+        space(containing: tabID)?.id == spaceID || favorites(for: spaceID).contains { $0.id == tabID }
+    }
+
     func tabs(in spaceID: UUID, pinned: Bool) -> [SidebarTab] {
         guard let space = space(spaceID) else { return [] }
         return tree.tabs(under: pinned ? space.pinnedRootID : space.unpinnedRootID)
@@ -259,9 +289,10 @@ struct SidebarState {
         tree.append(SidebarItem(id: tab.id, kind: .tab(tab)), to: space.unpinnedRootID)
     }
 
-    /// As Arc: after the opener's last descendant; a pinned opener's group sits at the top of the unpinned section.
-    mutating func openTab(_ tab: SidebarTab, from openerID: UUID) {
-        guard let space = space(containing: openerID) else { return }
+    /// As Arc: after the opener's last descendant; a pinned opener's group sits at the top of the unpinned section,
+    /// a Favorite's at the top of the shown Space's.
+    mutating func openTab(_ tab: SidebarTab, from openerID: UUID, in shownSpaceID: UUID) {
+        guard let space = space(containing: openerID) ?? space(shownSpaceID) else { return }
         let siblings = tree[space.unpinnedRootID]?.childIDs ?? []
         var group: Set<UUID> = [openerID]
         var index = siblings.firstIndex(of: openerID).map { $0 + 1 } ?? 0
@@ -289,17 +320,18 @@ struct SidebarState {
     }
 
     mutating func archiveTab(_ id: UUID, reason: SidebarArchivedTab.Reason, at date: Date = .now) {
-        guard let space = space(containing: id), let tab = tree.tab(id) else { return }
-        let position = isPinned(id) ? nil : tree[space.unpinnedRootID]?.childIDs.firstIndex(of: id)
+        guard let tab = tree.tab(id) else { return }
+        let space = space(containing: id)
+        let position = space.flatMap { tree[$0.unpinnedRootID]?.childIDs.firstIndex(of: id) }
         tree.remove(id)
         archive.append(
             SidebarArchivedTab(
-                id: id, title: tab.title, url: tab.url, spaceID: space.id, archivedAt: date, reason: reason,
+                id: id, title: tab.title, url: tab.url, spaceID: space?.id, archivedAt: date, reason: reason,
                 position: position))
     }
 
     /// A page without a row, a Peek's. No position, so it restores at the top of the section.
-    mutating func archivePage(id: UUID, title: String, url: URL?, in spaceID: UUID, at date: Date = .now) {
+    mutating func archivePage(id: UUID, title: String, url: URL?, in spaceID: UUID?, at date: Date = .now) {
         archive.append(
             SidebarArchivedTab(
                 id: id, title: title, url: url, spaceID: spaceID, archivedAt: date, reason: .manual, position: nil))
@@ -310,7 +342,7 @@ struct SidebarState {
     mutating func restoreArchived(_ id: UUID, in fallbackSpaceID: UUID, toOldPosition: Bool) -> UUID? {
         guard let index = archive.firstIndex(where: { $0.id == id }) else { return nil }
         let entry = archive.remove(at: index)
-        guard let space = space(entry.spaceID) ?? space(fallbackSpaceID) else { return nil }
+        guard let space = entry.spaceID.flatMap({ space($0) }) ?? space(fallbackSpaceID) else { return nil }
         let tab = SidebarTab(id: entry.id, title: entry.title, url: entry.url, viewedAt: .now)
         tree.insert(
             SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID,
@@ -356,16 +388,28 @@ struct SidebarState {
     /// A move to the end of the other section.
     mutating func togglePin(_ tabID: UUID) {
         guard let space = space(containing: tabID) else { return }
-        tree.move(tabID, toEndOf: isPinned(tabID) ? space.unpinnedRootID : space.pinnedRootID)
+        tree.move(tabID, into: isPinned(tabID) ? space.unpinnedRootID : space.pinnedRootID)
     }
 
-    /// Write-back from a live page. A pinned tab keeps its address and takes the title only while the page is at it.
+    /// Into the profile's grid at `index`, where a drop lands in Arc; appended when nil, as Arc's Favorite Tab does.
+    mutating func favoriteTab(_ tabID: UUID, at index: Int? = nil) {
+        guard let profile = profile(containing: tabID) else { return }
+        tree.move(tabID, into: profile.favoritesRootID, at: index)
+    }
+
+    /// To the top of the Space's unpinned section. Arc moves it to that section; the position is Oa's own.
+    mutating func unfavoriteTab(_ tabID: UUID, in spaceID: UUID) {
+        guard isFavorite(tabID), let space = space(spaceID) else { return }
+        tree.move(tabID, into: space.unpinnedRootID, at: 0)
+    }
+
+    /// Write-back from a live page. A tab that keeps its address takes the title only while the page is at it.
     mutating func setSavedPage(_ tabID: UUID, title: String, url: URL?) {
-        let pinned = isPinned(tabID)
+        let keeps = keepsAddress(tabID)
         tree.update(tabID) { item in
             guard var tab = item.tab else { return }
-            if !title.isEmpty, !pinned || tab.isAt(url) { tab.title = title }
-            if let url, !pinned { tab.url = url }
+            if !title.isEmpty, !keeps || tab.isAt(url) { tab.title = title }
+            if let url, !keeps { tab.url = url }
             item.kind = .tab(tab)
         }
     }
