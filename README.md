@@ -13,7 +13,9 @@ which come forward when they ask to be shown, Peeks: a pinned tab's
 cross-origin links and any Shift-clicked link open over the window, to be
 expanded into a tab or closed into the Archive, and Favorites: a profile's grid
 of tiles at the top of the sidebar in every one of its Spaces, which keep their
-address and peek like pinned tabs.
+address and peek like pinned tabs, and JavaScript dialogs: `alert`, `confirm`,
+`prompt` and "Leave site?" shown over the window as Arc shows them, with
+archiving, a Peek's close and a Space's deletion waiting for the page's answer.
 
 Start with the [architecture](docs/architecture/README.md). The
 chapters cover UI product state and native presentation, DevKit's Swift
