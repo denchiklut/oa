@@ -15,8 +15,8 @@ class WebContents;
 namespace oa {
 
 // The sad tab of a page whose renderer is gone, in place of Chrome's, which
-// needs a BrowserView. It draws nothing: the page reports the crash to the app,
-// which shows its own crashed page, as Arc's does.
+// needs a BrowserView. It draws nothing: the app shows its own crashed page
+// from the page's renderer events, as Arc's does.
 class SadTabImpl : public SadTab {
  public:
   // Makes SadTab::Create() return a SadTabImpl for every crashed tab. Call

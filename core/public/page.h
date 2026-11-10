@@ -22,12 +22,16 @@ enum class SecurityLevel {
   kDangerous,
 };
 
-// Why the page's renderer is gone; kNone while one runs.
-enum class Crash {
-  kNone,
-  kCrashed,
+// How a page's renderer process ended, from base::TerminationStatus.
+enum class RendererExit {
+  kNormal,
+  kAbnormal,
   kKilled,
+  kCrashed,
+  kStillRunning,
+  kLaunchFailed,
   kOutOfMemory,
+  kEvictedForMemory,
 };
 
 struct Dialog {
@@ -64,6 +68,10 @@ class Page {
                                   const std::string& target_url,
                                   OpenDisposition disposition) = 0;
     virtual void OnPageWantsActivation() = 0;
+    // The app decides which exits show the page as crashed, as Arc's does.
+    virtual void OnPageRendererGone(RendererExit exit) = 0;
+    // Also after a reload of a page whose renderer was gone.
+    virtual void OnPageRendererReady() = 0;
     // The reply is safe to call after the dialog was dismissed; it is ignored.
     virtual void OnPageDialog(const Dialog& dialog, DialogReply reply) = 0;
     // The engine closed the dialog: a navigation, a tab switch, a close.
@@ -89,8 +97,6 @@ class Page {
   // An NSImage, held by the tab while it keeps the icon; null until it has one.
   virtual void* Favicon() const = 0;
   virtual SecurityLevel GetSecurityLevel() const = 0;
-  // Set when the renderer dies, cleared when a new one starts, as on Reload.
-  virtual Crash GetCrash() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;
