@@ -24,11 +24,15 @@ typedef NS_ENUM(NSInteger, OAPageSecurityLevel) {
   OAPageSecurityLevelDangerous,
 };
 
-typedef NS_ENUM(NSInteger, OAPageCrash) {
-  OAPageCrashNone,
-  OAPageCrashCrashed,
-  OAPageCrashKilled,
-  OAPageCrashOutOfMemory,
+typedef NS_ENUM(NSInteger, OAPageRendererExit) {
+  OAPageRendererExitNormal,
+  OAPageRendererExitAbnormal,
+  OAPageRendererExitKilled,
+  OAPageRendererExitCrashed,
+  OAPageRendererExitStillRunning,
+  OAPageRendererExitLaunchFailed,
+  OAPageRendererExitOutOfMemory,
+  OAPageRendererExitEvictedForMemory,
 };
 
 typedef NS_ENUM(NSInteger, OAPageDialogKind) {
@@ -58,6 +62,8 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
       targetURL:(nullable NSURL*)targetURL
     disposition:(OAPageOpenDisposition)disposition;
 - (void)pageWantsActivation:(OAPage*)page;
+- (void)page:(OAPage*)page rendererGone:(OAPageRendererExit)exit;
+- (void)pageRendererReady:(OAPage*)page;
 - (void)page:(OAPage*)page didRequestDialog:(OAPageDialog*)dialog;
 - (void)page:(OAPage*)page didDismissDialog:(OAPageDialog*)dialog;
 - (void)pageDidCancelClose:(OAPage*)page;
@@ -77,8 +83,6 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 // Nil until Chromium's favicon driver has an icon for the page.
 @property(nonatomic, readonly, nullable) NSImage* favicon;
 @property(nonatomic, readonly) OAPageSecurityLevel securityLevel;
-// Why the renderer is gone; none while one runs, as after a reload.
-@property(nonatomic, readonly) OAPageCrash crash;
 // Links to another host open a new page instead of navigating this one.
 @property(nonatomic) BOOL keepsAddress;
 - (instancetype)init NS_UNAVAILABLE;

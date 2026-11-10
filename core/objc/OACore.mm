@@ -20,6 +20,8 @@
              targetURL:(const std::string&)url
            disposition:(oa::OpenDisposition)disposition;
 - (void)pageWantsActivation;
+- (void)pageRendererGone:(oa::RendererExit)exit;
+- (void)pageRendererReady;
 - (void)pageClosed;
 @end
 
@@ -66,16 +68,24 @@ OAPageSecurityLevel ToSecurityLevel(oa::SecurityLevel level) {
   }
 }
 
-OAPageCrash ToCrash(oa::Crash crash) {
-  switch (crash) {
-    case oa::Crash::kNone:
-      return OAPageCrashNone;
-    case oa::Crash::kCrashed:
-      return OAPageCrashCrashed;
-    case oa::Crash::kKilled:
-      return OAPageCrashKilled;
-    case oa::Crash::kOutOfMemory:
-      return OAPageCrashOutOfMemory;
+OAPageRendererExit ToRendererExit(oa::RendererExit exit) {
+  switch (exit) {
+    case oa::RendererExit::kNormal:
+      return OAPageRendererExitNormal;
+    case oa::RendererExit::kAbnormal:
+      return OAPageRendererExitAbnormal;
+    case oa::RendererExit::kKilled:
+      return OAPageRendererExitKilled;
+    case oa::RendererExit::kCrashed:
+      return OAPageRendererExitCrashed;
+    case oa::RendererExit::kStillRunning:
+      return OAPageRendererExitStillRunning;
+    case oa::RendererExit::kLaunchFailed:
+      return OAPageRendererExitLaunchFailed;
+    case oa::RendererExit::kOutOfMemory:
+      return OAPageRendererExitOutOfMemory;
+    case oa::RendererExit::kEvictedForMemory:
+      return OAPageRendererExitEvictedForMemory;
   }
 }
 
@@ -91,6 +101,10 @@ class PageObserverBridge : public oa::Page::Observer {
               disposition:disposition];
   }
   void OnPageWantsActivation() override { [page_ pageWantsActivation]; }
+  void OnPageRendererGone(oa::RendererExit exit) override {
+    [page_ pageRendererGone:exit];
+  }
+  void OnPageRendererReady() override { [page_ pageRendererReady]; }
   void OnPageDialog(const oa::Dialog& dialog,
                     oa::Page::DialogReply reply) override {
     [page_ pageDialog:dialog reply:std::move(reply)];
@@ -250,10 +264,6 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
                : OAPageSecurityLevelNeutral;
 }
 
-- (OAPageCrash)crash {
-  return _page ? ToCrash(_page->GetCrash()) : OAPageCrashNone;
-}
-
 - (void)loadURL:(NSURL*)url {
   if (_page) {
     _page->Load(url.absoluteString.UTF8String ?: "");
@@ -335,6 +345,14 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (void)pageWantsActivation {
   [self.delegate pageWantsActivation:self];
+}
+
+- (void)pageRendererGone:(oa::RendererExit)exit {
+  [self.delegate page:self rendererGone:ToRendererExit(exit)];
+}
+
+- (void)pageRendererReady {
+  [self.delegate pageRendererReady:self];
 }
 
 - (void)pageDialog:(const oa::Dialog&)dialog

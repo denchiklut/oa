@@ -84,6 +84,27 @@ bool ToOpenDisposition(WindowOpenDisposition disposition,
   }
 }
 
+RendererExit ToRendererExit(base::TerminationStatus status) {
+  switch (status) {
+    case base::TERMINATION_STATUS_NORMAL_TERMINATION:
+      return RendererExit::kNormal;
+    case base::TERMINATION_STATUS_PROCESS_WAS_KILLED:
+      return RendererExit::kKilled;
+    case base::TERMINATION_STATUS_PROCESS_CRASHED:
+      return RendererExit::kCrashed;
+    case base::TERMINATION_STATUS_STILL_RUNNING:
+      return RendererExit::kStillRunning;
+    case base::TERMINATION_STATUS_LAUNCH_FAILED:
+      return RendererExit::kLaunchFailed;
+    case base::TERMINATION_STATUS_OOM:
+      return RendererExit::kOutOfMemory;
+    case base::TERMINATION_STATUS_EVICTED_FOR_MEMORY:
+      return RendererExit::kEvictedForMemory;
+    default:
+      return RendererExit::kAbnormal;
+  }
+}
+
 }  // namespace
 
 // static
@@ -248,18 +269,6 @@ SecurityLevel PageImpl::GetSecurityLevel() const {
     default:
       return SecurityLevel::kNeutral;
   }
-}
-
-Crash PageImpl::GetCrash() const {
-  return crash_;
-}
-
-void PageImpl::SetCrash(Crash crash) {
-  if (crash_ == crash) {
-    return;
-  }
-  crash_ = crash;
-  NotifyStateChanged();
 }
 
 void PageImpl::Load(const std::string& url) {
@@ -546,9 +555,18 @@ void PageImpl::BeforeUnloadFired(bool proceed) {
   }
 }
 
-void PageImpl::RenderFrameCreated(content::RenderFrameHost* render_frame_host) {
-  if (render_frame_host->IsInPrimaryMainFrame()) {
-    SetCrash(Crash::kNone);
+// Unlike RenderFrameCreated, this comes after a crashed page's replacement
+// frame becomes primary; Arc and Chrome's sad tab clear theirs here too.
+void PageImpl::RenderViewReady() {
+  if (observer_) {
+    observer_->OnPageRendererReady();
+  }
+}
+
+void PageImpl::PrimaryMainFrameRenderProcessGone(
+    base::TerminationStatus status) {
+  if (observer_) {
+    observer_->OnPageRendererGone(ToRendererExit(status));
   }
 }
 

@@ -6,6 +6,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/process/kill.h"
 #include "base/scoped_observation.h"
 #include "components/favicon/core/favicon_driver.h"
 #include "components/favicon/core/favicon_driver_observer.h"
@@ -40,8 +41,6 @@ class PageImpl : public Page,
 
   void Rebind(content::WebContents* new_contents);
   void OnRemovedFromStrip();
-  // From the sad tab Chrome creates for the dead renderer.
-  void SetCrash(Crash crash);
   // From the dialog views Chrome's managers create for this page.
   void RunDialog(const Dialog& dialog, DialogReply reply);
   void DismissDialog(const Dialog& dialog);
@@ -58,7 +57,6 @@ class PageImpl : public Page,
   bool CanGoForward() const override;
   void* Favicon() const override;
   SecurityLevel GetSecurityLevel() const override;
-  Crash GetCrash() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -99,7 +97,9 @@ class PageImpl : public Page,
   // content::WebContentsObserver:
   using ForwardingWebContentsDelegate::BeforeUnloadFired;
   void BeforeUnloadFired(bool proceed) override;
-  void RenderFrameCreated(content::RenderFrameHost* render_frame_host) override;
+  void PrimaryMainFrameRenderProcessGone(
+      base::TerminationStatus status) override;
+  void RenderViewReady() override;
   void DidFinishNavigation(
       content::NavigationHandle* navigation_handle) override;
   void LoadProgressChanged(double progress) override;
@@ -133,7 +133,6 @@ class PageImpl : public Page,
   int dialogs_shown_ = 0;
   bool suppress_dialogs_ = false;
   double load_progress_ = 0;
-  Crash crash_ = Crash::kNone;
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>
       favicon_observation_{this};
