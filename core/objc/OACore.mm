@@ -340,8 +340,17 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 - (void)pageDialog:(const oa::Dialog&)dialog
              reply:(oa::Page::DialogReply)reply {
   NSNumber* key = @(dialog.id);
-  OAPageDialog* shown = [[OAPageDialog alloc] initWithDialog:dialog
-                                                       reply:std::move(reply)];
+  __weak OAPage* weakSelf = self;
+  OAPageDialog* shown = [[OAPageDialog alloc]
+      initWithDialog:dialog
+               reply:[weakSelf, key, reply = std::move(reply)](
+                         bool accepted, const std::string& text,
+                         bool suppress) {
+                 if (OAPage* page = weakSelf) {
+                   [page->_dialogs removeObjectForKey:key];
+                 }
+                 reply(accepted, text, suppress);
+               }];
   _dialogs[key] = shown;
   [self.delegate page:self didRequestDialog:shown];
 }
