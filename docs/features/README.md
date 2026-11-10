@@ -2,8 +2,9 @@
 
 Arc feature snapshot: **November 7, 2026**. Oa checklist initialized:
 **November 8, 2026**. This folder is the starting point for documenting Arc's
-features and tracking Oa's equivalents. For now it contains only an inventory;
-detailed behavior, acceptance criteria and prioritization come later.
+features and tracking Oa's equivalents. The checklist is separate from the
+implementation notes linked below; acceptance criteria and prioritization
+remain to be defined.
 
 ## How to read this
 
@@ -26,6 +27,16 @@ Arc's shutdown for December 22, 2026. That is still in the future at this snapsh
 The table records its documented feature set, including older official release
 notes where dedicated help pages are no longer available; it does not certify
 that every online integration still works.
+
+## Oa implementation notes
+
+- [Sidebar state](sidebar/README.md)
+- [Peek](peek/README.md)
+- [Favorites](favorites/README.md)
+- [Saved state and recovery](saved-state/README.md)
+
+These pages describe existing slices and their product choices. Moving the
+notes here does not assess or change the checklist status below.
 
 ## Browse the checklist
 
