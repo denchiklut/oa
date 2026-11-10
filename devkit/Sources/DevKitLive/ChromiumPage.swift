@@ -25,6 +25,7 @@ final class ChromiumPage: Page {
     @ObservationIgnored private let delegate: PageDelegate
     @ObservationIgnored private let continuation: AsyncStream<PageEvent>.Continuation
     @ObservationIgnored private let hostingView = PageHostingView()
+    @ObservationIgnored private var dialogs: [ObjectIdentifier: PageDialog] = [:]
 
     var view: NSView { hostingView }
 
@@ -53,10 +54,7 @@ final class ChromiumPage: Page {
         }
     }
 
-    func close() {
-        page?.close()
-        finish()
-    }
+    func close() { page?.close() }
 
     func drop() {
         page?.drop()
@@ -89,6 +87,27 @@ final class ChromiumPage: Page {
 
     fileprivate func wantsActivation() {
         if page != nil { continuation.yield(.wantsActivation) }
+    }
+
+    fileprivate func dialogRequested(_ core: CorePageDialog) {
+        let dialog = PageDialog(
+            kind: .init(core: core), title: core.title, message: core.message,
+            offersSuppression: core.offersSuppression
+        ) { accepted, text, suppress in
+            accepted ? core.accept(text: text, suppress: suppress) : core.cancel(suppress: suppress)
+        }
+        dialogs[ObjectIdentifier(core)] = dialog
+        continuation.yield(.dialog(dialog))
+    }
+
+    fileprivate func dialogDismissed(_ core: CorePageDialog) {
+        if let dialog = dialogs.removeValue(forKey: ObjectIdentifier(core)) {
+            continuation.yield(.dialogDismissed(dialog))
+        }
+    }
+
+    fileprivate func closeCancelled() {
+        if page != nil { continuation.yield(.closeCancelled) }
     }
 
     fileprivate func closed() {
@@ -138,6 +157,12 @@ final class PageDelegate: NSObject, CorePageDelegate {
 
     func pageWantsActivation(_ page: CorePage) { content?.wantsActivation() }
 
+    func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog) { content?.dialogRequested(dialog) }
+
+    func page(_ page: CorePage, didDismissDialog dialog: CorePageDialog) { content?.dialogDismissed(dialog) }
+
+    func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }
+
     func pageDidClose(_ page: CorePage) { content?.closed() }
 }
 
@@ -161,6 +186,18 @@ extension PageCrash {
         case 2: self = .killed
         case 3: self = .outOfMemory
         default: return nil
+        }
+    }
+}
+
+extension PageDialog.Kind {
+    /// `OAPageDialogKind` in `core/objc/OACore.h`.
+    @MainActor init(core: CorePageDialog) {
+        switch core.kind {
+        case 1: self = .confirm
+        case 2: self = .prompt(defaultText: core.defaultText)
+        case 3: self = .beforeUnload(isReload: core.isReload)
+        default: self = .alert
         }
     }
 }
