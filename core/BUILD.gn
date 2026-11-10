@@ -13,6 +13,8 @@ source_set("oa") {
     "browser/ui/browser_window_impl.mm",
     "browser/ui/permission_prompt_impl.cc",
     "browser/ui/permission_prompt_impl.h",
+    "browser/ui/sad_tab_impl.cc",
+    "browser/ui/sad_tab_impl.h",
     "browser/ui/side_panel_ui_impl.cc",
     "browser/ui/side_panel_ui_impl.h",
     "browser/window_browser.h",

@@ -39,6 +39,7 @@
 #include "oa/browser/profile_services.h"
 #include "oa/browser/ui/browser_window_impl.h"
 #include "oa/browser/ui/permission_prompt_impl.h"
+#include "oa/browser/ui/sad_tab_impl.h"
 #include "oa/browser/window_browser.h"
 
 // The app's NSApplication: Chrome's event handling without its AppController.
@@ -151,6 +152,7 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder();
   BrowserWindowImpl::InstallFactory();
   PermissionPromptImpl::InstallFactory();
+  SadTabImpl::InstallFactory();
 
   [OAApplication sharedApplication];
   SetUpBundleOverrides();

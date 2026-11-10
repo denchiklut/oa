@@ -21,6 +21,14 @@ enum class SecurityLevel {
   kDangerous,
 };
 
+// Why the page's renderer is gone; kNone while one runs.
+enum class Crash {
+  kNone,
+  kCrashed,
+  kKilled,
+  kOutOfMemory,
+};
+
 class Page {
  public:
   // The NSImage lives only for the call; null if nothing could be copied.
@@ -54,6 +62,8 @@ class Page {
   // An NSImage, held by the tab while it keeps the icon; null until it has one.
   virtual void* Favicon() const = 0;
   virtual SecurityLevel GetSecurityLevel() const = 0;
+  // Set when the renderer dies, cleared when a new one starts, as on Reload.
+  virtual Crash GetCrash() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;

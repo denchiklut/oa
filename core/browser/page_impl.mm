@@ -26,6 +26,7 @@
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/page_navigator.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
@@ -250,6 +251,18 @@ SecurityLevel PageImpl::GetSecurityLevel() const {
     default:
       return SecurityLevel::kNeutral;
   }
+}
+
+Crash PageImpl::GetCrash() const {
+  return crash_;
+}
+
+void PageImpl::SetCrash(Crash crash) {
+  if (crash_ == crash) {
+    return;
+  }
+  crash_ = crash;
+  NotifyStateChanged();
 }
 
 void PageImpl::Load(const std::string& url) {
@@ -514,6 +527,12 @@ bool PageImpl::HandleContextMenu(content::RenderFrameHost& render_frame_host,
 bool PageImpl::CanEnterFullscreenModeForTab(
     content::RenderFrameHost* requesting_frame) {
   return false;
+}
+
+void PageImpl::RenderFrameCreated(content::RenderFrameHost* render_frame_host) {
+  if (render_frame_host->IsInPrimaryMainFrame()) {
+    SetCrash(Crash::kNone);
+  }
 }
 
 void PageImpl::DidFinishNavigation(
