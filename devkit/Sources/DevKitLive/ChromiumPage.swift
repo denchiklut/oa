@@ -15,6 +15,7 @@ final class ChromiumPage: Page {
     private(set) var canGoForward = false
     private(set) var favicon: NSImage?
     private(set) var securityLevel = SecurityLevel.neutral
+    private(set) var crash: PageCrash?
     var keepsAddress = false {
         didSet { page?.keepsAddress = keepsAddress }
     }
@@ -76,6 +77,8 @@ final class ChromiumPage: Page {
         if favicon !== self.favicon { self.favicon = favicon }
         let level = SecurityLevel(core: page.securityLevel)
         if level != securityLevel { securityLevel = level }
+        let crash = PageCrash(core: page.crash)
+        if crash != self.crash { self.crash = crash }
         updateHostedView()
     }
 
@@ -146,6 +149,18 @@ extension SecurityLevel {
         case 2: self = .warning
         case 3: self = .dangerous
         default: self = .neutral
+        }
+    }
+}
+
+extension PageCrash {
+    /// `OAPageCrash` in `core/objc/OACore.h`; none is nil.
+    init?(core: Int) {
+        switch core {
+        case 1: self = .crashed
+        case 2: self = .killed
+        case 3: self = .outOfMemory
+        default: return nil
         }
     }
 }
