@@ -32,6 +32,11 @@ struct BrowserWindowView: View {
                 PeekView(model: model, page: peek, sidebarWidth: model.showingArchive ? 0 : SidebarView.width)
             }
         }
+        .overlay {
+            if let dialog = model.dialog {
+                DialogView(model: model, dialog: dialog).id(ObjectIdentifier(dialog))
+            }
+        }
         .onChange(of: model.address) { _, url in
             if !editing || address.isEmpty { address = url?.absoluteString ?? "" }
         }
@@ -44,11 +49,14 @@ struct BrowserWindowView: View {
                 guard let page = model.page else { return }
                 if page.url == nil {
                     addressFocused = true
-                } else {
+                } else if model.dialog == nil {
                     addressFocused = false
                     (model.peek ?? page).activate()
                 }
             }
+        }
+        .onChange(of: model.dialog == nil) { _, none in
+            if none { model.frontPage?.activate() }
         }
         .onChange(of: model.focusAddressField) { _, _ in
             addressFocused = true

@@ -108,13 +108,14 @@ struct PeekView: View {
 }
 
 /// An NSView, so it dims the engine's view too, which draws above SwiftUI's own layers.
-private struct Backdrop: NSViewRepresentable {
+struct Backdrop: NSViewRepresentable {
     let onClick: (() -> Void)?
+    var opacity = 0.2
 
     func makeNSView(context: Context) -> DimView {
         let view = DimView()
         view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.2).cgColor
+        view.layer?.backgroundColor = NSColor.black.withAlphaComponent(opacity).cgColor
         return view
     }
 
