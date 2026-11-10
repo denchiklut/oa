@@ -65,7 +65,7 @@ when it has any. Its Archive entries stay.
 
 The Archive is a sidebar mode, as in Arc: Archive ▸ View Archive… replaces the
 sidebar with one list across Spaces, grouped by day and newest first, each row
-with the title and the scheme-less URL, Restore and Delete on hover and in a
+with the favicon, the title and the scheme-less URL, Restore and Delete on hover and in a
 context menu, and the page stays live beside it. Restore puts the tab back at the
 top of its Space's unpinned section, not selected, with its page made on first
 selection from the saved URL and no history; a tab whose Space is gone returns to
@@ -177,8 +177,8 @@ the address field; Arc shows Chromium's blank view and `about:blank` there,
 which isn't worth copying. A sidebar row looks the same whether its page exists
 or not, as in Arc, and a tab with no title yet reads "Untitled". The row starts
 with the favicon Chromium's favicon driver chose for the live page, wherever
-the page lives, else the favicon the tab's page last showed, saved with the
-tab as Arc shows it after a relaunch, else an empty tile. The page also carries Chromium's
+the page lives, else the favicon the tab's page last showed, kept beside the
+sidebar file as Arc shows it after a relaunch, else an empty tile. The page also carries Chromium's
 security level for its visible URL, neutral, secure, warning or dangerous,
 which nothing shows yet.
 
@@ -240,8 +240,7 @@ with unchanged bytes is skipped.
 where `tree` lists `rootIDs` and `items` in display order. Each item has `id`,
 optional `parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
 `splitView`, and for a container its `container` kind, for a tab its `title`,
-`url`, `viewedAt`, `openerID`, the tab whose page opened it, and `favicon`, the
-last one its page showed as base64 PNG. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
+`url`, `viewedAt` and `openerID`, the tab whose page opened it. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
 absent for a Favorite and a Favorite's Peek, `archivedAt`, a `reason` of
 `manual` or `auto`, and `position`. Dates are ISO
 8601. A file without `archive`, `viewedAt` or `openerID` reads as an empty Archive, no
@@ -252,6 +251,14 @@ right kind, and no archived tab is also in the tree.
 `windows.json` carries `version` and `windows`, each with `id` and
 `selectedSpaceID`. A saved Space that no longer exists falls back to the first.
 Window frames are not saved.
+
+The last favicon each tab's page showed is a PNG at `favicons/<id>.png` beside
+the files, written when the page shows a new one, read when a row, tile or
+Archive entry has no page, and removed at a save once the tab is in neither the
+tree nor the Archive. Arc keeps such caches apart from its sidebar store too,
+one for sidebar items and one for archived ones, under hashed names; Oa keeps
+one directory named by tab ID, its own choice. A restored copy of the sidebar
+shares the IDs, so its tabs find their icons.
 
 `version` is a format number, as Arc's own stores carry at their top level.
 Adding a key with a default, as `archive`, `viewedAt` and `openerID` were,
