@@ -1,7 +1,7 @@
 # DevKit
 
 DevKit will be Oa's Swift engine layer between
-[App/UI](../app/README.md) and [Core](../core/README.md). It will present
+[UI](../ui/README.md) and [Core](../core/README.md). It will present
 browser objects, commands, state and requests in the form the app uses. Core
 will connect those interfaces to the native engine; the app will choose product
 behavior and presentation.
@@ -40,7 +40,7 @@ value will have a defined application, context or page scope, and an explicit
 relationship between its initial value and later updates. Translating a
 per-profile setting into a native call will not make an engine-global setting
 profile-local. Product preferences and their saved representation will remain
-in App/UI; the underlying engine service will remain in Core or Chromium.
+in UI; the underlying engine service will remain in Core or Chromium.
 
 DevKit's feature surface will also include operations that need services or
 renderer support. The app will use a Swift operation and receive a result or
@@ -80,7 +80,7 @@ The same distinction applies to callback ownership. A closure's existence
 will not establish which page or app instance it reaches. Installation,
 replacement, captured context and teardown will be part of the adapter's
 contract. Core will own native object relationships; DevKit will own the Swift
-handles, subscriptions and translations it introduces; App/UI will own the
+handles, subscriptions and translations it introduces; UI will own the
 product state and presentation that consume them.
 
 ## 3. Separate events, decisions and operation results
@@ -119,7 +119,7 @@ work; a deferred reply needs an owner while it is outstanding. Replies must
 remain associated with their originating request, including when a page moves,
 closes or is replaced.
 
-Feature adapters will preserve these contracts at the App/UI boundary:
+Feature adapters will preserve these contracts at the UI boundary:
 
 | Adapter family | Boundary to define |
 | --- | --- |

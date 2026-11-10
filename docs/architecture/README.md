@@ -1,7 +1,7 @@
 # Architecture
 
 This documentation describes how Oa will work: what each layer owns, how the
-layers communicate, and which design decisions remain open. The App/UI, DevKit, Core and Chromium
+layers communicate, and which design decisions remain open. The UI, DevKit, Core and Chromium
 chapters cover product state and native presentation, the Swift engine interface,
 native integration and browser infrastructure.
 
@@ -9,7 +9,7 @@ native integration and browser infrastructure.
 
 | Layer | Responsibility |
 | --- | --- |
-| [App/UI](app/README.md) | Product model, native presentation, windows and user decisions |
+| [UI](ui/README.md) | Product model, native presentation, windows and user decisions |
 | [DevKit](devkit/README.md) | Swift engine interface and translation between app and native engine |
 | [Core](core/README.md) | Native adapters, ownership and integration with Chromium |
 | [Chromium](chromium/README.md) | Browser infrastructure, rendering, networking, services and engine extensions |
