@@ -39,7 +39,7 @@ public protocol Page: AnyObject, Observable {
     /// The icon the engine's favicon driver chose for the page, nil until it has one.
     var favicon: NSImage? { get }
     var securityLevel: SecurityLevel { get }
-    /// Why the renderer is gone, nil while one runs; a reload starts a new one.
+    /// Why the renderer is gone, nil once a new one is ready, as after a reload.
     var crash: PageCrash? { get }
     /// A page that keeps its address, as a pinned tab does: a link to another host opens a new page instead of
     /// navigating this one.

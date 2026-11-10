@@ -75,8 +75,6 @@ final class ChromiumPage: Page {
         if favicon !== self.favicon { self.favicon = favicon }
         let level = SecurityLevel(core: page.securityLevel)
         if level != securityLevel { securityLevel = level }
-        let crash = PageCrash(core: page.crash)
-        if crash != self.crash { self.crash = crash }
         updateHostedView()
     }
 
@@ -87,6 +85,14 @@ final class ChromiumPage: Page {
 
     fileprivate func wantsActivation() {
         if page != nil { continuation.yield(.wantsActivation) }
+    }
+
+    fileprivate func rendererGone(_ exit: Int) {
+        if let crash = PageCrash(rendererExit: exit), crash != self.crash { self.crash = crash }
+    }
+
+    fileprivate func rendererReady() {
+        if crash != nil { crash = nil }
     }
 
     fileprivate func dialogRequested(_ core: CorePageDialog) {
@@ -158,6 +164,10 @@ final class PageDelegate: NSObject, CorePageDelegate {
 
     func pageWantsActivation(_ page: CorePage) { content?.wantsActivation() }
 
+    func page(_ page: CorePage, rendererGone exit: Int) { content?.rendererGone(exit) }
+
+    func pageRendererReady(_ page: CorePage) { content?.rendererReady() }
+
     func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog) { content?.dialogRequested(dialog) }
 
     func page(_ page: CorePage, didDismissDialog dialog: CorePageDialog) { content?.dialogDismissed(dialog) }
@@ -180,12 +190,13 @@ extension SecurityLevel {
 }
 
 extension PageCrash {
-    /// `OAPageCrash` in `core/objc/OACore.h`; none is nil.
-    init?(core: Int) {
-        switch core {
-        case 1: self = .crashed
+    /// `OAPageRendererExit` in `core/objc/OACore.h`. Nil for the exits Arc shows no crashed page for: normal, still
+    /// running, launch failed. Evicted for memory reads as out of memory, Oa's own choice.
+    init?(rendererExit: Int) {
+        switch rendererExit {
+        case 1, 3: self = .crashed
         case 2: self = .killed
-        case 3: self = .outOfMemory
+        case 6, 7: self = .outOfMemory
         default: return nil
         }
     }
