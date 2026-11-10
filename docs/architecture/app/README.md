@@ -182,6 +182,14 @@ sidebar file as Arc shows it after a relaunch, else an empty tile. The page also
 security level for its visible URL, neutral, secure, warning or dangerous,
 which nothing shows yet.
 
+A page whose renderer has died, crashed, killed or out of memory, shows a
+native crashed page with a Reload button in place of the engine's view, in the
+window and in a Peek, until a reload starts a new renderer. Arc replaces
+Chrome's sad tab in its engine, reports the death to its app and draws its own
+page there; Oa does the same through a Chromium seam like the one for
+permission prompts, since Chrome's sad tab wants a BrowserView and aborts
+without one. The words on the page are Oa's own.
+
 ## Favorites
 
 A profile's Favorites are tabs in its favorites root, shown as a grid of tiles
