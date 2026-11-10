@@ -11,6 +11,7 @@ can't live in `//oa` (`core/`). Every patch is rebased at each Chromium update, 
 | 0004 | Lets `//oa` supply permission prompts; Chrome's Views prompts crash without a `BrowserView` |
 | 0005 | Lets the embedder load the startup profile without a window, in place of `--no-startup-window` and its keep-alives |
 | 0006 | Keeps form submissions, client redirects and blank loads in the renderer when `browser_handles_all_top_level_requests` is on, as Arc's renderer does, so only links reach the browser's routing |
+| 0007 | Lets `//oa` supply the sad tab; Chrome's `SadTabController` asserts on the missing `BrowserView` the moment a renderer dies |
 
 Don't edit these files by hand. Commit on the `oa-patches` branch in `.local/chromium/src`, then run
 `scripts/patches.sh export`. `scripts/build.sh` applies the series before building.

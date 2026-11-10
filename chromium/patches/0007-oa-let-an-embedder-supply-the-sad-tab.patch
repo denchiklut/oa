@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Mon, 9 Nov 2026 19:31:20 -0700
+Subject: [PATCH] oa: let an embedder supply the sad tab
+
+Adds SadTab::SetFactoryForEmbedder(). Once a factory is set, SadTab::Create() returns the factory's SadTab for every crashed tab instead of Chrome's SadTabController, whose FindContentsWebView() asserts on BrowserView::GetBrowserViewForBrowser(); an embedder whose Browsers have no BrowserView aborts the moment a renderer dies.
+---
+ chrome/browser/ui/sad_tab.h             |  9 +++++++++
+ chrome/browser/ui/sad_tab_controller.cc | 11 +++++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/chrome/browser/ui/sad_tab.h b/chrome/browser/ui/sad_tab.h
+index 255d8853a5ed591925e4d87a7d04fb7c0f667d5f..6f8eb9b3cc32ee0249d9518518ab858446596680 100644
+--- a/chrome/browser/ui/sad_tab.h
++++ b/chrome/browser/ui/sad_tab.h
+@@ -31,6 +31,15 @@ class SadTab {
+   // Returns true if the sad tab should be shown.
+   static bool ShouldShow(base::TerminationStatus status);
+ 
++  // For an embedder that draws its own crashed page. Once a factory is set,
++  // Create() returns the factory's SadTab for every crashed tab and never
++  // builds Chrome's view, which needs a BrowserView. Call it before the
++  // browser starts.
++  using EmbedderFactory =
++      std::unique_ptr<SadTab> (*)(content::WebContents* web_contents,
++                                  SadTabKind kind);
++  static void SetFactoryForEmbedder(EmbedderFactory factory);
++
+   SadTab(const SadTab&) = delete;
+   SadTab& operator=(const SadTab&) = delete;
+ 
+diff --git a/chrome/browser/ui/sad_tab_controller.cc b/chrome/browser/ui/sad_tab_controller.cc
+index 804a89c5584ccacd04d0eece5d21b546cfd4e662..a40dca7f6795e32bea5a09fcbeb371cd00e625c1 100644
+--- a/chrome/browser/ui/sad_tab_controller.cc
++++ b/chrome/browser/ui/sad_tab_controller.cc
+@@ -15,6 +15,9 @@
+ 
+ namespace {
+ 
++// Set by SadTab::SetFactoryForEmbedder().
++SadTab::EmbedderFactory g_embedder_factory = nullptr;
++
+ ContentsWebView* FindContentsWebView(content::WebContents* web_contents) {
+   tabs::TabInterface* tab =
+       tabs::TabInterface::MaybeGetFromContents(web_contents);
+@@ -123,8 +126,16 @@ void SadTabController::RequestFocus() {
+   }
+ }
+ 
++// static
++void SadTab::SetFactoryForEmbedder(EmbedderFactory factory) {
++  g_embedder_factory = factory;
++}
++
+ // SadTab::Create implementation moved here.
+ std::unique_ptr<SadTab> SadTab::Create(content::WebContents* web_contents,
+                                        SadTabKind kind) {
++  if (g_embedder_factory) {
++    return g_embedder_factory(web_contents, kind);
++  }
+   return std::make_unique<SadTabController>(web_contents, kind);
+ }
