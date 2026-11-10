@@ -31,6 +31,25 @@ typedef NS_ENUM(NSInteger, OAPageCrash) {
   OAPageCrashOutOfMemory,
 };
 
+typedef NS_ENUM(NSInteger, OAPageDialogKind) {
+  OAPageDialogKindAlert,
+  OAPageDialogKindConfirm,
+  OAPageDialogKindPrompt,
+  OAPageDialogKindBeforeUnload,
+};
+
+@interface OAPageDialog : NSObject
+@property(nonatomic, readonly) OAPageDialogKind kind;
+@property(nonatomic, readonly) NSString* title;
+@property(nonatomic, readonly) NSString* message;
+@property(nonatomic, readonly) NSString* defaultText;
+@property(nonatomic, readonly, getter=isReload) BOOL reload;
+@property(nonatomic, readonly) BOOL offersSuppression;
+- (instancetype)init NS_UNAVAILABLE;
+- (void)acceptWithText:(nullable NSString*)text suppress:(BOOL)suppress;
+- (void)cancelWithSuppress:(BOOL)suppress;
+@end
+
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
 // `openedPage` has no delegate yet; releasing it drops the page.
@@ -39,6 +58,9 @@ typedef NS_ENUM(NSInteger, OAPageCrash) {
       targetURL:(nullable NSURL*)targetURL
     disposition:(OAPageOpenDisposition)disposition;
 - (void)pageWantsActivation:(OAPage*)page;
+- (void)page:(OAPage*)page didRequestDialog:(OAPageDialog*)dialog;
+- (void)page:(OAPage*)page didDismissDialog:(OAPageDialog*)dialog;
+- (void)pageDidCancelClose:(OAPage*)page;
 - (void)pageDidClose:(OAPage*)page;
 @end
 

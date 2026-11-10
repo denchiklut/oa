@@ -1,6 +1,7 @@
 #ifndef OA_PUBLIC_PAGE_H_
 #define OA_PUBLIC_PAGE_H_
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -29,10 +30,30 @@ enum class Crash {
   kOutOfMemory,
 };
 
+struct Dialog {
+  enum class Kind {
+    kAlert,
+    kConfirm,
+    kPrompt,
+    kBeforeUnload,
+  };
+  uint64_t id = 0;
+  Kind kind = Kind::kAlert;
+  std::string title;
+  std::string message;
+  std::string default_text;
+  bool is_reload = false;
+  // From the page's seventh dialog on, as Arc offers it.
+  bool offers_suppression = false;
+};
+
 class Page {
  public:
   // The NSImage lives only for the call; null if nothing could be copied.
   using SnapshotCallback = std::function<void(void* ns_image)>;
+  // Call once. `suppress` answers this page's later dialogs without asking.
+  using DialogReply = std::function<
+      void(bool accepted, const std::string& text, bool suppress)>;
 
   class Observer {
    public:
@@ -43,6 +64,12 @@ class Page {
                                   const std::string& target_url,
                                   OpenDisposition disposition) = 0;
     virtual void OnPageWantsActivation() = 0;
+    // The reply is safe to call after the dialog was dismissed; it is ignored.
+    virtual void OnPageDialog(const Dialog& dialog, DialogReply reply) = 0;
+    // The engine closed the dialog: a navigation, a tab switch, a close.
+    virtual void OnPageDialogDismissed(const Dialog& dialog) = 0;
+    // A beforeunload handler kept the page after Close().
+    virtual void OnPageCloseCancelled() = 0;
     virtual void OnPageClosed() = 0;
 
    protected:

@@ -182,9 +182,6 @@ void PageImpl::Rebind(content::WebContents* new_contents) {
 }
 
 void PageImpl::OnRemovedFromStrip() {
-  if (closing_) {
-    return;
-  }
   Unbind();
   NotifyClosed();
 }
@@ -388,23 +385,9 @@ void PageImpl::Close() {
   if (!contents) {
     return;
   }
-  if (!window_browser_) {
+  closing_ = true;
+  if (!window_browser_ || !window_browser_->Close(contents)) {
     Drop();
-    return;
-  }
-  // A PageImpl of its own owns the page while its unload handlers run.
-  observer_ = nullptr;
-  Unbind();
-  OpenPages().erase(this);
-  auto* closing = new PageImpl(window_browser_.get(), /*observer=*/nullptr);
-  closing->closing_ = true;
-  contents->SetUserData(
-      kPageMarkerKey,
-      std::make_unique<PageMarker>(closing->weak_factory_.GetWeakPtr()));
-  closing->Bind(contents);
-  OpenPages().insert(closing);
-  if (!window_browser_->Close(contents)) {
-    closing->Drop();
   }
 }
 
@@ -418,9 +401,38 @@ void PageImpl::Drop() {
     window_browser_->Remove(contents);
   }
   OpenPages().erase(this);
-  if (closing_) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
-                                                                  this);
+}
+
+void PageImpl::RunDialog(const Dialog& dialog, DialogReply reply) {
+  if (suppress_dialogs_ || !observer_) {
+    // A silenced or unwatched page gets Chrome's answers: alerts and unloads
+    // go on, questions are declined.
+    const bool accepted = dialog.kind == Dialog::Kind::kAlert ||
+                          dialog.kind == Dialog::Kind::kBeforeUnload;
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](DialogReply reply, bool accepted) {
+                         reply(accepted, std::string(), false);
+                       },
+                       std::move(reply), accepted));
+    return;
+  }
+  Dialog shown = dialog;
+  shown.offers_suppression =
+      dialog.kind != Dialog::Kind::kBeforeUnload && ++dialogs_shown_ >= 7;
+  observer_->OnPageDialog(
+      shown, [weak = weak_factory_.GetWeakPtr(), reply = std::move(reply)](
+                 bool accepted, const std::string& text, bool suppress) {
+        if (weak && suppress) {
+          weak->suppress_dialogs_ = true;
+        }
+        reply(accepted, text, suppress);
+      });
+}
+
+void PageImpl::DismissDialog(const Dialog& dialog) {
+  if (observer_) {
+    observer_->OnPageDialogDismissed(dialog);
   }
 }
 
@@ -514,11 +526,6 @@ void PageImpl::CloseContents(content::WebContents* source) {
   ForwardingWebContentsDelegate::CloseContents(source);
 }
 
-content::JavaScriptDialogManager* PageImpl::GetJavaScriptDialogManager(
-    content::WebContents* source) {
-  return content::WebContentsDelegate::GetJavaScriptDialogManager(source);
-}
-
 bool PageImpl::HandleContextMenu(content::RenderFrameHost& render_frame_host,
                                  const content::ContextMenuParams& params) {
   return true;
@@ -527,6 +534,16 @@ bool PageImpl::HandleContextMenu(content::RenderFrameHost& render_frame_host,
 bool PageImpl::CanEnterFullscreenModeForTab(
     content::RenderFrameHost* requesting_frame) {
   return false;
+}
+
+void PageImpl::BeforeUnloadFired(bool proceed) {
+  if (proceed || !closing_) {
+    return;
+  }
+  closing_ = false;
+  if (observer_) {
+    observer_->OnPageCloseCancelled();
+  }
 }
 
 void PageImpl::RenderFrameCreated(content::RenderFrameHost* render_frame_host) {
@@ -564,12 +581,6 @@ void PageImpl::OnFaviconUpdated(favicon::FaviconDriver* favicon_driver,
 void PageImpl::WebContentsDestroyed() {
   favicon_observation_.Reset();
   set_inner(nullptr);
-  if (closing_) {
-    OpenPages().erase(this);
-    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
-                                                                  this);
-    return;
-  }
   NotifyClosed();
 }
 
