@@ -20,6 +20,7 @@ final class WindowModel {
     private(set) var showingArchive = false {
         didSet { if !showingArchive { closeArchivePeek() } }
     }
+    private(set) var dialogs: [UUID: [PageDialog]] = [:]
     var focusAddressField = 0
     @ObservationIgnored var bringToFront: () -> Void = {}
     @ObservationIgnored private let engine: any BrowserApplication
@@ -38,6 +39,8 @@ final class WindowModel {
     var peek: (any Page)? { peekOwnerID.flatMap { peeks[$0] } }
     /// What the toolbar commands act on: the Peek while one is shown.
     var frontPage: (any Page)? { peek ?? page }
+    /// The shown page's dialog, over the whole window as Arc draws it.
+    var dialog: PageDialog? { frontPage.flatMap { dialogs[$0.id]?.last } }
     private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
     /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
     var address: URL? { page?.url ?? selectedTab?.url }
@@ -148,12 +151,26 @@ final class WindowModel {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }
 
-    /// Pages of the Space's tabs are dropped in every window. This window moves to the neighbor above, else below.
+    /// As Arc: the Space's live pages close one at a time, each asked as the user would and shown while it asks, so
+    /// a `beforeunload` Cancel keeps the Space; sidebar order is Oa's own. Then the rest is archived and this window
+    /// moves to the neighbor above, else below.
     func deleteSpace(_ spaceID: UUID) {
-        let spaces = state.spaces
-        guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == spaceID }) else { return }
-        if selectedSpaceID == spaceID { selectSpace(spaces[index == 0 ? 1 : index - 1].id) }
-        store.edit { $0.removeSpace(spaceID) }
+        guard state.spaces.count > 1, state.space(spaceID) != nil else { return store.deletingSpace = nil }
+        let live = state.tabs(in: spaceID).lazy.compactMap { tab in
+            self.store.windows.lazy.compactMap { $0.pages[tab.id] }.first.map { (tab.id, $0) }
+        }
+        guard let (tabID, page) = live.first else {
+            store.deletingSpace = nil
+            let spaces = state.spaces
+            let index = spaces.firstIndex { $0.id == spaceID }!
+            if selectedSpaceID == spaceID { selectSpace(spaces[index == 0 ? 1 : index - 1].id) }
+            return store.edit { $0.removeSpace(spaceID) }
+        }
+        store.deletingSpace = (spaceID, self)
+        if selectedSpaceID != spaceID { selectSpace(spaceID) }
+        select(tabID)
+        store.closing[page.id] = .manual
+        page.close()
     }
 
     func togglePin() {
@@ -176,13 +193,16 @@ final class WindowModel {
         store.edit { $0.favoriteTab(tabID, at: index) }
     }
 
-    /// Remove Favorite: archived under no Space with its page closed, and nothing selected in its place, as Arc does.
+    /// Remove Favorite: archived under no Space once its page has closed, and nothing selected in its place, as
+    /// Arc does.
     func removeFavorite(_ tabID: UUID) {
         guard state.isFavorite(tabID) else { return }
-        let page = store.windows.compactMap { $0.release(tabID) }.first
-        for window in store.windows { window.placeholders[tabID] = nil }
-        store.edit { $0.archiveTab(tabID, reason: .manual) }
-        page?.close()
+        guard let page = store.windows.lazy.compactMap({ $0.pages[tabID] }).first else {
+            for window in store.windows { window.placeholders[tabID] = nil }
+            return store.edit { $0.archiveTab(tabID, reason: .manual) }
+        }
+        store.closing[page.id] = .manual
+        page.close()
     }
 
     func viewArchive() {
@@ -233,18 +253,12 @@ final class WindowModel {
         select(tab.id)
     }
 
-    /// ✕, the backdrop and ⌘W: an opened Peek's page is archived under its tab's Space, as Arc does; an Archive
-    /// Peek keeps its entry.
+    /// ✕, the backdrop and ⌘W: the Peek stays until its page has closed, so a `beforeunload` handler can keep it,
+    /// as Arc does; then an opened Peek's page is archived under its tab's Space and an Archive Peek keeps its entry.
     func closePeek() {
-        guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
-        if ownerID == archivePeekID {
-            archivePeekID = nil
-        } else {
-            let spaceID = state.space(containing: ownerID)?.id
-            store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
-        }
+        guard let page = peek else { return }
+        store.closing[page.id] = .manual
         page.close()
-        self.page?.activate()
     }
 
     func restoreLastClosed() {
@@ -288,17 +302,30 @@ final class WindowModel {
         }
     }
 
-    /// ⌘W. An unpinned tab is archived and its page, wherever it lives, closed as the user would; a pinned one
-    /// keeps its entry and drops its page; a Favorite is only deselected, its page reloading the saved URL in the
-    /// background when it has left it, as Arc does.
-    func close(_ tabID: UUID) {
+    /// ⌘W. An unpinned tab's page, wherever it lives, is closed as the user would and the tab archived once it is
+    /// gone, so a `beforeunload` handler can keep both, as Arc does; a pinned one keeps its entry and drops its
+    /// page; a Favorite is only deselected, its page reloading the saved URL in the background when it has left
+    /// it, as Arc does.
+    func close(_ tabID: UUID, reason: SidebarArchivedTab.Reason = .manual) {
         if state.isFavorite(tabID) {
             if let tab = state.tree.tab(tabID), let url = tab.url, let page = pages[tabID], !tab.isAt(page.url) {
                 page.load(url)
             }
             return deselect(tabID)
         }
-        end(tabID) { page, pinned in pinned ? page.drop() : page.close() }
+        let page = store.windows.lazy.compactMap { $0.pages[tabID] }.first
+        guard let page, !state.isPinned(tabID) else {
+            return end(tabID, reason: reason) { page, _ in page.drop() }
+        }
+        store.closing[page.id] = reason
+        page.close()
+    }
+
+    func forget(_ dialog: PageDialog) {
+        for (pageID, shown) in dialogs where shown.contains(where: { $0 === dialog }) {
+            dialogs[pageID] = shown.filter { $0 !== dialog }
+            if dialogs[pageID]?.isEmpty == true { dialogs[pageID] = nil }
+        }
     }
 
     /// Window close and quit: a page whose tab another window shows moves there; the rest are dropped without
@@ -317,6 +344,7 @@ final class WindowModel {
             page.drop()
         }
         peeks = [:]
+        dialogs = [:]
         archivePeekID = nil
         creating = [:]
     }
@@ -364,20 +392,22 @@ final class WindowModel {
         return selectedSpaceID
     }
 
+    /// The page stays in `peeks`, unshown, until it reports closed.
     private func closeArchivePeek() {
-        guard let entryID = archivePeekID else { return }
+        guard let entryID = archivePeekID, let page = peeks[entryID] else { return }
         archivePeekID = nil
-        peeks.removeValue(forKey: entryID)?.close()
+        store.closing[page.id] = .manual
+        page.close()
     }
 
-    private func end(_ tabID: UUID, _ finish: (any Page, Bool) -> Void) {
+    private func end(_ tabID: UUID, reason: SidebarArchivedTab.Reason, _ finish: (any Page, Bool) -> Void) {
         guard let spaceID = state.space(containing: tabID)?.id else { return }
         let pinned = state.isPinned(tabID)
         let wasSelected = selectedTabIDs[spaceID] == tabID
         let next = wasSelected ? nextSelection(closing: tabID, pinned: pinned, in: spaceID) : nil
         let page = store.windows.compactMap { $0.release(tabID) }.first
         for window in store.windows { window.placeholders[tabID] = nil }
-        if !pinned { store.edit { $0.archiveTab(tabID, reason: .manual) } }
+        if !pinned { store.edit { $0.archiveTab(tabID, reason: reason) } }
         if let page { finish(page, pinned) }
         if wasSelected {
             selectedTabIDs[spaceID] = next
@@ -498,6 +528,16 @@ final class WindowModel {
     }
 
     private func handle(_ event: PageEvent, for pageID: UUID) {
+        switch event {
+        case .dialog(let dialog):
+            return dialogs[pageID, default: []].append(dialog)
+        case .dialogDismissed(let dialog):
+            return forget(dialog)
+        case .closeCancelled:
+            return closeCancelled(pageID)
+        default:
+            break
+        }
         if let ownerID = peekOwner(of: pageID) {
             switch event {
             case .opened(let opened, let url, let disposition):
@@ -505,9 +545,9 @@ final class WindowModel {
             case .wantsActivation:
                 if ownerID != archivePeekID { show(ownerID) } else { bringToFront() }
             case .closed:
-                peeks[ownerID] = nil
-                if ownerID == archivePeekID { archivePeekID = nil }
-                page?.activate()
+                peekEnded(ownerID)
+            default:
+                break
             }
             return
         }
@@ -518,7 +558,30 @@ final class WindowModel {
             show(pageID)
         case .closed:
             pageEnded(pageID)
+        default:
+            break
         }
+    }
+
+    /// A `beforeunload` handler kept the page: an auto-archive counts it as viewed, a Space deletion stops.
+    private func closeCancelled(_ pageID: UUID) {
+        if store.closing.removeValue(forKey: pageID) == .auto, state.tree.tab(pageID) != nil {
+            store.markViewed(pageID)
+        }
+        store.deletingSpace = nil
+    }
+
+    /// A Peek the user closed leaves an entry under its tab's Space, as Arc does; one that closed itself, or showed
+    /// an Archive entry, leaves none.
+    private func peekEnded(_ ownerID: UUID) {
+        guard let page = peeks.removeValue(forKey: ownerID) else { return }
+        dialogs[page.id] = nil
+        if store.closing.removeValue(forKey: page.id) != nil, state.tree.tab(ownerID) != nil {
+            let spaceID = state.space(containing: ownerID)?.id
+            store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
+        }
+        if ownerID == archivePeekID { archivePeekID = nil }
+        self.page?.activate()
     }
 
     /// As Arc: a Shift-click from any tab, which the engine reports as a new window, and the foreground opens of a
@@ -588,13 +651,20 @@ final class WindowModel {
         }
     }
 
-    /// A Favorite's page that ends leaves the tile, as a pinned tab's leaves its row.
+    /// A Favorite's page that ends leaves the tile, as a pinned tab's leaves its row, unless Remove Favorite asked
+    /// for the close.
     private func pageEnded(_ tabID: UUID) {
         guard pages[tabID] != nil else { return }
+        dialogs[tabID] = nil
+        let reason = store.closing.removeValue(forKey: tabID)
         if state.isFavorite(tabID) {
             release(tabID)
-            return deselect(tabID)
+            for window in store.windows { window.placeholders[tabID] = nil }
+            if reason != nil { store.edit { $0.archiveTab(tabID, reason: .manual) } }
+            deselect(tabID)
+        } else {
+            end(tabID, reason: reason ?? .manual) { _, _ in }
         }
-        end(tabID) { _, _ in }
+        if let deleting = store.deletingSpace { deleting.window.deleteSpace(deleting.id) }
     }
 }

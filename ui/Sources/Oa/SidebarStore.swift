@@ -16,6 +16,10 @@ final class SidebarStore {
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
     @ObservationIgnored private var sweep: Task<Void, Never>?
     @ObservationIgnored private var frozen = false
+    /// Pages the user asked to close, by page ID, until the page reports closed or kept.
+    @ObservationIgnored var closing: [UUID: SidebarArchivedTab.Reason] = [:]
+    /// A Space whose live pages are being closed one at a time before it goes.
+    @ObservationIgnored var deletingSpace: (id: UUID, window: WindowModel)?
 
     init(directory: URL) {
         persistence = SidebarPersistence(directory: directory)
@@ -61,8 +65,18 @@ final class SidebarStore {
         }
     }
 
+    /// A tab with a live page is closed as the user would, so a `beforeunload` handler can keep it, as Arc's idle
+    /// unload lets a page stay; the rest are archived outright.
     private func autoArchive() {
-        guard state.autoArchive(shown: Set(windows.compactMap(\.selectedTabID))) else { return }
+        let due = state.tabsDueForArchive(shown: Set(windows.compactMap(\.selectedTabID)))
+        guard !due.isEmpty else { return }
+        for tabID in due {
+            if let holder = windows.first(where: { $0.pages[tabID] != nil }) {
+                holder.close(tabID, reason: .auto)
+            } else {
+                state.archiveTab(tabID, reason: .auto)
+            }
+        }
         for window in windows { window.reconcile() }
         scheduleSave()
     }

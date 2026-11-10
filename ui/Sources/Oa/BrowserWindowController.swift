@@ -64,7 +64,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowDidBecomeKey(_ notification: Notification) {
         model.showSelected()
-        model.page?.activate()
+        if model.dialog == nil { model.page?.activate() }
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -132,7 +132,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         return index >= 0 && index < count ? index : nil
     }
 
+    /// The window's commands wait while a dialog is up, as Arc swallows them; other windows and quit stay usable.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if model.dialog != nil { return false }
         if item.action == #selector(togglePin(_:)) {
             guard let tabID = model.selectedTabID, !model.state.isFavorite(tabID) else { return false }
             item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"

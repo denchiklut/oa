@@ -373,21 +373,21 @@ struct SidebarState {
 
     /// Tabs in `shown`, and tabs without a stamp yet, are stamped instead of archived.
     @discardableResult
-    mutating func autoArchive(shown: Set<UUID>, at now: Date = .now) -> Bool {
-        var archived = false
+    /// The unpinned tabs idle for `autoArchiveAge` and not shown anywhere; shown and new tabs count as viewed now.
+    mutating func tabsDueForArchive(shown: Set<UUID>, at now: Date = .now) -> [UUID] {
+        var due: [UUID] = []
         for space in spaces {
             for tab in tabs(in: space.id, pinned: false) {
                 if let viewedAt = tab.viewedAt, !shown.contains(tab.id),
                     now.timeIntervalSince(viewedAt) > SidebarState.autoArchiveAge
                 {
-                    archiveTab(tab.id, reason: .auto, at: now)
-                    archived = true
+                    due.append(tab.id)
                 } else if tab.viewedAt == nil || shown.contains(tab.id) {
                     markViewed(tab.id, at: now)
                 }
             }
         }
-        return archived
+        return due
     }
 
     /// A move to the end of the other section.
