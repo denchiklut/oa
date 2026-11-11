@@ -333,11 +333,13 @@ final class WindowModel {
         }
     }
 
-    /// Quitting hands no page to another window, as Arc does.
+    /// As Arc: a closing window hands every page to another window, preferring one that shows its tab; quitting
+    /// hands nothing over.
     func dropAll(handingOff: Bool) {
+        let others = store.windows.filter { $0 !== self }
         for tabID in Array(pages.keys) {
             guard let page = release(tabID) else { continue }
-            if handingOff, let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }) {
+            if handingOff, let heir = others.first(where: { $0.shows(tabID) }) ?? others.first {
                 heir.adopt(page, for: tabID, from: self)
             } else {
                 page.drop()
@@ -353,6 +355,18 @@ final class WindowModel {
         dialogs = [:]
         archivePeekID = nil
         creating = [:]
+    }
+
+    /// Stops at the first page a `beforeunload` handler keeps. A page that asks comes forward, as in Arc; the
+    /// sidebar order is Oa's own.
+    func askToLeave() async -> Bool {
+        var seen = Set<ObjectIdentifier>()
+        let tabIDs = state.spaces.flatMap { state.selectableTabs(in: $0.id) }.map(\.id)
+        let ordered = tabIDs.flatMap { [pages[$0], peeks[$0]] }.compactMap { $0 } + pages.values + peeks.values
+        for page in ordered where seen.insert(ObjectIdentifier(page)).inserted {
+            guard await page.askToLeave() else { return false }
+        }
+        return true
     }
 
     /// Lets go of the page for `tabID` without ending it. Another window takes it over this way.
