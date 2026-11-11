@@ -50,6 +50,11 @@ class PageImpl : public Page,
   // From the dialog views Chrome's managers create for this page.
   void RunDialog(const Dialog& dialog, DialogReply reply);
   void DismissDialog(const Dialog& dialog);
+  // From the permission prompts Chrome's request manager creates for this
+  // page.
+  void RequestPermission(const PermissionRequest& request,
+                         PermissionReply reply);
+  void ClosePermissionRequest(const PermissionRequest& request);
   // Runs the beforeunload handler as quitting does and keeps the page either
   // way. A handler-less page answers at once.
   void AskToLeave(std::function<void(bool leave)> callback);

@@ -10,6 +10,7 @@
 
 #include "base/memory/weak_ptr.h"
 #include "components/permissions/permission_prompt.h"
+#include "oa/public/page.h"
 
 namespace content {
 class WebContents;
@@ -17,18 +18,19 @@ class WebContents;
 
 namespace oa {
 
+class PageImpl;
+
 // The prompt for every permission request a page makes, in place of Chrome's
-// Views prompts, which need a BrowserView (ADR 0008 §4).
-//
-// Until the app draws permission prompts (C6), it shows nothing and ignores
-// the request: the page's request fails, and nothing is saved for the site.
+// Views prompts, which need a BrowserView (ADR 0008 §4). As Arc's: it carries
+// the request to the page's observer and the reply back, and reports its close
+// when Chromium takes it down.
 class PermissionPromptImpl : public permissions::PermissionPrompt {
  public:
   // Makes CreatePermissionPrompt() return a PermissionPromptImpl for every
   // request. Call before the browser starts.
   static void InstallFactory();
 
-  explicit PermissionPromptImpl(Delegate* delegate);
+  PermissionPromptImpl(content::WebContents* web_contents, Delegate* delegate);
   PermissionPromptImpl(const PermissionPromptImpl&) = delete;
   PermissionPromptImpl& operator=(const PermissionPromptImpl&) = delete;
   ~PermissionPromptImpl() override;
@@ -49,6 +51,15 @@ class PermissionPromptImpl : public permissions::PermissionPrompt {
   static std::unique_ptr<permissions::PermissionPrompt> Create(
       content::WebContents* web_contents,
       Delegate* delegate);
+
+  void Show();
+  void Reply(PermissionResponse response);
+
+  base::WeakPtr<PageImpl> page_;
+  base::WeakPtr<Delegate> delegate_;
+  PermissionRequest request_;
+  bool shown_ = false;
+  base::WeakPtrFactory<PermissionPromptImpl> weak_factory_{this};
 };
 
 }  // namespace oa

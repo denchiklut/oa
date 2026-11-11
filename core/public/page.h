@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace oa {
 
@@ -60,6 +61,56 @@ struct Dialog {
   bool offers_suppression = false;
 };
 
+// Chromium's permissions::RequestType on macOS, as ADK's request types mirror
+// it.
+enum class PermissionKind {
+  kAmbientLogin,
+  kArSession,
+  kCameraPanTiltZoom,
+  kCamera,
+  kCapturedSurfaceControl,
+  kClipboard,
+  kTopLevelStorageAccess,
+  kDiskQuota,
+  kFileSystemAccess,
+  kGeolocation,
+  kHandTracking,
+  kIdentityProvider,
+  kIdleDetection,
+  kLocalFonts,
+  kLocalNetwork,
+  kLoopbackNetwork,
+  kMicrophone,
+  kMidiSysex,
+  kMultipleDownloads,
+  kNotifications,
+  kKeyboardLock,
+  kPointerLock,
+  kProtocolHandler,
+  kSensors,
+  kStorageAccess,
+  kVrSession,
+  kWebAppInstallation,
+  kWindowManagement,
+};
+
+// What Chromium's request manager shows at once: one site, one or more kinds
+// merged, as camera and microphone are.
+struct PermissionRequest {
+  uint64_t id = 0;
+  // The host as Chromium's prompts show it, or an extension's name.
+  std::string name_or_origin;
+  bool is_origin = true;
+  std::vector<PermissionKind> kinds;
+};
+
+enum class PermissionResponse {
+  kAllow,
+  kAllowThisTime,
+  kDeny,
+  kDismiss,
+};
+
 class Page {
  public:
   // The NSImage lives only for the call; null if nothing could be copied.
@@ -67,6 +118,8 @@ class Page {
   // Call once. `suppress` answers this page's later dialogs without asking.
   using DialogReply = std::function<
       void(bool accepted, const std::string& text, bool suppress)>;
+  // Call once; ignored after the request was closed.
+  using PermissionReply = std::function<void(PermissionResponse response)>;
 
   class Observer {
    public:
@@ -85,6 +138,13 @@ class Page {
     virtual void OnPageDialog(const Dialog& dialog, DialogReply reply) = 0;
     // The engine closed the dialog: a navigation, a tab switch, a close.
     virtual void OnPageDialogDismissed(const Dialog& dialog) = 0;
+    // Only while the page's tab is the active one; a tab switch closes it and
+    // asks again on return, as Arc's prompt does.
+    virtual void OnPagePermissionRequest(const PermissionRequest& request,
+                                         PermissionReply reply) = 0;
+    // Also after a reply, once Chromium has taken the prompt down.
+    virtual void OnPagePermissionRequestClosed(
+        const PermissionRequest& request) = 0;
     // A beforeunload handler kept the page after Close().
     virtual void OnPageCloseCancelled() = 0;
     virtual void OnPageClosed(std::optional<int32_t> session_id) = 0;

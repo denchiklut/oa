@@ -14,6 +14,9 @@
 - (oa::Page::Observer*)observer;
 - (void)pageDialog:(const oa::Dialog&)dialog reply:(oa::Page::DialogReply)reply;
 - (void)pageDialogDismissed:(const oa::Dialog&)dialog;
+- (void)pagePermissionRequest:(const oa::PermissionRequest&)request
+                        reply:(oa::Page::PermissionReply)reply;
+- (void)pagePermissionRequestClosed:(const oa::PermissionRequest&)request;
 - (void)pageCloseCancelled;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
@@ -124,6 +127,14 @@ class PageObserverBridge : public oa::Page::Observer {
   void OnPageDialogDismissed(const oa::Dialog& dialog) override {
     [page_ pageDialogDismissed:dialog];
   }
+  void OnPagePermissionRequest(const oa::PermissionRequest& request,
+                               oa::Page::PermissionReply reply) override {
+    [page_ pagePermissionRequest:request reply:std::move(reply)];
+  }
+  void OnPagePermissionRequestClosed(
+      const oa::PermissionRequest& request) override {
+    [page_ pagePermissionRequestClosed:request];
+  }
   void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
   void OnPageClosed(std::optional<int32_t> session_id) override {
     [page_ pageClosedWithSessionID:session_id.value_or(-1)];
@@ -192,10 +203,58 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 @end
 
+@interface OAPagePermissionRequest ()
+- (instancetype)initWithRequest:(const oa::PermissionRequest&)request
+                          reply:(oa::Page::PermissionReply)reply;
+@end
+
+@implementation OAPagePermissionRequest {
+  oa::Page::PermissionReply _reply;
+}
+
+@synthesize nameOrOrigin = _nameOrOrigin;
+@synthesize nameIsOrigin = _nameIsOrigin;
+@synthesize kinds = _kinds;
+
+- (instancetype)initWithRequest:(const oa::PermissionRequest&)request
+                          reply:(oa::Page::PermissionReply)reply {
+  if ((self = [super init])) {
+    _nameOrOrigin = ToNSString(request.name_or_origin);
+    _nameIsOrigin = request.is_origin;
+    NSMutableArray<NSNumber*>* kinds = [NSMutableArray array];
+    for (oa::PermissionKind kind : request.kinds) {
+      [kinds addObject:@(static_cast<NSInteger>(kind))];
+    }
+    _kinds = kinds;
+    _reply = std::move(reply);
+  }
+  return self;
+}
+
+- (void)respond:(OAPagePermissionResponse)response {
+  oa::Page::PermissionReply reply = std::exchange(_reply, nullptr);
+  if (!reply) {
+    return;
+  }
+  switch (response) {
+    case OAPagePermissionResponseAllow:
+      return reply(oa::PermissionResponse::kAllow);
+    case OAPagePermissionResponseAllowThisTime:
+      return reply(oa::PermissionResponse::kAllowThisTime);
+    case OAPagePermissionResponseDeny:
+      return reply(oa::PermissionResponse::kDeny);
+    case OAPagePermissionResponseDismiss:
+      return reply(oa::PermissionResponse::kDismiss);
+  }
+}
+
+@end
+
 @implementation OAPage {
   std::unique_ptr<PageObserverBridge> _observer;
   std::unique_ptr<oa::Page> _page;
   NSMutableDictionary<NSNumber*, OAPageDialog*>* _dialogs;
+  NSMutableDictionary<NSNumber*, OAPagePermissionRequest*>* _permissionRequests;
   BOOL _keepsAddress;
 }
 
@@ -206,6 +265,7 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
     _delegate = delegate;
     _observer = std::make_unique<PageObserverBridge>(self);
     _dialogs = [[NSMutableDictionary alloc] init];
+    _permissionRequests = [[NSMutableDictionary alloc] init];
   }
   return self;
 }
@@ -400,6 +460,25 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   }
   [_dialogs removeObjectForKey:key];
   [self.delegate page:self didDismissDialog:shown];
+}
+
+- (void)pagePermissionRequest:(const oa::PermissionRequest&)request
+                        reply:(oa::Page::PermissionReply)reply {
+  OAPagePermissionRequest* shown =
+      [[OAPagePermissionRequest alloc] initWithRequest:request
+                                                 reply:std::move(reply)];
+  _permissionRequests[@(request.id)] = shown;
+  [self.delegate page:self didRequestPermission:shown];
+}
+
+- (void)pagePermissionRequestClosed:(const oa::PermissionRequest&)request {
+  NSNumber* key = @(request.id);
+  OAPagePermissionRequest* shown = _permissionRequests[key];
+  if (!shown) {
+    return;
+  }
+  [_permissionRequests removeObjectForKey:key];
+  [self.delegate page:self didClosePermissionRequest:shown];
 }
 
 - (void)pageCloseCancelled {
