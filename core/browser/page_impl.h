@@ -10,6 +10,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/process/kill.h"
 #include "base/scoped_observation.h"
+#include "chrome/browser/media/webrtc/media_stream_capture_indicator.h"
 #include "components/favicon/core/favicon_driver.h"
 #include "components/favicon/core/favicon_driver_observer.h"
 #include "components/sessions/core/session_id.h"
@@ -31,7 +32,8 @@ class WindowBrowser;
 class PageImpl : public Page,
                  public ForwardingWebContentsDelegate,
                  public content::WebContentsObserver,
-                 public favicon::FaviconDriverObserver {
+                 public favicon::FaviconDriverObserver,
+                 public MediaStreamCaptureIndicator::Observer {
  public:
   static std::unique_ptr<PageImpl> Create(WindowBrowser* window_browser,
                                           Page::Observer* observer);
@@ -72,6 +74,8 @@ class PageImpl : public Page,
   void* Favicon() const override;
   SecurityLevel GetSecurityLevel() const override;
   NavigationResult GetNavigationResult() const override;
+  bool IsCameraOn() const override;
+  bool IsMicrophoneOn() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -138,6 +142,12 @@ class PageImpl : public Page,
                         bool icon_url_changed,
                         const gfx::Image& image) override;
 
+  // MediaStreamCaptureIndicator::Observer:
+  void OnIsCapturingVideoChanged(content::WebContents* contents,
+                                 bool is_capturing_video) override;
+  void OnIsCapturingAudioChanged(content::WebContents* contents,
+                                 bool is_capturing_audio) override;
+
  private:
   PageImpl(WindowBrowser* window_browser, Page::Observer* observer);
 
@@ -163,6 +173,9 @@ class PageImpl : public Page,
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>
       favicon_observation_{this};
+  base::ScopedObservation<MediaStreamCaptureIndicator,
+                          MediaStreamCaptureIndicator::Observer>
+      capture_observation_{this};
   base::WeakPtrFactory<PageImpl> weak_factory_{this};
 };
 

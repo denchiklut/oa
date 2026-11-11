@@ -14,6 +14,7 @@
 #include "base/task/bind_post_task.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/ssl/chrome_security_state_util.h"
@@ -169,7 +170,11 @@ void PageImpl::CloseAll() {
 }
 
 PageImpl::PageImpl(WindowBrowser* window_browser, Page::Observer* observer)
-    : window_browser_(window_browser->GetWeakPtr()), observer_(observer) {}
+    : window_browser_(window_browser->GetWeakPtr()), observer_(observer) {
+  capture_observation_.Observe(MediaCaptureDevicesDispatcher::GetInstance()
+                                   ->GetMediaStreamCaptureIndicator()
+                                   .get());
+}
 
 PageImpl::~PageImpl() {
   observer_ = nullptr;
@@ -311,6 +316,18 @@ SecurityLevel PageImpl::GetSecurityLevel() const {
 
 NavigationResult PageImpl::GetNavigationResult() const {
   return navigation_result_;
+}
+
+bool PageImpl::IsCameraOn() const {
+  return web_contents() && MediaCaptureDevicesDispatcher::GetInstance()
+                               ->GetMediaStreamCaptureIndicator()
+                               ->IsCapturingVideo(web_contents());
+}
+
+bool PageImpl::IsMicrophoneOn() const {
+  return web_contents() && MediaCaptureDevicesDispatcher::GetInstance()
+                               ->GetMediaStreamCaptureIndicator()
+                               ->IsCapturingAudio(web_contents());
 }
 
 void PageImpl::Load(const std::string& url) {
@@ -718,6 +735,20 @@ void PageImpl::OnFaviconUpdated(favicon::FaviconDriver* favicon_driver,
                                 bool icon_url_changed,
                                 const gfx::Image& image) {
   NotifyStateChanged();
+}
+
+void PageImpl::OnIsCapturingVideoChanged(content::WebContents* contents,
+                                         bool is_capturing_video) {
+  if (contents == web_contents()) {
+    NotifyStateChanged();
+  }
+}
+
+void PageImpl::OnIsCapturingAudioChanged(content::WebContents* contents,
+                                         bool is_capturing_audio) {
+  if (contents == web_contents()) {
+    NotifyStateChanged();
+  }
 }
 
 void PageImpl::WebContentsDestroyed() {
