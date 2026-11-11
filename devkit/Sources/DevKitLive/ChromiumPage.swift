@@ -16,6 +16,8 @@ final class ChromiumPage: Page {
     private(set) var favicon: NSImage?
     private(set) var securityLevel = SecurityLevel.neutral
     private(set) var navigationResult: NavigationResult?
+    private(set) var isCameraOn = false
+    private(set) var isMicrophoneOn = false
     private(set) var crash: PageCrash?
     var keepsAddress = false {
         didSet { page?.keepsAddress = keepsAddress }
@@ -78,6 +80,8 @@ final class ChromiumPage: Page {
         if level != securityLevel { securityLevel = level }
         let result = NavigationResult(core: page.navigationResult)
         if result != navigationResult { navigationResult = result }
+        if page.isCameraOn != isCameraOn { isCameraOn = page.isCameraOn }
+        if page.isMicrophoneOn != isMicrophoneOn { isMicrophoneOn = page.isMicrophoneOn }
         updateHostedView()
     }
 
