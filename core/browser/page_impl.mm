@@ -31,6 +31,7 @@
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/referrer.h"
+#include "content/public/common/url_constants.h"
 #include "oa/browser/window_browser.h"
 #include "skia/ext/skia_utils_mac.h"
 #include "third_party/blink/public/common/renderer_preferences/renderer_preferences.h"
@@ -269,6 +270,10 @@ SecurityLevel PageImpl::GetSecurityLevel() const {
     default:
       return SecurityLevel::kNeutral;
   }
+}
+
+NavigationResult PageImpl::GetNavigationResult() const {
+  return navigation_result_;
 }
 
 void PageImpl::Load(const std::string& url) {
@@ -596,9 +601,49 @@ void PageImpl::PrimaryMainFrameRenderProcessGone(
   }
 }
 
+// The navigation result follows ArcCore. A navigation's start clears it. A
+// document that finishes loading sets it, as does a same-document navigation.
+// A committed error page fails it, as does a failed load. The error page's own
+// document loading is ignored, and a navigation that never commits leaves the
+// result cleared.
+void PageImpl::DidStartNavigation(
+    content::NavigationHandle* navigation_handle) {
+  if (navigation_handle->IsInPrimaryMainFrame()) {
+    navigation_result_ = NavigationResult::kNone;
+    NotifyStateChanged();
+  }
+}
+
 void PageImpl::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
+  if (navigation_handle->IsInPrimaryMainFrame() &&
+      navigation_handle->HasCommitted()) {
+    if (navigation_handle->IsSameDocument()) {
+      navigation_result_ = NavigationResult::kLoaded;
+    } else if (navigation_handle->IsErrorPage()) {
+      navigation_result_ = NavigationResult::kFailed;
+    }
+  }
   NotifyStateChanged();
+}
+
+void PageImpl::DidFinishLoad(content::RenderFrameHost* render_frame_host,
+                             const GURL& validated_url) {
+  if (render_frame_host->IsInPrimaryMainFrame() &&
+      !validated_url.SchemeIs(content::kChromeErrorScheme)) {
+    navigation_result_ = NavigationResult::kLoaded;
+    NotifyStateChanged();
+  }
+}
+
+void PageImpl::DidFailLoad(content::RenderFrameHost* render_frame_host,
+                           const GURL& validated_url,
+                           int error_code) {
+  if (render_frame_host->IsInPrimaryMainFrame() &&
+      !validated_url.SchemeIs(content::kChromeErrorScheme)) {
+    navigation_result_ = NavigationResult::kFailed;
+    NotifyStateChanged();
+  }
 }
 
 void PageImpl::LoadProgressChanged(double progress) {

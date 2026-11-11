@@ -24,6 +24,14 @@ typedef NS_ENUM(NSInteger, OAPageSecurityLevel) {
   OAPageSecurityLevelDangerous,
 };
 
+// How the page's last navigation ended: none from a navigation's start until
+// its document loads or fails.
+typedef NS_ENUM(NSInteger, OAPageNavigationResult) {
+  OAPageNavigationResultNone,
+  OAPageNavigationResultLoaded,
+  OAPageNavigationResultFailed,
+};
+
 typedef NS_ENUM(NSInteger, OAPageRendererExit) {
   OAPageRendererExitNormal,
   OAPageRendererExitAbnormal,
@@ -83,6 +91,7 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 // Nil until Chromium's favicon driver has an icon for the page.
 @property(nonatomic, readonly, nullable) NSImage* favicon;
 @property(nonatomic, readonly) OAPageSecurityLevel securityLevel;
+@property(nonatomic, readonly) OAPageNavigationResult navigationResult;
 // Links to another host open a new page instead of navigating this one.
 @property(nonatomic) BOOL keepsAddress;
 - (instancetype)init NS_UNAVAILABLE;

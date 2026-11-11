@@ -68,6 +68,17 @@ OAPageSecurityLevel ToSecurityLevel(oa::SecurityLevel level) {
   }
 }
 
+OAPageNavigationResult ToNavigationResult(oa::NavigationResult result) {
+  switch (result) {
+    case oa::NavigationResult::kNone:
+      return OAPageNavigationResultNone;
+    case oa::NavigationResult::kLoaded:
+      return OAPageNavigationResultLoaded;
+    case oa::NavigationResult::kFailed:
+      return OAPageNavigationResultFailed;
+  }
+}
+
 OAPageRendererExit ToRendererExit(oa::RendererExit exit) {
   switch (exit) {
     case oa::RendererExit::kNormal:
@@ -262,6 +273,11 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 - (OAPageSecurityLevel)securityLevel {
   return _page ? ToSecurityLevel(_page->GetSecurityLevel())
                : OAPageSecurityLevelNeutral;
+}
+
+- (OAPageNavigationResult)navigationResult {
+  return _page ? ToNavigationResult(_page->GetNavigationResult())
+               : OAPageNavigationResultNone;
 }
 
 - (void)loadURL:(NSURL*)url {
