@@ -674,6 +674,7 @@ final class WindowModel {
             _ = page.title
             _ = page.url
             _ = page.favicon
+            _ = page.isLoading
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, let page = pages[tabID], ObjectIdentifier(page) == identity else { return }
@@ -683,9 +684,17 @@ final class WindowModel {
         }
     }
 
+    /// As Arc: a page that has loaded with no favicon clears an unpinned tab's, and a tab that keeps its address never
+    /// loses its own. Arc reads "has loaded" from a navigation result, which a failed load doesn't set; the engine
+    /// reports none yet, so a page that stopped loading is Oa's own reading.
     private func save(_ page: any Page, for tabID: UUID) {
         store.setSavedPage(tabID, title: page.title, url: page.url)
-        if let favicon = page.favicon { store.setSavedFavicon(tabID, favicon) }
+        let favicon = page.favicon
+        let hasLoaded = page.url != nil && !page.isLoading
+        guard favicon != nil || (hasLoaded && !state.keepsAddress(tabID)) else { return }
+        let hasSaved = store.savedFavicon(tabID) != nil
+        guard state.takesFavicon(tabID, at: page.url, canGoBack: page.canGoBack, hasSaved: hasSaved) else { return }
+        store.setSavedFavicon(tabID, favicon)
     }
 
     /// A Favorite's page that ends leaves the tile, as a pinned tab's leaves its row, unless Remove Favorite asked

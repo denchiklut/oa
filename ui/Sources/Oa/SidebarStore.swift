@@ -9,6 +9,7 @@ import Observation
 @Observable
 final class SidebarStore {
     private(set) var state: SidebarState
+    private var removedFavicons = 0
     @ObservationIgnored private(set) var windows: [WindowModel] = []
     @ObservationIgnored let savedWindows: [WindowRecord]
     @ObservationIgnored private let persistence: SidebarPersistence
@@ -39,11 +40,17 @@ final class SidebarStore {
 
     /// The last favicon a tab's page showed, for a tab or Archive entry without a page.
     func savedFavicon(_ id: UUID) -> NSImage? {
-        favicons.image(for: id)
+        _ = removedFavicons
+        return favicons.image(for: id)
     }
 
-    func setSavedFavicon(_ tabID: UUID, _ favicon: NSImage) {
-        favicons.set(favicon, for: tabID)
+    /// Nil removes it. The cache isn't observed, and a row showing a removed favicon has nothing else to redraw for.
+    func setSavedFavicon(_ tabID: UUID, _ favicon: NSImage?) {
+        if let favicon {
+            favicons.set(favicon, for: tabID)
+        } else if favicons.remove(for: tabID) {
+            removedFavicons += 1
+        }
     }
 
     func markViewed(_ tabID: UUID) {
