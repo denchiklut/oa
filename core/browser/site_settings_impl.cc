@@ -17,6 +17,7 @@
 #include "components/content_settings/core/common/content_settings_types.h"
 #include "components/permissions/permission_decision_auto_blocker.h"
 #include "components/permissions/permission_uma_util.h"
+#include "components/permissions/permission_util.h"
 #include "oa/browser/profile_services.h"
 #include "oa/public/site_settings.h"
 #include "url/gurl.h"
@@ -77,10 +78,17 @@ ContentSettingsType ToContentSettingsType(SiteSettingType type) {
                                           : ContentSettingsType::DEFAULT;
 }
 
-SiteSettingValue ToSiteSettingValue(const PermissionSetting& setting) {
+// As page info's toggle (PageInfoUI::IsToggleOn): a device guard has no
+// Allow, so its Ask is what the row shows as allowed.
+SiteSettingValue ToSiteSettingValue(ContentSettingsType type,
+                                    const PermissionSetting& setting) {
   const ContentSetting* value = std::get_if<ContentSetting>(&setting);
   if (!value) {
     return SiteSettingValue::kDefault;
+  }
+  if (permissions::PermissionUtil::IsGuardContentSetting(type) &&
+      *value == CONTENT_SETTING_ASK) {
+    return SiteSettingValue::kAllow;
   }
   switch (*value) {
     case CONTENT_SETTING_ALLOW:
@@ -96,10 +104,13 @@ SiteSettingValue ToSiteSettingValue(const PermissionSetting& setting) {
   }
 }
 
-ContentSetting ToContentSetting(SiteSettingValue value) {
+ContentSetting ToContentSetting(ContentSettingsType type,
+                                SiteSettingValue value) {
   switch (value) {
     case SiteSettingValue::kAllow:
-      return CONTENT_SETTING_ALLOW;
+      return permissions::PermissionUtil::IsGuardContentSetting(type)
+                 ? CONTENT_SETTING_ASK
+                 : CONTENT_SETTING_ALLOW;
     case SiteSettingValue::kBlock:
       return CONTENT_SETTING_BLOCK;
     case SiteSettingValue::kAsk:
@@ -183,11 +194,18 @@ std::optional<std::vector<SiteSetting>> GetChangedSiteSettings(
       HostContentSettingsMapFactory::GetForProfile(profile);
   std::vector<SiteSetting> settings;
   for (size_t index = 0; index < kSiteSettingTypes.size(); ++index) {
+    // Page info lists it in place of GEOLOCATION only under
+    // kApproximateGeolocationPermission, off on macOS; its structured value
+    // has no row here.
+    if (kSiteSettingTypes[index] ==
+        ContentSettingsType::GEOLOCATION_WITH_OPTIONS) {
+      continue;
+    }
     PermissionSetting value;
     if (IsChanged(map, profile->IsOffTheRecord(), kSiteSettingTypes[index], url,
                   &value)) {
-      settings.push_back(
-          {static_cast<SiteSettingType>(index), ToSiteSettingValue(value)});
+      settings.push_back({static_cast<SiteSettingType>(index),
+                          ToSiteSettingValue(kSiteSettingTypes[index], value)});
     }
   }
   return settings;
@@ -205,7 +223,7 @@ std::optional<SiteSettingValue> GetSiteSetting(const std::string& profile_id,
     return std::nullopt;
   }
   return ToSiteSettingValue(
-      map->GetPermissionSetting(url, url, content_type, nullptr));
+      content_type, map->GetPermissionSetting(url, url, content_type, nullptr));
 }
 
 void SetSiteSetting(const std::string& profile_id,
@@ -242,7 +260,7 @@ void SetSiteSetting(const std::string& profile_id,
             HostContentSettingsMapFactory::GetForProfile(profile)
                 ->SetContentSettingDefaultScope(url, url, type, setting);
           },
-          url, content_type, ToContentSetting(value)));
+          url, content_type, ToContentSetting(content_type, value)));
 }
 
 }  // namespace oa
