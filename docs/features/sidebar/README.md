@@ -27,7 +27,9 @@ One `SidebarStore` holds the state and the open windows. Every change goes
 through `edit`, after which each window reconciles its selection and drops pages
 of tabs or Spaces that are gone, and a save follows 2.8 s later. Write-backs of
 title and URL change the state without scheduling a save; they ride on the next
-one, and on the save at quit.
+one, and on the save at quit. SIGTERM, as from `kill` or launchd, ends the
+process without that save, so changes from the last 2.8 s are lost, as Arc
+loses those younger than its 3 s delay. SIGINT and SIGHUP quit as the Dock does.
 
 A `WindowModel` holds the window's selected Space, a selected tab per Space, a
 one-step previous tab, and the pages it holds. A page exists only once its tab
