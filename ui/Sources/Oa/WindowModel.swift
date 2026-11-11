@@ -461,9 +461,7 @@ final class WindowModel {
             return adopt(page, for: tabID, from: holder)
         }
         if let maker = store.windows.first(where: { $0 !== self && $0.creating[tabID] != nil }) {
-            creating[tabID] = maker.creating.removeValue(forKey: tabID)
-            if let url = maker.pendingURLs.removeValue(forKey: tabID) { pendingURLs[tabID] = url }
-            return
+            return takeCreation(of: tabID, from: maker)
         }
         guard let profile = state.profile(containing: tabID) else { return }
         let token = UUID()
@@ -483,10 +481,16 @@ final class WindowModel {
         }
     }
 
+    /// As Arc's eject on deselection, a page still being made goes too.
     private func handOff(_ tabID: UUID) {
-        guard let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }), let page = release(tabID)
-        else { return }
-        heir.adopt(page, for: tabID, from: self)
+        guard let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }) else { return }
+        if creating[tabID] != nil { return heir.takeCreation(of: tabID, from: self) }
+        if let page = release(tabID) { heir.adopt(page, for: tabID, from: self) }
+    }
+
+    private func takeCreation(of tabID: UUID, from maker: WindowModel) {
+        creating[tabID] = maker.creating.removeValue(forKey: tabID)
+        if let url = maker.pendingURLs.removeValue(forKey: tabID) { pendingURLs[tabID] = url }
     }
 
     /// The tab's Peek comes along, as Arc's does.
