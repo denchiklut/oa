@@ -29,6 +29,7 @@ import AppKit
     var canGoForward: Bool { get }
     var favicon: NSImage? { get }
     var securityLevel: Int { get }
+    var navigationResult: Int { get }
     var keepsAddress: Bool { get set }
     @objc(loadURL:) func load(_ url: URL)
     func goBack()
