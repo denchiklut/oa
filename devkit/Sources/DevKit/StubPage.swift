@@ -177,9 +177,26 @@ final class StubPage: Page {
         crash = .crashed
     }
 
+    /// Chrome's closed-tab records, as the stub keeps them: a closed page's history; `drop()` leaves none.
+    private static var records: [PageSessionID: (history: [URL], position: Int)] = [:]
+    private static var lastSessionID: Int32 = 0
+
     func closeItself() {
-        continuation?.yield(.closed)
+        Self.lastSessionID += 1
+        let sessionID = PageSessionID(rawValue: Self.lastSessionID)
+        Self.records[sessionID] = (history, position)
+        continuation?.yield(.closed(sessionID))
         drop()
+    }
+
+    static func restore(_ sessionID: PageSessionID, id: UUID, windowID: UUID) -> StubPage? {
+        guard let record = records.removeValue(forKey: sessionID), record.history.indices.contains(record.position)
+        else { return nil }
+        let page = StubPage(id: id, windowID: windowID)
+        page.history = record.history
+        page.position = record.position
+        page.show(record.history[record.position])
+        return page
     }
 
     func alert() { ask(.alert, message: "Hello from the stub page") { _ in } }

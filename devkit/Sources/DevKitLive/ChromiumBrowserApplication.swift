@@ -106,22 +106,28 @@ final class ChromiumBrowserContext: BrowserContext {
         self.profile = profile
     }
 
-    func makePage(windowID: UUID) async -> (any Page)? {
+    func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
         guard let profile = profile() else { return nil }
         let delegate = PageDelegate()
         let created = CreatedPage()
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            profile.createPage(inWindow: windowID.uuidString, delegate: delegate) { page in
-                MainActor.assumeIsolated { created.page = page }
+            profile.createPage(
+                inWindow: windowID.uuidString, restoringSessionID: sessionID?.rawValue ?? -1, delegate: delegate
+            ) { page, restored in
+                MainActor.assumeIsolated {
+                    created.page = page
+                    created.restored = restored
+                }
                 continuation.resume()
             }
         }
         guard let page = created.page else { return nil }
-        return ChromiumPage(id: UUID(), page: page, delegate: delegate)
+        return (ChromiumPage(id: UUID(), page: page, delegate: delegate), created.restored)
     }
 }
 
 @MainActor
 private final class CreatedPage {
     var page: CorePage?
+    var restored = false
 }

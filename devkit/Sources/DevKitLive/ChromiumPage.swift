@@ -119,9 +119,9 @@ final class ChromiumPage: Page {
         if page != nil { continuation.yield(.closeCancelled) }
     }
 
-    fileprivate func closed() {
+    fileprivate func closed(_ sessionID: PageSessionID?) {
         guard page != nil else { return }
-        continuation.yield(.closed)
+        continuation.yield(.closed(sessionID))
         finish()
     }
 
@@ -176,7 +176,9 @@ final class PageDelegate: NSObject, CorePageDelegate {
 
     func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }
 
-    func pageDidClose(_ page: CorePage) { content?.closed() }
+    func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32) {
+        content?.closed(sessionID < 0 ? nil : PageSessionID(rawValue: sessionID))
+    }
 }
 
 extension SecurityLevel {

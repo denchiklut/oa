@@ -13,9 +13,10 @@ import AppKit
 }
 
 @MainActor @objc protocol CoreProfile: NSObjectProtocol {
-    @objc(createPageInWindow:delegate:completion:)
+    @objc(createPageInWindow:restoringSessionID:delegate:completion:)
     func createPage(
-        inWindow windowIdentifier: String, delegate: CorePageDelegate?, completion: @escaping (CorePage?) -> Void)
+        inWindow windowIdentifier: String, restoringSessionID sessionID: Int32, delegate: CorePageDelegate?,
+        completion: @escaping (CorePage?, Bool) -> Void)
 }
 
 @MainActor @objc protocol CorePage: NSObjectProtocol {
@@ -64,7 +65,7 @@ import AppKit
     @objc(page:didRequestDialog:) func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog)
     @objc(page:didDismissDialog:) func page(_ page: CorePage, didDismissDialog dialog: CorePageDialog)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
-    @objc(pageDidClose:) func pageDidClose(_ page: CorePage)
+    @objc(page:didCloseWithSessionID:) func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32)
 }
 
 typealias CoreReadyCallback = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutableRawPointer) -> Void

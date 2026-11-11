@@ -41,7 +41,8 @@ final class StubBrowserContext: BrowserContext {
 
     init(id: UUID) { self.id = id }
 
-    func makePage(windowID: UUID) async -> (any Page)? {
-        StubPage(id: UUID(), windowID: windowID)
+    func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
+        if let sessionID, let page = StubPage.restore(sessionID, id: UUID(), windowID: windowID) { return (page, true) }
+        return (StubPage(id: UUID(), windowID: windowID), false)
     }
 }
