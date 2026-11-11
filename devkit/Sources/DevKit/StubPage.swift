@@ -289,8 +289,9 @@ final class StubPage: Page {
         return url.path().count > 1 ? host + url.path() : host
     }
 
-    private static func icon(for url: URL) -> NSImage {
-        let host = url.host()?.replacingOccurrences(of: "www.", with: "") ?? "?"
+    /// None for an address without a host, as a page with no icon has in Chromium.
+    private static func icon(for url: URL) -> NSImage? {
+        guard let host = url.host()?.replacingOccurrences(of: "www.", with: "") else { return nil }
         let hue = Double(host.unicodeScalars.reduce(0) { ($0 * 31 + Int($1.value)) % 360 }) / 360
         let letter = String(host.prefix(1)).uppercased()
         let attributes: [NSAttributedString.Key: Any] = [
