@@ -129,8 +129,18 @@ typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
 - (void)drop;
 @end
 
+// `type` is an `oa::SiteSettingType`, `value` an `oa::SiteSettingValue`.
+@interface OASiteSetting : NSObject
+@property(nonatomic, readonly) NSInteger type;
+@property(nonatomic, readonly) NSInteger value;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
 @interface OAProfile : NSObject
 - (instancetype)init NS_UNAVAILABLE;
+// Nil until the profile has loaded.
+- (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
+- (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url;
 // Creates a page in the window's Browser for this profile, loading the profile
 // first if needed. The page starts in the background with nothing loaded, or
 // with the history of a closed page's `sessionID` (not -1) and `restored`;

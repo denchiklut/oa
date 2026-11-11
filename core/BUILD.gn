@@ -9,6 +9,7 @@ source_set("oa") {
     "browser/page_impl.mm",
     "browser/profile_services.cc",
     "browser/profile_services.h",
+    "browser/site_settings_impl.cc",
     "browser/ui/browser_window_impl.h",
     "browser/ui/browser_window_impl.mm",
     "browser/ui/javascript_dialog_impl.cc",
@@ -25,6 +26,7 @@ source_set("oa") {
     "objc/OACore.mm",
     "public/engine.h",
     "public/page.h",
+    "public/site_settings.h",
   ]
 
   # ChromeMainDelegate's sources live in //chrome:chrome_dll, which links this
