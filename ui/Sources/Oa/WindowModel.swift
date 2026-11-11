@@ -234,14 +234,12 @@ final class WindowModel {
         }
     }
 
-    /// Expand: an opened Peek becomes a selected tab after its opener's earlier children, as Arc does; an Archive
-    /// Peek's entry leaves the Archive for the top of the shown Space.
     func expandPeek() {
         guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
         var tab = SidebarTab(id: page.id, title: page.title, url: page.url, viewedAt: .now)
         if ownerID == archivePeekID {
             archivePeekID = nil
-            // Another window brought the entry back: Oa's own choice, after Arc's ⇧⌘T, is to select its tab.
+            // Another window brought the entry back; selecting its tab is Oa's own, after Arc's ⇧⌘T.
             if let spaceID = state.space(containing: ownerID)?.id {
                 dialogs[page.id] = nil
                 page.drop()
@@ -260,8 +258,7 @@ final class WindowModel {
         select(tab.id)
     }
 
-    /// ✕, the backdrop and ⌘W: the Peek stays until its page has closed, so a `beforeunload` handler can keep it,
-    /// as Arc does; then an opened Peek's page is archived under its tab's Space and an Archive Peek keeps its entry.
+    /// Closes as the user would, so a `beforeunload` handler can keep the Peek, as Arc does.
     func closePeek() {
         guard let page = peek else { return }
         if peekOwnerID != archivePeekID { store.closing[page.id] = .manual }
@@ -335,8 +332,7 @@ final class WindowModel {
         }
     }
 
-    /// Window close and quit: pages are dropped without unload handlers and the records stay. Only a closing window
-    /// hands a page to another window showing its tab; quitting hands nothing over, as Arc does.
+    /// Quitting hands no page to another window, as Arc does.
     func dropAll(handingOff: Bool) {
         for tabID in Array(pages.keys) {
             guard let page = release(tabID) else { continue }

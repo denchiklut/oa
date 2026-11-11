@@ -131,7 +131,7 @@ struct SidebarTree {
         insert(item, into: parentID, at: items[parentID]?.childIDs.count ?? 0)
     }
 
-    /// An item already in the tree isn't inserted again, as Arc's sidebar does.
+    /// Two windows can bring back one Archive entry; Arc's sidebar also takes an ID once.
     mutating func insert(_ item: SidebarItem, into parentID: UUID, at index: Int) {
         guard let parent = items[parentID], items[item.id] == nil else { return }
         var item = item
