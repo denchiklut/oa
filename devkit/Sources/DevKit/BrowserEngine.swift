@@ -24,10 +24,8 @@ public protocol BrowserApplication: AnyObject {
 @MainActor
 public protocol BrowserContext: AnyObject {
     var id: UUID { get }
-    /// A page with an `id` of its own in the app's window `windowID`, in the background. Given a closed page's
-    /// session ID, as Arc's restorable session ID, the engine brings it back with its history where it still can and
-    /// `restored` is true; otherwise nothing is loaded and the app issues the first `load`. Nil when the engine
-    /// can't create it.
+    /// A page with an `id` of its own in the app's window `windowID`, in the background; nil if the engine can't.
+    /// A closed page's `sessionID` brings its history back where it can (`restored`); else the app issues the `load`.
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)?
 }
 
@@ -92,8 +90,7 @@ public enum PageEvent {
     case dialogDismissed(PageDialog)
     /// A `beforeunload` handler kept the page after `close()`.
     case closeCancelled
-    /// The page is gone, after `close()` or without the app asking. The session ID is nil when the engine kept no
-    /// record, as after `drop()`.
+    /// The page is gone, after `close()` or without the app asking, with the engine's record of it if it kept one.
     case closed(PageSessionID?)
 }
 

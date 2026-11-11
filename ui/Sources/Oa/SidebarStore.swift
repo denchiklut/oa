@@ -20,7 +20,7 @@ final class SidebarStore {
     /// Pages the user asked to close, by page ID, until the page reports closed or kept.
     @ObservationIgnored var closing: [UUID: SidebarArchivedTab.Reason] = [:]
     @ObservationIgnored var deletingSpace: ClosingSpace?
-    /// Archive entries' closed pages, for ⇧⌘T. In memory only, as Arc's ⇧⌘T list is gone after a relaunch.
+    /// In memory only, as Arc's ⇧⌘T list is gone after a relaunch.
     @ObservationIgnored var sessionIDs: [UUID: PageSessionID] = [:]
 
     init(directory: URL) {

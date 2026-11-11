@@ -271,7 +271,7 @@ final class WindowModel {
         page.close()
     }
 
-    /// As Arc: with its history while the engine still has the closed page; Restore and the Archive Peek load fresh.
+    /// As Arc, with its history; Restore and the Archive Peek load fresh.
     func restoreLastClosed() {
         guard let entry = state.archive.last else { return }
         let sessionID = store.sessionIDs[entry.id]
