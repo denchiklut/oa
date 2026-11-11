@@ -5,6 +5,7 @@ struct BrowserWindowView: View {
     let model: WindowModel
     @State private var address = ""
     @State private var editing = false
+    @State private var showingSiteControls = false
     @FocusState private var addressFocused: Bool
 
     var body: some View {
@@ -108,14 +109,26 @@ struct BrowserWindowView: View {
                             .padding(.horizontal, 2)
                     }
                 }
-            // Arc's Site Controls button, which its permission prompt hangs from.
-            Image(systemName: "slider.horizontal.3")
-                .foregroundStyle(.secondary)
-                .popover(isPresented: model.permissionPromptBinding(forPeek: false), arrowEdge: .bottom) {
+            // Arc's Site Controls button, which its permission prompt hangs from too. Oa's own: nothing to control
+            // on a page that isn't a website.
+            Button {
+                showingSiteControls = true
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .disabled(!["http", "https"].contains(page?.url?.scheme))
+            .popover(isPresented: $showingSiteControls, arrowEdge: .bottom) {
+                SiteControlsView(model: model, isSecure: page?.securityLevel == .secure) {
+                    showingSiteControls = false
+                }
+            }
+            .background {
+                Color.clear.popover(isPresented: model.permissionPromptBinding(forPeek: false), arrowEdge: .bottom) {
                     if let request = model.promptedPermissionRequest {
                         PermissionRequestView(model: model, request: request)
                     }
                 }
+            }
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 10)
