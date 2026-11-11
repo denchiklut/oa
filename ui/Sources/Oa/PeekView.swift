@@ -68,6 +68,11 @@ struct PeekView: View {
             }
             Spacer()
             address
+                .popover(isPresented: model.permissionPromptBinding(forPeek: true), arrowEdge: .bottom) {
+                    if let request = model.promptedPermissionRequest {
+                        PermissionRequestView(model: model, request: request)
+                    }
+                }
             Spacer()
             Color.clear.frame(width: 78)
         }

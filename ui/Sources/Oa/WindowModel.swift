@@ -21,6 +21,9 @@ final class WindowModel {
         didSet { if !showingArchive { closeArchivePeek() } }
     }
     private(set) var dialogs: [UUID: [PageDialog]] = [:]
+    /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
+    private(set) var permissionRequests: [UUID: [PagePermissionRequest]] = [:]
+    private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
     var focusAddressField = 0
     @ObservationIgnored var bringToFront: () -> Void = {}
     @ObservationIgnored private let engine: any BrowserApplication
@@ -41,6 +44,12 @@ final class WindowModel {
     var frontPage: (any Page)? { peek ?? page }
     /// Over the whole window as Arc draws it, so a tab's own page can ask while its Peek is up.
     var dialog: PageDialog? { [peek, page].lazy.compactMap { $0.flatMap { self.dialogs[$0.id]?.last } }.first }
+    var permissionRequest: PagePermissionRequest? {
+        guard let page = frontPage, answeredPermissionRequest?.pageID != page.id else { return nil }
+        return permissionRequests[page.id]?.first
+    }
+    /// What the prompt draws: the answered request stays until its popover has closed.
+    var promptedPermissionRequest: PagePermissionRequest? { permissionRequest ?? answeredPermissionRequest?.request }
     private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
     /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
     var address: URL? { page?.url ?? selectedTab?.url }
@@ -161,6 +170,7 @@ final class WindowModel {
             for tabID in tabIDs {
                 guard let peek = window.peeks.removeValue(forKey: tabID) else { continue }
                 window.dialogs[peek.id] = nil
+                window.permissionRequests[peek.id] = nil
                 peek.drop()
             }
         }
@@ -248,6 +258,7 @@ final class WindowModel {
             // Another window brought the entry back; selecting its tab is Oa's own, after Arc's ⇧⌘T.
             if let spaceID = state.space(containing: ownerID)?.id {
                 dialogs[page.id] = nil
+                permissionRequests[page.id] = nil
                 page.drop()
                 selectSpace(spaceID)
                 return select(ownerID)
@@ -333,6 +344,29 @@ final class WindowModel {
         page.close()
     }
 
+    func respond(to request: PagePermissionRequest, with response: PermissionResponse) {
+        guard let pageID = permissionRequests.first(where: { $0.value.contains { $0 === request } })?.key else {
+            return
+        }
+        answeredPermissionRequest = (pageID, request)
+        request.respond(response)
+    }
+
+    /// As Arc: the prompt's close dismisses the request its page holds by then, so one queued behind an answered
+    /// request is never shown (arc-permissions.md §11 L7).
+    func permissionPromptClosed() {
+        guard let answered = answeredPermissionRequest else { return }
+        answeredPermissionRequest = nil
+        permissionRequests[answered.pageID]?.first { $0 !== answered.request }?.respond(.dismiss)
+    }
+
+    private func forget(_ request: PagePermissionRequest) {
+        for (pageID, requests) in permissionRequests where requests.contains(where: { $0 === request }) {
+            permissionRequests[pageID] = requests.filter { $0 !== request }
+            if permissionRequests[pageID]?.isEmpty == true { permissionRequests[pageID] = nil }
+        }
+    }
+
     func forget(_ dialog: PageDialog) {
         for (pageID, shown) in dialogs where shown.contains(where: { $0 === dialog }) {
             dialogs[pageID] = shown.filter { $0 !== dialog }
@@ -360,6 +394,7 @@ final class WindowModel {
         }
         peeks = [:]
         dialogs = [:]
+        permissionRequests = [:]
         archivePeekID = nil
         creating = [:]
     }
@@ -582,6 +617,12 @@ final class WindowModel {
             return
         case .dialogDismissed(let dialog):
             return forget(dialog)
+        case .permissionRequest(let request):
+            permissionRequests[pageID, default: []].append(request)
+            return
+        case .permissionRequestClosed(let request):
+            for window in store.windows { window.forget(request) }
+            return
         case .closeCancelled:
             return closeCancelled(pageID)
         default:
@@ -633,6 +674,7 @@ final class WindowModel {
     private func peekEnded(_ ownerID: UUID, sessionID: PageSessionID?) {
         guard let page = peeks.removeValue(forKey: ownerID) else { return }
         dialogs[page.id] = nil
+        permissionRequests[page.id] = nil
         if store.closing.removeValue(forKey: page.id) != nil, state.tree.tab(ownerID) != nil {
             let spaceID = state.space(containing: ownerID)?.id
             store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
@@ -727,6 +769,7 @@ final class WindowModel {
     private func pageEnded(_ tabID: UUID, sessionID: PageSessionID?) {
         guard let page = pages[tabID] else { return }
         dialogs[page.id] = nil
+        permissionRequests[page.id] = nil
         let reason = store.closing.removeValue(forKey: page.id)
         if state.isFavorite(tabID) {
             release(tabID)

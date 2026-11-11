@@ -108,6 +108,14 @@ struct BrowserWindowView: View {
                             .padding(.horizontal, 2)
                     }
                 }
+            // Arc's Site Controls button, which its permission prompt hangs from.
+            Image(systemName: "slider.horizontal.3")
+                .foregroundStyle(.secondary)
+                .popover(isPresented: model.permissionPromptBinding(forPeek: false), arrowEdge: .bottom) {
+                    if let request = model.promptedPermissionRequest {
+                        PermissionRequestView(model: model, request: request)
+                    }
+                }
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 10)
