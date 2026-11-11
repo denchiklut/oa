@@ -324,45 +324,47 @@ private final class StubHostingView: NSHostingView<StubPageView> {
 }
 
 private struct StubPageView: View {
-    let page: StubPage
+    weak var page: StubPage?
 
     var body: some View {
         VStack(spacing: 12) {
-            Text(page.title)
-                .font(.system(size: 24, weight: .medium, design: .rounded))
-            Text(page.url?.absoluteString ?? "")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-            Text("Stub engine")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-            if page.url != nil {
-                VStack(spacing: 8) {
-                    HStack(spacing: 16) {
-                        Button("Open a page") { page.open(.foregroundTab) }
-                        Button("Open in background") { page.open(.backgroundTab) }
-                        Button("Shift-click a link") { page.open(.newWindow) }
+            if let page {
+                Text(page.title)
+                    .font(.system(size: 24, weight: .medium, design: .rounded))
+                Text(page.url?.absoluteString ?? "")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                Text("Stub engine")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                if page.url != nil {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 16) {
+                            Button("Open a page") { page.open(.foregroundTab) }
+                            Button("Open in background") { page.open(.backgroundTab) }
+                            Button("Shift-click a link") { page.open(.newWindow) }
+                        }
+                        HStack(spacing: 16) {
+                            Button("Follow a link on this host") { page.followLink() }
+                            Button("Click a link to another host") { page.clickCrossOriginLink() }
+                            Button("Ask for focus in 3 s") { page.askForFocus() }
+                            Button("Crash the renderer") { page.crashRenderer() }
+                            Button("Close itself") { page.closeItself() }
+                        }
+                        HStack(spacing: 16) {
+                            Button("Alert") { page.alert() }
+                            Button("Confirm") { page.confirm() }
+                            Button("Prompt") { page.prompt() }
+                            Button("Alert in 3 s") { page.alertLater() }
+                            Toggle("Ask before closing", isOn: Bindable(page).asksBeforeClosing)
+                                .toggleStyle(.checkbox)
+                        }
                     }
-                    HStack(spacing: 16) {
-                        Button("Follow a link on this host") { page.followLink() }
-                        Button("Click a link to another host") { page.clickCrossOriginLink() }
-                        Button("Ask for focus in 3 s") { page.askForFocus() }
-                        Button("Crash the renderer") { page.crashRenderer() }
-                        Button("Close itself") { page.closeItself() }
-                    }
-                    HStack(spacing: 16) {
-                        Button("Alert") { page.alert() }
-                        Button("Confirm") { page.confirm() }
-                        Button("Prompt") { page.prompt() }
-                        Button("Alert in 3 s") { page.alertLater() }
-                        Toggle("Ask before closing", isOn: Bindable(page).asksBeforeClosing)
-                            .toggleStyle(.checkbox)
-                    }
+                    .buttonStyle(.link)
+                    .font(.system(size: 12))
+                    .padding(.top, 8)
                 }
-                .buttonStyle(.link)
-                .font(.system(size: 12))
-                .padding(.top, 8)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
