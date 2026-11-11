@@ -151,26 +151,26 @@ final class WindowModel {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }
 
-    /// As Arc: the Space's live pages close one at a time, each asked as the user would and shown while it asks, so
-    /// a `beforeunload` Cancel keeps the Space; sidebar order is Oa's own. Then the rest is archived and this window
-    /// moves to the neighbor above, else below.
+    /// As Arc: every live page of the Space, Peeks too, closes at once as the user would; the ones that ask come
+    /// forward one after another, and any that stays keeps the Space. Then this window moves to the neighbor above,
+    /// else below.
     func deleteSpace(_ spaceID: UUID) {
-        guard state.spaces.count > 1, state.space(spaceID) != nil else { return store.deletingSpace = nil }
-        let live = state.tabs(in: spaceID).lazy.compactMap { tab in
-            self.store.windows.lazy.compactMap { $0.pages[tab.id] }.first.map { (tab.id, $0) }
+        guard state.spaces.count > 1, state.space(spaceID) != nil, store.deletingSpace == nil else { return }
+        let tabIDs = state.tabs(in: spaceID).map(\.id)
+        let live = store.windows.flatMap { window in
+            tabIDs.flatMap { [window.pages[$0], window.peeks[$0]] }.compactMap { $0 }
         }
-        guard let (tabID, page) = live.first else {
-            store.deletingSpace = nil
-            let spaces = state.spaces
-            let index = spaces.firstIndex { $0.id == spaceID }!
-            if selectedSpaceID == spaceID { selectSpace(spaces[index == 0 ? 1 : index - 1].id) }
-            return store.edit { $0.removeSpace(spaceID) }
-        }
-        store.deletingSpace = (spaceID, self)
+        guard !live.isEmpty else { return removeSpace(spaceID) }
         if selectedSpaceID != spaceID { selectSpace(spaceID) }
-        select(tabID)
-        store.closing[page.id] = .manual
-        page.close()
+        store.deletingSpace = ClosingSpace(id: spaceID, window: self, closing: Set(live.map(\.id)))
+        for page in live { page.close() }
+    }
+
+    private func removeSpace(_ spaceID: UUID) {
+        let spaces = state.spaces
+        let index = spaces.firstIndex { $0.id == spaceID }!
+        if selectedSpaceID == spaceID { selectSpace(spaces[index == 0 ? 1 : index - 1].id) }
+        store.edit { $0.removeSpace(spaceID) }
     }
 
     func togglePin() {
@@ -598,7 +598,14 @@ final class WindowModel {
         if store.closing.removeValue(forKey: pageID) == .auto, let tabID = tabID(of: pageID) {
             store.markViewed(tabID)
         }
-        store.deletingSpace = nil
+        spaceDeletionEnded(pageID, kept: true)
+    }
+
+    private func spaceDeletionEnded(_ pageID: UUID, kept: Bool) {
+        guard var deletion = store.deletingSpace, deletion.closing.remove(pageID) != nil else { return }
+        deletion.kept = deletion.kept || kept
+        store.deletingSpace = deletion.closing.isEmpty ? nil : deletion
+        if deletion.closing.isEmpty, !deletion.kept { deletion.window.removeSpace(deletion.id) }
     }
 
     /// A Peek the user closed leaves an entry under its tab's Space, as Arc does; one that closed itself, or showed
@@ -612,6 +619,7 @@ final class WindowModel {
         }
         if ownerID == archivePeekID { archivePeekID = nil }
         self.page?.activate()
+        spaceDeletionEnded(page.id, kept: false)
     }
 
     /// As Arc; a Shift-click arrives as a new window. A page from an Archive Peek has no tab to join, and the top of
@@ -691,11 +699,11 @@ final class WindowModel {
             for window in store.windows { window.placeholders[tabID] = nil }
             if reason != nil { store.edit { $0.archiveTab(tabID, reason: .manual) } }
             deselect(tabID)
-        } else if let deleting = store.deletingSpace, state.space(containing: tabID)?.id == deleting.id {
+        } else if store.deletingSpace?.closing.contains(page.id) == true {
             release(tabID)
         } else {
             end(tabID, reason: reason ?? .manual) { _, _ in }
         }
-        if let deleting = store.deletingSpace { deleting.window.deleteSpace(deleting.id) }
+        spaceDeletionEnded(page.id, kept: false)
     }
 }

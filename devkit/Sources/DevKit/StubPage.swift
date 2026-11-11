@@ -95,7 +95,7 @@ final class StubPage: Page {
     func askToLeave() async -> Bool {
         guard asksBeforeClosing else { return true }
         return await withCheckedContinuation { continuation in
-            ask(.beforeUnload(isReload: false), title: "Leave site?", activating: true) {
+            ask(.beforeUnload(isReload: false), title: "Leave site?") {
                 continuation.resume(returning: $0)
             }
         }
@@ -170,7 +170,7 @@ final class StubPage: Page {
 
     private func ask(
         _ kind: PageDialog.Kind, title: String? = nil, message: String = "Changes you made may not be saved.",
-        activating: Bool = false, reply: @escaping (Bool) -> Void
+        reply: @escaping (Bool) -> Void
     ) {
         if suppressesDialogs {
             return reply(
@@ -185,15 +185,33 @@ final class StubPage: Page {
         ) { [weak self] accepted, _, suppress in
             if suppress { self?.suppressesDialogs = true }
             reply(accepted)
+            if case .beforeUnload = kind { Self.showNextLeaveDialog(after: true) }
+        }
+        if case .beforeUnload = kind {
+            Self.leaveDialogs.append { [weak self] in
+                guard let self else { return Self.showNextLeaveDialog(after: true) }
+                pendingDialog = dialog
+                if hostingView.window == nil { continuation?.yield(.wantsActivation) } else { showPendingDialog() }
+            }
+            return Self.showNextLeaveDialog(after: false)
         }
         guard hostingView.window != nil else {
-            guard kind == .alert || activating else { return reply(false) }
+            guard kind == .alert else { return reply(false) }
             pendingDialog = dialog
-            // Chromium brings the tab of an app-modal dialog forward, which is how quitting shows each one.
-            if activating { continuation?.yield(.wantsActivation) }
             return
         }
         continuation?.yield(.dialog(dialog))
+    }
+
+    // Chromium shows `beforeunload` dialogs app-modally: one at a time across pages, each bringing its tab forward.
+    private static var leaveDialogs: [() -> Void] = []
+    private static var showingLeaveDialog = false
+
+    private static func showNextLeaveDialog(after answered: Bool) {
+        if answered { showingLeaveDialog = false }
+        guard !showingLeaveDialog, !leaveDialogs.isEmpty else { return }
+        showingLeaveDialog = true
+        leaveDialogs.removeFirst()()
     }
 
     private func showPendingDialog() {

@@ -64,12 +64,13 @@ pinned tab the item reads "Close Tab", the entry stays and the page is dropped
 without unload handlers, Oa's own choice. A page the engine closes on its own is
 archived the same way. Pin Tab ⌘D toggles the section. Spaces have New, Rename
 and Delete without shortcuts; the last Space can't be deleted. Deleting one asks
-"Delete your Space?" when it has tabs, then closes its live pages one at a time
-in sidebar order, Oa's own order where Arc's is unknown, selecting each so a
-"Leave site?" shows over it; a Cancel keeps the Space with every row, as in
-Arc, with the pages already closed staying closed. When every page is gone the
-tabs are archived, pinned too, and the window moves to the neighbor Space. Its
-Archive entries stay.
+"Delete your Space?" when it has tabs, then closes all its live pages and their
+Peeks at once as the user would, as Arc does: pages without a handler go at once,
+the ones that ask come forward with "Leave site?" one after another, and every
+one is asked even after a Cancel. Any Cancel keeps the Space with every row,
+with the pages already closed staying closed. When every page is gone the tabs
+are archived, pinned too, and the window moves to the neighbor Space. Its
+Archive entries stay; its Peeks leave none, as in Arc.
 
 The Archive is a sidebar mode, as in Arc: Archive ▸ View Archive… replaces the
 sidebar with one list across Spaces, grouped by day and newest first, each row
