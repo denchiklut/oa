@@ -88,6 +88,11 @@ public enum PageEvent {
     case dialog(PageDialog)
     /// The engine closed the dialog: a navigation, a tab switch, a close. No answer is expected.
     case dialogDismissed(PageDialog)
+    /// The page asked for permissions, while its tab is the selected one; the app answers it once.
+    case permissionRequest(PagePermissionRequest)
+    /// The engine took the request down: after the answer, or on a navigation, a close or a tab switch, which asks
+    /// again when the tab is back, as Arc's ADK does.
+    case permissionRequestClosed(PagePermissionRequest)
     /// A `beforeunload` handler kept the page after `close()`.
     case closeCancelled
     /// The page is gone, after `close()` or without the app asking, with the engine's record of it if it kept one.
@@ -130,6 +135,71 @@ public final class PageDialog {
 
     public func cancel(suppress: Bool = false) {
         reply?(false, "", suppress)
+        reply = nil
+    }
+}
+
+/// The engine's permission request types, as ADK mirrors Chromium's.
+public enum PermissionKind: Sendable, Equatable {
+    case ambientLogin
+    case ar
+    case cameraPanTiltZoom
+    case camera
+    case capturedSurfaceControl
+    case clipboard
+    case topLevelStorageAccess
+    case quota
+    case fileSystemAccess
+    case geolocation
+    case handTracking
+    case identityProvider
+    case idleDetection
+    case localFonts
+    case localNetwork
+    case loopbackNetwork
+    case microphone
+    case midiSysex
+    case multipleDownloads
+    case notifications
+    case keyboardLock
+    case pointerLock
+    case protocolHandler
+    case sensors
+    case storageAccess
+    case vr
+    case webAppInstallation
+    case windowManagement
+}
+
+public enum PermissionResponse: Sendable {
+    case allow
+    case allowThisTime
+    case deny
+    /// Closed unanswered; nothing is saved for the site.
+    case dismiss
+}
+
+/// What a page asked for at once: one site, one or more kinds the engine merged, as camera and microphone are.
+@MainActor
+public final class PagePermissionRequest {
+    /// The host as the engine's prompts show it, or an extension's name.
+    public let nameOrOrigin: String
+    public let nameIsOrigin: Bool
+    public let kinds: [PermissionKind]
+    private var reply: ((PermissionResponse) -> Void)?
+
+    public init(
+        nameOrOrigin: String, nameIsOrigin: Bool = true, kinds: [PermissionKind],
+        reply: @escaping (PermissionResponse) -> Void
+    ) {
+        self.nameOrOrigin = nameOrOrigin
+        self.nameIsOrigin = nameIsOrigin
+        self.kinds = kinds
+        self.reply = reply
+    }
+
+    public func respond(_ response: PermissionResponse) {
+        reply?(response)
         reply = nil
     }
 }

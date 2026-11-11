@@ -35,6 +35,8 @@ final class StubPage: Page {
     @ObservationIgnored private var dialogsShown = 0
     @ObservationIgnored private var suppressesDialogs = false
     @ObservationIgnored private var pendingDialog: PageDialog?
+    @ObservationIgnored private var permissionQueue: [[PermissionKind]] = []
+    @ObservationIgnored private var shownPermissionRequest: PagePermissionRequest?
     @ObservationIgnored private lazy var hostingView: NSView = {
         let view = StubHostingView(rootView: StubPageView(page: self))
         view.sizingOptions = []
@@ -100,10 +102,17 @@ final class StubPage: Page {
 
     func stopLoading() { finishLoading() }
 
-    func activate() {}
+    /// As Chromium's tab strip: one active page per window, and only it shows its permission request.
+    func activate() {
+        if let previous = Self.activePages[windowID]?.page, previous !== self { previous.closePermissionRequest() }
+        Self.activePages[windowID] = Arrival(self)
+        showPermissionRequest()
+    }
 
     func move(toWindow windowID: UUID) {
         guard windowID != self.windowID else { return }
+        if Self.activePages[self.windowID]?.page === self { Self.activePages[self.windowID] = nil }
+        closePermissionRequest()
         self.windowID = windowID
         Self.arrive(self)
     }
@@ -137,6 +146,7 @@ final class StubPage: Page {
 
     func drop() {
         load?.cancel()
+        if Self.activePages[windowID]?.page === self { Self.activePages[windowID] = nil }
         continuation?.finish()
         continuation = nil
         Self.arrivals.removeAll { $0.page == nil || $0.page === self }
@@ -264,6 +274,53 @@ final class StubPage: Page {
         continuation?.yield(.dialog(dialog))
     }
 
+    // As Chromium's request manager: one request shown per page at a time, the rest queued; a site's answer is kept
+    // for its host.
+    private static var activePages: [UUID: Arrival] = [:]
+    private static var permissionAnswers: [String: PermissionResponse] = [:]
+
+    func askPermission(_ kinds: [PermissionKind]) {
+        guard let host = url?.host() else { return }
+        let open = kinds.filter { Self.permissionAnswers["\(host) \($0)"] == nil }
+        guard !open.isEmpty else { return }
+        permissionQueue.append(open)
+        showPermissionRequest()
+    }
+
+    func askPermissionLater(_ kinds: [PermissionKind]) {
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.askPermission(kinds)
+        }
+    }
+
+    private func showPermissionRequest() {
+        guard shownPermissionRequest == nil, Self.activePages[windowID]?.page === self,
+            let kinds = permissionQueue.first, let host = url?.host()
+        else { return }
+        let request = PagePermissionRequest(nameOrOrigin: host, kinds: kinds) { [weak self] response in
+            self?.permissionAnswered(response, host: host, kinds: kinds)
+        }
+        shownPermissionRequest = request
+        continuation?.yield(.permissionRequest(request))
+    }
+
+    private func permissionAnswered(_ response: PermissionResponse, host: String, kinds: [PermissionKind]) {
+        if response == .allow || response == .deny {
+            for kind in kinds { Self.permissionAnswers["\(host) \(kind)"] = response }
+        }
+        permissionQueue.removeFirst()
+        closePermissionRequest()
+        Task { [weak self] in self?.showPermissionRequest() }
+    }
+
+    /// The request stays queued and is asked again when the page is active.
+    private func closePermissionRequest() {
+        guard let request = shownPermissionRequest else { return }
+        shownPermissionRequest = nil
+        continuation?.yield(.permissionRequestClosed(request))
+    }
+
     func askForFocus() {
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
@@ -278,6 +335,8 @@ final class StubPage: Page {
 
     private func startLoading() {
         load?.cancel()
+        permissionQueue = []
+        closePermissionRequest()
         crash = nil
         navigationResult = nil
         isLoading = true
@@ -375,6 +434,16 @@ private struct StubPageView: View {
                             Button("Alert in 3 s") { page.alertLater() }
                             Toggle("Ask before closing", isOn: Bindable(page).asksBeforeClosing)
                                 .toggleStyle(.checkbox)
+                        }
+                        HStack(spacing: 16) {
+                            Button("Ask for location") { page.askPermission([.geolocation]) }
+                            Button("Ask for notifications") { page.askPermission([.notifications]) }
+                            Button("Ask for camera and microphone") { page.askPermission([.camera, .microphone]) }
+                            Button("Ask for location and notifications") {
+                                page.askPermission([.geolocation])
+                                page.askPermission([.notifications])
+                            }
+                            Button("Ask for location in 3 s") { page.askPermissionLater([.geolocation]) }
                         }
                     }
                     .buttonStyle(.link)
