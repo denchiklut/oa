@@ -91,6 +91,13 @@ final class WindowModel {
 
     func savedFavicon(_ id: UUID) -> NSImage? { store.savedFavicon(id) }
 
+    func isRecording(_ tab: SidebarTab) -> Bool {
+        guard let page = pages[tab.id] ?? store.windows.lazy.compactMap({ $0.pages[tab.id] }).first else {
+            return false
+        }
+        return page.isCameraOn || page.isMicrophoneOn
+    }
+
     /// Only the only window picks a tab: first unpinned, else first pinned. Another window starts empty.
     func showFirst(isOnlyWindow: Bool) {
         if isOnlyWindow, let first = state.firstTabID(in: selectedSpaceID) {
