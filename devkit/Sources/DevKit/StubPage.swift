@@ -277,13 +277,17 @@ final class StubPage: Page {
     }
 
     // As Chromium's request manager: one request shown per page at a time, the rest queued; a site's answer is kept
-    // for its host.
+    // in its settings, by host and across profiles.
     private static var activePages: [UUID: Arrival] = [:]
-    private static var permissionAnswers: [String: PermissionResponse] = [:]
+    static var siteSettings: [String: SiteSettingValue] = [:]
+
+    private static func setting(_ kind: PermissionKind, host: String) -> SiteSettingValue? {
+        kind.siteSettingType.flatMap { siteSettings["\(host) \($0)"] }
+    }
 
     func askPermission(_ kinds: [PermissionKind]) {
         guard let host = url?.host() else { return }
-        let open = kinds.filter { Self.permissionAnswers["\(host) \($0)"] == nil }
+        let open = kinds.filter { Self.setting($0, host: host) == nil }
         guard !open.isEmpty else { return }
         permissionQueue.append(open)
         showPermissionRequest()
@@ -315,7 +319,7 @@ final class StubPage: Page {
             return
         }
         guard let host = url?.host() else { return }
-        let allowed = { (kind: PermissionKind) in Self.permissionAnswers["\(host) \(kind)"] == .allow }
+        let allowed = { (kind: PermissionKind) in Self.setting(kind, host: host) == .allow }
         guard allowed(.camera), allowed(.microphone) else {
             return askPermission([.camera, .microphone])
         }
@@ -325,7 +329,9 @@ final class StubPage: Page {
 
     private func permissionAnswered(_ response: PermissionResponse, host: String, kinds: [PermissionKind]) {
         if response == .allow || response == .deny {
-            for kind in kinds { Self.permissionAnswers["\(host) \(kind)"] = response }
+            for type in kinds.compactMap(\.siteSettingType) {
+                Self.siteSettings["\(host) \(type)"] = response == .allow ? .allow : .block
+            }
         }
         permissionQueue.removeFirst()
         closePermissionRequest()
@@ -477,5 +483,18 @@ private struct StubPageView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .textBackgroundColor))
+    }
+}
+
+extension PermissionKind {
+    fileprivate var siteSettingType: SiteSettingType? {
+        switch self {
+        case .geolocation: .geolocation
+        case .notifications: .notifications
+        case .camera: .camera
+        case .microphone: .microphone
+        case .clipboard: .clipboardReadWrite
+        default: nil
+        }
     }
 }
