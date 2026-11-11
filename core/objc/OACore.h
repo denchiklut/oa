@@ -24,8 +24,6 @@ typedef NS_ENUM(NSInteger, OAPageSecurityLevel) {
   OAPageSecurityLevelDangerous,
 };
 
-// How the page's last navigation ended: none from a navigation's start until
-// its document loads or fails.
 typedef NS_ENUM(NSInteger, OAPageNavigationResult) {
   OAPageNavigationResultNone,
   OAPageNavigationResultLoaded,
