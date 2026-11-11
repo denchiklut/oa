@@ -15,7 +15,9 @@ implied to be implemented.
 A profile owns a favorites root; a Space owns a pinned root and an unpinned
 root. Tree nodes are containers, tabs, folders and split views; only containers
 and tabs are implemented. A tab entry takes its tab's ID, so pinning is a move
-to the end of the other section and the entry keeps its identity. A tab record
+to the end of the other section and the entry keeps its identity. A tab's live
+page has an ID of its own, a fresh one per page as Arc gives its contents, so
+two pages for one entry stay two. A tab record
 saves a title and a URL. A live page writes both back; a pinned tab or a
 Favorite keeps its address and takes the title only while the page is at it.
 While the page is elsewhere a pinned row reads "/ live title", as in Arc, and

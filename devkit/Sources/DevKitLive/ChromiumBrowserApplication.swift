@@ -99,7 +99,7 @@ final class ChromiumBrowserContext: BrowserContext {
         self.profile = profile
     }
 
-    func makePage(id: UUID, windowID: UUID) async -> (any Page)? {
+    func makePage(windowID: UUID) async -> (any Page)? {
         guard let profile = profile() else { return nil }
         let delegate = PageDelegate()
         let created = CreatedPage()
@@ -110,7 +110,7 @@ final class ChromiumBrowserContext: BrowserContext {
             }
         }
         guard let page = created.page else { return nil }
-        return ChromiumPage(id: id, page: page, delegate: delegate)
+        return ChromiumPage(id: UUID(), page: page, delegate: delegate)
     }
 }
 
