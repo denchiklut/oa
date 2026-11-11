@@ -241,6 +241,13 @@ final class WindowModel {
         var tab = SidebarTab(id: page.id, title: page.title, url: page.url, viewedAt: .now)
         if ownerID == archivePeekID {
             archivePeekID = nil
+            // Another window brought the entry back: Oa's own choice, after Arc's ⇧⌘T, is to select its tab.
+            if let spaceID = state.space(containing: ownerID)?.id {
+                dialogs[page.id] = nil
+                page.drop()
+                selectSpace(spaceID)
+                return select(ownerID)
+            }
             store.edit {
                 $0.removeArchived(ownerID)
                 $0.insertTab(tab, atTopOf: selectedSpaceID)
@@ -257,7 +264,7 @@ final class WindowModel {
     /// as Arc does; then an opened Peek's page is archived under its tab's Space and an Archive Peek keeps its entry.
     func closePeek() {
         guard let page = peek else { return }
-        store.closing[page.id] = .manual
+        if peekOwnerID != archivePeekID { store.closing[page.id] = .manual }
         page.close()
     }
 
@@ -398,7 +405,6 @@ final class WindowModel {
     private func closeArchivePeek() {
         guard let entryID = archivePeekID, let page = peeks[entryID] else { return }
         archivePeekID = nil
-        store.closing[page.id] = .manual
         page.close()
     }
 

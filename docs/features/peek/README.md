@@ -56,8 +56,10 @@ Clicking an Archive row shows the entry's page in a Peek over the list, made
 from the saved URL with no history, centered over the whole window as Arc does
 over its Library; the entry stays. Its Expand removes the entry and puts the
 tab, selected, at the top of the unpinned section of the Space the window
-shows, as Arc does. Closing it, or leaving the Archive view, closes the page and
-keeps the entry; leaving the view is Oa's own choice. A page such a Peek opens
+shows, as Arc does. When another window has already brought the entry back,
+Expand selects that tab instead of adding a second row, Oa's own choice after
+Arc's ⇧⌘T, which selects a tab that is already open. Closing it, or leaving the Archive view, closes the
+page and keeps the entry; leaving the view is Oa's own choice. A page such a Peek opens
 has no tab to join, so it goes to the top of the shown Space, Oa's own choice.
 Arc's Split View button and copy-link icon don't exist in Oa yet.
 
