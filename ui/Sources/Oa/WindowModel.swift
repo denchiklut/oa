@@ -226,17 +226,18 @@ final class WindowModel {
         archivePeekID = entryID
         let context = engine.browserContext(id: profileID)
         Task { [weak self, id] in
-            guard let page = await context.makePage(id: entryID, windowID: id), let self else { return }
+            guard let page = await context.makePage(windowID: id), let self else { return }
             guard showingArchive, archivePeekID == entryID else { return page.drop() }
             peeks[entryID] = page
-            listen(to: page, for: entryID)
+            listen(to: page)
             page.load(url)
         }
     }
 
     func expandPeek() {
         guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
-        var tab = SidebarTab(id: page.id, title: page.title, url: page.url, viewedAt: .now)
+        let tabID = ownerID == archivePeekID ? ownerID : UUID()
+        var tab = SidebarTab(id: tabID, title: page.title, url: page.url, viewedAt: .now)
         if ownerID == archivePeekID {
             archivePeekID = nil
             // Another window brought the entry back; selecting its tab is Oa's own, after Arc's ⇧⌘T.
@@ -464,11 +465,11 @@ final class WindowModel {
         }
         let context = engine.browserContext(id: profile.id)
         Task { [weak self, id] in
-            guard let page = await context.makePage(id: tabID, windowID: id), let self else { return }
+            guard let page = await context.makePage(windowID: id), let self else { return }
             guard creating[tabID] == token, let tab = state.tree.tab(tabID) else { return page.drop() }
             creating.removeValue(forKey: tabID)
             install(page, for: tabID)
-            listen(to: page, for: tabID)
+            listen(to: page)
             if let url = pendingURLs.removeValue(forKey: tabID) ?? tab.url { page.load(url) }
         }
     }
@@ -514,17 +515,22 @@ final class WindowModel {
     }
 
     /// The stream has one consumer, so a page gets one loop for its life, delivering to whichever window holds it.
-    private func listen(to page: any Page, for tabID: UUID) {
+    private func listen(to page: any Page) {
         let store = store
+        let pageID = page.id
         Task {
             for await event in page.events {
-                store.windows.first { $0.holds(tabID) }?.handle(event, for: tabID)
+                store.windows.first { $0.holds(pageID) }?.handle(event, for: pageID)
             }
         }
     }
 
     private func holds(_ pageID: UUID) -> Bool {
-        pages[pageID] != nil || peekOwner(of: pageID) != nil
+        tabID(of: pageID) != nil || peekOwner(of: pageID) != nil
+    }
+
+    private func tabID(of pageID: UUID) -> UUID? {
+        pages.first { $0.value.id == pageID }?.key
     }
 
     private func peekOwner(of pageID: UUID) -> UUID? {
@@ -560,13 +566,14 @@ final class WindowModel {
             }
             return
         }
+        guard let tabID = tabID(of: pageID) else { return }
         switch event {
         case .opened(let opened, let url, let disposition):
-            place(opened, url: url, disposition: disposition, from: pageID, insidePeek: false)
+            place(opened, url: url, disposition: disposition, from: tabID, insidePeek: false)
         case .wantsActivation:
-            show(pageID)
+            show(tabID)
         case .closed:
-            pageEnded(pageID)
+            pageEnded(tabID)
         default:
             break
         }
@@ -574,8 +581,8 @@ final class WindowModel {
 
     /// A `beforeunload` handler kept the page: an auto-archive counts it as viewed, a Space deletion stops.
     private func closeCancelled(_ pageID: UUID) {
-        if store.closing.removeValue(forKey: pageID) == .auto, state.tree.tab(pageID) != nil {
-            store.markViewed(pageID)
+        if store.closing.removeValue(forKey: pageID) == .auto, let tabID = tabID(of: pageID) {
+            store.markViewed(tabID)
         }
         store.deletingSpace = nil
     }
@@ -601,20 +608,20 @@ final class WindowModel {
     ) {
         guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
-            let tab = SidebarTab(id: page.id, url: url, viewedAt: .now)
+            let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
             install(page, for: tab.id)
-            listen(to: page, for: tab.id)
+            listen(to: page)
             return select(tab.id)
         }
         let background = disposition == .backgroundTab
         if !insidePeek, disposition == .newWindow || (!background && state.keepsAddress(openerID)) {
             return peek(page, from: openerID)
         }
-        let tab = SidebarTab(id: page.id, url: url, viewedAt: .now, openerID: openerID)
+        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now, openerID: openerID)
         store.edit { $0.openTab(tab, from: openerID, in: selectedSpaceID) }
         install(page, for: tab.id)
-        listen(to: page, for: tab.id)
+        listen(to: page)
         if !background, state.isSelectable(tab.id, in: selectedSpaceID) { select(tab.id) }
     }
 
@@ -626,7 +633,7 @@ final class WindowModel {
             current.close()
         }
         peeks[openerID] = page
-        listen(to: page, for: page.id)
+        listen(to: page)
     }
 
     /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown.
@@ -663,9 +670,9 @@ final class WindowModel {
     /// A Favorite's page that ends leaves the tile, as a pinned tab's leaves its row, unless Remove Favorite asked
     /// for the close.
     private func pageEnded(_ tabID: UUID) {
-        guard pages[tabID] != nil else { return }
-        dialogs[tabID] = nil
-        let reason = store.closing.removeValue(forKey: tabID)
+        guard let page = pages[tabID] else { return }
+        dialogs[page.id] = nil
+        let reason = store.closing.removeValue(forKey: page.id)
         if state.isFavorite(tabID) {
             release(tabID)
             for window in store.windows { window.placeholders[tabID] = nil }

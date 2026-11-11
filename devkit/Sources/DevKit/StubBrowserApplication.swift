@@ -37,7 +37,7 @@ final class StubBrowserContext: BrowserContext {
 
     init(id: UUID) { self.id = id }
 
-    func makePage(id: UUID, windowID: UUID) async -> (any Page)? {
-        StubPage(id: id)
+    func makePage(windowID: UUID) async -> (any Page)? {
+        StubPage(id: UUID())
     }
 }
