@@ -135,8 +135,7 @@ std::unique_ptr<PageImpl> PageImpl::Restore(WindowBrowser* window_browser,
   if (!service || !context) {
     return nullptr;
   }
-  // In the background, so Chrome neither selects the tab nor raises the
-  // window; the app's sidebar does that.
+  // In the background: the app's sidebar selects the tab, not Chrome.
   std::optional<std::vector<sessions::LiveTab*>> tabs =
       service->RestoreEntryById(context,
                                 SessionID::FromSerializedValue(session_id),
@@ -146,9 +145,8 @@ std::unique_ptr<PageImpl> PageImpl::Restore(WindowBrowser* window_browser,
   }
   content::WebContents* contents =
       &static_cast<sessions::ContentLiveTab*>(tabs->front())->GetWebContents();
-  // Chrome hides the view of a tab restored in the background and leaves
-  // showing it to its BrowserView; Oa shows a page by putting its view in a
-  // window, which then loads it.
+  // Chrome hides the view of a tab restored in the background until a
+  // BrowserView shows it; Oa has none.
   contents->GetNativeView().GetNativeNSView().hidden = NO;
   std::unique_ptr<PageImpl> page(new PageImpl(window_browser, observer));
   page->Adopt(contents);

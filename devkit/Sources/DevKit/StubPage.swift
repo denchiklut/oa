@@ -177,7 +177,6 @@ final class StubPage: Page {
         crash = .crashed
     }
 
-    /// Chrome's closed-tab records, as the stub keeps them: a closed page's history; `drop()` leaves none.
     private static var records: [PageSessionID: (history: [URL], position: Int)] = [:]
     private static var lastSessionID: Int32 = 0
 
