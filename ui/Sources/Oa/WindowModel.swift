@@ -217,7 +217,7 @@ final class WindowModel {
         store.edit { $0.restoreArchived(id, in: selectedSpaceID, toOldPosition: false) }
     }
 
-    /// As Arc: the row's page in a Peek over the list, from the saved URL with no history; the entry stays.
+    /// As Arc: no history, and the entry stays.
     func peekArchived(_ entryID: UUID) {
         guard let entry = state.archive.first(where: { $0.id == entryID }), let url = entry.url,
             let profileID = (entry.spaceID.flatMap { state.space($0) } ?? space)?.profileID
@@ -480,7 +480,7 @@ final class WindowModel {
         heir.adopt(page, for: tabID, from: self)
     }
 
-    /// The tab's Peek, its state, comes along.
+    /// The tab's Peek comes along, as Arc's does.
     private func adopt(_ page: any Page, for tabID: UUID, from holder: WindowModel) {
         page.move(toWindow: id)
         if let peek = holder.releasePeek(tabID) {
@@ -579,7 +579,7 @@ final class WindowModel {
         }
     }
 
-    /// A `beforeunload` handler kept the page: an auto-archive counts it as viewed, a Space deletion stops.
+    /// A refused auto-archive counts as a view, so the next sweep doesn't ask again.
     private func closeCancelled(_ pageID: UUID) {
         if store.closing.removeValue(forKey: pageID) == .auto, let tabID = tabID(of: pageID) {
             store.markViewed(tabID)
@@ -600,9 +600,8 @@ final class WindowModel {
         self.page?.activate()
     }
 
-    /// As Arc: a Shift-click from any tab, which the engine reports as a new window, and the foreground opens of a
-    /// tab that keeps its address show a Peek; a Peek's own opens become tabs of its tab; the rest go below the
-    /// opener. A page from an Archive Peek has no tab to join, so it goes to the top of the shown Space.
+    /// As Arc; a Shift-click arrives as a new window. A page from an Archive Peek has no tab to join, and the top of
+    /// the shown Space is Oa's own.
     private func place(
         _ page: any Page, url: URL?, disposition: OpenDisposition, from openerID: UUID, insidePeek: Bool
     ) {
@@ -625,7 +624,7 @@ final class WindowModel {
         if !background, state.isSelectable(tab.id, in: selectedSpaceID) { select(tab.id) }
     }
 
-    /// A tab has one Peek: a new one takes the place of the current one, which closes as with ✕.
+    /// Oa's own: a new Peek replaces the tab's current one, archived at once.
     private func peek(_ page: any Page, from openerID: UUID) {
         if let current = peeks[openerID] {
             let spaceID = state.space(containing: openerID)?.id
