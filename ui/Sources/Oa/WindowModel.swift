@@ -132,10 +132,10 @@ final class WindowModel {
         store.windowStateChanged()
     }
 
-    /// On becoming key, the selected tab takes its page back from the window that holds it.
+    /// On becoming key, the selected tab takes its page back from the window that holds or is making it.
     func showSelected() {
         guard let tabID = selectedTabID, pages[tabID] == nil,
-            store.windows.contains(where: { $0 !== self && $0.pages[tabID] != nil })
+            store.windows.contains(where: { $0 !== self && ($0.pages[tabID] != nil || $0.creating[tabID] != nil) })
         else { return }
         ensurePage(tabID)
     }
@@ -450,7 +450,8 @@ final class WindowModel {
         return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : nil
     }
 
-    /// As Arc's ingest, in one step: the last window to select a tab takes its page from the window that holds it.
+    /// As Arc's ingest, in one step: the last window to select a tab takes its page from the window that holds it, or
+    /// the page still being made from the window making it.
     private func ensurePage(_ tabID: UUID) {
         guard pages[tabID] == nil, creating[tabID] == nil else { return }
         if let holder = store.windows.first(where: { $0 !== self && $0.pages[tabID] != nil }),
@@ -459,17 +460,26 @@ final class WindowModel {
             holder.keepFrame(of: page, for: tabID)
             return adopt(page, for: tabID, from: holder)
         }
+        if let maker = store.windows.first(where: { $0 !== self && $0.creating[tabID] != nil }) {
+            creating[tabID] = maker.creating.removeValue(forKey: tabID)
+            if let url = maker.pendingURLs.removeValue(forKey: tabID) { pendingURLs[tabID] = url }
+            return
+        }
         guard let profile = state.profile(containing: tabID) else { return }
         let token = UUID()
         creating[tabID] = token
         let context = engine.browserContext(id: profile.id)
-        Task { [weak self, id] in
-            guard let page = await context.makePage(windowID: id), let self else { return }
-            guard creating[tabID] == token, let tab = state.tree.tab(tabID) else { return page.drop() }
-            creating.removeValue(forKey: tabID)
-            install(page, for: tabID)
-            listen(to: page)
-            if let url = pendingURLs.removeValue(forKey: tabID) ?? tab.url { page.load(url) }
+        Task { [store, id] in
+            let page = await context.makePage(windowID: id)
+            let owner = store.windows.first { $0.creating[tabID] == token }
+            owner?.creating.removeValue(forKey: tabID)
+            guard let page else { return }
+            guard let owner, let tab = store.state.tree.tab(tabID) else { return page.drop() }
+            if owner.id != id { page.move(toWindow: owner.id) }
+            owner.install(page, for: tabID)
+            owner.listen(to: page)
+            if let url = owner.pendingURLs.removeValue(forKey: tabID) ?? tab.url { page.load(url) }
+            for window in store.windows where window !== owner { window.keepFrameLater(of: page, for: tabID) }
         }
     }
 
