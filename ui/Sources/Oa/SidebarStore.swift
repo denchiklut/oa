@@ -18,8 +18,7 @@ final class SidebarStore {
     @ObservationIgnored private var frozen = false
     /// Pages the user asked to close, by page ID, until the page reports closed or kept.
     @ObservationIgnored var closing: [UUID: SidebarArchivedTab.Reason] = [:]
-    /// A Space whose live pages are being closed one at a time before it goes.
-    @ObservationIgnored var deletingSpace: (id: UUID, window: WindowModel)?
+    @ObservationIgnored var deletingSpace: ClosingSpace?
 
     init(directory: URL) {
         persistence = SidebarPersistence(directory: directory)
@@ -130,4 +129,12 @@ final class SidebarStore {
         persistence.save(state, windows: windows.map(\.record))
         favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
     }
+}
+
+/// The Space's pages still closing, by page ID; one that stayed keeps the Space.
+struct ClosingSpace {
+    let id: UUID
+    let window: WindowModel
+    var closing: Set<UUID>
+    var kept = false
 }
