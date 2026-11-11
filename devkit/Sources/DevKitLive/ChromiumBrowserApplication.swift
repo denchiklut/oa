@@ -124,6 +124,18 @@ final class ChromiumBrowserContext: BrowserContext {
         guard let page = created.page else { return nil }
         return (ChromiumPage(id: UUID(), page: page, delegate: delegate), created.restored)
     }
+
+    func changedSiteSettings(for url: URL) -> [SiteSetting]? {
+        profile()?.changedSiteSettings(for: url)?.compactMap { object in
+            let setting = unsafeBitCast(object, to: CoreSiteSetting.self)
+            guard let type = SiteSettingType(rawValue: setting.type) else { return nil }
+            return SiteSetting(type: type, value: SiteSettingValue(rawValue: setting.value) ?? .default)
+        }
+    }
+
+    func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL) {
+        profile()?.setSiteSetting(type.rawValue, to: value.rawValue, for: url)
+    }
 }
 
 @MainActor

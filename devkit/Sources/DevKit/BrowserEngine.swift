@@ -27,6 +27,36 @@ public protocol BrowserContext: AnyObject {
     /// A page with an `id` of its own in the app's window `windowID`, in the background; nil if the engine can't.
     /// A closed page's `sessionID` brings its history back where it can (`restored`); else the app issues the `load`.
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)?
+    /// The settings of `url`'s site that differ from the engine's defaults, in page info's order, as ArcCore's
+    /// `getChangedContentSettingsForOrigin:`. Nil until the profile has loaded.
+    func changedSiteSettings(for url: URL) -> [SiteSetting]?
+    /// For the site's whole origin, without reloading its pages, as Chrome's site settings page sets it.
+    func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL)
+}
+
+/// The settings page info lists on macOS, in its order, as ADK's `ArcContentSettingsType`.
+public enum SiteSettingType: Int, Sendable, CaseIterable {
+    case geolocation, geolocationWithOptions, camera, cameraPanTiltZoom, microphone, sensors, notifications
+    case javascript, images, popups, windowManagement, ads, backgroundSync, sound, automaticDownloads, midiSysex
+    case clipboardReadWrite, usbGuard, hidGuard, serialGuard, fileSystemWriteGuard, localFonts, bluetoothGuard
+    case bluetoothScanning, handTracking, vr, ar, idleDetection, federatedIdentityAPI, automaticPictureInPicture
+    case capturedSurfaceControl, automaticFullscreen, keyboardLock, pointerLock, webAppInstallation, localNetwork
+    case loopbackNetwork
+}
+
+/// Chromium's `ContentSetting`; `default` resets the site's own value.
+public enum SiteSettingValue: Int, Sendable {
+    case `default`, allow, block, ask, sessionOnly
+}
+
+public struct SiteSetting: Sendable, Equatable {
+    public let type: SiteSettingType
+    public var value: SiteSettingValue
+
+    public init(type: SiteSettingType, value: SiteSettingValue) {
+        self.type = type
+        self.value = value
+    }
 }
 
 /// The engine's record of a closed page, valid until the app quits.

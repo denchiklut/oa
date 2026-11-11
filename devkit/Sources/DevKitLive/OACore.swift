@@ -12,7 +12,15 @@ import AppKit
     func quit()
 }
 
+@MainActor @objc protocol CoreSiteSetting: NSObjectProtocol {
+    var type: Int { get }
+    var value: Int { get }
+}
+
 @MainActor @objc protocol CoreProfile: NSObjectProtocol {
+    /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
+    @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
+    @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
     @objc(createPageInWindow:restoringSessionID:delegate:completion:)
     func createPage(
         inWindow windowIdentifier: String, restoringSessionID sessionID: Int32, delegate: CorePageDelegate?,

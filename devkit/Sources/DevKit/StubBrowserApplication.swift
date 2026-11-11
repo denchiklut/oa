@@ -45,4 +45,16 @@ final class StubBrowserContext: BrowserContext {
         if let sessionID, let page = StubPage.restore(sessionID, id: UUID(), windowID: windowID) { return (page, true) }
         return (StubPage(id: UUID(), windowID: windowID), false)
     }
+
+    func changedSiteSettings(for url: URL) -> [SiteSetting]? {
+        guard let host = url.host() else { return [] }
+        return SiteSettingType.allCases.compactMap { type in
+            StubPage.siteSettings["\(host) \(type)"].map { SiteSetting(type: type, value: $0) }
+        }
+    }
+
+    func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL) {
+        guard let host = url.host() else { return }
+        StubPage.siteSettings["\(host) \(type)"] = value == .default ? nil : value
+    }
 }
