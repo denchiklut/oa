@@ -8,6 +8,7 @@
 #include "base/memory/raw_ptr.h"
 #include "oa/public/engine.h"
 #include "oa/public/page.h"
+#include "oa/public/site_settings.h"
 
 @interface OAPage ()
 - (instancetype)initWithDelegate:(nullable id<OAPageDelegate>)delegate;
@@ -27,6 +28,10 @@
 - (void)pageRendererGone:(oa::RendererExit)exit;
 - (void)pageRendererReady;
 - (void)pageClosedWithSessionID:(int32_t)sessionID;
+@end
+
+@interface OASiteSetting ()
+- (instancetype)initWithSetting:(const oa::SiteSetting&)setting;
 @end
 
 @interface OAProfile ()
@@ -499,6 +504,21 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 @end
 
+@implementation OASiteSetting
+
+@synthesize type = _type;
+@synthesize value = _value;
+
+- (instancetype)initWithSetting:(const oa::SiteSetting&)setting {
+  if ((self = [super init])) {
+    _type = static_cast<NSInteger>(setting.type);
+    _value = static_cast<NSInteger>(setting.value);
+  }
+  return self;
+}
+
+@end
+
 @implementation OAProfile {
   NSString* _identifier;
 }
@@ -527,6 +547,27 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
         [page setPage:std::move(created)];
         handler(page, restored);
       });
+}
+
+- (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url {
+  std::optional<std::vector<oa::SiteSetting>> settings =
+      oa::GetChangedSiteSettings(_identifier.UTF8String ?: "",
+                                 url.absoluteString.UTF8String ?: "");
+  if (!settings) {
+    return nil;
+  }
+  NSMutableArray<OASiteSetting*>* result = [NSMutableArray array];
+  for (const oa::SiteSetting& setting : *settings) {
+    [result addObject:[[OASiteSetting alloc] initWithSetting:setting]];
+  }
+  return result;
+}
+
+- (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url {
+  oa::SetSiteSetting(_identifier.UTF8String ?: "",
+                     url.absoluteString.UTF8String ?: "",
+                     static_cast<oa::SiteSettingType>(type),
+                     static_cast<oa::SiteSettingValue>(value));
 }
 
 @end
