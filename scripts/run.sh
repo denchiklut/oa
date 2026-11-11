@@ -54,6 +54,10 @@ if [[ "$mode" == live ]]; then
   plutil -replace CFBundleIdentifier -string org.oa.Oa "$plist"
   plutil -replace CFBundleName -string Oa "$plist"
   plutil -replace CFBundleDisplayName -string Oa "$plist"
+  for key in NSLocationUsageDescription NSLocationWhenInUseUsageDescription NSLocationAlwaysUsageDescription \
+    NSLocationAlwaysAndWhenInUseUsageDescription; do
+    plutil -replace "$key" -string "Websites may use your location for features on their site." "$plist"
+  done
 else
   log "assembling $bundle on the stub engine"
   mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
