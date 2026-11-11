@@ -303,12 +303,12 @@ final class WindowModel {
             url = components.url!
         }
         guard let tabID = selectedTabID else { return newTab(url) }
+        ensurePage(tabID)
         if let page = pages[tabID] {
             page.load(url)
             page.activate()
         } else {
             pendingURLs[tabID] = url
-            ensurePage(tabID)
         }
     }
 
@@ -450,26 +450,18 @@ final class WindowModel {
         return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : nil
     }
 
-    /// Takes the page over from the window that holds it, else creates it.
+    /// As Arc's ingest, in one step: the last window to select a tab takes its page from the window that holds it.
     private func ensurePage(_ tabID: UUID) {
         guard pages[tabID] == nil, creating[tabID] == nil else { return }
+        if let holder = store.windows.first(where: { $0 !== self && $0.pages[tabID] != nil }),
+            let page = holder.release(tabID)
+        {
+            holder.keepFrame(of: page, for: tabID)
+            return adopt(page, for: tabID, from: holder)
+        }
+        guard let profile = state.profile(containing: tabID) else { return }
         let token = UUID()
         creating[tabID] = token
-        if let holder = store.windows.first(where: { $0 !== self && $0.pages[tabID] != nil }) {
-            Task { [weak self] in
-                await holder.keepFrame(tabID)
-                guard let self, creating[tabID] == token else { return }
-                creating.removeValue(forKey: tabID)
-                guard let page = holder.release(tabID) else { return }
-                adopt(page, for: tabID, from: holder)
-                holder.keepFrameLater(of: page, for: tabID)
-            }
-            return
-        }
-        guard let profile = state.profile(containing: tabID) else {
-            creating.removeValue(forKey: tabID)
-            return
-        }
         let context = engine.browserContext(id: profile.id)
         Task { [weak self, id] in
             guard let page = await context.makePage(windowID: id), let self else { return }
@@ -498,19 +490,27 @@ final class WindowModel {
         install(page, for: tabID)
     }
 
-    /// Before the page leaves: the frame can only be copied while the page still draws here.
-    private func keepFrame(_ tabID: UUID) async {
-        guard selectedTabID == tabID, let page = pages[tabID], let image = await page.snapshot() else { return }
-        placeholders[tabID] = image
+    /// Asked before the page leaves, while it still draws here, and not waited for, as Arc's ingest does.
+    private func keepFrame(of page: any Page, for tabID: UUID) {
+        guard selectedTabID == tabID else { return }
+        page.snapshot { [weak self] image in
+            guard let self, selectedTabID == tabID, pages[tabID] == nil else { return }
+            if let image { placeholders[tabID] = image } else { keepFrameLater(of: page, for: tabID) }
+        }
     }
 
-    private func keepFrameLater(of page: any Page, for tabID: UUID) {
-        guard placeholders[tabID] == nil else { return }
+    private func keepFrameLater(of page: any Page, for tabID: UUID, attempts: Int = 2) {
+        guard attempts > 0, placeholders[tabID] == nil, selectedTabID == tabID, pages[tabID] == nil else { return }
         Task { [weak self] in
-            for _ in 0..<2 {
-                try? await Task.sleep(for: .milliseconds(500))
-                guard let self, placeholders[tabID] == nil, selectedTabID == tabID, pages[tabID] == nil else { return }
-                if let image = await page.snapshot() { placeholders[tabID] = image }
+            try? await Task.sleep(for: .milliseconds(500))
+            guard let self, placeholders[tabID] == nil, selectedTabID == tabID, pages[tabID] == nil else { return }
+            page.snapshot { [weak self] image in
+                guard let self, selectedTabID == tabID, pages[tabID] == nil else { return }
+                if let image {
+                    placeholders[tabID] = image
+                } else {
+                    keepFrameLater(of: page, for: tabID, attempts: attempts - 1)
+                }
             }
         }
     }

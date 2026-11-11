@@ -108,15 +108,15 @@ final class StubPage: Page {
         Self.arrive(self)
     }
 
-    func snapshot() async -> NSImage? {
+    func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void) {
         let view = hostingView
         guard view.bounds.width > 0, view.bounds.height > 0,
             let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
-        else { return nil }
+        else { return completion(nil) }
         view.cacheDisplay(in: view.bounds, to: bitmap)
         let image = NSImage(size: view.bounds.size)
         image.addRepresentation(bitmap)
-        return image
+        completion(image)
     }
 
     private func askToLeave() async -> Bool {

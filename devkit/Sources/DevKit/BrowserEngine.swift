@@ -62,8 +62,9 @@ public protocol Page: AnyObject, Observable {
     func activate()
     /// Moves the live page into another of the app's windows. History and the engine's tab identity stay.
     func move(toWindow windowID: UUID)
-    /// The page's last frame, for a window it left. Nil while it has nothing drawn.
-    func snapshot() async -> NSImage?
+    /// Asks now for the page's last frame, for a window it leaves, as Arc's ADK does with a completion so a move need
+    /// not wait for it. Nil while it has nothing drawn.
+    func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void)
     /// Closes as the user would: unload handlers run, and `closed` or `closeCancelled` follows.
     func close()
     /// Ends the page without unload handlers. Events end.
