@@ -222,6 +222,13 @@ struct SidebarState {
     /// Pinned tabs and Favorites keep their saved address, as in Arc.
     func keepsAddress(_ tabID: UUID) -> Bool { isPinned(tabID) || isFavorite(tabID) }
 
+    /// As Arc: a tab that keeps its address takes a favicon only from its own site, and once it has one and the page
+    /// can go back, only from the saved address itself.
+    func takesFavicon(_ tabID: UUID, at url: URL?, canGoBack: Bool, hasSaved: Bool) -> Bool {
+        guard keepsAddress(tabID), let tab = tree.tab(tabID), let saved = tab.url, let url else { return true }
+        return hasSaved && canGoBack ? tab.isAt(url) : saved.host() == url.host()
+    }
+
     func profile(containing tabID: UUID) -> SidebarProfile? {
         guard tree.tab(tabID) != nil, let rootID = tree.rootID(of: tabID) else { return nil }
         return profiles.first { $0.favoritesRootID == rootID }

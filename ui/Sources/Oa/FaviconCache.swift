@@ -33,6 +33,14 @@ final class FaviconCache {
         }
     }
 
+    func remove(for id: UUID) -> Bool {
+        guard bytes(for: id) != nil else { return false }
+        try? FileManager.default.removeItem(at: url(for: id))
+        written[id] = .some(nil)
+        images[id] = .some(nil)
+        return true
+    }
+
     func prune(keeping ids: Set<UUID>) {
         let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         for url in urls {
