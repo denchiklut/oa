@@ -262,7 +262,7 @@ Sources: Arc [2021][arc21], [2022][arc22], [2023][arc23],
 | Ad blocker | ✅ | ☐ |
 | Install and manage Chrome extensions | ✅ | ☐ |
 | Site Controls and per-site permission settings | ✅ | ☐ |
-| Permission prompts for camera, microphone, location, etc. | ✅ | ☐ |
+| Permission prompts for camera, microphone, location, etc. | ✅ | ✅ |
 | Connection-security indicator | ✅ | ☐ |
 | JavaScript alert, confirm and prompt dialogs | ✅ | ✅ |
 | Clear browsing data / privacy settings UI | ✅ | ☐ |
