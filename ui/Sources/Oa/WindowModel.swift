@@ -107,6 +107,31 @@ final class WindowModel {
         }
     }
 
+    /// As Arc's Site Controls: read when it opens and after each change, for the page's site in its tab's profile;
+    /// only a secure page lists its settings.
+    func siteSettings() -> [SiteSetting] {
+        guard let page, page.securityLevel == .secure, let url = page.url, let context = siteContext else { return [] }
+        return context.changedSiteSettings(for: url) ?? []
+    }
+
+    /// As Arc: allowed becomes blocked and anything else allowed, with no reload.
+    func toggle(_ setting: SiteSetting) {
+        guard let url = page?.url, let context = siteContext else { return }
+        context.setSiteSetting(setting.type, to: setting.value.isAllowed ? .block : .allow, for: url)
+    }
+
+    /// Arc shows the page in a panel in the window; a new tab is Oa's own.
+    func openAllSiteSettings() {
+        guard let url = page?.url, var components = URLComponents(string: "chrome://settings/content/siteDetails")
+        else { return }
+        components.queryItems = [URLQueryItem(name: "site", value: url.absoluteString)]
+        if let settings = components.url { newTab(settings) }
+    }
+
+    private var siteContext: (any BrowserContext)? {
+        selectedTabID.flatMap { state.profile(containing: $0) }.map { engine.browserContext(id: $0.id) }
+    }
+
     func newTab(_ url: URL? = nil) {
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
         store.edit { $0.appendTab(tab, in: selectedSpaceID) }
