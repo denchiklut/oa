@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace oa {
@@ -86,7 +87,9 @@ class Page {
     virtual void OnPageDialogDismissed(const Dialog& dialog) = 0;
     // A beforeunload handler kept the page after Close().
     virtual void OnPageCloseCancelled() = 0;
-    virtual void OnPageClosed() = 0;
+    // `session_id` names Chrome's record of the closed tab, from which
+    // CreatePage brings it back with its history during this run.
+    virtual void OnPageClosed(std::optional<int32_t> session_id) = 0;
 
    protected:
     virtual ~Observer() = default;

@@ -15,12 +15,16 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/ssl/chrome_security_state_util.h"
 #include "chrome/browser/tab_contents/tab_util.h"
+#include "chrome/browser/ui/browser_live_tab_context.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/security_state/core/security_state.h"
+#include "components/sessions/content/content_live_tab.h"
+#include "components/sessions/core/tab_restore_service.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/frame_tree_node_id.h"
 #include "content/public/browser/navigation_controller.h"
@@ -121,6 +125,37 @@ std::unique_ptr<PageImpl> PageImpl::Create(WindowBrowser* window_browser,
 }
 
 // static
+std::unique_ptr<PageImpl> PageImpl::Restore(WindowBrowser* window_browser,
+                                            int32_t session_id,
+                                            Page::Observer* observer) {
+  BrowserWindowInterface* browser = window_browser->browser();
+  sessions::TabRestoreService* service =
+      TabRestoreServiceFactory::GetForProfile(browser->GetProfile());
+  BrowserLiveTabContext* context = BrowserLiveTabContext::From(browser);
+  if (!service || !context) {
+    return nullptr;
+  }
+  // In the background, so Chrome neither selects the tab nor raises the
+  // window; the app's sidebar does that.
+  std::optional<std::vector<sessions::LiveTab*>> tabs =
+      service->RestoreEntryById(context,
+                                SessionID::FromSerializedValue(session_id),
+                                WindowOpenDisposition::NEW_BACKGROUND_TAB);
+  if (!tabs || tabs->size() != 1) {
+    return nullptr;
+  }
+  content::WebContents* contents =
+      &static_cast<sessions::ContentLiveTab*>(tabs->front())->GetWebContents();
+  // Chrome hides the view of a tab restored in the background and leaves
+  // showing it to its BrowserView; Oa shows a page by putting its view in a
+  // window, which then loads it.
+  contents->GetNativeView().GetNativeNSView().hidden = NO;
+  std::unique_ptr<PageImpl> page(new PageImpl(window_browser, observer));
+  page->Adopt(contents);
+  return page;
+}
+
+// static
 PageImpl* PageImpl::FromWebContents(content::WebContents* contents) {
   auto* marker =
       static_cast<PageMarker*>(contents->GetUserData(kPageMarkerKey));
@@ -145,16 +180,20 @@ PageImpl::~PageImpl() {
 
 bool PageImpl::Insert(std::unique_ptr<content::WebContents> contents) {
   content::WebContents* page = contents.get();
-  page->SetUserData(kPageMarkerKey,
-                    std::make_unique<PageMarker>(weak_factory_.GetWeakPtr()));
   if (!window_browser_ || !window_browser_->Insert(std::move(contents))) {
     return false;
   }
   // Hidden until its view first joins a window, as Chrome's background tabs.
   page->WasHidden();
-  Bind(page);
-  OpenPages().insert(this);
+  Adopt(page);
   return true;
+}
+
+void PageImpl::Adopt(content::WebContents* contents) {
+  contents->SetUserData(
+      kPageMarkerKey, std::make_unique<PageMarker>(weak_factory_.GetWeakPtr()));
+  Bind(contents);
+  OpenPages().insert(this);
 }
 
 std::unique_ptr<PageImpl> PageImpl::Wrap(
@@ -203,9 +242,9 @@ void PageImpl::Rebind(content::WebContents* new_contents) {
   NotifyStateChanged();
 }
 
-void PageImpl::OnRemovedFromStrip() {
+void PageImpl::OnRemovedFromStrip(std::optional<SessionID> session_id) {
   Unbind();
-  NotifyClosed();
+  NotifyClosed(session_id);
 }
 
 void PageImpl::SetObserver(Page::Observer* observer) {
@@ -667,7 +706,7 @@ void PageImpl::OnFaviconUpdated(favicon::FaviconDriver* favicon_driver,
 void PageImpl::WebContentsDestroyed() {
   favicon_observation_.Reset();
   set_inner(nullptr);
-  NotifyClosed();
+  NotifyClosed(std::nullopt);
 }
 
 void PageImpl::NotifyStateChanged() {
@@ -676,12 +715,14 @@ void PageImpl::NotifyStateChanged() {
   }
 }
 
-void PageImpl::NotifyClosed() {
+void PageImpl::NotifyClosed(std::optional<SessionID> session_id) {
   if (!OpenPages().erase(this)) {
     return;
   }
   if (observer_) {
-    observer_->OnPageClosed();
+    observer_->OnPageClosed(session_id && session_id->is_valid()
+                                ? std::optional(session_id->id())
+                                : std::nullopt);
   }
 }
 

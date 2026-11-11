@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "base/memory/raw_ptr.h"
@@ -11,6 +12,7 @@
 #include "base/scoped_observation.h"
 #include "components/favicon/core/favicon_driver.h"
 #include "components/favicon/core/favicon_driver_observer.h"
+#include "components/sessions/core/session_id.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "oa/browser/forwarding_web_contents_delegate.h"
 #include "oa/public/page.h"
@@ -33,6 +35,9 @@ class PageImpl : public Page,
  public:
   static std::unique_ptr<PageImpl> Create(WindowBrowser* window_browser,
                                           Page::Observer* observer);
+  static std::unique_ptr<PageImpl> Restore(WindowBrowser* window_browser,
+                                           int32_t session_id,
+                                           Page::Observer* observer);
   static PageImpl* FromWebContents(content::WebContents* contents);
   static void CloseAll();
 
@@ -41,7 +46,7 @@ class PageImpl : public Page,
   ~PageImpl() override;
 
   void Rebind(content::WebContents* new_contents);
-  void OnRemovedFromStrip();
+  void OnRemovedFromStrip(std::optional<SessionID> session_id);
   // From the dialog views Chrome's managers create for this page.
   void RunDialog(const Dialog& dialog, DialogReply reply);
   void DismissDialog(const Dialog& dialog);
@@ -132,13 +137,14 @@ class PageImpl : public Page,
   PageImpl(WindowBrowser* window_browser, Page::Observer* observer);
 
   bool Insert(std::unique_ptr<content::WebContents> contents);
+  void Adopt(content::WebContents* contents);
   std::unique_ptr<PageImpl> Wrap(
       std::unique_ptr<content::WebContents> contents);
   void Bind(content::WebContents* contents);
   bool KeepsAddressAgainst(const content::OpenURLParams& params) const;
   void Unbind();
   void NotifyStateChanged();
-  void NotifyClosed();
+  void NotifyClosed(std::optional<SessionID> session_id);
 
   base::WeakPtr<WindowBrowser> window_browser_;
   raw_ptr<Page::Observer> observer_;

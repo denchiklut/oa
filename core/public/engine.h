@@ -1,8 +1,10 @@
 #ifndef OA_PUBLIC_ENGINE_H_
 #define OA_PUBLIC_ENGINE_H_
 
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "oa/public/page.h"
@@ -16,12 +18,16 @@ using ReadyCallback = void (*)(void* context);
 int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context);
 
 // Loads the profile if needed, then creates a page in `window_id`'s Browser
-// for it, in the background and without a load. `completion` gets null if the
-// engine isn't running or the profile can't load.
-void CreatePage(const std::string& window_id,
-                const std::string& profile_id,
-                Page::Observer* observer,
-                std::function<void(std::unique_ptr<Page>)> completion);
+// for it, in the background. Given the session ID of a page that closed, as
+// Arc's restorable session ID, Chrome's record brings that tab back with its
+// history and `restored` is true; otherwise the page has no load. `completion`
+// gets null if the engine isn't running or the profile can't load.
+void CreatePage(
+    const std::string& window_id,
+    const std::string& profile_id,
+    std::optional<int32_t> restorable_session_id,
+    Page::Observer* observer,
+    std::function<void(std::unique_ptr<Page> page, bool restored)> completion);
 
 // Binds the app's NSWindow to `window_id` once; a later call is ignored.
 void AttachWindow(const std::string& window_id, void* ns_window);

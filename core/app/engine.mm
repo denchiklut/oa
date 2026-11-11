@@ -168,33 +168,45 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   return content::ContentMain(std::move(params));
 }
 
-void CreatePage(const std::string& window_id,
-                const std::string& profile_id,
-                Page::Observer* observer,
-                std::function<void(std::unique_ptr<Page>)> completion) {
+void CreatePage(
+    const std::string& window_id,
+    const std::string& profile_id,
+    std::optional<int32_t> restorable_session_id,
+    Page::Observer* observer,
+    std::function<void(std::unique_ptr<Page> page, bool restored)> completion) {
   if (!State().running) {
-    completion(nullptr);
+    completion(nullptr, false);
     return;
   }
   LoadBrowserProfile(
       profile_id,
       base::BindOnce(
-          [](std::string window_id, Page::Observer* observer,
-             std::function<void(std::unique_ptr<Page>)> completion,
+          [](std::string window_id,
+             std::optional<int32_t> restorable_session_id,
+             Page::Observer* observer,
+             std::function<void(std::unique_ptr<Page>, bool)> completion,
              Profile* profile) {
             if (!State().running || !profile) {
-              completion(nullptr);
+              completion(nullptr, false);
               return;
             }
             WindowBrowser* browser =
                 WindowBrowser::GetOrCreate(window_id, profile);
             if (!browser) {
-              completion(nullptr);
+              completion(nullptr, false);
               return;
             }
-            completion(PageImpl::Create(browser, observer));
+            if (restorable_session_id) {
+              if (std::unique_ptr<PageImpl> page = PageImpl::Restore(
+                      browser, *restorable_session_id, observer)) {
+                completion(std::move(page), true);
+                return;
+              }
+            }
+            completion(PageImpl::Create(browser, observer), false);
           },
-          window_id, base::Unretained(observer), std::move(completion)));
+          window_id, restorable_session_id, base::Unretained(observer),
+          std::move(completion)));
 }
 
 void AttachWindow(const std::string& window_id, void* ns_window) {

@@ -47,6 +47,7 @@ source_set("oa") {
     "//components/permissions",
     "//components/security_interstitials/core",
     "//components/security_state/core",
+    "//components/sessions",
     "//components/viz/common",
     "//components/web_modal",
     "//content/public/app",
