@@ -43,12 +43,13 @@ frame frozen and dimmed to 0.57 over the window background with an empty toolbar
 strip. The page also moves to a window that shows its tab when the holding
 window selects another tab, when the showing window becomes key, and when the
 holding window closes. Pages of Spaces not shown stay alive with their views
-detached, so the engine sees them as hidden. Window close and quit drop pages
-without unload handlers, except a page whose tab another window shows, which
-moves there; the records stay. Arc hands every page a closing window holds to a
-surviving window first, with no prompt, and only then asks "Leave site?" per
-armed page for what is left, which is the last window and quit, where a Cancel
-keeps Arc running; a follow-up.
+detached, so the engine sees them as hidden. A closing window that isn't the
+last hands every page it holds, shown or hidden and with its Peek, to another
+window, preferring one that shows its tab, with no prompt, as Arc does. The last
+window and quit first ask each page's `beforeunload` handler in sidebar order
+(the order is Oa's own) without closing it; a page that asks comes forward with
+"Leave site?", and a Cancel keeps the window or the app running, as in Arc. Then
+the pages are dropped and the records stay.
 
 Close Tab ⌘W reads "Archive Tab" on an unpinned tab, as in Arc: the page,
 wherever it lives, closes as the user would, and once it reports closed the

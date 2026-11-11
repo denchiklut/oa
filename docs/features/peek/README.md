@@ -46,7 +46,9 @@ children, the same live page with no reload, and asks nothing. ✕, a click on
 the backdrop and ⌘W close the page as the user would, so a `beforeunload`
 handler can keep the Peek with "Leave site?" over it, as Arc does, and archive
 it under the tab's Space once it is gone, as do archiving the opener, closing
-the window and quitting; a page that closes itself leaves no entry. A tab has
+the last window and quitting; a page that closes itself leaves no entry. When
+another window takes the tab's page, on selection or because its window closed,
+the Peek goes with it, as Arc's does. A tab has
 one Peek: a new request while one is up closes the current one as ✕ would and
 archives it at once, Oa's own choice. The entry has no position, so it restores at the top of the
 unpinned section, also Oa's own: Arc's entries carry no visible position.
