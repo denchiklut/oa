@@ -59,7 +59,7 @@ final class SidebarPersistence {
     func restore(_ backup: SidebarBackup) throws {
         let data = try Data(contentsOf: backup.url)
         _ = try decode(SidebarSnapshot.self, from: data, version: SidebarSnapshot.version).state()
-        try keepCopy()
+        keepCopy()
         try data.write(to: sidebarURL, options: .atomic)
         written[sidebarURL] = data
         disabled.remove(sidebarURL)
@@ -94,7 +94,7 @@ final class SidebarPersistence {
         do {
             let data = try encoder.encode(snapshot)
             guard written[url] != data else { return }
-            if url == sidebarURL, !copied { try keepCopy() }
+            if url == sidebarURL, !copied { keepCopy() }
             try FileManager.default.createDirectory(
                 at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             try data.write(to: url, options: .atomic)
@@ -104,14 +104,19 @@ final class SidebarPersistence {
         }
     }
 
-    /// A copy named by the file's save time; the same bytes found again at a later launch add nothing.
-    private func keepCopy() throws {
+    /// A copy named by the file's save time; the same bytes found again at a later launch add nothing. A copy that
+    /// fails is logged and the write goes ahead, as Arc's `saveImpl` does, so a failing copy never stops saving.
+    private func keepCopy() {
         copied = true
         guard let saved = try? sidebarURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
         else { return }
         let copy = directory.appendingPathComponent(SidebarBackup.name(for: saved))
         if !FileManager.default.fileExists(atPath: copy.path) {
-            try FileManager.default.copyItem(at: sidebarURL, to: copy)
+            do {
+                try FileManager.default.copyItem(at: sidebarURL, to: copy)
+            } catch {
+                NSLog("Oa: couldn't keep a copy of %@: %@", sidebarURL.lastPathComponent, "\(error)")
+            }
         }
         prune()
     }
