@@ -61,6 +61,7 @@ class PageImpl : public Page,
   bool CanGoForward() const override;
   void* Favicon() const override;
   SecurityLevel GetSecurityLevel() const override;
+  NavigationResult GetNavigationResult() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -106,8 +107,15 @@ class PageImpl : public Page,
   void PrimaryMainFrameRenderProcessGone(
       base::TerminationStatus status) override;
   void RenderViewReady() override;
+  void DidStartNavigation(
+      content::NavigationHandle* navigation_handle) override;
   void DidFinishNavigation(
       content::NavigationHandle* navigation_handle) override;
+  void DidFinishLoad(content::RenderFrameHost* render_frame_host,
+                     const GURL& validated_url) override;
+  void DidFailLoad(content::RenderFrameHost* render_frame_host,
+                   const GURL& validated_url,
+                   int error_code) override;
   void LoadProgressChanged(double progress) override;
   void TitleWasSet(content::NavigationEntry* entry) override;
   void DidChangeVisibleSecurityState() override;
@@ -140,6 +148,7 @@ class PageImpl : public Page,
   int dialogs_shown_ = 0;
   bool suppress_dialogs_ = false;
   double load_progress_ = 0;
+  NavigationResult navigation_result_ = NavigationResult::kNone;
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>
       favicon_observation_{this};

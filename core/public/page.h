@@ -22,6 +22,14 @@ enum class SecurityLevel {
   kDangerous,
 };
 
+// How the page's last navigation ended, as Arc's navigation result: none from
+// a navigation's start until its document loads or fails.
+enum class NavigationResult {
+  kNone,
+  kLoaded,
+  kFailed,
+};
+
 // How a page's renderer process ended, from base::TerminationStatus.
 enum class RendererExit {
   kNormal,
@@ -97,6 +105,7 @@ class Page {
   // An NSImage, held by the tab while it keeps the icon; null until it has one.
   virtual void* Favicon() const = 0;
   virtual SecurityLevel GetSecurityLevel() const = 0;
+  virtual NavigationResult GetNavigationResult() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;
