@@ -39,8 +39,8 @@ final class WindowModel {
     var peek: (any Page)? { peekOwnerID.flatMap { peeks[$0] } }
     /// What the toolbar commands act on: the Peek while one is shown.
     var frontPage: (any Page)? { peek ?? page }
-    /// The shown page's dialog, over the whole window as Arc draws it.
-    var dialog: PageDialog? { frontPage.flatMap { dialogs[$0.id]?.last } }
+    /// Over the whole window as Arc draws it, so a tab's own page can ask while its Peek is up.
+    var dialog: PageDialog? { [peek, page].lazy.compactMap { $0.flatMap { self.dialogs[$0.id]?.last } }.first }
     private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
     /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
     var address: URL? { page?.url ?? selectedTab?.url }
