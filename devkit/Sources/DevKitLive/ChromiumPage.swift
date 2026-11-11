@@ -48,11 +48,10 @@ final class ChromiumPage: Page {
     func activate() { page?.activate() }
     func move(toWindow windowID: UUID) { page?.move(toWindowIdentifier: windowID.uuidString) }
 
-    func snapshot() async -> NSImage? {
-        guard let page else { return nil }
-        return await withCheckedContinuation { continuation in
-            page.snapshot { continuation.resume(returning: $0) }
-        }
+    /// Core answers on the main thread.
+    func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void) {
+        guard let page else { return completion(nil) }
+        page.snapshot { image in MainActor.assumeIsolated { completion(image) } }
     }
 
     func close() { page?.close() }
