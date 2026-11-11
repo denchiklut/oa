@@ -58,6 +58,9 @@ if [[ "$mode" == live ]]; then
     NSLocationAlwaysAndWhenInUseUsageDescription; do
     plutil -replace "$key" -string "Websites may use your location for features on their site." "$plist"
   done
+  plutil -replace NSCameraUsageDescription -string "Websites may use your camera for features on their site." "$plist"
+  plutil -replace NSMicrophoneUsageDescription -string "Websites may use your microphone for features on their site." \
+    "$plist"
 else
   log "assembling $bundle on the stub engine"
   mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
