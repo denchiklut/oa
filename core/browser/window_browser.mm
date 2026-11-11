@@ -269,7 +269,7 @@ void WindowBrowser::OnTabStripModelChanged(
           continue;
         }
         if (PageImpl* page = PageImpl::FromWebContents(removed.contents)) {
-          page->OnRemovedFromStrip();
+          page->OnRemovedFromStrip(removed.session_id);
         }
       }
       break;

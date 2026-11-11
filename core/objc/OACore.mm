@@ -1,6 +1,7 @@
 #import "oa/objc/OACore.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -22,7 +23,7 @@
 - (void)pageWantsActivation;
 - (void)pageRendererGone:(oa::RendererExit)exit;
 - (void)pageRendererReady;
-- (void)pageClosed;
+- (void)pageClosedWithSessionID:(int32_t)sessionID;
 @end
 
 @interface OAProfile ()
@@ -124,7 +125,9 @@ class PageObserverBridge : public oa::Page::Observer {
     [page_ pageDialogDismissed:dialog];
   }
   void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
-  void OnPageClosed() override { [page_ pageClosed]; }
+  void OnPageClosed(std::optional<int32_t> session_id) override {
+    [page_ pageClosedWithSessionID:session_id.value_or(-1)];
+  }
 
  private:
   __weak OAPage* page_;
@@ -403,8 +406,8 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   [self.delegate pageDidCancelClose:self];
 }
 
-- (void)pageClosed {
-  [self.delegate pageDidClose:self];
+- (void)pageClosedWithSessionID:(int32_t)sessionID {
+  [self.delegate page:self didCloseWithSessionID:sessionID];
 }
 
 @end
@@ -421,20 +424,22 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 }
 
 - (void)createPageInWindow:(NSString*)windowIdentifier
+        restoringSessionID:(int32_t)sessionID
                   delegate:(nullable id<OAPageDelegate>)delegate
-                completion:(void (^)(OAPage* _Nullable))completion {
+                completion:(void (^)(OAPage* _Nullable, BOOL))completion {
   OAPage* page = [[OAPage alloc] initWithDelegate:delegate];
-  void (^handler)(OAPage* _Nullable) = [completion copy];
-  oa::CreatePage(windowIdentifier.UTF8String ?: "",
-                 _identifier.UTF8String ?: "", page.observer,
-                 [page, handler](std::unique_ptr<oa::Page> created) {
-                   if (!created) {
-                     handler(nil);
-                     return;
-                   }
-                   [page setPage:std::move(created)];
-                   handler(page);
-                 });
+  void (^handler)(OAPage* _Nullable, BOOL) = [completion copy];
+  oa::CreatePage(
+      windowIdentifier.UTF8String ?: "", _identifier.UTF8String ?: "",
+      sessionID < 0 ? std::nullopt : std::optional(sessionID), page.observer,
+      [page, handler](std::unique_ptr<oa::Page> created, bool restored) {
+        if (!created) {
+          handler(nil, NO);
+          return;
+        }
+        [page setPage:std::move(created)];
+        handler(page, restored);
+      });
 }
 
 @end

@@ -73,7 +73,8 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 - (void)page:(OAPage*)page didRequestDialog:(OAPageDialog*)dialog;
 - (void)page:(OAPage*)page didDismissDialog:(OAPageDialog*)dialog;
 - (void)pageDidCancelClose:(OAPage*)page;
-- (void)pageDidClose:(OAPage*)page;
+// `sessionID` is Chrome's record of the closed tab, -1 when it kept none.
+- (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;
 @end
 
 @interface OAPage : NSObject
@@ -109,11 +110,15 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 @interface OAProfile : NSObject
 - (instancetype)init NS_UNAVAILABLE;
 // Creates a page in the window's Browser for this profile, loading the profile
-// first if needed. The page starts in the background with nothing loaded;
-// `completion` gets nil if it can't be created.
+// first if needed. Given a closed page's session ID, not -1, Chrome's record
+// brings it back with its history and `restored` is YES; otherwise the page
+// starts in the background with nothing loaded. `completion` gets nil if it
+// can't be created.
 - (void)createPageInWindow:(NSString*)windowIdentifier
+        restoringSessionID:(int32_t)sessionID
                   delegate:(nullable id<OAPageDelegate>)delegate
-                completion:(void (^)(OAPage* _Nullable page))completion;
+                completion:
+                    (void (^)(OAPage* _Nullable page, BOOL restored))completion;
 @end
 
 @interface OAEngine : NSObject
