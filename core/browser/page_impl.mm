@@ -389,6 +389,16 @@ void PageImpl::Snapshot(SnapshotCallback callback) {
           std::move(callback))));
 }
 
+void PageImpl::AskToLeave(LeaveCallback callback) {
+  content::WebContents* contents = web_contents();
+  if (!contents || closing_ || leave_callback_) {
+    callback(!contents);
+    return;
+  }
+  leave_callback_ = std::move(callback);
+  contents->DispatchBeforeUnload(/*auto_cancel=*/false);
+}
+
 void PageImpl::Close() {
   content::WebContents* contents = web_contents();
   if (!contents) {
@@ -401,6 +411,9 @@ void PageImpl::Close() {
 }
 
 void PageImpl::Drop() {
+  if (leave_callback_) {
+    std::exchange(leave_callback_, nullptr)(true);
+  }
   content::WebContents* contents = web_contents();
   if (!contents) {
     return;
@@ -543,6 +556,19 @@ bool PageImpl::HandleContextMenu(content::RenderFrameHost& render_frame_host,
 bool PageImpl::CanEnterFullscreenModeForTab(
     content::RenderFrameHost* requesting_frame) {
   return false;
+}
+
+// Chrome would close the page once the handler lets it go; asking keeps it.
+void PageImpl::BeforeUnloadFired(content::WebContents* tab,
+                                 bool proceed,
+                                 bool* proceed_to_fire_unload) {
+  if (!leave_callback_) {
+    ForwardingWebContentsDelegate::BeforeUnloadFired(tab, proceed,
+                                                     proceed_to_fire_unload);
+    return;
+  }
+  *proceed_to_fire_unload = false;
+  std::exchange(leave_callback_, nullptr)(proceed);
 }
 
 void PageImpl::BeforeUnloadFired(bool proceed) {

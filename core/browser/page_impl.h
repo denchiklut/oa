@@ -66,6 +66,7 @@ class PageImpl : public Page,
   void SetKeepsAddress(bool keeps_address) override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
+  void AskToLeave(LeaveCallback callback) override;
   void Close() override;
   void Drop() override;
 
@@ -93,9 +94,11 @@ class PageImpl : public Page,
                          const content::ContextMenuParams& params) override;
   bool CanEnterFullscreenModeForTab(
       content::RenderFrameHost* requesting_frame) override;
+  void BeforeUnloadFired(content::WebContents* tab,
+                         bool proceed,
+                         bool* proceed_to_fire_unload) override;
 
   // content::WebContentsObserver:
-  using ForwardingWebContentsDelegate::BeforeUnloadFired;
   void BeforeUnloadFired(bool proceed) override;
   void PrimaryMainFrameRenderProcessGone(
       base::TerminationStatus status) override;
@@ -129,6 +132,7 @@ class PageImpl : public Page,
   base::WeakPtr<WindowBrowser> window_browser_;
   raw_ptr<Page::Observer> observer_;
   bool closing_ = false;
+  LeaveCallback leave_callback_;
   bool keeps_address_ = false;
   int dialogs_shown_ = 0;
   bool suppress_dialogs_ = false;
