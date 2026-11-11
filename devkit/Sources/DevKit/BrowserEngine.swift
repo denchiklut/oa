@@ -59,6 +59,8 @@ public protocol Page: AnyObject, Observable {
     func move(toWindow windowID: UUID)
     /// The page's last frame, for a window it left. Nil while it has nothing drawn.
     func snapshot() async -> NSImage?
+    /// Runs the `beforeunload` handler as quitting does and keeps the page either way. True to leave.
+    func askToLeave() async -> Bool
     /// Closes as the user would: unload handlers run, and `closed` or `closeCancelled` follows.
     func close()
     /// Ends the page without unload handlers. Events end.
