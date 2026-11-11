@@ -685,7 +685,7 @@ final class WindowModel {
     }
 
     /// As Arc: a page that has loaded with no favicon clears an unpinned tab's, and a tab that keeps its address never
-    /// loses its own. A failed load isn't loaded, so it clears nothing.
+    /// loses its own.
     private func save(_ page: any Page, for tabID: UUID) {
         store.setSavedPage(tabID, title: page.title, url: page.url)
         let favicon = page.favicon

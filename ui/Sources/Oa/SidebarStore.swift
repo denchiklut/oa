@@ -44,7 +44,7 @@ final class SidebarStore {
         return favicons.image(for: id)
     }
 
-    /// Nil removes it. The cache isn't observed, and a row showing a removed favicon has nothing else to redraw for.
+    /// The cache isn't observed, and a row showing a removed favicon has nothing else to redraw for.
     func setSavedFavicon(_ tabID: UUID, _ favicon: NSImage?) {
         if let favicon {
             favicons.set(favicon, for: tabID)

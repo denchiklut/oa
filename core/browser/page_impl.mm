@@ -601,11 +601,8 @@ void PageImpl::PrimaryMainFrameRenderProcessGone(
   }
 }
 
-// The navigation result follows ArcCore. A navigation's start clears it. A
-// document that finishes loading sets it, as does a same-document navigation.
-// A committed error page fails it, as does a failed load. The error page's own
-// document loading is ignored, and a navigation that never commits leaves the
-// result cleared.
+// As ArcCore: an error page's own document loading doesn't count as loaded,
+// and a navigation that never commits leaves the result cleared.
 void PageImpl::DidStartNavigation(
     content::NavigationHandle* navigation_handle) {
   if (navigation_handle->IsInPrimaryMainFrame()) {
