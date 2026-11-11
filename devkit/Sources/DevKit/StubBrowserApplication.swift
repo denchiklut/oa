@@ -29,6 +29,10 @@ public final class StubBrowserApplication: BrowserApplication {
     public func attachWindow(_ window: NSWindow, id: UUID) {}
 
     public func closeWindow(id: UUID) {}
+
+    public func askToLeave(windowID: UUID) async -> Bool {
+        await StubPage.askToLeave(windowID: windowID)
+    }
 }
 
 @MainActor
@@ -38,6 +42,6 @@ final class StubBrowserContext: BrowserContext {
     init(id: UUID) { self.id = id }
 
     func makePage(windowID: UUID) async -> (any Page)? {
-        StubPage(id: UUID())
+        StubPage(id: UUID(), windowID: windowID)
     }
 }

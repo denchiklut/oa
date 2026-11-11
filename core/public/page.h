@@ -58,7 +58,6 @@ class Page {
   // Call once. `suppress` answers this page's later dialogs without asking.
   using DialogReply = std::function<
       void(bool accepted, const std::string& text, bool suppress)>;
-  using LeaveCallback = std::function<void(bool leave)>;
 
   class Observer {
    public:
@@ -113,9 +112,6 @@ class Page {
   // Fails while the page has nothing drawn, for example when no window shows
   // it.
   virtual void Snapshot(SnapshotCallback callback) = 0;
-  // Runs the beforeunload handler as quitting does and keeps the page either
-  // way. A handler-less page answers at once.
-  virtual void AskToLeave(LeaveCallback callback) = 0;
   // Closes as the user would: unload handlers run and Chrome records the tab.
   virtual void Close() = 0;
   // Destroys the page without unload handlers or a closed-tab entry.

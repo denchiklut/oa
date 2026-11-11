@@ -44,7 +44,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
             for window in windows {
-                guard await window.model.askToLeave() else { return sender.reply(toApplicationShouldTerminate: false) }
+                guard await engine.askToLeave(windowID: window.model.id) else {
+                    return sender.reply(toApplicationShouldTerminate: false)
+                }
             }
             for window in windows { window.model.dropAll(handingOff: false) }
             store.saveAndFreeze()

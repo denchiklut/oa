@@ -72,6 +72,13 @@ public final class ChromiumBrowserApplication: BrowserApplication {
         engine?.closeWindow(identifier: id.uuidString)
     }
 
+    public func askToLeave(windowID: UUID) async -> Bool {
+        guard let engine else { return true }
+        return await withCheckedContinuation { continuation in
+            engine.askToLeaveWindow(identifier: windowID.uuidString) { continuation.resume(returning: $0) }
+        }
+    }
+
     @MainActor
     private final class Start {
         let application: ChromiumBrowserApplication

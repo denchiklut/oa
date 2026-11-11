@@ -43,9 +43,31 @@ final class StubPage: Page {
 
     var view: NSView { hostingView }
 
-    init(id: UUID) {
+    init(id: UUID, windowID: UUID) {
         self.id = id
+        self.windowID = windowID
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
+        Self.arrive(self)
+    }
+
+    // The engine's tab strips: a page goes to the end of its window's on creation and on each move.
+    private final class Arrival {
+        weak var page: StubPage?
+        init(_ page: StubPage) { self.page = page }
+    }
+    private static var arrivals: [Arrival] = []
+    private var windowID: UUID
+
+    private static func arrive(_ page: StubPage) {
+        arrivals.removeAll { $0.page == nil || $0.page === page }
+        arrivals.append(Arrival(page))
+    }
+
+    static func askToLeave(windowID: UUID) async -> Bool {
+        for page in arrivals.compactMap(\.page) where page.windowID == windowID {
+            guard await page.askToLeave() else { return false }
+        }
+        return true
     }
 
     func load(_ url: URL) {
@@ -79,7 +101,11 @@ final class StubPage: Page {
 
     func activate() {}
 
-    func move(toWindow windowID: UUID) {}
+    func move(toWindow windowID: UUID) {
+        guard windowID != self.windowID else { return }
+        self.windowID = windowID
+        Self.arrive(self)
+    }
 
     func snapshot() async -> NSImage? {
         let view = hostingView
@@ -92,7 +118,7 @@ final class StubPage: Page {
         return image
     }
 
-    func askToLeave() async -> Bool {
+    private func askToLeave() async -> Bool {
         guard asksBeforeClosing else { return true }
         return await withCheckedContinuation { continuation in
             ask(.beforeUnload(isReload: false), title: "Leave site?") {
@@ -112,6 +138,7 @@ final class StubPage: Page {
         load?.cancel()
         continuation?.finish()
         continuation = nil
+        Self.arrivals.removeAll { $0.page == nil || $0.page === self }
     }
 
     func open(_ disposition: OpenDisposition) {
@@ -120,7 +147,7 @@ final class StubPage: Page {
         components.path = "/opened-\(StubPage.openedCount)"
         components.query = nil
         guard let target = components.url else { return }
-        let opened = StubPage(id: UUID())
+        let opened = StubPage(id: UUID(), windowID: windowID)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: disposition))
     }
@@ -131,7 +158,7 @@ final class StubPage: Page {
         components.path = "/linked"
         guard let target = components.url else { return }
         guard keepsAddress else { return load(target) }
-        let opened = StubPage(id: UUID())
+        let opened = StubPage(id: UUID(), windowID: windowID)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab))
     }
