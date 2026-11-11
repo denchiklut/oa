@@ -54,13 +54,6 @@ final class ChromiumPage: Page {
         }
     }
 
-    func askToLeave() async -> Bool {
-        guard let page else { return true }
-        return await withCheckedContinuation { continuation in
-            page.askToLeave { continuation.resume(returning: $0) }
-        }
-    }
-
     func close() { page?.close() }
 
     func drop() {

@@ -15,6 +15,9 @@ public protocol BrowserApplication: AnyObject {
     func attachWindow(_ window: NSWindow, id: UUID)
     /// Drops the window's remaining pages. Call it when the window closes.
     func closeWindow(id: UUID)
+    /// Runs each of the window's `beforeunload` handlers in the engine's tab order, as quitting does, and stops at the
+    /// first that keeps its page. Every page stays. True to leave.
+    func askToLeave(windowID: UUID) async -> Bool
 }
 
 /// A profile's engine side: separate cookies, storage and history.
@@ -59,8 +62,6 @@ public protocol Page: AnyObject, Observable {
     func move(toWindow windowID: UUID)
     /// The page's last frame, for a window it left. Nil while it has nothing drawn.
     func snapshot() async -> NSImage?
-    /// Runs the `beforeunload` handler as quitting does and keeps the page either way. True to leave.
-    func askToLeave() async -> Bool
     /// Closes as the user would: unload handlers run, and `closed` or `closeCancelled` follows.
     func close()
     /// Ends the page without unload handlers. Events end.

@@ -74,7 +74,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         guard !asking else { return false }
         asking = true
         Task {
-            if await model.askToLeave() { sender.close() }
+            if await engine.askToLeave(windowID: model.id) { sender.close() }
             asking = false
         }
         return false

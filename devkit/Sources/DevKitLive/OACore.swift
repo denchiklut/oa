@@ -7,6 +7,8 @@ import AppKit
     @objc(profileWithIdentifier:) func profile(identifier: String) -> CoreProfile
     @objc(attachWindow:withIdentifier:) func attach(_ window: NSWindow, identifier: String)
     @objc(closeWindowWithIdentifier:) func closeWindow(identifier: String)
+    @objc(askToLeaveWindowWithIdentifier:completion:) func askToLeaveWindow(
+        identifier: String, completion: @escaping (Bool) -> Void)
     func quit()
 }
 
@@ -36,7 +38,6 @@ import AppKit
     func activate()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
     @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
-    @objc(askToLeaveWithCompletion:) func askToLeave(completion: @escaping (Bool) -> Void)
     func close()
     func drop()
 }

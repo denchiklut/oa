@@ -1,6 +1,7 @@
 #ifndef OA_BROWSER_WINDOW_BROWSER_H_
 #define OA_BROWSER_WINDOW_BROWSER_H_
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -31,6 +32,8 @@ class WindowBrowser : public TabStripModelObserver {
   static WindowBrowser* Find(const std::string& window_id, Profile* profile);
   static void AttachWindow(const std::string& window_id, void* ns_window);
   static void CloseWindow(const std::string& window_id);
+  static void AskToLeave(const std::string& window_id,
+                         std::function<void(bool leave)> completion);
   static void CloseAll();
 
   explicit WindowBrowser(BrowserWindowInterface* browser);

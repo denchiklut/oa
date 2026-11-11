@@ -316,15 +316,6 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
       [handler](void* image) { handler((__bridge NSImage*)image); });
 }
 
-- (void)askToLeaveWithCompletion:(void (^)(BOOL))completion {
-  if (!_page) {
-    completion(YES);
-    return;
-  }
-  void (^handler)(BOOL) = [completion copy];
-  _page->AskToLeave([handler](bool leave) { handler(leave); });
-}
-
 - (void)close {
   if (_page) {
     _page->Close();
@@ -463,6 +454,13 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (void)closeWindowWithIdentifier:(NSString*)identifier {
   oa::CloseWindow(identifier.UTF8String ?: "");
+}
+
+- (void)askToLeaveWindowWithIdentifier:(NSString*)identifier
+                            completion:(void (^)(BOOL))completion {
+  void (^handler)(BOOL) = [completion copy];
+  oa::AskToLeaveWindow(identifier.UTF8String ?: "",
+                       [handler](bool leave) { handler(leave); });
 }
 
 - (void)quit {

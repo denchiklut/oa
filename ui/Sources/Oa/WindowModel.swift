@@ -357,18 +357,6 @@ final class WindowModel {
         creating = [:]
     }
 
-    /// Stops at the first page a `beforeunload` handler keeps. A page that asks comes forward, as in Arc; the
-    /// sidebar order is Oa's own.
-    func askToLeave() async -> Bool {
-        var seen = Set<ObjectIdentifier>()
-        let tabIDs = state.spaces.flatMap { state.selectableTabs(in: $0.id) }.map(\.id)
-        let ordered = tabIDs.flatMap { [pages[$0], peeks[$0]] }.compactMap { $0 } + pages.values + peeks.values
-        for page in ordered where seen.insert(ObjectIdentifier(page)).inserted {
-            guard await page.askToLeave() else { return false }
-        }
-        return true
-    }
-
     /// Lets go of the page for `tabID` without ending it. Another window takes it over this way.
     @discardableResult
     func release(_ tabID: UUID) -> (any Page)? {

@@ -1,6 +1,7 @@
 #ifndef OA_BROWSER_PAGE_IMPL_H_
 #define OA_BROWSER_PAGE_IMPL_H_
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -44,6 +45,9 @@ class PageImpl : public Page,
   // From the dialog views Chrome's managers create for this page.
   void RunDialog(const Dialog& dialog, DialogReply reply);
   void DismissDialog(const Dialog& dialog);
+  // Runs the beforeunload handler as quitting does and keeps the page either
+  // way. A handler-less page answers at once.
+  void AskToLeave(std::function<void(bool leave)> callback);
   base::WeakPtr<PageImpl> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
   // Page:
@@ -66,7 +70,6 @@ class PageImpl : public Page,
   void SetKeepsAddress(bool keeps_address) override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
-  void AskToLeave(LeaveCallback callback) override;
   void Close() override;
   void Drop() override;
 
@@ -132,7 +135,7 @@ class PageImpl : public Page,
   base::WeakPtr<WindowBrowser> window_browser_;
   raw_ptr<Page::Observer> observer_;
   bool closing_ = false;
-  LeaveCallback leave_callback_;
+  std::function<void(bool leave)> leave_callback_;
   bool keeps_address_ = false;
   int dialogs_shown_ = 0;
   bool suppress_dialogs_ = false;

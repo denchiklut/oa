@@ -389,7 +389,7 @@ void PageImpl::Snapshot(SnapshotCallback callback) {
           std::move(callback))));
 }
 
-void PageImpl::AskToLeave(LeaveCallback callback) {
+void PageImpl::AskToLeave(std::function<void(bool leave)> callback) {
   content::WebContents* contents = web_contents();
   if (!contents || closing_ || leave_callback_) {
     callback(!contents);

@@ -205,6 +205,11 @@ void CloseWindow(const std::string& window_id) {
   WindowBrowser::CloseWindow(window_id);
 }
 
+void AskToLeaveWindow(const std::string& window_id,
+                      std::function<void(bool leave)> completion) {
+  WindowBrowser::AskToLeave(window_id, std::move(completion));
+}
+
 void QuitEngine() {
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce([] {

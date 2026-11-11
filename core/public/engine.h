@@ -27,6 +27,11 @@ void CreatePage(const std::string& window_id,
 void AttachWindow(const std::string& window_id, void* ns_window);
 // Drops every page of `window_id`'s Browsers, which then close.
 void CloseWindow(const std::string& window_id);
+// Runs the beforeunload handler of each page of `window_id`'s Browsers in tab
+// strip order, as Chrome's shutdown does, and stops at the first that keeps its
+// page. Every page stays.
+void AskToLeaveWindow(const std::string& window_id,
+                      std::function<void(bool leave)> completion);
 
 void QuitEngine();
 

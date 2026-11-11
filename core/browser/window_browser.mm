@@ -49,6 +49,27 @@ std::vector<base::WeakPtr<WindowBrowser>> OpenWindowBrowsers(
   return result;
 }
 
+void AskPagesToLeave(std::vector<base::WeakPtr<PageImpl>> pages,
+                     size_t index,
+                     std::function<void(bool leave)> completion) {
+  while (index < pages.size() && !pages[index]) {
+    ++index;
+  }
+  if (index == pages.size()) {
+    completion(true);
+    return;
+  }
+  PageImpl* page = pages[index].get();
+  page->AskToLeave([pages = std::move(pages), index,
+                    completion = std::move(completion)](bool leave) mutable {
+    if (!leave) {
+      completion(false);
+      return;
+    }
+    AskPagesToLeave(std::move(pages), index + 1, std::move(completion));
+  });
+}
+
 void RemoveAllTabs(base::WeakPtr<WindowBrowser> window_browser) {
   while (window_browser) {
     TabStripModel* model = window_browser->browser()->GetTabStripModel();
@@ -116,6 +137,23 @@ void WindowBrowser::CloseWindow(const std::string& window_id) {
        OpenWindowBrowsers(&window_id)) {
     RemoveAllTabs(window_browser);
   }
+}
+
+// static
+void WindowBrowser::AskToLeave(const std::string& window_id,
+                               std::function<void(bool leave)> completion) {
+  std::vector<base::WeakPtr<PageImpl>> pages;
+  for (base::WeakPtr<WindowBrowser>& window_browser :
+       OpenWindowBrowsers(&window_id)) {
+    TabStripModel* model = window_browser->browser()->GetTabStripModel();
+    for (int index = 0; index < model->count(); ++index) {
+      if (PageImpl* page =
+              PageImpl::FromWebContents(model->GetWebContentsAt(index))) {
+        pages.push_back(page->GetWeakPtr());
+      }
+    }
+  }
+  AskPagesToLeave(std::move(pages), 0, std::move(completion));
 }
 
 // static

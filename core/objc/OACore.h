@@ -95,8 +95,6 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
 // Nil while the page has nothing drawn, for example when no window shows it.
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable image))completion;
-// Runs the beforeunload handler as quitting does and keeps the page either way.
-- (void)askToLeaveWithCompletion:(void (^)(BOOL leave))completion;
 - (void)close;
 - (void)drop;
 @end
@@ -118,6 +116,9 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 - (void)attachWindow:(NSWindow*)window withIdentifier:(NSString*)identifier;
 // Drops the window's pages; its Browsers then close.
 - (void)closeWindowWithIdentifier:(NSString*)identifier;
+// Asks each page's beforeunload handler in tab strip order; every page stays.
+- (void)askToLeaveWindowWithIdentifier:(NSString*)identifier
+                            completion:(void (^)(BOOL leave))completion;
 - (void)quit;
 @end
 
