@@ -131,8 +131,9 @@ struct SidebarTree {
         insert(item, into: parentID, at: items[parentID]?.childIDs.count ?? 0)
     }
 
+    /// An item already in the tree isn't inserted again, as Arc's sidebar does.
     mutating func insert(_ item: SidebarItem, into parentID: UUID, at index: Int) {
-        guard let parent = items[parentID] else { return }
+        guard let parent = items[parentID], items[item.id] == nil else { return }
         var item = item
         item.parentID = parentID
         items[item.id] = item
