@@ -92,6 +92,15 @@ final class StubPage: Page {
         return image
     }
 
+    func askToLeave() async -> Bool {
+        guard asksBeforeClosing else { return true }
+        return await withCheckedContinuation { continuation in
+            ask(.beforeUnload(isReload: false), title: "Leave site?", activating: true) {
+                continuation.resume(returning: $0)
+            }
+        }
+    }
+
     func close() {
         guard asksBeforeClosing else { return closeItself() }
         ask(.beforeUnload(isReload: false), title: "Leave site?") { [weak self] accepted in
@@ -161,7 +170,7 @@ final class StubPage: Page {
 
     private func ask(
         _ kind: PageDialog.Kind, title: String? = nil, message: String = "Changes you made may not be saved.",
-        reply: @escaping (Bool) -> Void
+        activating: Bool = false, reply: @escaping (Bool) -> Void
     ) {
         if suppressesDialogs {
             return reply(
@@ -178,8 +187,10 @@ final class StubPage: Page {
             reply(accepted)
         }
         guard hostingView.window != nil else {
-            guard kind == .alert else { return reply(false) }
+            guard kind == .alert || activating else { return reply(false) }
             pendingDialog = dialog
+            // Chromium brings the tab of an app-modal dialog forward, which is how quitting shows each one.
+            if activating { continuation?.yield(.wantsActivation) }
             return
         }
         continuation?.yield(.dialog(dialog))
