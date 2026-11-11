@@ -328,19 +328,21 @@ final class WindowModel {
         }
     }
 
-    /// Window close and quit: a page whose tab another window shows moves there; the rest are dropped without
-    /// unload handlers. The records stay.
-    func dropAll() {
+    /// Window close and quit: pages are dropped without unload handlers and the records stay. Only a closing window
+    /// hands a page to another window showing its tab; quitting hands nothing over, as Arc does.
+    func dropAll(handingOff: Bool) {
         for tabID in Array(pages.keys) {
             guard let page = release(tabID) else { continue }
-            if let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }) {
+            if handingOff, let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }) {
                 heir.adopt(page, for: tabID, from: self)
             } else {
                 page.drop()
             }
         }
         for (ownerID, page) in peeks {
-            if ownerID != archivePeekID { store.archivePage(page, in: spaceID(ofPeekOwner: ownerID)) }
+            if ownerID != archivePeekID, state.tree.tab(ownerID) != nil {
+                store.archivePage(page, in: spaceID(ofPeekOwner: ownerID))
+            }
             page.drop()
         }
         peeks = [:]

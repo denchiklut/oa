@@ -41,7 +41,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        for window in windows { window.model.dropAll() }
+        for window in windows { window.model.dropAll(handingOff: false) }
         store.saveAndFreeze()
         engine.terminate()
         return .terminateLater
