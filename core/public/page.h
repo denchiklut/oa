@@ -167,6 +167,9 @@ class Page {
   virtual void* Favicon() const = 0;
   virtual SecurityLevel GetSecurityLevel() const = 0;
   virtual NavigationResult GetNavigationResult() const = 0;
+  // While the page captures from them, as ArcCore's media session reports.
+  virtual bool IsCameraOn() const = 0;
+  virtual bool IsMicrophoneOn() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;

@@ -111,6 +111,8 @@ typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
 @property(nonatomic, readonly, nullable) NSImage* favicon;
 @property(nonatomic, readonly) OAPageSecurityLevel securityLevel;
 @property(nonatomic, readonly) OAPageNavigationResult navigationResult;
+@property(nonatomic, readonly, getter=isCameraOn) BOOL cameraOn;
+@property(nonatomic, readonly, getter=isMicrophoneOn) BOOL microphoneOn;
 // Links to another host open a new page instead of navigating this one.
 @property(nonatomic) BOOL keepsAddress;
 - (instancetype)init NS_UNAVAILABLE;

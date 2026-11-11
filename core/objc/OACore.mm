@@ -343,6 +343,14 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
                : OAPageNavigationResultNone;
 }
 
+- (BOOL)isCameraOn {
+  return _page && _page->IsCameraOn();
+}
+
+- (BOOL)isMicrophoneOn {
+  return _page && _page->IsMicrophoneOn();
+}
+
 - (void)loadURL:(NSURL*)url {
   if (_page) {
     _page->Load(url.absoluteString.UTF8String ?: "");
