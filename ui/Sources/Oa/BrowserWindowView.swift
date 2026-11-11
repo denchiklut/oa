@@ -117,6 +117,9 @@ struct BrowserWindowView: View {
                 Image(systemName: "slider.horizontal.3")
             }
             .disabled(!["http", "https"].contains(page?.url?.scheme))
+            // As Arc: another tab or another site closes it, a navigation within the site doesn't. Where Arc draws
+            // the site's edge is unknown; the host is Oa's own.
+            .onChange(of: [page?.id.uuidString, page?.url?.host()]) { showingSiteControls = false }
             .popover(isPresented: $showingSiteControls, arrowEdge: .bottom) {
                 SiteControlsView(model: model, isSecure: page?.securityLevel == .secure) {
                     showingSiteControls = false
