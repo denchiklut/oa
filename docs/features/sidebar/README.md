@@ -85,15 +85,19 @@ top of its Space's unpinned section, not selected, with its page made on first
 selection from the saved URL and no history; a tab whose Space is gone returns to
 the window's Space. Clicking the row itself shows the page in a Peek over the
 list; see [Peek](../peek/README.md). File ▸ Restore Last Closed Tab ⇧⌘T brings the newest entry
-back at its old index, selected, switching the window to its Space. Archive ▸
+back at its old index, selected, switching the window to its Space, and, as in
+Arc, with its back and forward history and the page from Chromium's cache while
+Chromium still keeps the closed tab; that record lasts until quit, so after a
+relaunch the tab loads its saved URL. Archive ▸
 Clear Archive empties it after a confirmation. Each tab carries the time a
 window last selected it; a sweep at launch and every 15 minutes archives
 unpinned tabs idle for 12 hours, Arc's default, unless a window has them
 selected, and there is no setting to turn it off. A due tab with a live page is
 closed as the user would, so a `beforeunload` handler can keep it; a kept tab
 counts as viewed now and is not asked again for another 12 hours, Oa's own rule,
-after Arc's idle unload, which never prompts. Arc keeps a separate session-only
-⇧⌘T stack with engine history; a follow-up.
+after Arc's idle unload, which never prompts. Arc's ⇧⌘T walks a separate
+session-only stack and switches to a tab that is open again; Oa's walks the
+Archive, a follow-up.
 
 A page a page opens, with a `target=_blank` link, `window.open` or a ⌘-click,
 keeps the page the engine made for it, so `window.opener`, session storage and a
