@@ -151,15 +151,20 @@ final class WindowModel {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }
 
-    /// As Arc: every live page of the Space, Peeks too, closes at once as the user would; the ones that ask come
-    /// forward one after another, and any that stays keeps the Space. Then this window moves to the neighbor above,
-    /// else below.
+    /// As Arc: every live page of the Space closes at once as the user would; the ones that ask come forward one
+    /// after another, and any that stays keeps the Space. Its Peeks go without asking or an entry; Arc runs their
+    /// handlers and unloads them, Oa drops them. Then this window moves to the neighbor above, else below.
     func deleteSpace(_ spaceID: UUID) {
         guard state.spaces.count > 1, state.space(spaceID) != nil, store.deletingSpace == nil else { return }
         let tabIDs = state.tabs(in: spaceID).map(\.id)
-        let live = store.windows.flatMap { window in
-            tabIDs.flatMap { [window.pages[$0], window.peeks[$0]] }.compactMap { $0 }
+        for window in store.windows {
+            for tabID in tabIDs {
+                guard let peek = window.peeks.removeValue(forKey: tabID) else { continue }
+                window.dialogs[peek.id] = nil
+                peek.drop()
+            }
         }
+        let live = store.windows.flatMap { window in tabIDs.compactMap { window.pages[$0] } }
         guard !live.isEmpty else { return removeSpace(spaceID) }
         if selectedSpaceID != spaceID { selectSpace(spaceID) }
         store.deletingSpace = ClosingSpace(id: spaceID, window: self, closing: Set(live.map(\.id)))
