@@ -8,6 +8,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let engine: any BrowserApplication
     private let store: SidebarStore
     private let didClose: (BrowserWindowController) -> Void
+    private var asking = false
 
     init(
         id: UUID, engine: any BrowserApplication, store: SidebarStore, spaceID: UUID,
@@ -65,6 +66,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowDidBecomeKey(_ notification: Notification) {
         model.showSelected()
         if model.dialog == nil { model.page?.activate() }
+    }
+
+    /// Only the last window asks, as Arc's does: another one takes the pages over.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard store.windows.count == 1 else { return true }
+        guard !asking else { return false }
+        asking = true
+        Task {
+            if await model.askToLeave() { sender.close() }
+            asking = false
+        }
+        return false
     }
 
     func windowWillClose(_ notification: Notification) {

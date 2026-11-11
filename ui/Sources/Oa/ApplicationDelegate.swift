@@ -40,10 +40,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
+    /// A page whose `beforeunload` handler stays cancels the quit, as Arc's does.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        for window in windows { window.model.dropAll(handingOff: false) }
-        store.saveAndFreeze()
-        engine.terminate()
+        Task {
+            for window in windows {
+                guard await window.model.askToLeave() else { return sender.reply(toApplicationShouldTerminate: false) }
+            }
+            for window in windows { window.model.dropAll(handingOff: false) }
+            store.saveAndFreeze()
+            engine.terminate()
+        }
         return .terminateLater
     }
 
