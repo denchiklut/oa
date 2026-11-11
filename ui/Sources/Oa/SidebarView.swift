@@ -350,6 +350,17 @@ private struct PeekBadge: View {
 }
 
 /// Reads the model itself, so a change to its tab's page, Peek or selection re-renders the row alone.
+/// Arc's recording dot, before the favicon while the tab's page uses the camera or microphone.
+private struct RecordingDot: View {
+    var body: some View {
+        Circle()
+            .fill(Color.red)
+            .overlay(Circle().strokeBorder(.white.opacity(0.85), lineWidth: 1.5))
+            .frame(width: 8, height: 8)
+            .help("This tab is using your camera or microphone")
+    }
+}
+
 private struct TabRow: View {
     let model: WindowModel
     let tab: SidebarTab
@@ -358,6 +369,7 @@ private struct TabRow: View {
     var body: some View {
         let selected = model.selectedTabID == tab.id
         HStack(spacing: 6) {
+            if model.isRecording(tab) { RecordingDot() }
             Group {
                 if let icon = model.favicon(for: tab) {
                     Image(nsImage: icon).resizable().interpolation(.high)
