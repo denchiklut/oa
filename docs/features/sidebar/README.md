@@ -45,12 +45,15 @@ window selects another tab, when the showing window becomes key, and when the
 holding window closes. Pages of Spaces not shown stay alive with their views
 detached, so the engine sees them as hidden. A closing window that isn't the
 last hands every page it holds, shown or hidden and with its Peek, to another
-window, preferring one that shows its tab, with no prompt, as Arc does. The last
-window and quit first ask each page's `beforeunload` handler without closing it,
-window by window in the order each window got its pages, as Chrome's shutdown
-pass in Arc does; a page that asks comes forward with "Leave site?", and a
-Cancel ends the pass and keeps the window or the app running. Then the pages are
-dropped and the records stay.
+window, preferring one that shows its tab, with no prompt, as Arc does. ⌘Q and
+Quit first show Arc's "Quit Oa?" with Quit, Cancel and "Quit, and don't ask
+again", which turns the warning off; Settings ▸ General ▸ "Warn before quitting"
+turns it back on. It is on by default, LIKELY as in Arc, and a quit from the
+Dock or at logout doesn't ask. Then the last window and quit ask each page's
+`beforeunload` handler without closing it, window by window in the order each
+window got its pages, as Chrome's shutdown pass in Arc does; a page that asks
+comes forward with "Leave site?", and a Cancel ends the pass and keeps the
+window or the app running. Then the pages are dropped and the records stay.
 
 Close Tab ⌘W reads "Archive Tab" on an unpinned tab, as in Arc: the page,
 wherever it lives, closes as the user would, and once it reports closed the

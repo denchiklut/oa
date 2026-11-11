@@ -8,6 +8,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     private var windows: [BrowserWindowController] = []
     private var mainMenu: MainMenu?
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
+    private lazy var settings = SettingsWindowController()
+    private var askingToQuit = false
     private static var current: ApplicationDelegate?
 
     static func start(engine: any BrowserApplication) {
@@ -56,6 +58,34 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func newWindow(_ sender: Any?) { openWindow() }
+    @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
+
+    /// As Arc: ⌘Q and Quit ask first while the warning is on, before any page is asked; quitting from the Dock or
+    /// at logout doesn't.
+    @objc func quit(_ sender: Any?) {
+        guard QuitWarning.isOn else { return NSApplication.shared.terminate(nil) }
+        guard !askingToQuit else { return }
+        askingToQuit = true
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa"
+        let alert = NSAlert()
+        alert.messageText = "Quit \(name)?"
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Quit, and don't ask again")
+        let answer: @MainActor (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            self?.askingToQuit = false
+            guard response != .alertSecondButtonReturn else { return }
+            if response == .alertThirdButtonReturn { QuitWarning.isOn = false }
+            // After the sheet is gone, and from the run loop rather than the main queue: quitting waits on pages'
+            // prompts, which run on the main queue.
+            NSApplication.shared.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
+        }
+        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow {
+            alert.beginSheetModal(for: window) { response in MainActor.assumeIsolated { answer(response) } }
+        } else {
+            answer(alert.runModal())
+        }
+    }
     @objc func restoreData(_ sender: Any?) { restoreData.show() }
 
     /// Quits and opens the bundle again once this process is gone, with the engine and data directory it was

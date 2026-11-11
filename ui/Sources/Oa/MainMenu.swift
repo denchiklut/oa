@@ -11,6 +11,8 @@ final class MainMenu {
         let app = submenu(appName, in: menu)
         app.addItem(item("About \(appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
         app.addItem(.separator())
+        app.addItem(item("Settings…", #selector(ApplicationDelegate.showSettings(_:)), key: ","))
+        app.addItem(.separator())
         app.addItem(item("Hide \(appName)", #selector(NSApplication.hide(_:)), key: "h"))
         app.addItem(
             item(
@@ -18,7 +20,7 @@ final class MainMenu {
                 modifiers: [.command, .option]))
         app.addItem(item("Show All", #selector(NSApplication.unhideAllApplications(_:))))
         app.addItem(.separator())
-        app.addItem(item("Quit \(appName)", #selector(NSApplication.terminate(_:)), key: "q"))
+        app.addItem(item("Quit \(appName)", #selector(ApplicationDelegate.quit(_:)), key: "q"))
 
         let file = submenu("File", in: menu)
         file.addItem(item("New Window", #selector(ApplicationDelegate.newWindow(_:)), key: "n"))

@@ -411,7 +411,7 @@ Sources: Arc [2023][arc23], [2024–2026][arc24], [feature FAQ][arc-faq].
 | Manually check for browser updates | ✅ | ☐ |
 | Automatic browser updates | ✅ | ☐ |
 | Update-available prompt and restart workflow | ✅ | ☐ |
-| Warn before quitting | ✅ | ☐ |
+| Warn before quitting | ✅ | ✅ |
 | Browser sound-effects switch | ✅ | ☐ |
 | Tab-reordering haptic-feedback switch | ✅ | ☐ |
 | Configure whether previous windows reopen at startup | ✅ | ☐ |
