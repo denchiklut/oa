@@ -294,6 +294,10 @@ private struct FavoriteTile: View {
             .overlay(alignment: .topTrailing) {
                 if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon).offset(x: 5, y: -5) }
             }
+            // Arc's tiles carry the recording dot too (AppTray's `recordingIndicatorView`); the corner is Oa's own.
+            .overlay(alignment: .topLeading) {
+                if model.isRecording(tab) { RecordingDot().padding(6) }
+            }
             .contentShape(Rectangle())
             .onTapGesture { model.select(tab.id) }
             .onHover { hovering = $0 }
