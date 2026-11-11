@@ -27,6 +27,7 @@ final class ChromiumPage: Page {
     @ObservationIgnored private let continuation: AsyncStream<PageEvent>.Continuation
     @ObservationIgnored private let hostingView = PageHostingView()
     @ObservationIgnored private var dialogs: [ObjectIdentifier: PageDialog] = [:]
+    @ObservationIgnored private var permissionRequests: [ObjectIdentifier: PagePermissionRequest] = [:]
 
     var view: NSView { hostingView }
 
@@ -115,6 +116,21 @@ final class ChromiumPage: Page {
         }
     }
 
+    fileprivate func permissionRequested(_ core: CorePagePermissionRequest) {
+        let request = PagePermissionRequest(
+            nameOrOrigin: core.nameOrOrigin, nameIsOrigin: core.nameIsOrigin,
+            kinds: core.kinds.compactMap { PermissionKind(core: $0.intValue) }
+        ) { core.respond($0.core) }
+        permissionRequests[ObjectIdentifier(core)] = request
+        continuation.yield(.permissionRequest(request))
+    }
+
+    fileprivate func permissionRequestClosed(_ core: CorePagePermissionRequest) {
+        if let request = permissionRequests.removeValue(forKey: ObjectIdentifier(core)) {
+            continuation.yield(.permissionRequestClosed(request))
+        }
+    }
+
     fileprivate func closeCancelled() {
         if page != nil { continuation.yield(.closeCancelled) }
     }
@@ -174,6 +190,14 @@ final class PageDelegate: NSObject, CorePageDelegate {
 
     func page(_ page: CorePage, didDismissDialog dialog: CorePageDialog) { content?.dialogDismissed(dialog) }
 
+    func page(_ page: CorePage, didRequestPermission request: CorePagePermissionRequest) {
+        content?.permissionRequested(request)
+    }
+
+    func page(_ page: CorePage, didClosePermissionRequest request: CorePagePermissionRequest) {
+        content?.permissionRequestClosed(request)
+    }
+
     func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }
 
     func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32) {
@@ -225,6 +249,33 @@ extension PageDialog.Kind {
         case 2: self = .prompt(defaultText: core.defaultText)
         case 3: self = .beforeUnload(isReload: core.isReload)
         default: self = .alert
+        }
+    }
+}
+
+extension PermissionKind {
+    /// `oa::PermissionKind` in `core/public/page.h`.
+    init?(core: Int) {
+        let kinds: [PermissionKind] = [
+            .ambientLogin, .ar, .cameraPanTiltZoom, .camera, .capturedSurfaceControl, .clipboard,
+            .topLevelStorageAccess, .quota, .fileSystemAccess, .geolocation, .handTracking, .identityProvider,
+            .idleDetection, .localFonts, .localNetwork, .loopbackNetwork, .microphone, .midiSysex, .multipleDownloads,
+            .notifications, .keyboardLock, .pointerLock, .protocolHandler, .sensors, .storageAccess, .vr,
+            .webAppInstallation, .windowManagement,
+        ]
+        guard kinds.indices.contains(core) else { return nil }
+        self = kinds[core]
+    }
+}
+
+extension PermissionResponse {
+    /// `OAPagePermissionResponse` in `core/objc/OACore.h`.
+    var core: Int {
+        switch self {
+        case .allow: 0
+        case .allowThisTime: 1
+        case .deny: 2
+        case .dismiss: 3
         }
     }
 }

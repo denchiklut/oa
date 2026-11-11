@@ -55,6 +55,13 @@ import AppKit
     @objc(cancelWithSuppress:) func cancel(suppress: Bool)
 }
 
+@MainActor @objc protocol CorePagePermissionRequest: NSObjectProtocol {
+    var nameOrOrigin: String { get }
+    var nameIsOrigin: Bool { get }
+    var kinds: [NSNumber] { get }
+    @objc(respond:) func respond(_ response: Int)
+}
+
 @MainActor @objc protocol CorePageDelegate: NSObjectProtocol {
     @objc(pageDidChangeState:) func pageDidChangeState(_ page: CorePage)
     @objc(page:didOpenPage:targetURL:disposition:)
@@ -64,6 +71,10 @@ import AppKit
     @objc(pageRendererReady:) func pageRendererReady(_ page: CorePage)
     @objc(page:didRequestDialog:) func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog)
     @objc(page:didDismissDialog:) func page(_ page: CorePage, didDismissDialog dialog: CorePageDialog)
+    @objc(page:didRequestPermission:)
+    func page(_ page: CorePage, didRequestPermission request: CorePagePermissionRequest)
+    @objc(page:didClosePermissionRequest:)
+    func page(_ page: CorePage, didClosePermissionRequest request: CorePagePermissionRequest)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
     @objc(page:didCloseWithSessionID:) func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32)
 }
