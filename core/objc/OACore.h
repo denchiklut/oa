@@ -60,6 +60,22 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 - (void)cancelWithSuppress:(BOOL)suppress;
 @end
 
+typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
+  OAPagePermissionResponseAllow,
+  OAPagePermissionResponseAllowThisTime,
+  OAPagePermissionResponseDeny,
+  OAPagePermissionResponseDismiss,
+};
+
+@interface OAPagePermissionRequest : NSObject
+@property(nonatomic, readonly) NSString* nameOrOrigin;
+@property(nonatomic, readonly) BOOL nameIsOrigin;
+// `oa::PermissionKind` values, in Chromium's order for the merged request.
+@property(nonatomic, readonly) NSArray<NSNumber*>* kinds;
+- (instancetype)init NS_UNAVAILABLE;
+- (void)respond:(OAPagePermissionResponse)response;
+@end
+
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
 // `openedPage` has no delegate yet; releasing it drops the page.
@@ -72,6 +88,10 @@ typedef NS_ENUM(NSInteger, OAPageDialogKind) {
 - (void)pageRendererReady:(OAPage*)page;
 - (void)page:(OAPage*)page didRequestDialog:(OAPageDialog*)dialog;
 - (void)page:(OAPage*)page didDismissDialog:(OAPageDialog*)dialog;
+- (void)page:(OAPage*)page
+    didRequestPermission:(OAPagePermissionRequest*)request;
+- (void)page:(OAPage*)page
+    didClosePermissionRequest:(OAPagePermissionRequest*)request;
 - (void)pageDidCancelClose:(OAPage*)page;
 // `sessionID` is -1 when Chrome kept no record of the tab.
 - (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;

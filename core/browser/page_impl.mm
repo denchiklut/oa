@@ -500,6 +500,25 @@ void PageImpl::DismissDialog(const Dialog& dialog) {
   }
 }
 
+void PageImpl::RequestPermission(const PermissionRequest& request,
+                                 PermissionReply reply) {
+  if (!observer_) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](PermissionReply reply) { reply(PermissionResponse::kDismiss); },
+            std::move(reply)));
+    return;
+  }
+  observer_->OnPagePermissionRequest(request, std::move(reply));
+}
+
+void PageImpl::ClosePermissionRequest(const PermissionRequest& request) {
+  if (observer_) {
+    observer_->OnPagePermissionRequestClosed(request);
+  }
+}
+
 content::WebContents* PageImpl::OpenURLFromTab(
     content::WebContents* source,
     const content::OpenURLParams& params,
