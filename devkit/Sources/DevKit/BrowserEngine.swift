@@ -51,6 +51,9 @@ public protocol Page: AnyObject, Observable {
     var securityLevel: SecurityLevel { get }
     /// Nil from a navigation's start until its document loads or fails, as Arc's ADK reports it.
     var navigationResult: NavigationResult? { get }
+    /// While the page captures from them, as ADK's media session state reports.
+    var isCameraOn: Bool { get }
+    var isMicrophoneOn: Bool { get }
     /// Why the renderer is gone, nil once a new one is ready, as after a reload.
     var crash: PageCrash? { get }
     /// A page that keeps its address, as a pinned tab does: a link to another host opens a new page instead of

@@ -31,6 +31,8 @@ import AppKit
     var favicon: NSImage? { get }
     var securityLevel: Int { get }
     var navigationResult: Int { get }
+    var isCameraOn: Bool { get }
+    var isMicrophoneOn: Bool { get }
     var keepsAddress: Bool { get set }
     @objc(loadURL:) func load(_ url: URL)
     func goBack()

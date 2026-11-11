@@ -23,6 +23,8 @@ final class StubPage: Page {
         }
     }
     private(set) var crash: PageCrash?
+    private(set) var isCameraOn = false
+    private(set) var isMicrophoneOn = false
     var keepsAddress = false
     /// A `beforeunload` handler that wants to stay, as a page with unsaved changes.
     var asksBeforeClosing = false
@@ -305,6 +307,22 @@ final class StubPage: Page {
         continuation?.yield(.permissionRequest(request))
     }
 
+    /// As a page's `getUserMedia`: capture starts once the host may use both.
+    func toggleCapture() {
+        if isCameraOn || isMicrophoneOn {
+            isCameraOn = false
+            isMicrophoneOn = false
+            return
+        }
+        guard let host = url?.host() else { return }
+        let allowed = { (kind: PermissionKind) in Self.permissionAnswers["\(host) \(kind)"] == .allow }
+        guard allowed(.camera), allowed(.microphone) else {
+            return askPermission([.camera, .microphone])
+        }
+        isCameraOn = true
+        isMicrophoneOn = true
+    }
+
     private func permissionAnswered(_ response: PermissionResponse, host: String, kinds: [PermissionKind]) {
         if response == .allow || response == .deny {
             for kind in kinds { Self.permissionAnswers["\(host) \(kind)"] = response }
@@ -335,6 +353,8 @@ final class StubPage: Page {
 
     private func startLoading() {
         load?.cancel()
+        isCameraOn = false
+        isMicrophoneOn = false
         permissionQueue = []
         closePermissionRequest()
         crash = nil
@@ -444,6 +464,9 @@ private struct StubPageView: View {
                                 page.askPermission([.notifications])
                             }
                             Button("Ask for location in 3 s") { page.askPermissionLater([.geolocation]) }
+                            Button(page.isCameraOn ? "Stop capturing" : "Capture camera and microphone") {
+                                page.toggleCapture()
+                            }
                         }
                     }
                     .buttonStyle(.link)
