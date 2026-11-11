@@ -43,6 +43,8 @@ public protocol Page: AnyObject, Observable {
     /// The icon the engine's favicon driver chose for the page, nil until it has one.
     var favicon: NSImage? { get }
     var securityLevel: SecurityLevel { get }
+    /// Nil from a navigation's start until its document loads or fails, as Arc's ADK reports it.
+    var navigationResult: NavigationResult? { get }
     /// Why the renderer is gone, nil once a new one is ready, as after a reload.
     var crash: PageCrash? { get }
     /// A page that keeps its address, as a pinned tab does: a link to another host opens a new page instead of
@@ -140,6 +142,11 @@ public enum PageCrash: Sendable, Equatable {
 }
 
 /// Chromium's security level for the page's visible URL.
+public enum NavigationResult: Sendable, Equatable {
+    case loaded
+    case failed
+}
+
 public enum SecurityLevel: Sendable, Equatable {
     case neutral
     case secure

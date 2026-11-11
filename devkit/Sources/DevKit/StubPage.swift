@@ -14,6 +14,7 @@ final class StubPage: Page {
     var canGoBack: Bool { position > 0 }
     var canGoForward: Bool { position < history.count - 1 }
     private(set) var favicon: NSImage?
+    private(set) var navigationResult: NavigationResult?
     var securityLevel: SecurityLevel {
         switch url?.scheme {
         case "https": .secure
@@ -262,6 +263,7 @@ final class StubPage: Page {
     private func startLoading() {
         load?.cancel()
         crash = nil
+        navigationResult = nil
         isLoading = true
         loadProgress = 0.1
         load = Task { [weak self] in
@@ -271,12 +273,15 @@ final class StubPage: Page {
         }
     }
 
+    /// A host ending in `.invalid` fails to load, as a site that can't be reached does.
     private func finishLoading() {
         load?.cancel()
         load = nil
         if let url {
+            let failed = url.host()?.hasSuffix(".invalid") == true
             title = StubPage.title(for: url)
-            favicon = StubPage.icon(for: url)
+            favicon = failed ? nil : StubPage.icon(for: url)
+            navigationResult = failed ? .failed : .loaded
         }
         isLoading = false
         loadProgress = 1
