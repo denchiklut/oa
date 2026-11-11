@@ -68,7 +68,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
-        model.dropAll()
+        model.dropAll(handingOff: true)
         store.removeWindow(model)
         engine.closeWindow(id: model.id)
         didClose(self)
