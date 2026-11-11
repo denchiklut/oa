@@ -21,14 +21,15 @@ public protocol BrowserApplication: AnyObject {
 @MainActor
 public protocol BrowserContext: AnyObject {
     var id: UUID { get }
-    /// A page with the app's `id` in the app's window `windowID`, in the background with nothing loaded. The app
-    /// issues the first `load`. Nil when the engine can't create it.
-    func makePage(id: UUID, windowID: UUID) async -> (any Page)?
+    /// A page with an `id` of its own in the app's window `windowID`, in the background with nothing loaded. The
+    /// app issues the first `load`. Nil when the engine can't create it.
+    func makePage(windowID: UUID) async -> (any Page)?
 }
 
 /// One page and its history. Observable, so views that read it update as it loads.
 @MainActor
 public protocol Page: AnyObject, Observable {
+    /// The page's own identity, never its tab's, as Arc's content IDs are.
     var id: UUID { get }
     var url: URL? { get }
     var title: String { get }
@@ -66,7 +67,7 @@ public protocol Page: AnyObject, Observable {
 
 public enum PageEvent {
     /// The page opened another page, live in this page's window with its opener kept. The app installs it under a
-    /// tab that takes its `id`, or drops it.
+    /// tab, or drops it.
     case opened(any Page, url: URL?, disposition: OpenDisposition)
     /// The page asked to be shown, as `window.focus()` and a `window.open` reusing a named page do. The app selects
     /// its tab or ignores it.
