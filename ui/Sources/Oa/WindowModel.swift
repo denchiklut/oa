@@ -515,9 +515,12 @@ final class WindowModel {
         }
     }
 
+    /// As Arc, whose ADK observes a page with `.initial`: what the page already shows counts, since tracking only
+    /// reports changes and a page opened by script may have its title before it arrives here.
     private func install(_ page: any Page, for tabID: UUID) {
         pages[tabID] = page
         page.keepsAddress = state.keepsAddress(tabID)
+        save(page, for: tabID)
         observe(page, for: tabID)
     }
 
@@ -674,11 +677,15 @@ final class WindowModel {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, let page = pages[tabID], ObjectIdentifier(page) == identity else { return }
-                store.setSavedPage(tabID, title: page.title, url: page.url)
-                if let favicon = page.favicon { store.setSavedFavicon(tabID, favicon) }
+                save(page, for: tabID)
                 observe(page, for: tabID)
             }
         }
+    }
+
+    private func save(_ page: any Page, for tabID: UUID) {
+        store.setSavedPage(tabID, title: page.title, url: page.url)
+        if let favicon = page.favicon { store.setSavedFavicon(tabID, favicon) }
     }
 
     /// A Favorite's page that ends leaves the tile, as a pinned tab's leaves its row, unless Remove Favorite asked
