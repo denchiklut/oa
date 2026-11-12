@@ -1,11 +1,13 @@
 #import "oa/objc/OACore.h"
 
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
 
 #include "base/memory/raw_ptr.h"
+#include "oa/public/downloads.h"
 #include "oa/public/engine.h"
 #include "oa/public/page.h"
 #include "oa/public/site_settings.h"
@@ -34,6 +36,19 @@
 - (instancetype)initWithSetting:(const oa::SiteSetting&)setting;
 @end
 
+@interface OADownload ()
+- (instancetype)initWithDownload:(const oa::Download&)download
+                            page:(nullable OAPage*)page;
+@end
+
+@interface OADownloads ()
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier;
+- (void)downloadsInitialized:(const std::vector<oa::Download>&)downloads;
+- (void)downloadCreated:(const oa::Download&)download page:(oa::Page*)page;
+- (void)downloadUpdated:(const oa::Download&)download page:(oa::Page*)page;
+- (void)downloadRemoved:(const std::string&)identifier;
+@end
+
 @interface OAProfile ()
 - (instancetype)initWithIdentifier:(NSString*)identifier;
 @end
@@ -49,6 +64,12 @@ NSString* ToNSString(const std::string& string) {
                                   length:string.size()
                                 encoding:NSUTF8StringEncoding]
              ?: @"";
+}
+
+// A download names its page by the engine's object.
+std::map<oa::Page*, __weak OAPage*>& PagesByCore() {
+  static auto* pages = new std::map<oa::Page*, __weak OAPage*>();
+  return *pages;
 }
 
 OAPageOpenDisposition ToDisposition(oa::OpenDisposition disposition) {
@@ -276,6 +297,7 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 }
 
 - (void)dealloc {
+  PagesByCore().erase(_page.get());
   _page.reset();
 }
 
@@ -285,6 +307,7 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (void)setPage:(std::unique_ptr<oa::Page>)page {
   _page = std::move(page);
+  PagesByCore()[_page.get()] = self;
   _page->SetObserver(_observer.get());
   _page->SetKeepsAddress(_keepsAddress);
 }
@@ -519,13 +542,177 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 @end
 
+namespace {
+
+OADownloadState ToDownloadState(oa::DownloadState state) {
+  switch (state) {
+    case oa::DownloadState::kInProgress:
+      return OADownloadStateInProgress;
+    case oa::DownloadState::kComplete:
+      return OADownloadStateComplete;
+    case oa::DownloadState::kCancelled:
+      return OADownloadStateCancelled;
+    case oa::DownloadState::kInterrupted:
+      return OADownloadStateInterrupted;
+  }
+}
+
+class DownloadsObserverBridge : public oa::Downloads::Observer {
+ public:
+  explicit DownloadsObserverBridge(OADownloads* downloads)
+      : downloads_(downloads) {}
+  void OnDownloadsInitialized(
+      const std::vector<oa::Download>& downloads) override {
+    [downloads_ downloadsInitialized:downloads];
+  }
+  void OnDownloadCreated(const oa::Download& download,
+                         oa::Page* page) override {
+    [downloads_ downloadCreated:download page:page];
+  }
+  void OnDownloadUpdated(const oa::Download& download,
+                         oa::Page* page) override {
+    [downloads_ downloadUpdated:download page:page];
+  }
+  void OnDownloadRemoved(const std::string& id) override {
+    [downloads_ downloadRemoved:id];
+  }
+
+ private:
+  __weak OADownloads* downloads_;
+};
+
+}  // namespace
+
+@implementation OADownload
+
+@synthesize identifier = _identifier;
+@synthesize state = _state;
+@synthesize receivedBytes = _receivedBytes;
+@synthesize totalBytes = _totalBytes;
+@synthesize bytesPerSecond = _bytesPerSecond;
+@synthesize remainingSeconds = _remainingSeconds;
+@synthesize targetFileURL = _targetFileURL;
+@synthesize sourceURL = _sourceURL;
+@synthesize startTime = _startTime;
+@synthesize paused = _paused;
+@synthesize done = _done;
+@synthesize canResume = _canResume;
+@synthesize page = _page;
+
+- (instancetype)initWithDownload:(const oa::Download&)download
+                            page:(nullable OAPage*)page {
+  if ((self = [super init])) {
+    _page = page;
+    _identifier = ToNSString(download.id);
+    _state = ToDownloadState(download.state);
+    _receivedBytes = download.received_bytes;
+    _totalBytes = download.total_bytes;
+    _bytesPerSecond = download.bytes_per_second;
+    _remainingSeconds = download.remaining_seconds;
+    _targetFileURL =
+        download.target_path.empty()
+            ? nil
+            : [NSURL fileURLWithPath:ToNSString(download.target_path)];
+    _sourceURL = download.source_url.empty()
+                     ? nil
+                     : [NSURL URLWithString:ToNSString(download.source_url)];
+    _startTime = [NSDate dateWithTimeIntervalSince1970:download.start_time];
+    _paused = download.is_paused;
+    _done = download.is_done;
+    _canResume = download.can_resume;
+  }
+  return self;
+}
+
+@end
+
+@implementation OADownloads {
+  NSString* _profileIdentifier;
+  std::unique_ptr<DownloadsObserverBridge> _observer;
+  std::unique_ptr<oa::Downloads> _downloads;
+}
+
+@synthesize delegate = _delegate;
+
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier {
+  if ((self = [super init])) {
+    _profileIdentifier = [identifier copy];
+    _observer = std::make_unique<DownloadsObserverBridge>(self);
+  }
+  return self;
+}
+
+- (void)setDelegate:(nullable id<OADownloadsDelegate>)delegate {
+  _delegate = delegate;
+  if (delegate && !_downloads) {
+    _downloads = oa::ObserveDownloads(_profileIdentifier.UTF8String ?: "",
+                                      _observer.get());
+  }
+}
+
+- (void)pauseDownloadWithIdentifier:(NSString*)identifier {
+  if (_downloads) {
+    _downloads->Pause(identifier.UTF8String ?: "");
+  }
+}
+
+- (void)resumeDownloadWithIdentifier:(NSString*)identifier {
+  if (_downloads) {
+    _downloads->Resume(identifier.UTF8String ?: "");
+  }
+}
+
+- (void)cancelDownloadWithIdentifier:(NSString*)identifier {
+  if (_downloads) {
+    _downloads->Cancel(identifier.UTF8String ?: "");
+  }
+}
+
+- (void)removeDownloadWithIdentifier:(NSString*)identifier {
+  if (_downloads) {
+    _downloads->Remove(identifier.UTF8String ?: "");
+  }
+}
+
+- (void)downloadsInitialized:(const std::vector<oa::Download>&)downloads {
+  NSMutableArray<OADownload*>* items = [NSMutableArray array];
+  for (const oa::Download& download : downloads) {
+    [items addObject:[[OADownload alloc] initWithDownload:download page:nil]];
+  }
+  [self.delegate downloadsDidInitialize:items];
+}
+
+- (OADownload*)download:(const oa::Download&)download page:(oa::Page*)page {
+  auto found = PagesByCore().find(page);
+  return [[OADownload alloc]
+      initWithDownload:download
+                  page:found == PagesByCore().end() ? nil : found->second];
+}
+
+- (void)downloadCreated:(const oa::Download&)download page:(oa::Page*)page {
+  [self.delegate downloadWasCreated:[self download:download page:page]];
+}
+
+- (void)downloadUpdated:(const oa::Download&)download page:(oa::Page*)page {
+  [self.delegate downloadWasUpdated:[self download:download page:page]];
+}
+
+- (void)downloadRemoved:(const std::string&)identifier {
+  [self.delegate downloadWasRemovedWithIdentifier:ToNSString(identifier)];
+}
+
+@end
+
 @implementation OAProfile {
   NSString* _identifier;
 }
 
+@synthesize downloads = _downloads;
+
 - (instancetype)initWithIdentifier:(NSString*)identifier {
   if ((self = [super init])) {
     _identifier = [identifier copy];
+    _downloads = [[OADownloads alloc] initWithProfileIdentifier:identifier];
   }
   return self;
 }
