@@ -26,7 +26,8 @@
 - (void)pageStateChanged;
 - (void)pageOpenedPage:(std::unique_ptr<oa::Page>)page
              targetURL:(const std::string&)url
-           disposition:(oa::OpenDisposition)disposition;
+           disposition:(oa::OpenDisposition)disposition
+                byPage:(BOOL)byPage;
 - (void)pageWantsActivation;
 - (void)pageRendererGone:(oa::RendererExit)exit;
 - (void)pageRendererReady;
@@ -142,10 +143,12 @@ class PageObserverBridge : public oa::Page::Observer {
   void OnPageStateChanged() override { [page_ pageStateChanged]; }
   void OnPageOpenedPage(std::unique_ptr<oa::Page> page,
                         const std::string& target_url,
-                        oa::OpenDisposition disposition) override {
+                        oa::OpenDisposition disposition,
+                        bool by_page) override {
     [page_ pageOpenedPage:std::move(page)
                 targetURL:target_url
-              disposition:disposition];
+              disposition:disposition
+                   byPage:by_page];
   }
   void OnPageWantsActivation() override { [page_ pageWantsActivation]; }
   void OnPageRendererGone(oa::RendererExit exit) override {
@@ -455,13 +458,15 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (void)pageOpenedPage:(std::unique_ptr<oa::Page>)page
              targetURL:(const std::string&)url
-           disposition:(oa::OpenDisposition)disposition {
+           disposition:(oa::OpenDisposition)disposition
+                byPage:(BOOL)byPage {
   OAPage* opened = [[OAPage alloc] initWithDelegate:nil];
   [opened setPage:std::move(page)];
   [self.delegate page:self
           didOpenPage:opened
             targetURL:url.empty() ? nil : [NSURL URLWithString:ToNSString(url)]
-          disposition:ToDisposition(disposition)];
+          disposition:ToDisposition(disposition)
+               byPage:byPage];
 }
 
 - (void)pageWantsActivation {
