@@ -170,8 +170,9 @@ final class WindowModel {
         autocompletes[profileID] = autocomplete
         let bar = CommandBar(
             destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
-            currentURL: editing ? frontPage?.url ?? address : nil)
-        bar.open = { [weak self, destination = bar.destination] url in self?.open(url, in: destination) }
+            currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks
+        ) { [weak self] in self?.commandBarTabs ?? [] }
+        bar.perform = { [weak self, destination = bar.destination] in self?.perform($0, in: destination) }
         commandBar = bar
         commandBarSelection = (selectedSpaceID, selectedTabID)
     }
@@ -192,19 +193,47 @@ final class WindowModel {
         closeCommandBar()
     }
 
-    private func open(_ url: URL, in destination: CommandBar.Destination) {
-        closeCommandBar()
-        guard destination == .currentTab, let tabID = selectedTabID else { return newTab(url) }
-        if let peek {
-            peek.load(url)
-            return peek.activate()
+    /// As Arc's sidebar provider: the Space's open tabs but the selected one. Whether Arc offers pinned tabs and
+    /// Favorites as rows is untested; Oa's own: pinned tabs are offered, Favorites aren't.
+    var commandBarTabs: [CommandBarRanking.Tab] {
+        (pinnedTabs + unpinnedTabs).filter { $0.id != selectedTabID }.map { tab in
+            CommandBarRanking.Tab(
+                tab: tab, isVisible: store.windows.contains { $0.selectedTabID == tab.id },
+                saveLevel: state.isPinned(tab.id) ? folderDepth(of: tab.id) : nil)
         }
-        ensurePage(tabID)
-        if let page = pages[tabID] {
-            page.load(url)
-            page.activate()
-        } else {
-            pendingURLs[tabID] = url
+    }
+
+    private func folderDepth(of id: UUID) -> Int {
+        var depth = 0
+        var parentID = state.tree[id]?.parentID
+        while let id = parentID, let parent = state.tree[id], parent.parentID != nil {
+            depth += 1
+            parentID = parent.parentID
+        }
+        return depth
+    }
+
+    private func perform(_ action: CommandBar.Action, in destination: CommandBar.Destination) {
+        closeCommandBar()
+        switch action {
+        case .switchTo(let tabID): select(tabID)
+        case .open(let url, background: true):
+            let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+            store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
+            ensurePage(tab.id)
+        case .open(let url, background: false):
+            guard destination == .currentTab, let tabID = selectedTabID else { return newTab(url) }
+            if let peek {
+                peek.load(url)
+                return peek.activate()
+            }
+            ensurePage(tabID)
+            if let page = pages[tabID] {
+                page.load(url)
+                page.activate()
+            } else {
+                pendingURLs[tabID] = url
+            }
         }
     }
 

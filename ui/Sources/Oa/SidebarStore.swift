@@ -22,16 +22,21 @@ final class SidebarStore {
     @ObservationIgnored var deletingSpace: ClosingSpace?
     /// In memory only, as Arc's ⇧⌘T list is gone after a relaunch.
     @ObservationIgnored var sessionIDs: [UUID: PageSessionID] = [:]
+    @ObservationIgnored let commandBarPicks: CommandBarPicks
 
     init(directory: URL) {
         persistence = SidebarPersistence(directory: directory)
         favicons = FaviconCache(directory: directory)
+        commandBarPicks = CommandBarPicks(directory: directory)
         state = persistence.loadSidebar() ?? .initial()
         savedWindows = persistence.loadWindows()
+        commandBarPicks.prune(keeping: state.profiles.map(\.id))
     }
 
     func edit(_ change: (inout SidebarState) -> Void) {
+        let profiles = state.profiles.map(\.id)
         change(&state)
+        if state.profiles.map(\.id) != profiles { commandBarPicks.prune(keeping: state.profiles.map(\.id)) }
         if !sessionIDs.isEmpty {
             let archived = Set(state.archive.map(\.id))
             sessionIDs = sessionIDs.filter { archived.contains($0.key) }
