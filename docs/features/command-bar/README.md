@@ -106,8 +106,9 @@ dropped, and so are the picks of a profile that is gone.
 - **Inline completion**: the top row's rest is typed in and selected, from
   Chromium's default match or from an open tab's URL. As in Chromium, there is
   none after a deletion, with the caret before the end of the text, or while
-  an input method composes. Moving the caret takes what the field shows as
-  typed.
+  an input method composes. Moving the caret or selecting keeps what the
+  field shows and leaves the rows as they are; the next edit takes the field's
+  text as typed, as in Arc.
 - **Arrows** move the selection and fill the field: a search with its untyped
   rest selected, a page with its URL, a tab with what was typed. Oa's own: the
   highlight stays on its row when a later answer re-ranks the list.
