@@ -13,8 +13,15 @@ final class CommandBar {
     let autocomplete: any Autocomplete
     /// The page ⌘L edits, prefilled and selected as Arc does.
     let currentURL: URL?
-    var text: String
+    /// What the user typed; the field may show more.
+    private(set) var text: String
     var selectedIndex = 0
+    private var edited = false
+    /// Chromium's rule: no completion after a deletion, with the caret before the end, or while an input method
+    /// composes, until the next typing.
+    private var suppressesInline = false
+    /// The field's caret in what was typed, in UTF-16 code units.
+    private var caret: Int
     @ObservationIgnored private var startedFresh = false
     /// Return pressed before Chromium answered the text; Arc's bar acts on the answer.
     @ObservationIgnored private var pendingReturn = false
@@ -24,18 +31,75 @@ final class CommandBar {
         self.destination = destination
         self.autocomplete = autocomplete
         self.currentURL = currentURL
-        text = currentURL?.absoluteString ?? ""
+        let text = currentURL?.absoluteString ?? ""
+        self.text = text
+        caret = text.utf16.count
         if !text.isEmpty { start(preventsInlineAutocomplete: true) }
     }
 
     var rows: [AutocompleteMatch] { text.isEmpty ? [] : autocomplete.matches }
 
-    func edit(_ text: String, preventsInlineAutocomplete: Bool) {
+    struct FieldText: Equatable {
+        var string: String
+        var selection: NSRange
+    }
+
+    /// As Arc's field: ⌘L's URL all selected until the first edit or arrow; the typed text with the default match's
+    /// inline completion selected after it; on another row, a search's text with the untyped rest selected, else its
+    /// URL.
+    var field: FieldText {
+        let typed = (text as NSString).length
+        if !edited, destination == .currentTab, selectedIndex == 0 {
+            return FieldText(string: text, selection: NSRange(0..<typed))
+        }
+        if selectedIndex > 0, rows.indices.contains(selectedIndex) {
+            let row = rows[selectedIndex]
+            switch row.kind {
+            case .searchWhatYouTyped, .searchHistory, .searchSuggest, .searchSuggestEntity, .searchOtherEngine:
+                let length = (row.contents as NSString).length
+                let rest = row.contents.lowercased().hasPrefix(text.lowercased()) ? typed..<length : length..<length
+                return FieldText(string: row.contents, selection: NSRange(rest))
+            default:
+                let length = (row.fillIntoEdit as NSString).length
+                return FieldText(string: row.fillIntoEdit, selection: NSRange(location: length, length: 0))
+            }
+        }
+        if !suppressesInline, autocomplete.input?.text == text, let first = rows.first, first.allowedToBeDefault,
+            !first.inlineAutocompletion.isEmpty
+        {
+            let completion = (first.inlineAutocompletion as NSString).length
+            return FieldText(
+                string: text + first.inlineAutocompletion, selection: NSRange(location: typed, length: completion))
+        }
+        return FieldText(string: text, selection: NSRange(location: min(caret, typed), length: 0))
+    }
+
+    /// `caret` is the field's, in UTF-16 code units.
+    func edit(_ text: String, caret: Int, deleting: Bool, composing: Bool = false) {
+        edited = true
+        selectedIndex = 0
+        self.caret = caret
+        suppressesInline = deleting || composing || caret < (text as NSString).length
         guard text != self.text else { return }
         self.text = text
-        selectedIndex = 0
         pendingReturn = false
-        if text.isEmpty { autocomplete.stop() } else { start(preventsInlineAutocomplete: preventsInlineAutocomplete) }
+        if text.isEmpty { autocomplete.stop() } else { start(preventsInlineAutocomplete: suppressesInline) }
+    }
+
+    /// The caret moved without an edit. What the field showed beyond the typed text, a completion or a row's
+    /// text, is typed from now on, as in Chromium.
+    func moveCaret(to caret: Int, in string: String) {
+        guard string == text else { return edit(string, caret: caret, deleting: false) }
+        edited = true
+        self.caret = caret
+        if caret < (text as NSString).length { suppressesInline = true }
+    }
+
+    /// As Arc's ⇧⌦: a past search goes, while a page from history stays.
+    func deleteSelectedRow() {
+        guard rows.indices.contains(selectedIndex) else { return }
+        let row = rows[selectedIndex]
+        if row.kind == .searchHistory, row.isDeletable { autocomplete.delete(row) }
     }
 
     func moveSelection(_ offset: Int) {
@@ -67,7 +131,8 @@ final class CommandBar {
     private func start(preventsInlineAutocomplete: Bool) {
         autocomplete.start(
             AutocompleteInput(
-                text: text, preventsInlineAutocomplete: preventsInlineAutocomplete, startsFresh: !startedFresh,
+                text: text, cursorPosition: min(caret, text.utf16.count),
+                preventsInlineAutocomplete: preventsInlineAutocomplete, startsFresh: !startedFresh,
                 currentURL: destination == .currentTab ? currentURL : nil))
         startedFresh = true
     }
@@ -196,8 +261,8 @@ private struct CommandBarRow: View {
     }
 }
 
-/// An AppKit field, which a SwiftUI one can't be: it takes focus over a web page and reports the arrow keys, Return
-/// and Esc.
+/// An AppKit field, which a SwiftUI one can't be: it takes focus over a web page, selects an inline completion and
+/// reports the caret, the arrow keys, Return, Esc and ⇧⌦.
 private struct CommandBarField: NSViewRepresentable {
     let bar: CommandBar
     let model: WindowModel
@@ -213,43 +278,93 @@ private struct CommandBarField: NSViewRepresentable {
         field.focusRingType = .none
         field.font = .systemFont(ofSize: 17)
         field.placeholderString = "Search or Enter URL…"
-        field.stringValue = bar.text
         field.cell?.usesSingleLineMode = true
         field.cell?.isScrollable = true
         field.delegate = context.coordinator
-        context.coordinator.isUnderDialog = isUnderDialog
-        if !isUnderDialog {
-            DispatchQueue.main.async {
-                field.window?.makeFirstResponder(field)
-                field.currentEditor()?.selectAll(nil)
-            }
-        }
+        let coordinator = context.coordinator
+        coordinator.field = field
+        coordinator.isUnderDialog = isUnderDialog
+        coordinator.show(bar.field, in: field)
+        NotificationCenter.default.addObserver(
+            coordinator, selector: #selector(Coordinator.selectionChanged(_:)),
+            name: NSTextView.didChangeSelectionNotification, object: nil)
+        if !isUnderDialog { DispatchQueue.main.async { coordinator.focus() } }
         return field
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
-        context.coordinator.bar = bar
-        if field.stringValue != bar.text { field.stringValue = bar.text }
-        if isUnderDialog != context.coordinator.isUnderDialog {
-            context.coordinator.isUnderDialog = isUnderDialog
-            if !isUnderDialog { field.window?.makeFirstResponder(field) }
+        let coordinator = context.coordinator
+        coordinator.bar = bar
+        if isUnderDialog != coordinator.isUnderDialog {
+            coordinator.isUnderDialog = isUnderDialog
+            if !isUnderDialog { coordinator.focus() }
         }
+        let editor = field.currentEditor() as? NSTextView
+        // An input method's marked text is the field's until it is committed.
+        guard editor?.hasMarkedText() != true else { return }
+        let shown = bar.field
+        guard shown != coordinator.shown else { return }
+        coordinator.show(shown, in: field)
+    }
+
+    static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
+        NotificationCenter.default.removeObserver(coordinator)
     }
 
     @MainActor
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var bar: CommandBar
         let model: WindowModel
+        weak var field: NSTextField?
+        /// What the field shows, with the user's selection in it.
+        private(set) var shown = CommandBar.FieldText(string: "", selection: NSRange())
         var isUnderDialog = false
+        /// The field is being written here, so its selection changes aren't the user's.
+        private var isShowing = false
 
         init(bar: CommandBar, model: WindowModel) {
             self.bar = bar
             self.model = model
         }
 
+        func show(_ text: CommandBar.FieldText, in field: NSTextField) {
+            isShowing = true
+            defer { isShowing = false }
+            shown = text
+            if field.stringValue != text.string { field.stringValue = text.string }
+            (field.currentEditor() as? NSTextView)?.setSelectedRange(text.selection)
+        }
+
+        func focus() {
+            guard let field else { return }
+            isShowing = true
+            defer { isShowing = false }
+            field.window?.makeFirstResponder(field)
+            (field.currentEditor() as? NSTextView)?.setSelectedRange(shown.selection)
+        }
+
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField else { return }
-            bar.edit(field.stringValue, preventsInlineAutocomplete: false)
+            let editor = field.currentEditor() as? NSTextView
+            let string = field.stringValue
+            let length = (string as NSString).length
+            let selection = editor?.selectedRange() ?? NSRange(location: length, length: 0)
+            // Chromium's rule for a deletion: the text got shorter and the caret didn't move forward.
+            let deleting =
+                length < (shown.string as NSString).length && selection.location <= shown.selection.location
+            shown = CommandBar.FieldText(string: string, selection: selection)
+            bar.edit(
+                string, caret: selection.location, deleting: deleting, composing: editor?.hasMarkedText() == true)
+        }
+
+        @objc func selectionChanged(_ notification: Notification) {
+            guard !isShowing, let field, let editor = notification.object as? NSTextView,
+                editor === field.currentEditor(), !editor.hasMarkedText(), field.stringValue == shown.string
+            else { return }
+            let selection = editor.selectedRange()
+            guard selection != shown.selection else { return }
+            shown.selection = selection
+            bar.moveCaret(to: selection.location, in: shown.string)
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
@@ -258,6 +373,10 @@ private struct CommandBarField: NSViewRepresentable {
             case #selector(NSResponder.moveDown(_:)): bar.moveSelection(1)
             case #selector(NSResponder.insertNewline(_:)): bar.submit()
             case #selector(NSResponder.cancelOperation(_:)): model.closeCommandBar()
+            case #selector(NSResponder.insertTab(_:)): break
+            case #selector(NSResponder.deleteForward(_:))
+            where NSApp.currentEvent?.modifierFlags.contains(.shift) == true:
+                bar.deleteSelectedRow()
             default: return false
             }
             return true
