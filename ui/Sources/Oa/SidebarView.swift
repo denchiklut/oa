@@ -8,15 +8,19 @@ struct SidebarView: View {
     let model: WindowModel
 
     var body: some View {
-        Group {
-            if model.showingArchive {
-                ArchiveView(model: model)
-            } else {
-                tabs
+        if model.showingDownloads {
+            LibraryView(model: model)
+        } else {
+            Group {
+                if model.showingArchive {
+                    ArchiveView(model: model)
+                } else {
+                    tabs
+                }
             }
+            .frame(width: Self.width)
+            .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(width: Self.width)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var tabs: some View {
@@ -51,6 +55,7 @@ struct SidebarView: View {
 
     private var spaces: some View {
         HStack(spacing: 4) {
+            LibraryButton(model: model)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
                     ForEach(model.state.spaces) { space in
