@@ -103,18 +103,11 @@ dropped, and so are the picks of a profile that is gone.
 
 ## Typing and Return
 
-- **Inline completion**: the top row's rest is typed in and selected, from
-  Chromium's default match or from an open tab's URL. As in Chromium, there is
-  none after a deletion, with the caret before the end of the text, or while
-  an input method composes. Moving the caret or selecting keeps what the
-  field shows without issuing a new query; the next edit takes the field's
-  text as typed, as in Arc. A later changed completion can refresh the field
-  if the current selection reaches the displayed text's end, including a
-  caret at the end or Select All. A selection ending earlier preserves the
-  field while rows may still update. An unchanged completion keeps the user's
-  selection, and moving it to the end doesn't replay a rejected completion.
-  These refresh rules follow Arc's static field-update trace; a live top-row
-  replacement wasn't reproduced. Oa uses UTF-16 consistently for the endpoint.
+- **Inline completion** selects the top row's untyped rest. There is none
+  after a deletion, with the caret before the end, or while an input method
+  composes. Moving the caret or selecting text keeps the query; the next edit
+  uses the visible text. A later completion can refresh the field only if the
+  selection reaches its end.
 - **Arrows** move the selection and fill the field: a search with its untyped
   rest selected, a page with its URL, a tab with what was typed. Oa's own: the
   highlight stays on its row when a later answer re-ranks the list.
