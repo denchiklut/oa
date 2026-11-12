@@ -138,6 +138,8 @@ Implementation details live with their features:
   backups and Restore Data.
 - <a id="downloads"></a>[Downloads](../../features/downloads/README.md): the Library, its button and flyout,
   quitting with downloads running and the download location.
+- <a id="context-menu"></a>[Page context menu](../../features/context-menu/README.md): Chrome's menu on every
+  page, the items kept and where the pages it opens go.
 
 The [feature inventory](../../features/README.md) tracks candidate capabilities
 separately; its unchecked entries have not been assessed for implementation.
