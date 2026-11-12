@@ -129,6 +129,10 @@ final class ChromiumBrowserContext: BrowserContext {
         return (ChromiumPage(id: UUID(), page: page, delegate: delegate), created.restored)
     }
 
+    func makeAutocomplete() -> any Autocomplete {
+        ChromiumAutocomplete(core: profile()?.makeAutocomplete())
+    }
+
     func changedSiteSettings(for url: URL) -> [SiteSetting]? {
         profile()?.changedSiteSettings(for: url)?.compactMap { object in
             let setting = unsafeBitCast(object, to: CoreSiteSetting.self)
