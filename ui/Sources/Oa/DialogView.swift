@@ -85,7 +85,7 @@ struct DialogView: View {
 
 /// Takes the keyboard from the engine's view, which would otherwise swallow Enter and Esc while its renderer waits
 /// on the dialog.
-private struct KeyTrap: NSViewRepresentable {
+struct KeyTrap: NSViewRepresentable {
     let onReturn: () -> Void
     let onEscape: () -> Void
 

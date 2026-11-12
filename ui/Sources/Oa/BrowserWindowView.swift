@@ -30,7 +30,12 @@ struct BrowserWindowView: View {
         }
         .overlay {
             if let peek = model.peek {
-                PeekView(model: model, page: peek, sidebarWidth: model.showingArchive ? 0 : SidebarView.width)
+                PeekView(model: model, page: peek, sidebarWidth: sidebarWidth)
+            }
+        }
+        .overlay {
+            if let entry = model.previewedDownload {
+                DownloadPreviewView(model: model, entry: entry)
             }
         }
         .overlay {
@@ -71,6 +76,10 @@ struct BrowserWindowView: View {
             address = model.address?.absoluteString ?? ""
             if model.page == nil { addressFocused = true }
         }
+    }
+
+    private var sidebarWidth: CGFloat {
+        model.showingArchive ? 0 : model.showingDownloads ? LibraryView.width : SidebarView.width
     }
 
     private var toolbar: some View {

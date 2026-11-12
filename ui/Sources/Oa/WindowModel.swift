@@ -20,12 +20,15 @@ final class WindowModel {
     private(set) var showingArchive = false {
         didSet { if !showingArchive { closeArchivePeek() } }
     }
+    private(set) var showingDownloads = false
+    private var previewedDownloadID: Download.ID?
     private(set) var dialogs: [UUID: [PageDialog]] = [:]
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
     private(set) var permissionRequests: [UUID: [PagePermissionRequest]] = [:]
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
     var focusAddressField = 0
     @ObservationIgnored var bringToFront: () -> Void = {}
+    @ObservationIgnored let downloads: DownloadsStore
     @ObservationIgnored private let engine: any BrowserApplication
     @ObservationIgnored private let store: SidebarStore
     @ObservationIgnored private var previousTabID: UUID?
@@ -60,10 +63,11 @@ final class WindowModel {
 
     var record: WindowRecord { WindowRecord(id: id, selectedSpaceID: selectedSpaceID) }
 
-    init(id: UUID, engine: any BrowserApplication, store: SidebarStore, spaceID: UUID) {
+    init(id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore, spaceID: UUID) {
         self.id = id
         self.engine = engine
         self.store = store
+        self.downloads = downloads
         selectedSpaceID = spaceID
     }
 
@@ -253,7 +257,45 @@ final class WindowModel {
     }
 
     func viewArchive() {
+        showingDownloads = false
         showingArchive = true
+    }
+
+    func viewDownloads() {
+        showingArchive = false
+        showingDownloads = true
+    }
+
+    func hideDownloads() {
+        showingDownloads = false
+    }
+
+    var previewedDownload: DownloadsStore.Entry? {
+        previewedDownloadID.flatMap { id in downloads.entries.first { $0.id == id } }
+    }
+
+    /// A click on a download, as Arc: a finished one is previewed over the window; one still running opens when it
+    /// finishes.
+    func activate(_ entry: DownloadsStore.Entry) {
+        if entry.isRunning {
+            downloads.toggleOpenWhenFinished(entry)
+        } else if entry.download.status == .finished, entry.fileExists {
+            previewedDownloadID = entry.id
+        }
+    }
+
+    func closeDownloadPreview() {
+        previewedDownloadID = nil
+        frontPage?.activate()
+    }
+
+    /// Arc's ‹ and ›, over the finished downloads in the Library's order.
+    func previewAdjacentDownload(_ offset: Int) {
+        let files = downloads.entries.filter { $0.download.status == .finished && $0.fileExists }
+        guard let index = files.firstIndex(where: { $0.id == previewedDownloadID }),
+            files.indices.contains(index + offset)
+        else { return }
+        previewedDownloadID = files[index + offset].id
     }
 
     func exitArchive() {

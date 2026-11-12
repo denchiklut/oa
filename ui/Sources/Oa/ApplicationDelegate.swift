@@ -5,6 +5,7 @@ import DevKit
 final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     private let engine: any BrowserApplication
     private let store: SidebarStore
+    private let downloads: DownloadsStore
     private var windows: [BrowserWindowController] = []
     private var mainMenu: MainMenu?
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
@@ -26,6 +27,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     private init(engine: any BrowserApplication) {
         self.engine = engine
         store = SidebarStore(directory: AppEngine.dataDirectory)
+        downloads = DownloadsStore(engine: engine, sidebar: store)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -114,7 +116,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
         let spaceID = key?.model.selectedSpaceID ?? store.state.spaces[0].id
         let controller = BrowserWindowController(
-            id: record?.id ?? UUID(), engine: engine, store: store, spaceID: spaceID
+            id: record?.id ?? UUID(), engine: engine, store: store, downloads: downloads, spaceID: spaceID
         ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
         }

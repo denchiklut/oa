@@ -11,13 +11,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private var asking = false
 
     init(
-        id: UUID, engine: any BrowserApplication, store: SidebarStore, spaceID: UUID,
+        id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore, spaceID: UUID,
         didClose: @escaping (BrowserWindowController) -> Void
     ) {
         self.engine = engine
         self.store = store
         self.didClose = didClose
-        model = WindowModel(id: id, engine: engine, store: store, spaceID: spaceID)
+        model = WindowModel(id: id, engine: engine, store: store, downloads: downloads, spaceID: spaceID)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
