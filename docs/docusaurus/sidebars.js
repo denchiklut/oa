@@ -27,6 +27,7 @@ const sidebars = {
         { type: "doc", id: "features/saved-state/README", label: "Saved state and recovery" },
         { type: "doc", id: "features/downloads/README", label: "Downloads" },
         { type: "doc", id: "features/context-menu/README", label: "Page context menu" },
+        { type: "doc", id: "features/command-bar/README", label: "Command bar and history" },
       ],
     },
   ],

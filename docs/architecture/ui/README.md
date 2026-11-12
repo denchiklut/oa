@@ -140,6 +140,8 @@ Implementation details live with their features:
   quitting with downloads running and the download location.
 - <a id="context-menu"></a>[Page context menu](../../features/context-menu/README.md): Chrome's menu on every
   page, the items kept and where the pages it opens go.
+- <a id="command-bar"></a>[Command bar and history](../../features/command-bar/README.md): the bar, its rows and
+  ranking, Return and its modifiers, search engines and View History.
 
 The [feature inventory](../../features/README.md) tracks candidate capabilities
 separately; its unchecked entries have not been assessed for implementation.
