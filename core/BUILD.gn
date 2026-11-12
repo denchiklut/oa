@@ -14,6 +14,8 @@ source_set("oa") {
     "browser/site_settings_impl.cc",
     "browser/ui/browser_window_impl.h",
     "browser/ui/browser_window_impl.mm",
+    "browser/ui/context_menu_impl.cc",
+    "browser/ui/context_menu_impl.h",
     "browser/ui/javascript_dialog_impl.cc",
     "browser/ui/javascript_dialog_impl.h",
     "browser/ui/permission_prompt_impl.cc",

@@ -626,11 +626,6 @@ void PageImpl::CloseContents(content::WebContents* source) {
   ForwardingWebContentsDelegate::CloseContents(source);
 }
 
-bool PageImpl::HandleContextMenu(content::RenderFrameHost& render_frame_host,
-                                 const content::ContextMenuParams& params) {
-  return true;
-}
-
 bool PageImpl::CanEnterFullscreenModeForTab(
     content::RenderFrameHost* requesting_frame) {
   return false;
