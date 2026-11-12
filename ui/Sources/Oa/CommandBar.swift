@@ -67,11 +67,11 @@ final class CommandBar {
     /// when a later answer re-ranks the rows wasn't traced. Oa's own: the highlight stays on its row.
     private var selectedKey: String?
     private var edited = false
-    /// Chromium's rule: no completion after a deletion, with the caret before the end, or while an input method
-    /// composes, until the next typing.
+    /// Chromium's rule: no completion after a deletion, unless the selection is a caret at the end, or while an
+    /// input method composes, until the next typing.
     private var suppressesInline = false
-    /// The field's caret in what was typed, in UTF-16 code units.
-    private var caret: Int
+    /// The user's selection in what was typed, in UTF-16 code units.
+    private var selection: NSRange
     @ObservationIgnored private let profileID: UUID
     @ObservationIgnored private let picks: CommandBarPicks
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
@@ -92,7 +92,7 @@ final class CommandBar {
         self.tabs = tabs
         let text = currentURL?.absoluteString ?? ""
         self.text = text
-        caret = text.utf16.count
+        selection = NSRange(location: text.utf16.count, length: 0)
         if !text.isEmpty { start(preventsInlineAutocomplete: true) }
         rank()
     }
@@ -133,15 +133,19 @@ final class CommandBar {
                 let length = (match.fillIntoEdit as NSString).length
                 return FieldText(string: match.fillIntoEdit, selection: NSRange(location: length, length: 0))
             }
-            let length = (match.contents as NSString).length
-            let rest = match.contents.lowercased().hasPrefix(text.lowercased()) ? typed..<length : length..<length
-            return FieldText(string: match.contents, selection: NSRange(rest))
+            // In the suggestion's own units: an equivalent prefix can be shorter or longer than what was typed.
+            let contents = match.contents as NSString
+            let prefix = contents.range(of: text, options: [.anchored, .caseInsensitive])
+            let rest = prefix.location == NSNotFound ? contents.length : NSMaxRange(prefix)
+            return FieldText(string: match.contents, selection: NSRange(rest..<contents.length))
         }
         if !suppressesInline, let completion = completion(of: rows.first) {
             let length = (completion as NSString).length
             return FieldText(string: text + completion, selection: NSRange(location: typed, length: length))
         }
-        return FieldText(string: text, selection: NSRange(location: min(caret, typed), length: 0))
+        let location = min(selection.location, typed)
+        return FieldText(
+            string: text, selection: NSRange(location: location, length: min(selection.length, typed - location)))
     }
 
     /// Chromium's for its default match; for a tab, the rest of its readable URL, as Arc completed "loc" to an open
@@ -161,12 +165,12 @@ final class CommandBar {
         }
     }
 
-    /// `caret` is the field's, in UTF-16 code units.
-    func edit(_ text: String, caret: Int, deleting: Bool, composing: Bool = false) {
+    /// `selection` is the field's, in UTF-16 code units.
+    func edit(_ text: String, selection: NSRange, deleting: Bool, composing: Bool = false) {
         edited = true
         selectedKey = nil
-        self.caret = caret
-        suppressesInline = deleting || composing || caret < (text as NSString).length
+        self.selection = selection
+        suppressesInline = deleting || composing || selection.location < (text as NSString).length
         guard text != self.text else { return }
         self.text = text
         pendingReturn = nil
@@ -174,13 +178,13 @@ final class CommandBar {
         rank()
     }
 
-    /// The caret moved without an edit. What the field showed beyond the typed text, a completion or a row's
-    /// text, is typed from now on, as in Chromium.
-    func moveCaret(to caret: Int, in string: String) {
-        guard string == text else { return edit(string, caret: caret, deleting: false) }
+    /// The user moved the caret or selected text without an edit. What the field showed beyond the typed text, a
+    /// completion or a row's text, is typed from now on, as in Chromium.
+    func selectText(_ selection: NSRange, in string: String) {
+        guard string == text else { return edit(string, selection: selection, deleting: false) }
         edited = true
-        self.caret = caret
-        if caret < (text as NSString).length { suppressesInline = true }
+        self.selection = selection
+        if selection.location < (text as NSString).length { suppressesInline = true }
     }
 
     /// As Arc's ⇧⌦: a past search goes, while a page from history stays.
@@ -230,7 +234,7 @@ final class CommandBar {
     private func start(preventsInlineAutocomplete: Bool) {
         autocomplete.start(
             AutocompleteInput(
-                text: text, cursorPosition: min(caret, text.utf16.count),
+                text: text, cursorPosition: min(selection.location, text.utf16.count),
                 preventsInlineAutocomplete: preventsInlineAutocomplete, startsFresh: !startedFresh,
                 currentURL: destination == .currentTab ? currentURL : nil))
         startedFresh = true
@@ -459,8 +463,7 @@ private struct CommandBarField: NSViewRepresentable {
             let deleting =
                 length < (shown.string as NSString).length && selection.location <= shown.selection.location
             shown = CommandBar.FieldText(string: string, selection: selection)
-            bar.edit(
-                string, caret: selection.location, deleting: deleting, composing: editor?.hasMarkedText() == true)
+            bar.edit(string, selection: selection, deleting: deleting, composing: editor?.hasMarkedText() == true)
         }
 
         @objc func selectionChanged(_ notification: Notification) {
@@ -470,7 +473,7 @@ private struct CommandBarField: NSViewRepresentable {
             let selection = editor.selectedRange()
             guard selection != shown.selection else { return }
             shown.selection = selection
-            bar.moveCaret(to: selection.location, in: shown.string)
+            bar.selectText(selection, in: shown.string)
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
