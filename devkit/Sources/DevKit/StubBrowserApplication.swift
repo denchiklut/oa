@@ -40,6 +40,8 @@ final class StubBrowserContext: BrowserContext {
     let id: UUID
     private let stubDownloads = StubDownloads()
     var downloads: any Downloads { stubDownloads }
+    var downloadDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+    var asksWhereToSaveDownloads = false
 
     init(id: UUID) { self.id = id }
 

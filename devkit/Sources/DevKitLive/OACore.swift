@@ -49,6 +49,8 @@ import AppKit
 
 @MainActor @objc protocol CoreProfile: NSObjectProtocol {
     var downloads: CoreDownloads { get }
+    var downloadDirectory: URL? { get set }
+    var asksWhereToSaveDownloads: Bool { get set }
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
