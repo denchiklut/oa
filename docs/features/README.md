@@ -36,6 +36,7 @@ that every online integration still works.
 - [Saved state and recovery](saved-state/README.md)
 - [Downloads](downloads/README.md)
 - [Page context menu](context-menu/README.md)
+- [Command bar and history](command-bar/README.md)
 
 These pages describe existing slices and their product choices. Moving the
 notes here does not assess or change the checklist status below.
@@ -138,14 +139,14 @@ Sources: Arc [2022][arc22], [2023][arc23].
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Command bar for addresses and web searches | ✅ | ☐ |
-| Search and switch to open tabs | ✅ | ☐ |
+| Command bar for addresses and web searches | ✅ | ✅ |
+| Search and switch to open tabs | ✅ | ✅ |
 | Run browser actions from the command bar | ✅ | ☐ |
-| Search suggestions and history matches | ✅ | ☐ |
+| Search suggestions and history matches | ✅ | ✅ |
 | Site Search shortcuts | ✅ | ☐ |
-| Choose and manage search engines per profile | ✅ | ☐ |
-| Enable/disable search suggestions per profile | ✅ | ☐ |
-| Delete individual command-bar suggestions † | ✅ | ☐ |
+| Choose and manage search engines per profile | ✅ | ✅ |
+| Enable/disable search suggestions per profile | ✅ | ✅ |
+| Delete individual command-bar suggestions † | ✅ | ✅ |
 | Keyboard shortcuts | ✅ | ☐ |
 | Customize keyboard shortcuts | ✅ | ☐ |
 | Search/filter shortcut settings | ✅ | ☐ |
@@ -242,7 +243,7 @@ Sources: Arc native Settings → Links and [2023 release notes][arc23].
 | Native page/link/image/text context menus | ✅ | ✅ |
 | Full-screen browser window | ✅ | ☐ |
 | Page translation | ✅ | ☐ |
-| Browsing-history viewer | ✅ | ☐ |
+| Browsing-history viewer | ✅ | ✅ |
 | Chromium DevTools, inspector and console | ✅ | ☐ |
 | View page source | ✅ | ✅ |
 | Arc Developer Mode tabs | ✅ | ☐ |

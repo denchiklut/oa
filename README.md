@@ -5,7 +5,7 @@ This repository contains the architecture and feature documentation, the Chromiu
 build setup, and the first vertical slices through all four layers: native windows
 over a saved sidebar of Spaces with pinned and unpinned tabs, each a Chromium page
 created when first shown and moved to whichever window shows it, its favicon in
-its row, with a URL field,
+its row, a command bar for every address and search,
 back, forward, reload and stop, an Archive that closed tabs go to and come back
 from, dated copies of the sidebar that Help ▸ Restore Data brings back, and
 pages a page opens, kept as the engine made them and placed below their opener,
@@ -20,7 +20,9 @@ and downloads: a Library in the window that lists every profile's downloads with
 their progress, a ring on its button and a flyout of the recent ones, and a
 download location for each profile, and the page context menu: Chrome's own,
 shown natively as Arc shows it, with its new tabs placed below their opener and
-its new window opened on the same Space.
+its new window opened on the same Space, and the command bar: one card for ⌘T,
+⌘L and the URL, ranking Chromium's matches and the Space's open tabs with Arc's
+own scorer, a search engine for each profile, and ⌘Y for history.
 
 Start with the [architecture](docs/architecture/README.md). The
 chapters cover UI product state and native presentation, DevKit's Swift
