@@ -34,11 +34,6 @@ struct BrowserWindowView: View {
             }
         }
         .overlay {
-            if let entry = model.previewedDownload {
-                DownloadPreviewView(model: model, entry: entry)
-            }
-        }
-        .overlay {
             if let dialog = model.dialog {
                 DialogView(model: model, dialog: dialog).id(ObjectIdentifier(dialog))
             }
