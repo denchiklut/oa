@@ -9,6 +9,9 @@ struct LibraryView: View {
 
     let model: WindowModel
     @State private var gone: Set<Download.ID> = []
+    @State private var search = ""
+    @State private var profileID: UUID?
+    @State private var filtering = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,10 +29,18 @@ struct LibraryView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
+            HStack(spacing: 6) {
+                TextField("Search Downloads…", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                Button("Filter") { filtering = true }
+                    .popover(isPresented: $filtering, arrowEdge: .bottom) { filter }
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 8)
             Divider()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    if groups.isEmpty { empty }
+                    if groups.isEmpty, search.isEmpty, profileID == nil { empty }
                     ForEach(groups, id: \.title) { group in
                         Text(group.title)
                             .font(.system(size: 11, weight: .semibold))
@@ -58,11 +69,48 @@ struct LibraryView: View {
         .padding(10)
     }
 
+    /// Arc's "Filter Downloads…": a chip for each profile, and the one chosen narrows the list to it.
+    private var filter: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Filter Downloads…")
+                .font(.system(size: 13, weight: .semibold))
+            Text("Profiles")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                ForEach(model.state.profiles) { profile in
+                    let chosen = profileID == profile.id
+                    Button {
+                        profileID = chosen ? nil : profile.id
+                    } label: {
+                        Text(profile.name)
+                            .font(.system(size: 12, weight: chosen ? .semibold : .regular))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.primary.opacity(chosen ? 0.2 : 0.07)))
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Done") { filtering = false }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(14)
+        .frame(minWidth: 220)
+    }
+
     /// As Arc: what was cancelled, failed or lost its file before the page opened isn't listed; one that ends so
     /// while it shows stays until the next time.
     private var groups: [(title: String, entries: [DownloadsStore.Entry])] {
         var groups: [(title: String, entries: [DownloadsStore.Entry])] = []
-        for entry in model.downloads.entries where !gone.contains(entry.id) {
+        for entry in model.downloads.entries
+        where !gone.contains(entry.id) && (profileID == nil || entry.profileID == profileID)
+            && (search.isEmpty || entry.name.localizedCaseInsensitiveContains(search))
+        {
             let title = DownloadText.day(entry.download.startedAt)
             if groups.last?.title == title {
                 groups[groups.count - 1].entries.append(entry)
