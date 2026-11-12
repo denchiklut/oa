@@ -198,8 +198,8 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @interface OAPreferences : NSObject
 // Setting it the first time loads the profile and starts the events.
 @property(nonatomic, weak, nullable) id<OAPreferencesDelegate> delegate;
-// Where downloads go and a Save panel starts. Nil until the first event; a
-// set value reads back with the event that follows.
+// Where downloads go and a Save panel starts, read from the profile. Nil
+// until it has loaded.
 @property(nonatomic, copy, nullable) NSURL* downloadDirectory;
 // Chromium asks where to save each download.
 @property(nonatomic) BOOL asksWhereToSaveDownloads;

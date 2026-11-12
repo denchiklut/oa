@@ -5,6 +5,7 @@
 #define OA_PUBLIC_PREFERENCES_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 
 // A profile's preferences the app reads and sets, as ArcCore's browser context
@@ -26,8 +27,7 @@ class Preferences {
    public:
     // Once the profile has loaded, then after each change from anywhere,
     // Chrome's settings page included.
-    virtual void OnDownloadLocationChanged(
-        const DownloadLocation& location) = 0;
+    virtual void OnDownloadLocationChanged() = 0;
 
    protected:
     virtual ~Observer() = default;
@@ -35,6 +35,9 @@ class Preferences {
 
   virtual ~Preferences() = default;
 
+  // Read from the profile when asked, as ArcCore's getters are; nullopt until
+  // the profile has loaded.
+  virtual std::optional<DownloadLocation> GetDownloadLocation() const = 0;
   // Chrome's download.default_directory and savefile.default_directory.
   virtual void SetDownloadDirectory(const std::string& directory) = 0;
   // Chrome's download.prompt_for_download.
