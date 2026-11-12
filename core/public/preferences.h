@@ -4,7 +4,7 @@
 #ifndef OA_PUBLIC_PREFERENCES_H_
 #define OA_PUBLIC_PREFERENCES_H_
 
-#include <optional>
+#include <memory>
 #include <string>
 
 // A profile's preferences the app reads and sets, as ArcCore's browser context
@@ -19,16 +19,33 @@ struct DownloadLocation {
   bool asks_each_time = false;
 };
 
-// Nullopt until the app profile `profile_id` has loaded.
-std::optional<DownloadLocation> GetDownloadLocation(
-    const std::string& profile_id);
+class Preferences {
+ public:
+  // Every call is posted, as ArcCore posts its observers'.
+  class Observer {
+   public:
+    // Once the profile has loaded, then after each change from anywhere,
+    // Chrome's settings page included.
+    virtual void OnDownloadLocationChanged(
+        const DownloadLocation& location) = 0;
 
-// Chrome's download.default_directory and savefile.default_directory.
-void SetDownloadDirectory(const std::string& profile_id,
-                          const std::string& directory);
+   protected:
+    virtual ~Observer() = default;
+  };
 
-// Chrome's download.prompt_for_download.
-void SetAsksWhereToSaveDownloads(const std::string& profile_id, bool asks);
+  virtual ~Preferences() = default;
+
+  // Chrome's download.default_directory and savefile.default_directory.
+  virtual void SetDownloadDirectory(const std::string& directory) = 0;
+  // Chrome's download.prompt_for_download.
+  virtual void SetAsksWhereToSaveDownloads(bool asks) = 0;
+};
+
+// Loads the app profile `profile_id` if needed, then reports its preferences
+// to `observer` until the result is destroyed.
+std::unique_ptr<Preferences> ObservePreferences(
+    const std::string& profile_id,
+    Preferences::Observer* observer);
 
 }  // namespace oa
 
