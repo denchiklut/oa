@@ -28,6 +28,8 @@ final class WindowModel {
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
     var focusAddressField = 0
     @ObservationIgnored var bringToFront: () -> Void = {}
+    /// Opens another window on this one's Space with the tab selected; the tab's page follows it there.
+    @ObservationIgnored var openWindow: (_ tabID: UUID) -> Void = { _ in }
     @ObservationIgnored let downloads: DownloadsStore
     @ObservationIgnored private let engine: any BrowserApplication
     @ObservationIgnored private let store: SidebarStore
@@ -704,8 +706,8 @@ final class WindowModel {
         }
         if let ownerID = peekOwner(of: pageID) {
             switch event {
-            case .opened(let opened, let url, let disposition, _):
-                place(opened, url: url, disposition: disposition, from: ownerID, insidePeek: true)
+            case .opened(let opened, let url, let disposition, let byPage):
+                place(opened, url: url, disposition: disposition, byPage: byPage, from: ownerID, insidePeek: true)
             case .wantsActivation:
                 if ownerID != archivePeekID { show(ownerID) } else { bringToFront() }
             case .closed(let sessionID):
@@ -717,8 +719,8 @@ final class WindowModel {
         }
         guard let tabID = tabID(of: pageID) else { return }
         switch event {
-        case .opened(let opened, let url, let disposition, _):
-            place(opened, url: url, disposition: disposition, from: tabID, insidePeek: false)
+        case .opened(let opened, let url, let disposition, let byPage):
+            place(opened, url: url, disposition: disposition, byPage: byPage, from: tabID, insidePeek: false)
         case .wantsActivation:
             show(tabID)
         case .closed(let sessionID):
@@ -760,28 +762,32 @@ final class WindowModel {
         spaceDeletionEnded(page.id, kept: false)
     }
 
-    /// As Arc; a Shift-click arrives as a new window. A page from an Archive Peek has no tab to join, and the top of
-    /// the shown Space is Oa's own.
+    /// As Arc; a Shift-click arrives as the page's own new window, and the engine's, as its page menu's Open Link in
+    /// New Window, opens a window on this Space with the page as its selected tab. A page from an Archive Peek has no
+    /// tab to join, and the top of the shown Space is Oa's own.
     private func place(
-        _ page: any Page, url: URL?, disposition: OpenDisposition, from openerID: UUID, insidePeek: Bool
+        _ page: any Page, url: URL?, disposition: OpenDisposition, byPage: Bool, from openerID: UUID,
+        insidePeek: Bool
     ) {
+        let inWindow = disposition == .newWindow && !byPage
         guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
             install(page, for: tab.id)
             listen(to: page)
-            return select(tab.id)
+            return inWindow ? openWindow(tab.id) : select(tab.id)
         }
         let background = disposition == .backgroundTab
-        if !insidePeek, disposition == .newWindow || (!background && state.keepsAddress(openerID)) {
+        if !insidePeek, !inWindow, disposition == .newWindow || (!background && state.keepsAddress(openerID)) {
             return peek(page, from: openerID)
         }
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now, openerID: openerID)
         store.edit { $0.openTab(tab, from: openerID, in: selectedSpaceID) }
         install(page, for: tab.id)
         listen(to: page)
-        if !background, state.isSelectable(tab.id, in: selectedSpaceID) { select(tab.id) }
+        guard state.isSelectable(tab.id, in: selectedSpaceID) else { return }
+        if inWindow { openWindow(tab.id) } else if !background { select(tab.id) }
     }
 
     /// Oa's own: a new Peek replaces the tab's current one, archived at once.

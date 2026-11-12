@@ -130,20 +130,28 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
-    /// A new window opens on the key window's Space. A restored one brings its own selection.
-    private func openWindow(restoring record: WindowRecord? = nil) {
+    /// A new window opens on the key window's Space. A restored one brings its own selection. One opened for a tab
+    /// of `source` opens beside it on its Space and selects the tab, as Arc's Open Link in New Window does.
+    private func openWindow(
+        restoring record: WindowRecord? = nil, selecting tabID: UUID? = nil, from source: WindowModel? = nil
+    ) {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
-        let spaceID = key?.model.selectedSpaceID ?? store.state.spaces[0].id
+        let spaceID = (source ?? key?.model)?.selectedSpaceID ?? store.state.spaces[0].id
         let controller = BrowserWindowController(
             id: record?.id ?? UUID(), engine: engine, store: store, downloads: downloads, spaceID: spaceID
         ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
         }
-        let previous = windows.last?.window
+        controller.model.openWindow = { [weak self, weak model = controller.model] tabID in
+            self?.openWindow(selecting: tabID, from: model)
+        }
+        let previous = (windows.first { $0.model === source } ?? windows.last)?.window
         windows.append(controller)
         controller.open(cascadingFrom: previous)
         if let record {
             controller.model.restore(record)
+        } else if let tabID {
+            controller.model.select(tabID)
         } else {
             controller.model.showFirst(isOnlyWindow: windows.count == 1)
         }
