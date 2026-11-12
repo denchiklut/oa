@@ -3,6 +3,7 @@
 source_set("oa") {
   sources = [
     "app/engine.mm",
+    "browser/downloads_impl.cc",
     "browser/forwarding_web_contents_delegate.cc",
     "browser/forwarding_web_contents_delegate.h",
     "browser/page_impl.h",
@@ -24,6 +25,7 @@ source_set("oa") {
     "browser/window_browser.mm",
     "objc/OACore.h",
     "objc/OACore.mm",
+    "public/downloads.h",
     "public/engine.h",
     "public/page.h",
     "public/site_settings.h",
@@ -41,6 +43,8 @@ source_set("oa") {
     "//chrome/common",
     "//chrome/browser/ssl",
     "//chrome/common:buildflags",
+    "//components/download/content/public",
+    "//components/download/public/common:public",
     "//components/favicon/content",
     "//components/favicon/core",
     "//components/javascript_dialogs",

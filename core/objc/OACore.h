@@ -129,6 +129,57 @@ typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
 - (void)drop;
 @end
 
+typedef NS_ENUM(NSInteger, OADownloadState) {
+  OADownloadStateInProgress,
+  OADownloadStateComplete,
+  OADownloadStateCancelled,
+  OADownloadStateInterrupted,
+};
+
+// A download at the time of an event, as ArcCore's ArcDownloadItem reads it.
+@interface OADownload : NSObject
+@property(nonatomic, readonly) NSString* identifier;
+@property(nonatomic, readonly) OADownloadState state;
+@property(nonatomic, readonly) int64_t receivedBytes;
+// 0 while the size is unknown.
+@property(nonatomic, readonly) int64_t totalBytes;
+@property(nonatomic, readonly) int64_t bytesPerSecond;
+// -1 while Chromium has no estimate.
+@property(nonatomic, readonly) int64_t remainingSeconds;
+// Nil until Chromium has chosen where the file goes.
+@property(nonatomic, readonly, nullable) NSURL* targetFileURL;
+@property(nonatomic, readonly, nullable) NSURL* sourceURL;
+@property(nonatomic, readonly) NSDate* startTime;
+@property(nonatomic, readonly, getter=isPaused) BOOL paused;
+@property(nonatomic, readonly, getter=isDone) BOOL done;
+@property(nonatomic, readonly) BOOL canResume;
+// The page that started it, while that page is open.
+@property(nonatomic, readonly, weak, nullable) OAPage* page;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+@protocol OADownloadsDelegate <NSObject>
+// Once, with the downloads Chromium's history brought back.
+- (void)downloadsDidInitialize:(NSArray<OADownload*>*)downloads;
+- (void)downloadWasCreated:(OADownload*)download;
+- (void)downloadWasUpdated:(OADownload*)download;
+- (void)downloadWasRemovedWithIdentifier:(NSString*)identifier;
+@end
+
+// A profile's downloads, as ArcCore's ArcBrowserContextDownloads.
+@interface OADownloads : NSObject
+// Setting it the first time loads the profile and starts the events.
+@property(nonatomic, weak, nullable) id<OADownloadsDelegate> delegate;
+- (instancetype)init NS_UNAVAILABLE;
+- (void)pauseDownloadWithIdentifier:(NSString*)identifier;
+- (void)resumeDownloadWithIdentifier:(NSString*)identifier;
+// Deletes the partial file.
+- (void)cancelDownloadWithIdentifier:(NSString*)identifier;
+// From Chromium's history too, cancelling it first if it runs; a finished
+// file stays.
+- (void)removeDownloadWithIdentifier:(NSString*)identifier;
+@end
+
 // `type` is an `oa::SiteSettingType`, `value` an `oa::SiteSettingValue`.
 @interface OASiteSetting : NSObject
 @property(nonatomic, readonly) NSInteger type;
@@ -137,6 +188,7 @@ typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
 @end
 
 @interface OAProfile : NSObject
+@property(nonatomic, readonly) OADownloads* downloads;
 - (instancetype)init NS_UNAVAILABLE;
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
