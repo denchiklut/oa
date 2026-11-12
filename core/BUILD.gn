@@ -60,6 +60,7 @@ source_set("oa") {
     "//components/omnibox/common",
     "//components/permissions",
     "//components/security_interstitials/core",
+    "//components/search_engines",
     "//components/security_state/core",
     "//components/sessions",
     "//components/viz/common",

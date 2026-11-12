@@ -188,6 +188,17 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (instancetype)init NS_UNAVAILABLE;
 @end
 
+// One of Chromium's search engines, as ArcCore's ArcSearchEngine.
+@interface OASearchEngine : NSObject
+@property(nonatomic, readonly) NSString* name;
+@property(nonatomic, readonly) NSString* keyword;
+// Chromium's URL template, with {searchTerms}.
+@property(nonatomic, readonly) NSString* url;
+@property(nonatomic, readonly, nullable) NSURL* faviconURL;
+@property(nonatomic, readonly, getter=isPrepopulated) BOOL prepopulated;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
 @class OAPreferences;
 
 @protocol OAPreferencesDelegate <NSObject>
@@ -204,7 +215,15 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @property(nonatomic, copy, nullable) NSURL* downloadDirectory;
 // Chromium asks where to save each download.
 @property(nonatomic) BOOL asksWhereToSaveDownloads;
+// The engines Chrome's settings offer as the default; nil until loaded.
+@property(nonatomic, readonly, nullable)
+    NSArray<OASearchEngine*>* searchEngines;
+@property(nonatomic, readonly, nullable) OASearchEngine* defaultSearchEngine;
+// Chrome's search.suggest_enabled.
+@property(nonatomic) BOOL searchSuggestEnabled;
 - (instancetype)init NS_UNAVAILABLE;
+// As the user's choice, as Chrome's settings page sets it.
+- (void)setDefaultSearchEngineWithKeyword:(NSString*)keyword;
 @end
 
 // A Chromium omnibox match, as ArcCore's ArcAutocompleteMatch.
