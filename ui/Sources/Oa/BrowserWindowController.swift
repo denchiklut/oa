@@ -126,6 +126,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     @objc func viewArchive(_ sender: Any?) { model.viewArchive() }
+    @objc func viewHistory(_ sender: Any?) { model.viewHistory() }
 
     @objc func toggleDownloads(_ sender: Any?) {
         if model.showingDownloads { model.hideDownloads() } else { model.viewDownloads() }
