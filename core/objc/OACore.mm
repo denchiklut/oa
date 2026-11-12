@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/memory/raw_ptr.h"
+#include "oa/public/autocomplete.h"
 #include "oa/public/downloads.h"
 #include "oa/public/engine.h"
 #include "oa/public/page.h"
@@ -54,6 +55,19 @@
 - (void)downloadCreated:(const oa::Download&)download page:(oa::Page*)page;
 - (void)downloadUpdated:(const oa::Download&)download page:(oa::Page*)page;
 - (void)downloadRemoved:(const std::string&)identifier;
+@end
+
+@interface OAAutocompleteMatch ()
+- (instancetype)initWithMatch:(const oa::AutocompleteMatch&)match;
+- (const oa::AutocompleteMatch&)match;
+@end
+
+@interface OAAutocompleteResult ()
+- (instancetype)initWithResult:(const oa::AutocompleteResult&)result;
+@end
+
+@interface OAAutocomplete ()
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier;
 @end
 
 @interface OAProfile ()
@@ -790,6 +804,145 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
 
 @end
 
+@implementation OAAutocompleteMatch {
+  oa::AutocompleteMatch _match;
+}
+
+@synthesize type = _type;
+@synthesize provider = _provider;
+@synthesize contents = _contents;
+@synthesize matchDescription = _matchDescription;
+@synthesize destinationURL = _destinationURL;
+@synthesize fillIntoEdit = _fillIntoEdit;
+@synthesize inlineAutocompletion = _inlineAutocompletion;
+@synthesize keyword = _keyword;
+@synthesize additionalInfo = _additionalInfo;
+
+- (instancetype)initWithMatch:(const oa::AutocompleteMatch&)match {
+  if ((self = [super init])) {
+    _match = match;
+    _type = ToNSString(match.type);
+    _provider = ToNSString(match.provider);
+    _contents = ToNSString(match.contents);
+    _matchDescription = ToNSString(match.description);
+    _destinationURL =
+        match.destination_url.empty()
+            ? nil
+            : [NSURL URLWithString:ToNSString(match.destination_url)];
+    _fillIntoEdit = ToNSString(match.fill_into_edit);
+    _inlineAutocompletion = ToNSString(match.inline_autocompletion);
+    _keyword = ToNSString(match.keyword);
+    NSMutableDictionary<NSString*, NSString*>* info =
+        [NSMutableDictionary dictionary];
+    for (const auto& [key, value] : match.additional_info) {
+      info[ToNSString(key)] = ToNSString(value);
+    }
+    _additionalInfo = info;
+  }
+  return self;
+}
+
+- (const oa::AutocompleteMatch&)match {
+  return _match;
+}
+
+- (NSInteger)relevance {
+  return _match.relevance;
+}
+
+- (BOOL)allowedToBeDefault {
+  return _match.allowed_to_be_default;
+}
+
+- (BOOL)isDeletable {
+  return _match.deletable;
+}
+
+- (BOOL)swapsContentsAndDescription {
+  return _match.swap_contents_and_description;
+}
+
+- (BOOL)isFromKeyword {
+  return _match.from_keyword;
+}
+
+- (BOOL)isFromPrevious {
+  return _match.from_previous;
+}
+
+@end
+
+namespace {
+
+NSArray<OAAutocompleteMatch*>* ToNSArray(
+    const std::vector<oa::AutocompleteMatch>& matches) {
+  NSMutableArray<OAAutocompleteMatch*>* result = [NSMutableArray array];
+  for (const oa::AutocompleteMatch& match : matches) {
+    [result addObject:[[OAAutocompleteMatch alloc] initWithMatch:match]];
+  }
+  return result;
+}
+
+}  // namespace
+
+@implementation OAAutocompleteResult
+
+@synthesize combinedMatches = _combinedMatches;
+@synthesize perProviderMatches = _perProviderMatches;
+
+- (instancetype)initWithResult:(const oa::AutocompleteResult&)result {
+  if ((self = [super init])) {
+    _combinedMatches = ToNSArray(result.combined_matches);
+    _perProviderMatches = ToNSArray(result.per_provider_matches);
+  }
+  return self;
+}
+
+@end
+
+@implementation OAAutocomplete {
+  std::unique_ptr<oa::Autocomplete> _autocomplete;
+}
+
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier {
+  if ((self = [super init])) {
+    _autocomplete = oa::CreateAutocomplete(identifier.UTF8String ?: "");
+  }
+  return self;
+}
+
+- (void)startWithText:(NSString*)text
+               cursorPosition:(NSUInteger)cursorPosition
+    preventInlineAutocomplete:(BOOL)preventInlineAutocomplete
+                   startFresh:(BOOL)startFresh
+                      keyword:(nullable NSString*)keyword
+                   currentURL:(nullable NSURL*)currentURL
+                   completion:
+                       (void (^)(OAAutocompleteResult*, BOOL))completion {
+  oa::AutocompleteInput input;
+  input.text = text.UTF8String ?: "";
+  input.cursor_position = cursorPosition;
+  input.prevent_inline_autocomplete = preventInlineAutocomplete;
+  input.start_fresh = startFresh;
+  input.keyword = keyword.UTF8String ?: "";
+  input.current_url = currentURL.absoluteString.UTF8String ?: "";
+  void (^handler)(OAAutocompleteResult*, BOOL) = [completion copy];
+  _autocomplete->Start(
+      input, [handler](const oa::AutocompleteResult& result, bool done) {
+        handler([[OAAutocompleteResult alloc] initWithResult:result], done);
+      });
+}
+
+- (void)stop {
+  _autocomplete->Stop();
+}
+
+- (void)deleteMatch:(OAAutocompleteMatch*)match {
+  _autocomplete->DeleteMatch(match.match);
+}
+
+@end
+
 @implementation OAProfile {
   NSString* _identifier;
 }
@@ -837,6 +990,10 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
     [result addObject:[[OASiteSetting alloc] initWithSetting:setting]];
   }
   return result;
+}
+
+- (OAAutocomplete*)makeAutocomplete {
+  return [[OAAutocomplete alloc] initWithProfileIdentifier:_identifier];
 }
 
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url {
