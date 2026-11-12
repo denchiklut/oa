@@ -3,10 +3,7 @@ import SwiftUI
 
 struct BrowserWindowView: View {
     let model: WindowModel
-    @State private var address = ""
-    @State private var editing = false
     @State private var showingSiteControls = false
-    @FocusState private var addressFocused: Bool
 
     var body: some View {
         HStack(spacing: 0) {
@@ -34,42 +31,24 @@ struct BrowserWindowView: View {
             }
         }
         .overlay {
+            if let bar = model.commandBar {
+                CommandBarView(model: model, bar: bar).id(ObjectIdentifier(bar))
+            }
+        }
+        // As Arc: over the command bar, which ⌘T opens behind a dialog.
+        .overlay {
             if let dialog = model.dialog {
                 DialogView(model: model, dialog: dialog).id(ObjectIdentifier(dialog))
             }
         }
-        .onChange(of: model.address) { _, url in
-            if !editing || address.isEmpty { address = url?.absoluteString ?? "" }
-        }
-        .onChange(of: model.selectedTabID) { _, _ in
-            address = model.address?.absoluteString ?? ""
-            if model.address == nil { addressFocused = true }
-        }
         .onChange(of: model.page?.id) { _, _ in
             DispatchQueue.main.async {
-                guard let page = model.page else { return }
-                if page.url == nil {
-                    addressFocused = true
-                } else if model.dialog == nil {
-                    addressFocused = false
-                    (model.peek ?? page).activate()
-                }
+                guard let page = model.page, model.dialog == nil, model.commandBar == nil else { return }
+                (model.peek ?? page).activate()
             }
         }
         .onChange(of: model.dialog == nil) { _, none in
-            if none { model.frontPage?.activate() }
-        }
-        .onChange(of: model.focusAddressField) { _, _ in
-            addressFocused = true
-            DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.selectAll(nil) }
-        }
-        .onChange(of: addressFocused) { _, focused in
-            editing = focused
-            if !focused { address = model.address?.absoluteString ?? "" }
-        }
-        .onAppear {
-            address = model.address?.absoluteString ?? ""
-            if model.page == nil { addressFocused = true }
+            if none, model.commandBar == nil { model.frontPage?.activate() }
         }
     }
 
@@ -98,21 +77,29 @@ struct BrowserWindowView: View {
                 Image(systemName: page?.isLoading == true ? "xmark" : "arrow.clockwise")
             }
             .disabled(page == nil)
-            TextField("Search or enter website name", text: $address)
-                .textFieldStyle(.roundedBorder)
-                .focused($addressFocused)
-                .onSubmit {
-                    model.navigate(to: address)
-                    addressFocused = false
+            // As Arc: the URL opens the command bar to edit it, rather than being edited in place.
+            Button {
+                model.openCommandBar(.currentTab)
+            } label: {
+                Text(model.address?.absoluteString ?? "Search or Enter URL…")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(model.address == nil ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .frame(height: 22)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .bottom) {
+                if let page, page.isLoading {
+                    ProgressView(value: page.loadProgress)
+                        .progressViewStyle(.linear)
+                        .frame(height: 2)
+                        .padding(.horizontal, 2)
                 }
-                .overlay(alignment: .bottom) {
-                    if let page, page.isLoading {
-                        ProgressView(value: page.loadProgress)
-                            .progressViewStyle(.linear)
-                            .frame(height: 2)
-                            .padding(.horizontal, 2)
-                    }
-                }
+            }
             // Arc's Site Controls button, which its permission prompt hangs from too. Oa's own: nothing to control
             // on a page that isn't a website.
             Button {
