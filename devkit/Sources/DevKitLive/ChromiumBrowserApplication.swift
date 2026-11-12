@@ -102,14 +102,8 @@ final class ChromiumBrowserContext: BrowserContext {
     private let profile: @MainActor () -> CoreProfile?
     private lazy var chromiumDownloads = ChromiumDownloads(core: profile()?.downloads)
     var downloads: any Downloads { chromiumDownloads }
-    var downloadDirectory: URL? {
-        get { profile()?.downloadDirectory }
-        set { profile()?.downloadDirectory = newValue }
-    }
-    var asksWhereToSaveDownloads: Bool {
-        get { profile()?.asksWhereToSaveDownloads ?? false }
-        set { profile()?.asksWhereToSaveDownloads = newValue }
-    }
+    private lazy var chromiumPreferences = ChromiumPreferences(core: profile()?.preferences)
+    var preferences: any BrowserContextPreferences { chromiumPreferences }
 
     init(id: UUID, profile: @escaping @MainActor () -> CoreProfile?) {
         self.id = id

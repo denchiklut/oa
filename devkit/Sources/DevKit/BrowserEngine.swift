@@ -34,8 +34,15 @@ public protocol BrowserContext: AnyObject {
     func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL)
     /// As ADK's download manager for the context: one per profile, alive as long as it.
     var downloads: any Downloads { get }
-    /// Where the profile's downloads go and a Save panel starts, as ArcCore's `downloadFilePath`. Nil until the
-    /// profile has loaded.
+    /// As ArcCore's `ArcBrowserContextPreferences`: one per profile, kept current by the engine.
+    var preferences: any BrowserContextPreferences { get }
+}
+
+/// A profile's preferences, observable: the engine reports them once the profile has loaded and after every change,
+/// Chrome's settings page included. A value set reads back with the report that follows.
+@MainActor
+public protocol BrowserContextPreferences: AnyObject, Observable {
+    /// Where the profile's downloads go and a Save panel starts, as ArcCore's `downloadFilePath`; nil until loaded.
     var downloadDirectory: URL? { get set }
     /// The engine asks where to save each download in its Save panel, as ArcCore's `promptForDownloadPath`.
     var asksWhereToSaveDownloads: Bool { get set }
