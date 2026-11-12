@@ -9,7 +9,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     private var windows: [BrowserWindowController] = []
     private var mainMenu: MainMenu?
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
-    private lazy var settings = SettingsWindowController(engine: engine, store: store)
+    private lazy var settings = SettingsWindowController(engine: engine, store: store) { [weak self] spaceID in
+        self?.openWindow(on: spaceID)
+    }
     private var askingToQuit = false
     private static var current: ApplicationDelegate?
 
@@ -130,13 +132,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
-    /// A new window opens on the key window's Space. A restored one brings its own selection. One opened for a tab
-    /// of `source` opens beside it on its Space and selects the tab, as Arc's Open Link in New Window does.
+    /// A new window opens on the key window's Space, or on the one asked for. A restored one brings its own
+    /// selection. One opened for a tab of `source` opens beside it on its Space and selects the tab, as Arc's Open
+    /// Link in New Window does.
+    @discardableResult
     private func openWindow(
-        restoring record: WindowRecord? = nil, selecting tabID: UUID? = nil, from source: WindowModel? = nil
-    ) {
+        restoring record: WindowRecord? = nil, selecting tabID: UUID? = nil, from source: WindowModel? = nil,
+        on spaceID: UUID? = nil
+    ) -> WindowModel {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
-        let spaceID = (source ?? key?.model)?.selectedSpaceID ?? store.state.spaces[0].id
+        let spaceID = spaceID ?? (source ?? key?.model)?.selectedSpaceID ?? store.state.spaces[0].id
         let controller = BrowserWindowController(
             id: record?.id ?? UUID(), engine: engine, store: store, downloads: downloads, spaceID: spaceID
         ) { [weak self] closed in
@@ -155,5 +160,6 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
         } else {
             controller.model.showFirst(isOnlyWindow: windows.count == 1)
         }
+        return controller.model
     }
 }
