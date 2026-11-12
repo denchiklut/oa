@@ -15,7 +15,10 @@ expanded into a tab or closed into the Archive, and Favorites: a profile's grid
 of tiles at the top of the sidebar in every one of its Spaces, which keep their
 address and peek like pinned tabs, and JavaScript dialogs: `alert`, `confirm`,
 `prompt` and "Leave site?" shown over the window as Arc shows them, with
-archiving, a Peek's close and a Space's deletion waiting for the page's answer.
+archiving, a Peek's close and a Space's deletion waiting for the page's answer,
+and downloads: a Library in the window that lists every profile's downloads with
+their progress, a ring on its button and a flyout of the recent ones, and a
+download location for each profile.
 
 Start with the [architecture](docs/architecture/README.md). The
 chapters cover UI product state and native presentation, DevKit's Swift
