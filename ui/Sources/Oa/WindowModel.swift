@@ -153,6 +153,11 @@ final class WindowModel {
         select(tab.id)
     }
 
+    /// As Arc: Chromium's History page in a new tab at the top of the Space, in the Space's profile.
+    func viewHistory() {
+        if let url = URL(string: "chrome://history/") { newTab(url) }
+    }
+
     /// As Arc: ⌘L edits the front page, the Peek included, and does nothing over a dialog; with no tab selected it
     /// makes one as ⌘T does.
     func openCommandBar(_ destination: CommandBar.Destination) {

@@ -54,6 +54,7 @@ final class MainMenu {
         archive.addItem(item("Back", #selector(BrowserWindowController.goBack(_:)), key: "["))
         archive.addItem(item("Forward", #selector(BrowserWindowController.goForward(_:)), key: "]"))
         archive.addItem(.separator())
+        archive.addItem(item("View History", #selector(BrowserWindowController.viewHistory(_:)), key: "y"))
         archive.addItem(item("View Archive…", #selector(BrowserWindowController.viewArchive(_:))))
         archive.addItem(item("Clear Archive", #selector(BrowserWindowController.clearArchive(_:))))
 
