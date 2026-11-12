@@ -44,9 +44,13 @@
                             page:(nullable OAPage*)page;
 @end
 
+@interface OASearchEngine ()
+- (instancetype)initWithEngine:(const oa::SearchEngine&)engine;
+@end
+
 @interface OAPreferences ()
 - (instancetype)initWithProfileIdentifier:(NSString*)identifier;
-- (void)downloadLocationChanged;
+- (void)preferencesChanged;
 @end
 
 @interface OADownloads ()
@@ -735,7 +739,11 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
   explicit PreferencesObserverBridge(OAPreferences* preferences)
       : preferences_(preferences) {}
   void OnDownloadLocationChanged() override {
-    [preferences_ downloadLocationChanged];
+    [preferences_ preferencesChanged];
+  }
+  void OnSearchEnginesChanged() override { [preferences_ preferencesChanged]; }
+  void OnSearchSuggestEnabledChanged() override {
+    [preferences_ preferencesChanged];
   }
 
  private:
@@ -743,6 +751,29 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
 };
 
 }  // namespace
+
+@implementation OASearchEngine
+
+@synthesize name = _name;
+@synthesize keyword = _keyword;
+@synthesize url = _url;
+@synthesize faviconURL = _faviconURL;
+@synthesize prepopulated = _prepopulated;
+
+- (instancetype)initWithEngine:(const oa::SearchEngine&)engine {
+  if ((self = [super init])) {
+    _name = ToNSString(engine.name);
+    _keyword = ToNSString(engine.keyword);
+    _url = ToNSString(engine.url);
+    _faviconURL = engine.favicon_url.empty()
+                      ? nil
+                      : [NSURL URLWithString:ToNSString(engine.favicon_url)];
+    _prepopulated = engine.is_prepopulated;
+  }
+  return self;
+}
+
+@end
 
 @implementation OAPreferences {
   NSString* _profileIdentifier;
@@ -798,7 +829,42 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
   _preferences->SetAsksWhereToSaveDownloads(asks);
 }
 
-- (void)downloadLocationChanged {
+- (nullable NSArray<OASearchEngine*>*)searchEngines {
+  std::optional<std::vector<oa::SearchEngine>> engines =
+      _preferences ? _preferences->GetSearchEngines() : std::nullopt;
+  if (!engines) {
+    return nil;
+  }
+  NSMutableArray<OASearchEngine*>* result = [NSMutableArray array];
+  for (const oa::SearchEngine& engine : *engines) {
+    [result addObject:[[OASearchEngine alloc] initWithEngine:engine]];
+  }
+  return result;
+}
+
+- (nullable OASearchEngine*)defaultSearchEngine {
+  std::optional<oa::SearchEngine> engine =
+      _preferences ? _preferences->GetDefaultSearchEngine() : std::nullopt;
+  return engine ? [[OASearchEngine alloc] initWithEngine:*engine] : nil;
+}
+
+- (void)setDefaultSearchEngineWithKeyword:(NSString*)keyword {
+  [self start];
+  _preferences->SetDefaultSearchEngine(keyword.UTF8String ?: "");
+}
+
+- (BOOL)searchSuggestEnabled {
+  std::optional<bool> enabled =
+      _preferences ? _preferences->GetSearchSuggestEnabled() : std::nullopt;
+  return enabled.value_or(true);
+}
+
+- (void)setSearchSuggestEnabled:(BOOL)enabled {
+  [self start];
+  _preferences->SetSearchSuggestEnabled(enabled);
+}
+
+- (void)preferencesChanged {
   [self.delegate preferencesDidChange:self];
 }
 
