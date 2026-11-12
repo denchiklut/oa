@@ -79,7 +79,6 @@ bool ToOpenDisposition(WindowOpenDisposition disposition,
       *result = OpenDisposition::kBackgroundTab;
       return true;
     case WindowOpenDisposition::NEW_WINDOW:
-    case WindowOpenDisposition::OFF_THE_RECORD:
       *result = OpenDisposition::kNewWindow;
       return true;
     case WindowOpenDisposition::NEW_POPUP:
