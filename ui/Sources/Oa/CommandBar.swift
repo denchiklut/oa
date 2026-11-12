@@ -63,8 +63,7 @@ final class CommandBar {
     private(set) var text: String
     /// Ranked once for each change of the text, of Chromium's answer and of the Space's tabs.
     private(set) var rows: [Row] = []
-    /// The highlighted row below the top one. Arc keeps an index, `currentHighlightedResultIndex`; what it does
-    /// when a later answer re-ranks the rows wasn't traced. Oa's own: the highlight stays on its row.
+    /// Oa's own: the highlight stays on its row when results change; Arc keeps a numeric position.
     private var selectedKey: String?
     private var edited = false
     /// Chromium's rule: no completion after a deletion, unless the selection is a caret at the end, or while an
@@ -72,9 +71,9 @@ final class CommandBar {
     private var suppressesInline = false
     /// The user's selection in the field, in UTF-16 code units.
     private var selection: NSRange
-    /// A completion or a row's text that stays in the field once the user moves the caret or selects in it. As Arc:
-    /// the query and the rows stay those of what was typed until the next edit, which takes the field's text.
+    /// Caret movement preserves the displayed text without changing the query, as Arc does.
     private var acceptedText: String?
+    @ObservationIgnored private var lastSuggestedText: String?
     @ObservationIgnored private let profileID: UUID
     @ObservationIgnored private let picks: CommandBarPicks
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
@@ -107,6 +106,7 @@ final class CommandBar {
     func select(_ index: Int) {
         selectedKey = index > 0 && rows.indices.contains(index) ? rows[index].id : nil
         acceptedText = nil
+        lastSuggestedText = suggestedField.string
     }
 
     func moveSelection(_ offset: Int) {
@@ -124,6 +124,10 @@ final class CommandBar {
     /// or for a tab the typed text.
     var field: FieldText {
         if let acceptedText { return FieldText(string: acceptedText, selection: clamped(selection, to: acceptedText)) }
+        return suggestedField
+    }
+
+    private var suggestedField: FieldText {
         let typed = (text as NSString).length
         if !edited, destination == .currentTab, selectedKey == nil {
             return FieldText(string: text, selection: NSRange(0..<typed))
@@ -192,8 +196,7 @@ final class CommandBar {
     func selectText(_ selection: NSRange, in string: String) {
         edited = true
         self.selection = selection
-        acceptedText = string == text ? nil : string
-        if acceptedText == nil, selection.location < (text as NSString).length { suppressesInline = true }
+        acceptedText = string
     }
 
     /// As Arc's ⇧⌦: a past search goes, while a page from history stays.
@@ -238,6 +241,15 @@ final class CommandBar {
             additionalMatches: text.isEmpty ? [] : autocomplete.additionalMatches,
             tabs: destination == .newTab ? tabs() : [], lastPick: picks.pick(for: text, in: profileID), now: .now)
         if ranked != rows { rows = ranked }
+        let output = suggestedField.string
+        guard output != lastSuggestedText else { return }
+        // Arc removes duplicate outputs before checking the selection, so a rejected completion isn't replayed.
+        lastSuggestedText = output
+        if let acceptedText, !suppressesInline,
+            NSMaxRange(clamped(selection, to: acceptedText)) == (acceptedText as NSString).length
+        {
+            self.acceptedText = nil
+        }
     }
 
     private func start(preventsInlineAutocomplete: Bool) {
