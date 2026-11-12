@@ -100,6 +100,8 @@ public final class ChromiumBrowserApplication: BrowserApplication {
 final class ChromiumBrowserContext: BrowserContext {
     let id: UUID
     private let profile: @MainActor () -> CoreProfile?
+    private lazy var chromiumDownloads = ChromiumDownloads(core: profile()?.downloads)
+    var downloads: any Downloads { chromiumDownloads }
 
     init(id: UUID, profile: @escaping @MainActor () -> CoreProfile?) {
         self.id = id
