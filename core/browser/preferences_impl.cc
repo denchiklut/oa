@@ -30,6 +30,14 @@ class PreferencesImpl : public Preferences, public ProfileObserver {
   }
 
   // Preferences:
+  std::optional<DownloadLocation> GetDownloadLocation() const override {
+    if (!profile_) {
+      return std::nullopt;
+    }
+    DownloadPrefs* prefs = DownloadPrefs::FromBrowserContext(profile_);
+    return DownloadLocation{prefs->DownloadPath().value(),
+                            prefs->PromptForDownload()};
+  }
   void SetDownloadDirectory(const std::string& directory) override {
     LoadBrowserProfile(
         profile_id_,
@@ -76,7 +84,7 @@ class PreferencesImpl : public Preferences, public ProfileObserver {
     DownloadLocationChanged();
   }
 
-  // Posted, so DownloadPrefs has taken the new value first.
+  // Posted, so DownloadPrefs has taken the new value before it is read.
   void DownloadLocationChanged() {
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&PreferencesImpl::ReportDownloadLocation,
@@ -84,12 +92,9 @@ class PreferencesImpl : public Preferences, public ProfileObserver {
   }
 
   void ReportDownloadLocation() {
-    if (!profile_) {
-      return;
+    if (profile_) {
+      observer_->OnDownloadLocationChanged();
     }
-    DownloadPrefs* prefs = DownloadPrefs::FromBrowserContext(profile_);
-    observer_->OnDownloadLocationChanged(
-        {prefs->DownloadPath().value(), prefs->PromptForDownload()});
   }
 
   const std::string profile_id_;

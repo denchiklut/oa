@@ -44,7 +44,7 @@
 
 @interface OAPreferences ()
 - (instancetype)initWithProfileIdentifier:(NSString*)identifier;
-- (void)downloadLocationChanged:(const oa::DownloadLocation&)location;
+- (void)downloadLocationChanged;
 @end
 
 @interface OADownloads ()
@@ -715,9 +715,8 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
  public:
   explicit PreferencesObserverBridge(OAPreferences* preferences)
       : preferences_(preferences) {}
-  void OnDownloadLocationChanged(
-      const oa::DownloadLocation& location) override {
-    [preferences_ downloadLocationChanged:location];
+  void OnDownloadLocationChanged() override {
+    [preferences_ downloadLocationChanged];
   }
 
  private:
@@ -730,8 +729,6 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
   NSString* _profileIdentifier;
   std::unique_ptr<PreferencesObserverBridge> _observer;
   std::unique_ptr<oa::Preferences> _preferences;
-  NSURL* _downloadDirectory;
-  BOOL _asksWhereToSaveDownloads;
 }
 
 @synthesize delegate = _delegate;
@@ -757,7 +754,11 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
 }
 
 - (nullable NSURL*)downloadDirectory {
-  return _downloadDirectory;
+  std::optional<oa::DownloadLocation> location =
+      _preferences ? _preferences->GetDownloadLocation() : std::nullopt;
+  return location ? [NSURL fileURLWithPath:ToNSString(location->directory)
+                               isDirectory:YES]
+                  : nil;
 }
 
 - (void)setDownloadDirectory:(nullable NSURL*)directory {
@@ -768,7 +769,9 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
 }
 
 - (BOOL)asksWhereToSaveDownloads {
-  return _asksWhereToSaveDownloads;
+  std::optional<oa::DownloadLocation> location =
+      _preferences ? _preferences->GetDownloadLocation() : std::nullopt;
+  return location && location->asks_each_time;
 }
 
 - (void)setAsksWhereToSaveDownloads:(BOOL)asks {
@@ -776,10 +779,7 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
   _preferences->SetAsksWhereToSaveDownloads(asks);
 }
 
-- (void)downloadLocationChanged:(const oa::DownloadLocation&)location {
-  _downloadDirectory = [NSURL fileURLWithPath:ToNSString(location.directory)
-                                  isDirectory:YES];
-  _asksWhereToSaveDownloads = location.asks_each_time;
+- (void)downloadLocationChanged {
   [self.delegate preferencesDidChange:self];
 }
 
