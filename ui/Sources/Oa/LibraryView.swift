@@ -102,6 +102,19 @@ private struct DownloadRow: View {
                 .lineLimit(1)
             }
             Spacer(minLength: 0)
+            if hovering {
+                Menu {
+                    DownloadMenu(model: model, entry: entry)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
         }
         .opacity(ended ? 0.5 : 1)
         .padding(.horizontal, 10)
@@ -111,7 +124,35 @@ private struct DownloadRow: View {
         .onTapGesture { model.activate(entry) }
         .onHover { hovering = $0 }
         .help(entry.name)
+        .contextMenu { DownloadMenu(model: model, entry: entry) }
     }
+}
+
+/// Arc's Library menu for a download, with Oa's name in Hide. Open on one still running makes it open when it
+/// finishes; a cancelled or failed one keeps the first three, disabled.
+struct DownloadMenu: View {
+    let model: WindowModel
+    let entry: DownloadsStore.Entry
+
+    var body: some View {
+        let downloads = model.downloads
+        let finished = entry.download.status == .finished
+        Button("Open \(entry.menuKind)") {
+            if finished { downloads.open(entry) } else { downloads.toggleOpenWhenFinished(entry) }
+        }
+        .disabled(!finished && !entry.isRunning)
+        Button("Copy \(entry.menuKind)") { downloads.copy(entry) }.disabled(!finished)
+        Button("Show in Finder") { downloads.reveal(entry) }.disabled(!finished)
+        Divider()
+        if entry.isRunning {
+            Button("Cancel Download") { downloads.cancel(entry) }
+            Divider()
+        }
+        Button("Hide from \(appName)") { downloads.hide(entry) }
+        if finished { Button("Move to Trash") { downloads.trash(entry) } }
+    }
+
+    private var appName: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa" }
 }
 
 /// A finished file's Quick Look thumbnail, else its type's icon; nothing for one that was cancelled or failed.
