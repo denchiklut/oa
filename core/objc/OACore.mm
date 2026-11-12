@@ -42,6 +42,11 @@
                             page:(nullable OAPage*)page;
 @end
 
+@interface OAPreferences ()
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier;
+- (void)downloadLocationChanged:(const oa::DownloadLocation&)location;
+@end
+
 @interface OADownloads ()
 - (instancetype)initWithProfileIdentifier:(NSString*)identifier;
 - (void)downloadsInitialized:(const std::vector<oa::Download>&)downloads;
@@ -704,43 +709,96 @@ class DownloadsObserverBridge : public oa::Downloads::Observer {
 
 @end
 
+namespace {
+
+class PreferencesObserverBridge : public oa::Preferences::Observer {
+ public:
+  explicit PreferencesObserverBridge(OAPreferences* preferences)
+      : preferences_(preferences) {}
+  void OnDownloadLocationChanged(
+      const oa::DownloadLocation& location) override {
+    [preferences_ downloadLocationChanged:location];
+  }
+
+ private:
+  __weak OAPreferences* preferences_;
+};
+
+}  // namespace
+
+@implementation OAPreferences {
+  NSString* _profileIdentifier;
+  std::unique_ptr<PreferencesObserverBridge> _observer;
+  std::unique_ptr<oa::Preferences> _preferences;
+  NSURL* _downloadDirectory;
+  BOOL _asksWhereToSaveDownloads;
+}
+
+@synthesize delegate = _delegate;
+
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier {
+  if ((self = [super init])) {
+    _profileIdentifier = [identifier copy];
+    _observer = std::make_unique<PreferencesObserverBridge>(self);
+  }
+  return self;
+}
+
+- (void)setDelegate:(nullable id<OAPreferencesDelegate>)delegate {
+  _delegate = delegate;
+  [self start];
+}
+
+- (void)start {
+  if (!_preferences) {
+    _preferences = oa::ObservePreferences(_profileIdentifier.UTF8String ?: "",
+                                          _observer.get());
+  }
+}
+
+- (nullable NSURL*)downloadDirectory {
+  return _downloadDirectory;
+}
+
+- (void)setDownloadDirectory:(nullable NSURL*)directory {
+  [self start];
+  if (directory.path) {
+    _preferences->SetDownloadDirectory(directory.path.UTF8String);
+  }
+}
+
+- (BOOL)asksWhereToSaveDownloads {
+  return _asksWhereToSaveDownloads;
+}
+
+- (void)setAsksWhereToSaveDownloads:(BOOL)asks {
+  [self start];
+  _preferences->SetAsksWhereToSaveDownloads(asks);
+}
+
+- (void)downloadLocationChanged:(const oa::DownloadLocation&)location {
+  _downloadDirectory = [NSURL fileURLWithPath:ToNSString(location.directory)
+                                  isDirectory:YES];
+  _asksWhereToSaveDownloads = location.asks_each_time;
+  [self.delegate preferencesDidChange:self];
+}
+
+@end
+
 @implementation OAProfile {
   NSString* _identifier;
 }
 
 @synthesize downloads = _downloads;
+@synthesize preferences = _preferences;
 
 - (instancetype)initWithIdentifier:(NSString*)identifier {
   if ((self = [super init])) {
     _identifier = [identifier copy];
     _downloads = [[OADownloads alloc] initWithProfileIdentifier:identifier];
+    _preferences = [[OAPreferences alloc] initWithProfileIdentifier:identifier];
   }
   return self;
-}
-
-- (nullable NSURL*)downloadDirectory {
-  std::optional<oa::DownloadLocation> location =
-      oa::GetDownloadLocation(_identifier.UTF8String ?: "");
-  return location ? [NSURL fileURLWithPath:ToNSString(location->directory)
-                               isDirectory:YES]
-                  : nil;
-}
-
-- (void)setDownloadDirectory:(nullable NSURL*)directory {
-  if (directory.path) {
-    oa::SetDownloadDirectory(_identifier.UTF8String ?: "",
-                             directory.path.UTF8String);
-  }
-}
-
-- (BOOL)asksWhereToSaveDownloads {
-  std::optional<oa::DownloadLocation> location =
-      oa::GetDownloadLocation(_identifier.UTF8String ?: "");
-  return location && location->asks_each_time;
-}
-
-- (void)setAsksWhereToSaveDownloads:(BOOL)asks {
-  oa::SetAsksWhereToSaveDownloads(_identifier.UTF8String ?: "", asks);
 }
 
 - (void)createPageInWindow:(NSString*)windowIdentifier

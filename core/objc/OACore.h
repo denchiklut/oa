@@ -187,12 +187,28 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (instancetype)init NS_UNAVAILABLE;
 @end
 
-@interface OAProfile : NSObject
-@property(nonatomic, readonly) OADownloads* downloads;
-// Where downloads go and a Save panel starts. Nil until the profile has loaded.
+@class OAPreferences;
+
+@protocol OAPreferencesDelegate <NSObject>
+// Once the profile has loaded, then after each change from anywhere.
+- (void)preferencesDidChange:(OAPreferences*)preferences;
+@end
+
+// A profile's preferences, as ArcCore's ArcBrowserContextPreferences.
+@interface OAPreferences : NSObject
+// Setting it the first time loads the profile and starts the events.
+@property(nonatomic, weak, nullable) id<OAPreferencesDelegate> delegate;
+// Where downloads go and a Save panel starts. Nil until the first event; a
+// set value reads back with the event that follows.
 @property(nonatomic, copy, nullable) NSURL* downloadDirectory;
 // Chromium asks where to save each download.
 @property(nonatomic) BOOL asksWhereToSaveDownloads;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+@interface OAProfile : NSObject
+@property(nonatomic, readonly) OADownloads* downloads;
+@property(nonatomic, readonly) OAPreferences* preferences;
 - (instancetype)init NS_UNAVAILABLE;
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
