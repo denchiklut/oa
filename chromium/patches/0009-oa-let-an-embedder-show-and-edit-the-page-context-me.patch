@@ -1,0 +1,167 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Thu, 12 Nov 2026 04:59:34 -0700
+Subject: [PATCH] oa: let an embedder show and edit the page context menu
+
+RenderViewContextMenuMacCocoa::Show() no longer returns when the page's view has no views::Widget, and MenuControllerParamsForWidget() accepts none: an embedder whose pages sit in its own AppKit windows gets Chrome's Cocoa menu, without a Widget's colors and element context. Adds RenderViewContextMenu::SetModelEditorForEmbedder(): once set, the editor runs on every menu's model at the end of InitMenu() and may remove and move items, and the separators it leaves at either end or doubled are removed, since the Cocoa menu doesn't collapse them around hidden items.
+---
+ .../render_view_context_menu.cc               | 22 +++++++++++++++++++
+ .../render_view_context_menu.h                |  8 +++++++
+ .../render_view_context_menu_mac_cocoa.mm     | 12 ++++++----
+ .../menu_controller_cocoa_delegate_params.cc  | 16 ++++++++------
+ .../menu_controller_cocoa_delegate_params.h   |  3 ++-
+ 5 files changed, 49 insertions(+), 12 deletions(-)
+
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+index cd1fc2e4db79b41e843f4f30a8a6814210dc5a88..05eb76937659ed32a3b226ecffe6e945b74450fe 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+@@ -444,6 +444,9 @@ constexpr int IDC_SPELLCHECK_LANGUAGES_LAST =
+ 
+ constexpr int kTabMenuIconSize = 16;
+ 
++// Set by RenderViewContextMenu::SetModelEditorForEmbedder().
++RenderViewContextMenu::EmbedderModelEditor g_embedder_model_editor = nullptr;
++
+ base::OnceCallback<void(RenderViewContextMenu*)>* GetMenuShownCallback() {
+   static base::NoDestructor<base::OnceCallback<void(RenderViewContextMenu*)>>
+       callback;
+@@ -1619,6 +1622,19 @@ void RenderViewContextMenu::InitMenu() {
+       AppendReadAnythingItem();
+     }
+   }
++
++  if (g_embedder_model_editor) {
++    g_embedder_model_editor(params_, &menu_model_);
++    for (size_t index = menu_model_.GetItemCount(); index-- > 0;) {
++      if (menu_model_.GetTypeAt(index) != ui::MenuModel::TYPE_SEPARATOR) {
++        continue;
++      }
++      if (index == 0 || index + 1 == menu_model_.GetItemCount() ||
++          menu_model_.GetTypeAt(index + 1) == ui::MenuModel::TYPE_SEPARATOR) {
++        menu_model_.RemoveItemAt(index);
++      }
++    }
++  }
+ }
+ 
+ Profile* RenderViewContextMenu::GetProfile() const {
+@@ -4451,6 +4467,12 @@ void RenderViewContextMenu::AddAccessibilityLabelsServiceItem(bool is_checked) {
+   }
+ }
+ 
++// static
++void RenderViewContextMenu::SetModelEditorForEmbedder(
++    EmbedderModelEditor editor) {
++  g_embedder_model_editor = editor;
++}
++
+ // static
+ void RenderViewContextMenu::RegisterMenuShownCallbackForTesting(
+     base::OnceCallback<void(RenderViewContextMenu*)> cb) {
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.h b/chrome/browser/renderer_context_menu/render_view_context_menu.h
+index 4734822d3777401dab1bc4ce4499ffb334bd41c2..b1c9b0f2328717acd9af6e31d937ff84849c3f0c 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.h
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.h
+@@ -165,6 +165,14 @@ class RenderViewContextMenu
+   void AddSpellCheckServiceItem(bool is_checked) override;
+   void AddAccessibilityLabelsServiceItem(bool is_checked) override;
+ 
++  // For an embedder that keeps only the items it can back. Once an editor is
++  // set, it runs on every menu's model at the end of InitMenu() and may remove
++  // and move items; separators it leaves at either end or doubled are removed
++  // after it. Call it before the browser starts.
++  using EmbedderModelEditor = void (*)(const content::ContextMenuParams& params,
++                                       ui::SimpleMenuModel* model);
++  static void SetModelEditorForEmbedder(EmbedderModelEditor editor);
++
+   // Registers a one-time callback that will be called the next time a context
+   // menu is shown.
+   static void RegisterMenuShownCallbackForTesting(
+diff --git a/chrome/browser/ui/cocoa/renderer_context_menu/render_view_context_menu_mac_cocoa.mm b/chrome/browser/ui/cocoa/renderer_context_menu/render_view_context_menu_mac_cocoa.mm
+index 10829d1e5930ce9f1b9deb4027b9ba7361ecb358..b7b22fc9181269db891ec67f247d17d841046c36 100644
+--- a/chrome/browser/ui/cocoa/renderer_context_menu/render_view_context_menu_mac_cocoa.mm
++++ b/chrome/browser/ui/cocoa/renderer_context_menu/render_view_context_menu_mac_cocoa.mm
+@@ -75,10 +75,12 @@
+ }
+ 
+ void RenderViewContextMenuMacCocoa::Show() {
++  // Null when an embedder shows the page in a window of its own; the menu
++  // then takes no colors or element context from a Widget.
+   views::Widget* widget = views::Widget::GetTopLevelWidgetForNativeView(
+       source_web_contents_->GetNativeView());
+ 
+-  if (!widget || headless::IsHeadlessMode()) {
++  if (headless::IsHeadlessMode()) {
+     return;
+   }
+ 
+@@ -95,9 +97,11 @@
+   NSEvent* clickEvent = ui::EventForPositioningContextMenuRelativeToWindow(
+       position, [parent_view_ window]);
+ 
+-  ui::ShowContextMenu(menu_controller_.menu, clickEvent, parent_view_,
+-                      /*allow_nested_tasks=*/true,
+-                      views::ElementTrackerViews::GetContextForWidget(widget));
++  ui::ShowContextMenu(
++      menu_controller_.menu, clickEvent, parent_view_,
++      /*allow_nested_tasks=*/true,
++      widget ? views::ElementTrackerViews::GetContextForWidget(widget)
++             : ui::ElementContext());
+ }
+ 
+ void RenderViewContextMenuMacCocoa::CancelToolkitMenu() {
+diff --git a/ui/views/controls/menu/menu_controller_cocoa_delegate_params.cc b/ui/views/controls/menu/menu_controller_cocoa_delegate_params.cc
+index 9905dd3b1521c72ba2a2df8e2290188092801dc6..2a4720d7bc48c33fff79cf3d6d392d64f87fc990 100644
+--- a/ui/views/controls/menu/menu_controller_cocoa_delegate_params.cc
++++ b/ui/views/controls/menu/menu_controller_cocoa_delegate_params.cc
+@@ -16,7 +16,7 @@ namespace views {
+ 
+ remote_cocoa::mojom::MenuControllerParamsPtr MenuControllerParamsForWidget(
+     Widget* widget) {
+-  auto* color_provider = widget->GetColorProvider();
++  auto* color_provider = widget ? widget->GetColorProvider() : nullptr;
+   auto params = remote_cocoa::mojom::MenuControllerParams::New();
+ 
+   // The preferred font is slightly smaller and slightly more bold than the
+@@ -27,18 +27,20 @@ remote_cocoa::mojom::MenuControllerParamsPtr MenuControllerParamsForWidget(
+   params->badge_font =
+       BadgePainter::GetBadgeFont(MenuConfig::instance().font_list)
+           .GetPrimaryFont();
+-  params->badge_color =
+-      color_provider->GetColor(ui::kColorBadgeInCocoaMenuBackground);
+-  params->badge_text_color =
+-      color_provider->GetColor(ui::kColorBadgeInCocoaMenuForeground);
++  if (color_provider) {
++    params->badge_color =
++        color_provider->GetColor(ui::kColorBadgeInCocoaMenuBackground);
++    params->badge_text_color =
++        color_provider->GetColor(ui::kColorBadgeInCocoaMenuForeground);
++    params->iph_dot_color =
++        color_provider->GetColor(ui::kColorButtonBackgroundProminent);
++  }
+   params->badge_horizontal_margin = BadgePainter::kBadgeHorizontalMargin;
+   params->badge_internal_padding = BadgePainter::kBadgeInternalPadding;
+   params->badge_min_height = BadgePainter::kBadgeMinHeightCocoa;
+   params->badge_radius =
+       base::checked_cast<uint32_t>(LayoutProvider::Get()->GetCornerRadiusMetric(
+           ShapeContextTokens::kBadgeRadius));
+-  params->iph_dot_color =
+-      color_provider->GetColor(ui::kColorButtonBackgroundProminent);
+   return params;
+ }
+ 
+diff --git a/ui/views/controls/menu/menu_controller_cocoa_delegate_params.h b/ui/views/controls/menu/menu_controller_cocoa_delegate_params.h
+index b8bc27787db5aa295993b47371cd7da2404848e1..ce58f65064957a3c991fa410bd2cb6e02496586f 100644
+--- a/ui/views/controls/menu/menu_controller_cocoa_delegate_params.h
++++ b/ui/views/controls/menu/menu_controller_cocoa_delegate_params.h
+@@ -12,7 +12,8 @@ namespace views {
+ class Widget;
+ 
+ // Create and populate a MenuControllerParams struct with the right parameters
+-// for a menu associated with `widget`.
++// for a menu associated with `widget`. With no Widget, as for an embedder's own
++// window, the colors a Widget provides stay unset.
+ VIEWS_EXPORT remote_cocoa::mojom::MenuControllerParamsPtr
+ MenuControllerParamsForWidget(Widget* widget);
+ 

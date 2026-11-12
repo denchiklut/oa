@@ -13,6 +13,7 @@ can't live in `//oa` (`core/`). Every patch is rebased at each Chromium update, 
 | 0006 | Keeps form submissions, client redirects and blank loads in the renderer when `browser_handles_all_top_level_requests` is on, as Arc's renderer does, so only links reach the browser's routing |
 | 0007 | Lets `//oa` supply the sad tab; Chrome's `SadTabController` asserts on the missing `BrowserView` the moment a renderer dies |
 | 0008 | Lets `//oa` supply the tab-modal JavaScript dialog view; Chrome's is a web-modal dialog anchored to the `BrowserView`. The app-modal view needs no patch: `AppModalDialogManager::SetNativeDialogFactory` is public |
+| 0009 | Lets Chrome's Cocoa page context menu show over a page that sits in the app's own window, where it found no `views::Widget` and returned, as ArcCore's patched menu does; and lets `//oa` edit the menu's model before it shows, to remove the items that need Chrome's views |
 
 Don't edit these files by hand. Commit on the `oa-patches` branch in `.local/chromium/src`, then run
 `scripts/patches.sh export`. `scripts/build.sh` applies the series before building.
