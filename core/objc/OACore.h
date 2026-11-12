@@ -207,6 +207,58 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (instancetype)init NS_UNAVAILABLE;
 @end
 
+// A Chromium omnibox match, as ArcCore's ArcAutocompleteMatch.
+@interface OAAutocompleteMatch : NSObject
+// Chromium's match type string, such as "history-url".
+@property(nonatomic, readonly) NSString* type;
+// Chromium's provider name, such as "HistoryURL".
+@property(nonatomic, readonly) NSString* provider;
+@property(nonatomic, readonly) NSString* contents;
+@property(nonatomic, readonly) NSString* matchDescription;
+@property(nonatomic, readonly, nullable) NSURL* destinationURL;
+@property(nonatomic, readonly) NSString* fillIntoEdit;
+@property(nonatomic, readonly) NSString* inlineAutocompletion;
+@property(nonatomic, readonly) NSString* keyword;
+@property(nonatomic, readonly) NSInteger relevance;
+@property(nonatomic, readonly) BOOL allowedToBeDefault;
+@property(nonatomic, readonly, getter=isDeletable) BOOL deletable;
+@property(nonatomic, readonly) BOOL swapsContentsAndDescription;
+@property(nonatomic, readonly, getter=isFromKeyword) BOOL fromKeyword;
+@property(nonatomic, readonly, getter=isFromPrevious) BOOL fromPrevious;
+// Chromium's additional info, such as "typed count" and "visit count".
+@property(nonatomic, readonly)
+    NSDictionary<NSString*, NSString*>* additionalInfo;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+// As ArcCore's ArcAutocompleteResult.
+@interface OAAutocompleteResult : NSObject
+// Chromium's combined result, in its order; it holds at most 8 matches.
+@property(nonatomic, readonly) NSArray<OAAutocompleteMatch*>* combinedMatches;
+// Every provider's own matches, provider by provider.
+@property(nonatomic, readonly)
+    NSArray<OAAutocompleteMatch*>* perProviderMatches;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+// Chromium's omnibox in one profile, as ArcCore's ArcBrowser runs it.
+@interface OAAutocomplete : NSObject
+- (instancetype)init NS_UNAVAILABLE;
+// Replaces a running query; before the profile has loaded, the last start
+// waits for it. `cursorPosition` is in UTF-16 code units. `completion` runs at
+// least once and again as providers answer, until the next start.
+- (void)startWithText:(NSString*)text
+               cursorPosition:(NSUInteger)cursorPosition
+    preventInlineAutocomplete:(BOOL)preventInlineAutocomplete
+                   startFresh:(BOOL)startFresh
+                      keyword:(nullable NSString*)keyword
+                   currentURL:(nullable NSURL*)currentURL
+                   completion:(void (^)(OAAutocompleteResult* result,
+                                        BOOL done))completion;
+- (void)stop;
+- (void)deleteMatch:(OAAutocompleteMatch*)match;
+@end
+
 @interface OAProfile : NSObject
 @property(nonatomic, readonly) OADownloads* downloads;
 @property(nonatomic, readonly) OAPreferences* preferences;
@@ -214,6 +266,8 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url;
+// Loads the profile if needed. ArcCore keeps one per window.
+- (OAAutocomplete*)makeAutocomplete;
 // Creates a page in the window's Browser for this profile, loading the profile
 // first if needed. The page starts in the background with nothing loaded, or
 // with the history of a closed page's `sessionID` (not -1) and `restored`;

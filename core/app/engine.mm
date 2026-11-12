@@ -15,6 +15,8 @@
 #include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/sampling_heap_profiler/poisson_allocation_sampler.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/app/chrome_main_delegate.h"
@@ -31,6 +33,8 @@
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/lens/lens_features.h"
+#include "components/omnibox/browser/autocomplete_provider.h"
+#include "components/omnibox/common/omnibox_features.h"
 #include "components/security_interstitials/core/features.h"
 #include "content/public/app/content_main.h"
 #include "content/public/browser/browser_main_runner.h"
@@ -85,6 +89,17 @@ void DisableFeature(base::CommandLine& command_line,
   }
   command_line.AppendSwitchASCII(switches::kDisableFeatures,
                                  disabled + feature.name);
+}
+
+// `feature` is a name, with its params as --enable-features takes them.
+void EnableFeature(base::CommandLine& command_line,
+                   const std::string& feature) {
+  std::string enabled =
+      command_line.GetSwitchValueASCII(switches::kEnableFeatures);
+  if (!enabled.empty()) {
+    enabled += ",";
+  }
+  command_line.AppendSwitchASCII(switches::kEnableFeatures, enabled + feature);
 }
 
 class MainDelegate : public ChromeMainDelegate {
@@ -151,6 +166,15 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   }
   DisableFeature(command_line, lens::features::kLensStandalone);
   DisableFeature(command_line, lens::features::kLensOverlay);
+  // ArcCore's Chromium has the history quick provider offer 10 matches where
+  // upstream has every provider offer 3, which is where the command bar's ten
+  // history rows come from. This param does the same without a patch.
+  EnableFeature(command_line,
+                base::StrCat({omnibox::kMlUrlScoring.name,
+                              ":MlUrlScoringMaxMatchesByProvider/",
+                              base::NumberToString(static_cast<int>(
+                                  AutocompleteProvider::Type::kHistoryQuick)),
+                              "%3A10"}));
 
   ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder();
   StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder();
