@@ -8,6 +8,7 @@ source_set("oa") {
     "browser/forwarding_web_contents_delegate.h",
     "browser/page_impl.h",
     "browser/page_impl.mm",
+    "browser/preferences_impl.cc",
     "browser/profile_services.cc",
     "browser/profile_services.h",
     "browser/site_settings_impl.cc",
@@ -28,6 +29,7 @@ source_set("oa") {
     "public/downloads.h",
     "public/engine.h",
     "public/page.h",
+    "public/preferences.h",
     "public/site_settings.h",
   ]
 

@@ -10,6 +10,7 @@
 #include "oa/public/downloads.h"
 #include "oa/public/engine.h"
 #include "oa/public/page.h"
+#include "oa/public/preferences.h"
 #include "oa/public/site_settings.h"
 
 @interface OAPage ()
@@ -715,6 +716,31 @@ class DownloadsObserverBridge : public oa::Downloads::Observer {
     _downloads = [[OADownloads alloc] initWithProfileIdentifier:identifier];
   }
   return self;
+}
+
+- (nullable NSURL*)downloadDirectory {
+  std::optional<oa::DownloadLocation> location =
+      oa::GetDownloadLocation(_identifier.UTF8String ?: "");
+  return location ? [NSURL fileURLWithPath:ToNSString(location->directory)
+                               isDirectory:YES]
+                  : nil;
+}
+
+- (void)setDownloadDirectory:(nullable NSURL*)directory {
+  if (directory.path) {
+    oa::SetDownloadDirectory(_identifier.UTF8String ?: "",
+                             directory.path.UTF8String);
+  }
+}
+
+- (BOOL)asksWhereToSaveDownloads {
+  std::optional<oa::DownloadLocation> location =
+      oa::GetDownloadLocation(_identifier.UTF8String ?: "");
+  return location && location->asks_each_time;
+}
+
+- (void)setAsksWhereToSaveDownloads:(BOOL)asks {
+  oa::SetAsksWhereToSaveDownloads(_identifier.UTF8String ?: "", asks);
 }
 
 - (void)createPageInWindow:(NSString*)windowIdentifier

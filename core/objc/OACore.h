@@ -189,6 +189,10 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 
 @interface OAProfile : NSObject
 @property(nonatomic, readonly) OADownloads* downloads;
+// Where downloads go and a Save panel starts. Nil until the profile has loaded.
+@property(nonatomic, copy, nullable) NSURL* downloadDirectory;
+// Chromium asks where to save each download.
+@property(nonatomic) BOOL asksWhereToSaveDownloads;
 - (instancetype)init NS_UNAVAILABLE;
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
