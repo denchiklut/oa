@@ -1,8 +1,71 @@
+import AppKit
 import Quartz
 import SwiftUI
 
-/// Arc's preview of a finished download, over the window as Quick Look draws a file: close, previous and next, the
-/// name and age, a menu and "Open in ‹App›".
+/// Arc's preview is a borderless window of its own, the size of the browser window and above it, that takes the
+/// keyboard and never becomes main: switching apps and back returns the keyboard to it, not to the page beneath.
+@MainActor
+final class DownloadPreviewWindow {
+    private var panel: PreviewPanel?
+    private var resizing: NSObjectProtocol?
+
+    func show(over parent: NSWindow, model: WindowModel) {
+        guard panel == nil else { return }
+        let panel = PreviewPanel(
+            contentRect: parent.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        let content = NSHostingView(rootView: PreviewContent(model: model))
+        content.wantsLayer = true
+        content.layer?.cornerRadius = Self.cornerRadius
+        content.layer?.masksToBounds = true
+        panel.contentView = content
+        panel.setFrame(parent.frame, display: false)
+        parent.addChildWindow(panel, ordered: .above)
+        panel.makeKey()
+        resizing = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: parent, queue: .main
+        ) { [weak panel, weak parent] _ in
+            MainActor.assumeIsolated {
+                if let parent { panel?.setFrame(parent.frame, display: true) }
+            }
+        }
+        self.panel = panel
+    }
+
+    func close() {
+        guard let panel else { return }
+        self.panel = nil
+        if let resizing { NotificationCenter.default.removeObserver(resizing) }
+        resizing = nil
+        let parent = panel.parent
+        parent?.removeChildWindow(panel)
+        panel.orderOut(nil)
+        parent?.makeKey()
+    }
+
+    /// A titled window's corners on macOS 26, so the dim stays inside the browser window's.
+    private static let cornerRadius: CGFloat = 16
+
+    private final class PreviewPanel: NSWindow {
+        override var canBecomeKey: Bool { true }
+        override var canBecomeMain: Bool { false }
+    }
+}
+
+/// Reads the model in its own body, so the preview follows ‹ and › and closes with it.
+private struct PreviewContent: View {
+    let model: WindowModel
+
+    var body: some View {
+        if let entry = model.previewedDownload { DownloadPreviewView(model: model, entry: entry) }
+    }
+}
+
+/// Arc's preview of a finished download, as Quick Look draws a file: close, previous and next, the name and age, a menu
+/// and "Open in ‹App›".
 struct DownloadPreviewView: View {
     let model: WindowModel
     let entry: DownloadsStore.Entry

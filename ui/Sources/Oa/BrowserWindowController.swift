@@ -9,6 +9,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let store: SidebarStore
     private let didClose: (BrowserWindowController) -> Void
     private var asking = false
+    private let downloadPreview = DownloadPreviewWindow()
 
     init(
         id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore, spaceID: UUID,
@@ -51,6 +52,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         window.makeKeyAndOrderFront(nil)
         observeTitle()
+        observeDownloadPreview()
+    }
+
+    private func observeDownloadPreview() {
+        let shown = withObservationTracking {
+            model.previewedDownload != nil
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeDownloadPreview() }
+        }
+        guard let window else { return }
+        if shown { downloadPreview.show(over: window, model: model) } else { downloadPreview.close() }
     }
 
     private func observeTitle() {
@@ -81,6 +93,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        downloadPreview.close()
         model.dropAll(handingOff: true)
         store.removeWindow(model)
         engine.closeWindow(id: model.id)
