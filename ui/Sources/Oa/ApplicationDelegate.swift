@@ -44,9 +44,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
-    /// A page whose `beforeunload` handler stays cancels the quit, as Arc's does.
+    /// As Arc: running downloads are asked about first, then the pages; a page whose `beforeunload` handler stays
+    /// cancels the quit.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
+            guard await confirmsCancellingDownloads() else { return sender.reply(toApplicationShouldTerminate: false) }
             for window in windows {
                 guard await engine.askToLeave(windowID: window.model.id) else {
                     return sender.reply(toApplicationShouldTerminate: false)
@@ -57,6 +59,23 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
             engine.terminate()
         }
         return .terminateLater
+    }
+
+    /// Arc's words and keys: Return closes, Esc keeps browsing. Arc draws its own panel over the key window; a
+    /// sheet there is Oa's, as for its quit warning. Closing lets the engine cancel them and delete their partial
+    /// files, Oa's own: Arc's stay behind.
+    private func confirmsCancellingDownloads() async -> Bool {
+        guard !downloads.running.isEmpty else { return true }
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa"
+        let alert = NSAlert()
+        alert.messageText = "Downloads in progress"
+        alert.informativeText = "There are downloads in progress. Closing the application will cancel them."
+        alert.addButton(withTitle: "Close \(name)")
+        alert.addButton(withTitle: "Keep browsing").keyEquivalent = "\u{1b}"
+        guard let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow else {
+            return alert.runModal() == .alertFirstButtonReturn
+        }
+        return await alert.beginSheetModal(for: window) == .alertFirstButtonReturn
     }
 
     @objc func newWindow(_ sender: Any?) { openWindow() }
