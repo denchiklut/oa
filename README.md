@@ -18,7 +18,9 @@ address and peek like pinned tabs, and JavaScript dialogs: `alert`, `confirm`,
 archiving, a Peek's close and a Space's deletion waiting for the page's answer,
 and downloads: a Library in the window that lists every profile's downloads with
 their progress, a ring on its button and a flyout of the recent ones, and a
-download location for each profile.
+download location for each profile, and the page context menu: Chrome's own,
+shown natively as Arc shows it, with its new tabs placed below their opener and
+its new window opened on the same Space.
 
 Start with the [architecture](docs/architecture/README.md). The
 chapters cover UI product state and native presentation, DevKit's Swift

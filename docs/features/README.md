@@ -35,6 +35,7 @@ that every online integration still works.
 - [Favorites](favorites/README.md)
 - [Saved state and recovery](saved-state/README.md)
 - [Downloads](downloads/README.md)
+- [Page context menu](context-menu/README.md)
 
 These pages describe existing slices and their product choices. Moving the
 notes here does not assess or change the checklist status below.
@@ -238,12 +239,12 @@ Sources: Arc native Settings → Links and [2023 release notes][arc23].
 | Print and Save as PDF | ✅ | ☐ |
 | Save Page As | ✅ | ☐ |
 | Open local files and PDFs | ✅ | ☐ |
-| Native page/link/image/text context menus | ✅ | ☐ |
+| Native page/link/image/text context menus | ✅ | ✅ |
 | Full-screen browser window | ✅ | ☐ |
 | Page translation | ✅ | ☐ |
 | Browsing-history viewer | ✅ | ☐ |
 | Chromium DevTools, inspector and console | ✅ | ☐ |
-| View page source | ✅ | ☐ |
+| View page source | ✅ | ✅ |
 | Arc Developer Mode tabs | ✅ | ☐ |
 | Developer Mode for localhost and its subdomains † | ✅ | ☐ |
 | Toggle Developer Mode by shortcut † | ✅ | ☐ |
