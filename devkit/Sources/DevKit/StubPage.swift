@@ -48,9 +48,12 @@ final class StubPage: Page {
 
     var view: NSView { hostingView }
 
-    init(id: UUID, windowID: UUID) {
+    @ObservationIgnored private let downloads: StubDownloads
+
+    init(id: UUID, windowID: UUID, downloads: StubDownloads) {
         self.id = id
         self.windowID = windowID
+        self.downloads = downloads
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
         Self.arrive(self)
     }
@@ -160,7 +163,7 @@ final class StubPage: Page {
         components.path = "/opened-\(StubPage.openedCount)"
         components.query = nil
         guard let target = components.url else { return }
-        let opened = StubPage(id: UUID(), windowID: windowID)
+        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: disposition))
     }
@@ -171,7 +174,7 @@ final class StubPage: Page {
         components.path = "/linked"
         guard let target = components.url else { return }
         guard keepsAddress else { return load(target) }
-        let opened = StubPage(id: UUID(), windowID: windowID)
+        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab))
     }
@@ -181,6 +184,10 @@ final class StubPage: Page {
         components.path = "/followed"
         components.query = nil
         if let target = components.url { load(target) }
+    }
+
+    func download(failing: Bool = false) {
+        downloads.start(from: url, pageID: id, failing: failing)
     }
 
     func crashRenderer() {
@@ -200,10 +207,10 @@ final class StubPage: Page {
         drop()
     }
 
-    static func restore(_ sessionID: PageSessionID, id: UUID, windowID: UUID) -> StubPage? {
+    static func restore(_ sessionID: PageSessionID, id: UUID, windowID: UUID, downloads: StubDownloads) -> StubPage? {
         guard let record = records.removeValue(forKey: sessionID), record.history.indices.contains(record.position)
         else { return nil }
-        let page = StubPage(id: id, windowID: windowID)
+        let page = StubPage(id: id, windowID: windowID, downloads: downloads)
         page.history = record.history
         page.position = record.position
         page.show(record.history[record.position])
@@ -473,6 +480,10 @@ private struct StubPageView: View {
                             Button(page.isCameraOn ? "Stop capturing" : "Capture camera and microphone") {
                                 page.toggleCapture()
                             }
+                        }
+                        HStack(spacing: 16) {
+                            Button("Download a file") { page.download() }
+                            Button("Download a file that fails") { page.download(failing: true) }
                         }
                     }
                     .buttonStyle(.link)

@@ -38,12 +38,18 @@ public final class StubBrowserApplication: BrowserApplication {
 @MainActor
 final class StubBrowserContext: BrowserContext {
     let id: UUID
+    private let stubDownloads = StubDownloads()
+    var downloads: any Downloads { stubDownloads }
 
     init(id: UUID) { self.id = id }
 
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
-        if let sessionID, let page = StubPage.restore(sessionID, id: UUID(), windowID: windowID) { return (page, true) }
-        return (StubPage(id: UUID(), windowID: windowID), false)
+        if let sessionID,
+            let page = StubPage.restore(sessionID, id: UUID(), windowID: windowID, downloads: stubDownloads)
+        {
+            return (page, true)
+        }
+        return (StubPage(id: UUID(), windowID: windowID, downloads: stubDownloads), false)
     }
 
     func changedSiteSettings(for url: URL) -> [SiteSetting]? {

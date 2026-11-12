@@ -32,6 +32,63 @@ public protocol BrowserContext: AnyObject {
     func changedSiteSettings(for url: URL) -> [SiteSetting]?
     /// For the site's whole origin, without reloading its pages, as Chrome's site settings page sets it.
     func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL)
+    /// As ADK's download manager for the context: one per profile, alive as long as it.
+    var downloads: any Downloads { get }
+}
+
+/// A profile's downloads, running and remembered by the engine. Observable: the engine's events change `items`,
+/// nothing polls. Opening, revealing, copying and trashing a file are the app's, as in Arc.
+@MainActor
+public protocol Downloads: AnyObject, Observable {
+    /// Oldest first; empty until the engine has read the profile's history.
+    var items: [Download] { get }
+    func pause(_ id: Download.ID)
+    func resume(_ id: Download.ID)
+    /// The partial file goes.
+    func cancel(_ id: Download.ID)
+    /// Forgets it, in the engine's history too, cancelling it first if it runs. A finished file stays.
+    func remove(_ id: Download.ID)
+}
+
+public struct Download: Identifiable, Sendable, Equatable {
+    /// As ADK's `DownloadFeatures.Status`: not started until the engine has chosen the file, and an interrupted
+    /// download reads as failed.
+    public enum Status: Sendable, Equatable {
+        case notStarted, inProgress, paused, finished, failed, cancelled
+    }
+
+    /// The engine's, the same after a relaunch.
+    public let id: String
+    public var status: Status
+    public var receivedBytes: Int64
+    /// Nil while the size is unknown.
+    public var totalBytes: Int64?
+    public var bytesPerSecond: Int64
+    /// Nil while the engine has no estimate.
+    public var secondsRemaining: Int?
+    /// Where the file goes, nil until the engine has chosen.
+    public var file: URL?
+    public var sourceURL: URL?
+    public var startedAt: Date
+    /// The page that started it, while that page is open.
+    public var pageID: UUID?
+
+    public init(
+        id: String, status: Status, receivedBytes: Int64 = 0, totalBytes: Int64? = nil, bytesPerSecond: Int64 = 0,
+        secondsRemaining: Int? = nil, file: URL? = nil, sourceURL: URL? = nil, startedAt: Date = .now,
+        pageID: UUID? = nil
+    ) {
+        self.id = id
+        self.status = status
+        self.receivedBytes = receivedBytes
+        self.totalBytes = totalBytes
+        self.bytesPerSecond = bytesPerSecond
+        self.secondsRemaining = secondsRemaining
+        self.file = file
+        self.sourceURL = sourceURL
+        self.startedAt = startedAt
+        self.pageID = pageID
+    }
 }
 
 /// The settings page info lists on macOS, in its order, as ADK's `ArcContentSettingsType`.

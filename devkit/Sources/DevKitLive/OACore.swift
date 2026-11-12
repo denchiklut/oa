@@ -17,7 +17,38 @@ import AppKit
     var value: Int { get }
 }
 
+@MainActor @objc protocol CoreDownload: NSObjectProtocol {
+    var identifier: String { get }
+    var state: Int { get }
+    var receivedBytes: Int64 { get }
+    var totalBytes: Int64 { get }
+    var bytesPerSecond: Int64 { get }
+    var remainingSeconds: Int64 { get }
+    var targetFileURL: URL? { get }
+    var sourceURL: URL? { get }
+    var startTime: Date { get }
+    var isPaused: Bool { get }
+    var page: CorePage? { get }
+}
+
+@MainActor @objc protocol CoreDownloadsDelegate: NSObjectProtocol {
+    /// `OADownload`s, which Swift can't check against `CoreDownload`.
+    @objc(downloadsDidInitialize:) func downloadsDidInitialize(_ downloads: [NSObject])
+    @objc(downloadWasCreated:) func downloadWasCreated(_ download: CoreDownload)
+    @objc(downloadWasUpdated:) func downloadWasUpdated(_ download: CoreDownload)
+    @objc(downloadWasRemovedWithIdentifier:) func downloadWasRemoved(identifier: String)
+}
+
+@MainActor @objc protocol CoreDownloads: NSObjectProtocol {
+    var delegate: CoreDownloadsDelegate? { get set }
+    @objc(pauseDownloadWithIdentifier:) func pauseDownload(identifier: String)
+    @objc(resumeDownloadWithIdentifier:) func resumeDownload(identifier: String)
+    @objc(cancelDownloadWithIdentifier:) func cancelDownload(identifier: String)
+    @objc(removeDownloadWithIdentifier:) func removeDownload(identifier: String)
+}
+
 @MainActor @objc protocol CoreProfile: NSObjectProtocol {
+    var downloads: CoreDownloads { get }
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
