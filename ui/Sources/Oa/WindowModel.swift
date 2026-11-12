@@ -704,7 +704,7 @@ final class WindowModel {
         }
         if let ownerID = peekOwner(of: pageID) {
             switch event {
-            case .opened(let opened, let url, let disposition):
+            case .opened(let opened, let url, let disposition, _):
                 place(opened, url: url, disposition: disposition, from: ownerID, insidePeek: true)
             case .wantsActivation:
                 if ownerID != archivePeekID { show(ownerID) } else { bringToFront() }
@@ -717,7 +717,7 @@ final class WindowModel {
         }
         guard let tabID = tabID(of: pageID) else { return }
         switch event {
-        case .opened(let opened, let url, let disposition):
+        case .opened(let opened, let url, let disposition, _):
             place(opened, url: url, disposition: disposition, from: tabID, insidePeek: false)
         case .wantsActivation:
             show(tabID)
