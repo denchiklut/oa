@@ -125,10 +125,13 @@ class Page {
    public:
     virtual void OnPageStateChanged() = 0;
     // The page opened another page, already a background tab in this page's
-    // Browser. The observer owns it; destroying it drops it.
+    // Browser. The observer owns it; destroying it drops it. `by_page` tells
+    // the page's own open, as a link or window.open, from one the browser
+    // made for the user, as the context menu's are.
     virtual void OnPageOpenedPage(std::unique_ptr<Page> page,
                                   const std::string& target_url,
-                                  OpenDisposition disposition) = 0;
+                                  OpenDisposition disposition,
+                                  bool by_page) = 0;
     virtual void OnPageWantsActivation() = 0;
     // The app decides which exits show the page as crashed, as Arc's does.
     virtual void OnPageRendererGone(RendererExit exit) = 0;

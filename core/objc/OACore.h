@@ -82,7 +82,8 @@ typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
 - (void)page:(OAPage*)page
     didOpenPage:(OAPage*)openedPage
       targetURL:(nullable NSURL*)targetURL
-    disposition:(OAPageOpenDisposition)disposition;
+    disposition:(OAPageOpenDisposition)disposition
+         byPage:(BOOL)byPage;
 - (void)pageWantsActivation:(OAPage*)page;
 - (void)page:(OAPage*)page rendererGone:(OAPageRendererExit)exit;
 - (void)pageRendererReady:(OAPage*)page;

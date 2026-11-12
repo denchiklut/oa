@@ -569,8 +569,8 @@ content::WebContents* PageImpl::OpenURLFromTab(
   if (navigation && callback) {
     std::move(callback).Run(*navigation);
   }
-  observer_->OnPageOpenedPage(std::move(opened), params.url.spec(),
-                              disposition);
+  observer_->OnPageOpenedPage(std::move(opened), params.url.spec(), disposition,
+                              params.is_renderer_initiated);
   return page;
 }
 
@@ -595,7 +595,7 @@ content::WebContents* PageImpl::AddNewContents(
   observer_->OnPageOpenedPage(
       std::move(opened),
       target_url.is_valid() ? target_url.spec() : std::string(),
-      open_disposition);
+      open_disposition, /*by_page=*/true);
   return page;
 }
 
