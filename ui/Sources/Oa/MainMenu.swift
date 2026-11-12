@@ -88,6 +88,8 @@ final class MainMenu {
         window.addItem(item("Minimize", #selector(NSWindow.performMiniaturize(_:)), key: "m"))
         window.addItem(item("Zoom", #selector(NSWindow.performZoom(_:))))
         window.addItem(.separator())
+        window.addItem(item("View Downloads…", #selector(BrowserWindowController.toggleDownloads(_:))))
+        window.addItem(.separator())
         window.addItem(item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:))))
         application.windowsMenu = window
 

@@ -113,6 +113,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     @objc func viewArchive(_ sender: Any?) { model.viewArchive() }
+
+    @objc func toggleDownloads(_ sender: Any?) {
+        if model.showingDownloads { model.hideDownloads() } else { model.viewDownloads() }
+    }
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
 
     @objc func clearArchive(_ sender: Any?) {
@@ -156,6 +160,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if item.action == #selector(toggleFavorite(_:)) {
             guard let tabID = model.selectedTabID else { return false }
             item.title = model.state.isFavorite(tabID) ? "Unfavorite Tab" : "Favorite Tab"
+            return true
+        }
+        if item.action == #selector(toggleDownloads(_:)) {
+            item.title = model.showingDownloads ? "Hide Downloads" : "View Downloads…"
             return true
         }
         if item.action == #selector(closeTab(_:)) {
