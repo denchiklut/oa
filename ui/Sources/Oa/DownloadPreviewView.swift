@@ -14,6 +14,7 @@ final class DownloadPreviewWindow {
         let panel = PreviewPanel(
             contentRect: parent.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
+        panel.onCloseKey = { [weak model] in model?.closeDownloadPreview() }
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -50,8 +51,28 @@ final class DownloadPreviewWindow {
     private static let cornerRadius: CGFloat = 16
 
     private final class PreviewPanel: NSWindow {
+        var onCloseKey: () -> Void = {}
+
         override var canBecomeKey: Bool { true }
         override var canBecomeMain: Bool { false }
+
+        /// As Arc's: Close Window closes the browser window beneath, preview and all.
+        override func performClose(_ sender: Any?) {
+            parent?.performClose(sender)
+        }
+
+        override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+            item.action == #selector(performClose(_:)) ? parent != nil : super.validateUserInterfaceItem(item)
+        }
+
+        /// As Arc's: ⌘W closes the preview, and the tab beneath stays.
+        override func performKeyEquivalent(with event: NSEvent) -> Bool {
+            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                event.charactersIgnoringModifiers == "w"
+            else { return super.performKeyEquivalent(with: event) }
+            onCloseKey()
+            return true
+        }
     }
 }
 
