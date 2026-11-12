@@ -43,6 +43,7 @@ final class StubPage: Page {
         let view = StubHostingView(rootView: StubPageView(page: self))
         view.sizingOptions = []
         view.movedToWindow = { [weak self] in self?.showPendingDialog() }
+        view.contextMenu = { [weak self] in self?.contextMenu() }
         return view
     }()
 
@@ -177,6 +178,20 @@ final class StubPage: Page {
         let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab, byPage: true))
+    }
+
+    /// A short stand-in for the engine's page menu: the items the app's own parts answer.
+    private func contextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(StubMenuItem("Back", enabled: canGoBack) { [weak self] in self?.goBack() })
+        menu.addItem(StubMenuItem("Forward", enabled: canGoForward) { [weak self] in self?.goForward() })
+        menu.addItem(StubMenuItem("Reload") { [weak self] in self?.reload() })
+        menu.addItem(.separator())
+        menu.addItem(StubMenuItem("Open Link in New Tab") { [weak self] in self?.open(.backgroundTab, byPage: false) })
+        menu.addItem(
+            StubMenuItem("Open Link in New Window") { [weak self] in self?.open(.newWindow, byPage: false) })
+        return menu
     }
 
     func followLink() {
@@ -422,8 +437,24 @@ final class StubPage: Page {
     }
 }
 
+private final class StubMenuItem: NSMenuItem {
+    private var run: () -> Void = {}
+
+    convenience init(_ title: String, enabled: Bool = true, run: @escaping () -> Void) {
+        self.init(title: title, action: #selector(choose), keyEquivalent: "")
+        self.run = run
+        target = self
+        isEnabled = enabled
+    }
+
+    @objc private func choose() { run() }
+}
+
 private final class StubHostingView: NSHostingView<StubPageView> {
     var movedToWindow: () -> Void = {}
+    var contextMenu: () -> NSMenu? = { nil }
+
+    override func menu(for event: NSEvent) -> NSMenu? { contextMenu() }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
