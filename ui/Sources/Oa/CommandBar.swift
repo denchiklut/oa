@@ -9,81 +9,169 @@ final class CommandBar {
     /// As Arc's `CommandBarDestinationType`.
     enum Destination { case newTab, currentTab }
 
+    /// As Arc's `CommandBarSelectionOptions.Action`.
+    enum Action {
+        case open(URL, background: Bool)
+        case switchTo(UUID)
+    }
+
+    /// One of Chromium's matches, or one of the Space's open tabs as Arc's sidebar provider offers them.
+    struct Row: Identifiable, Equatable {
+        enum Source: Equatable {
+            case match(AutocompleteMatch)
+            case tab(SidebarTab)
+        }
+
+        let source: Source
+
+        var kind: AutocompleteMatch.Kind? {
+            if case .match(let match) = source { match.kind } else { nil }
+        }
+        var isTab: Bool { kind == nil }
+        var isHistory: Bool { kind == .historyURL || kind == .historyTitle }
+        var isNavigation: Bool { isTab || isHistory || kind == .urlWhatYouTyped || kind == .navSuggest }
+
+        var url: URL? {
+            switch source {
+            case .match(let match): match.url
+            case .tab(let tab): tab.url
+            }
+        }
+
+        var title: String {
+            switch source {
+            case .tab(let tab): tab.displayTitle
+            case .match(let match):
+                isHistory || kind == .navSuggest
+                    ? (match.description.isEmpty ? match.contents : match.description) : match.contents
+            }
+        }
+
+        /// As ASE2's `DedupKey`: a search by its text and a page by its readable URL, with a tab apart from its
+        /// page; ASE2 makes those two one row after the sort.
+        var id: String {
+            let address = CommandBarRanking.readable(url).lowercased()
+            return isTab ? "tab " + address : isNavigation ? "url " + address : "search " + title.lowercased()
+        }
+    }
+
     let destination: Destination
     let autocomplete: any Autocomplete
     /// The page ⌘L edits, prefilled and selected as Arc does.
     let currentURL: URL?
     /// What the user typed; the field may show more.
     private(set) var text: String
-    var selectedIndex = 0
+    /// Ranked once for each change of the text, of Chromium's answer and of the Space's tabs.
+    private(set) var rows: [Row] = []
+    /// The highlighted row below the top one. Arc keeps an index, `currentHighlightedResultIndex`; what it does
+    /// when a later answer re-ranks the rows wasn't traced. Oa's own: the highlight stays on its row.
+    private var selectedKey: String?
     private var edited = false
     /// Chromium's rule: no completion after a deletion, with the caret before the end, or while an input method
     /// composes, until the next typing.
     private var suppressesInline = false
     /// The field's caret in what was typed, in UTF-16 code units.
     private var caret: Int
+    @ObservationIgnored private let profileID: UUID
+    @ObservationIgnored private let picks: CommandBarPicks
+    @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
     @ObservationIgnored private var startedFresh = false
-    /// Return pressed before Chromium answered the text; Arc's bar acts on the answer.
-    @ObservationIgnored private var pendingReturn = false
-    @ObservationIgnored var open: (URL) -> Void = { _ in }
+    /// As Arc's `pendingSelection`: Return pressed before Chromium answered the text, with its modifiers.
+    @ObservationIgnored private var pendingReturn: NSEvent.ModifierFlags?
+    @ObservationIgnored var perform: (Action) -> Void = { _ in }
 
-    init(destination: Destination, autocomplete: any Autocomplete, currentURL: URL?) {
+    init(
+        destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, profileID: UUID,
+        picks: CommandBarPicks, tabs: @escaping () -> [CommandBarRanking.Tab]
+    ) {
         self.destination = destination
         self.autocomplete = autocomplete
         self.currentURL = currentURL
+        self.profileID = profileID
+        self.picks = picks
+        self.tabs = tabs
         let text = currentURL?.absoluteString ?? ""
         self.text = text
         caret = text.utf16.count
         if !text.isEmpty { start(preventsInlineAutocomplete: true) }
+        rank()
     }
 
-    var rows: [AutocompleteMatch] { text.isEmpty ? [] : autocomplete.matches }
+    var selectedIndex: Int {
+        selectedKey.flatMap { key in rows.firstIndex { $0.id == key } } ?? 0
+    }
+
+    func select(_ index: Int) {
+        selectedKey = index > 0 && rows.indices.contains(index) ? rows[index].id : nil
+    }
+
+    func moveSelection(_ offset: Int) {
+        guard !rows.isEmpty else { return }
+        select(min(max(selectedIndex + offset, 0), rows.count - 1))
+    }
 
     struct FieldText: Equatable {
         var string: String
         var selection: NSRange
     }
 
-    /// As Arc's field: ⌘L's URL all selected until the first edit or arrow; the typed text with the default match's
-    /// inline completion selected after it; on another row, a search's text with the untyped rest selected, else its
-    /// URL.
+    /// As Arc's field: ⌘L's URL all selected until the first edit or arrow; the typed text with the top row's
+    /// completion selected after it; on another row, a search's text with the untyped rest selected, a page's URL,
+    /// or for a tab the typed text.
     var field: FieldText {
         let typed = (text as NSString).length
-        if !edited, destination == .currentTab, selectedIndex == 0 {
+        if !edited, destination == .currentTab, selectedKey == nil {
             return FieldText(string: text, selection: NSRange(0..<typed))
         }
-        if selectedIndex > 0, rows.indices.contains(selectedIndex) {
-            let row = rows[selectedIndex]
-            switch row.kind {
-            case .searchWhatYouTyped, .searchHistory, .searchSuggest, .searchSuggestEntity, .searchOtherEngine:
-                let length = (row.contents as NSString).length
-                let rest = row.contents.lowercased().hasPrefix(text.lowercased()) ? typed..<length : length..<length
-                return FieldText(string: row.contents, selection: NSRange(rest))
-            default:
-                let length = (row.fillIntoEdit as NSString).length
-                return FieldText(string: row.fillIntoEdit, selection: NSRange(location: length, length: 0))
+        let index = selectedIndex
+        if index > 0 {
+            let row = rows[index]
+            guard case .match(let match) = row.source else {
+                return FieldText(string: text, selection: NSRange(location: typed, length: 0))
             }
+            if row.isNavigation {
+                let length = (match.fillIntoEdit as NSString).length
+                return FieldText(string: match.fillIntoEdit, selection: NSRange(location: length, length: 0))
+            }
+            let length = (match.contents as NSString).length
+            let rest = match.contents.lowercased().hasPrefix(text.lowercased()) ? typed..<length : length..<length
+            return FieldText(string: match.contents, selection: NSRange(rest))
         }
-        if !suppressesInline, autocomplete.input?.text == text, let first = rows.first, first.allowedToBeDefault,
-            !first.inlineAutocompletion.isEmpty
-        {
-            let completion = (first.inlineAutocompletion as NSString).length
-            return FieldText(
-                string: text + first.inlineAutocompletion, selection: NSRange(location: typed, length: completion))
+        if !suppressesInline, let completion = completion(of: rows.first) {
+            let length = (completion as NSString).length
+            return FieldText(string: text + completion, selection: NSRange(location: typed, length: length))
         }
         return FieldText(string: text, selection: NSRange(location: min(caret, typed), length: 0))
+    }
+
+    /// Chromium's for its default match; for a tab, the rest of its readable URL, as Arc completed "loc" to an open
+    /// tab's "localtest.me:8795/…".
+    private func completion(of row: Row?) -> String? {
+        switch row?.source {
+        case .match(let match):
+            guard autocomplete.input?.text == text, match.allowedToBeDefault, !match.inlineAutocompletion.isEmpty
+            else { return nil }
+            return match.inlineAutocompletion
+        case .tab(let tab):
+            let address = CommandBarRanking.readable(tab.url)
+            guard !text.isEmpty, address.count > text.count, address.lowercased().hasPrefix(text.lowercased())
+            else { return nil }
+            return String(address.dropFirst(text.count))
+        case nil: return nil
+        }
     }
 
     /// `caret` is the field's, in UTF-16 code units.
     func edit(_ text: String, caret: Int, deleting: Bool, composing: Bool = false) {
         edited = true
-        selectedIndex = 0
+        selectedKey = nil
         self.caret = caret
         suppressesInline = deleting || composing || caret < (text as NSString).length
         guard text != self.text else { return }
         self.text = text
-        pendingReturn = false
+        pendingReturn = nil
         if text.isEmpty { autocomplete.stop() } else { start(preventsInlineAutocomplete: suppressesInline) }
+        rank()
     }
 
     /// The caret moved without an edit. What the field showed beyond the typed text, a completion or a row's
@@ -97,35 +185,46 @@ final class CommandBar {
 
     /// As Arc's ⇧⌦: a past search goes, while a page from history stays.
     func deleteSelectedRow() {
-        guard rows.indices.contains(selectedIndex) else { return }
-        let row = rows[selectedIndex]
-        if row.kind == .searchHistory, row.isDeletable { autocomplete.delete(row) }
+        guard rows.indices.contains(selectedIndex), case .match(let match) = rows[selectedIndex].source else { return }
+        if match.kind == .searchHistory, match.isDeletable { autocomplete.delete(match) }
     }
 
-    func moveSelection(_ offset: Int) {
-        guard !rows.isEmpty else { return }
-        selectedIndex = min(max(selectedIndex + offset, 0), rows.count - 1)
-    }
-
-    func submit() {
-        guard !text.isEmpty else { return }
-        guard autocomplete.input?.text == text else {
-            pendingReturn = true
+    /// As Arc from ⌘T: ⌘ opens a new tab in the background; ⇧ is plain Return. From ⌘L, where Arc's ⌘Return wasn't
+    /// tested, it does the same as Oa's own. ⌥ is Arc's Split View, which Oa doesn't have yet, so it is plain Return
+    /// too, as Oa's own.
+    func submit(_ modifiers: NSEvent.ModifierFlags) {
+        guard text.isEmpty || autocomplete.input?.text == text else {
+            pendingReturn = modifiers
             return
         }
-        openSelected()
+        act(modifiers)
     }
 
     func answered() {
-        if selectedIndex >= rows.count { selectedIndex = 0 }
-        guard pendingReturn, autocomplete.input?.text == text else { return }
-        pendingReturn = false
-        openSelected()
+        rank()
+        guard let modifiers = pendingReturn, autocomplete.input?.text == text else { return }
+        pendingReturn = nil
+        act(modifiers)
     }
 
-    private func openSelected() {
-        guard rows.indices.contains(selectedIndex), let url = rows[selectedIndex].url else { return }
-        open(url)
+    private func act(_ modifiers: NSEvent.ModifierFlags) {
+        guard rows.indices.contains(selectedIndex) else { return }
+        let row = rows[selectedIndex]
+        if !text.isEmpty { picks.record(row.id, for: text, in: profileID) }
+        switch row.source {
+        case .tab(let tab): perform(.switchTo(tab.id))
+        case .match(let match):
+            if let url = match.url { perform(.open(url, background: modifiers.contains(.command))) }
+        }
+    }
+
+    /// As Arc: open tabs only when the bar makes a new tab, as Switch to Tab.
+    private func rank() {
+        let ranked = CommandBarRanking.rank(
+            query: text, matches: text.isEmpty ? [] : autocomplete.matches,
+            additionalMatches: text.isEmpty ? [] : autocomplete.additionalMatches,
+            tabs: destination == .newTab ? tabs() : [], lastPick: picks.pick(for: text, in: profileID), now: .now)
+        if ranked != rows { rows = ranked }
     }
 
     private func start(preventsInlineAutocomplete: Bool) {
@@ -150,37 +249,38 @@ struct CommandBarView: View {
     let bar: CommandBar
 
     var body: some View {
+        let rows = bar.rows
+        let tabs = bar.destination == .newTab ? model.commandBarTabs : []
         GeometryReader { geometry in
             ZStack(alignment: .top) {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture { model.closeCommandBar() }
-                card
+                card(rows)
                     .frame(width: min(Self.width, geometry.size.width - 32))
                     .padding(.top, geometry.size.height * Self.topFraction)
             }
         }
         .onChange(of: bar.autocomplete.input) { _, _ in bar.answered() }
         .onChange(of: bar.autocomplete.matches) { _, _ in bar.answered() }
+        .onChange(of: bar.autocomplete.additionalMatches) { _, _ in bar.answered() }
+        .onChange(of: tabs) { _, _ in bar.answered() }
     }
 
-    private var card: some View {
+    private func card(_ rows: [CommandBar.Row]) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Image(
-                    systemName: icon(
-                        for: bar.rows.indices.contains(bar.selectedIndex) ? bar.rows[bar.selectedIndex] : nil)
-                )
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
+                Image(systemName: icon(for: rows.indices.contains(bar.selectedIndex) ? rows[bar.selectedIndex] : nil))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
                 CommandBarField(bar: bar, model: model, isUnderDialog: model.dialog != nil)
                     .frame(height: 23)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            if !bar.rows.isEmpty {
+            if !rows.isEmpty {
                 Divider()
-                rows
+                list(rows)
             }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -188,28 +288,35 @@ struct CommandBarView: View {
         .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
     }
 
-    private var rows: some View {
+    private func list(_ rows: [CommandBar.Row]) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(Array(bar.rows.enumerated()), id: \.element.id) { index, match in
-                        CommandBarRow(match: match, icon: icon(for: match), selected: index == bar.selectedIndex)
-                            .id(index)
-                            .onTapGesture {
-                                bar.selectedIndex = index
-                                bar.submit()
-                            }
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        CommandBarRow(
+                            row: row, icon: icon(for: row), favicon: favicon(for: row),
+                            selected: index == bar.selectedIndex
+                        )
+                        .id(index)
+                        .onTapGesture {
+                            bar.select(index)
+                            bar.submit(NSEvent.modifierFlags)
+                        }
                     }
                 }
                 .padding(.horizontal, 8)
             }
-            .frame(height: CGFloat(min(bar.rows.count, Self.visibleRows)) * Self.rowHeight)
+            .frame(height: CGFloat(min(rows.count, Self.visibleRows)) * Self.rowHeight)
             .onChange(of: bar.selectedIndex) { _, index in proxy.scrollTo(index) }
         }
     }
 
-    private func icon(for match: AutocompleteMatch?) -> String {
-        switch match?.kind {
+    private func favicon(for row: CommandBar.Row) -> NSImage? {
+        if case .tab(let tab) = row.source { model.favicon(for: tab) } else { nil }
+    }
+
+    private func icon(for row: CommandBar.Row?) -> String {
+        switch row?.kind {
         case .historyURL, .historyTitle: "clock"
         case .searchWhatYouTyped, .searchHistory, .searchSuggest, .searchSuggestEntity, .searchOtherEngine:
             "magnifyingglass"
@@ -219,16 +326,22 @@ struct CommandBarView: View {
 }
 
 private struct CommandBarRow: View {
-    let match: AutocompleteMatch
+    let row: CommandBar.Row
     let icon: String
+    let favicon: NSImage?
     let selected: Bool
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-            Text(title)
+            Group {
+                if let favicon {
+                    Image(nsImage: favicon).resizable().scaledToFit()
+                } else {
+                    Image(systemName: icon).foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 18, height: 18)
+            Text(row.title)
                 .lineLimit(1)
             if let address {
                 Text("— " + address)
@@ -236,6 +349,12 @@ private struct CommandBarRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            if row.isTab {
+                Text("Switch to Tab")
+                    .foregroundStyle(.secondary)
+                Image(systemName: "arrow.right")
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 8)
         .frame(height: CommandBarView.rowHeight)
@@ -243,21 +362,8 @@ private struct CommandBarRow: View {
         .contentShape(Rectangle())
     }
 
-    private var title: String {
-        switch match.kind {
-        case .historyURL, .historyTitle, .navSuggest: match.description.isEmpty ? match.contents : match.description
-        default: match.contents
-        }
-    }
-
     private var address: String? {
-        switch match.kind {
-        case .historyURL, .historyTitle, .navSuggest:
-            guard let url = match.url, let host = url.host() else { return nil }
-            let path = url.path() == "/" ? "" : url.path()
-            return host + (url.port.map { ":\($0)" } ?? "") + path
-        default: return nil
-        }
+        row.isHistory || row.kind == .navSuggest ? row.url.map(CommandBarRanking.readable) : nil
     }
 }
 
@@ -371,7 +477,11 @@ private struct CommandBarField: NSViewRepresentable {
             switch selector {
             case #selector(NSResponder.moveUp(_:)): bar.moveSelection(-1)
             case #selector(NSResponder.moveDown(_:)): bar.moveSelection(1)
-            case #selector(NSResponder.insertNewline(_:)): bar.submit()
+            case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
+                bar.submit(NSApp.currentEvent?.modifierFlags ?? [])
+            // ⌘Return and ⌘Enter on the keypad.
+            case Selector(("noop:")) where [36, 76].contains(NSApp.currentEvent?.keyCode):
+                bar.submit(NSApp.currentEvent?.modifierFlags ?? [])
             case #selector(NSResponder.cancelOperation(_:)): model.closeCommandBar()
             case #selector(NSResponder.insertTab(_:)): break
             case #selector(NSResponder.deleteForward(_:))
