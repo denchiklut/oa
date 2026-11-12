@@ -6,6 +6,9 @@ struct SidebarView: View {
     static let width: CGFloat = 220
 
     let model: WindowModel
+    @State private var overLibraryButton = false
+    @State private var overFlyout = false
+    @State private var showingFlyout = false
 
     var body: some View {
         if model.showingDownloads {
@@ -51,11 +54,33 @@ struct SidebarView: View {
             Divider()
             spaces
         }
+        .overlay(alignment: .bottomLeading) {
+            if showingFlyout {
+                DownloadsFlyout(model: model)
+                    .onHover { overFlyout = $0 }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 40)
+            }
+        }
+        // As Arc's hover regions: the button or the flyout keeps it up, and it outlasts the gap between them.
+        .onChange(of: overLibraryButton || overFlyout) { _, over in
+            guard !over else { return showingFlyout = true }
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                if !overLibraryButton, !overFlyout { showingFlyout = false }
+            }
+        }
+        .onDisappear {
+            overLibraryButton = false
+            overFlyout = false
+            showingFlyout = false
+        }
     }
 
     private var spaces: some View {
         HStack(spacing: 4) {
             LibraryButton(model: model)
+                .onHover { overLibraryButton = $0 }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
                     ForEach(model.state.spaces) { space in
