@@ -5,13 +5,14 @@ import SwiftUI
 /// Arc's Settings, with the panes Oa has so far: General and Profiles.
 @MainActor
 final class SettingsWindowController: NSWindowController {
-    init(engine: any BrowserApplication, store: SidebarStore) {
+    /// `openWindow` opens a browser window on a Space and gives its model.
+    init(engine: any BrowserApplication, store: SidebarStore, openWindow: @escaping (UUID) -> WindowModel?) {
         let content = TabView {
             GeneralSettingsView().tabItem { Text("General") }
-            ProfilesSettingsView(engine: engine, store: store).tabItem { Text("Profiles") }
+            ProfilesSettingsView(engine: engine, store: store, openWindow: openWindow).tabItem { Text("Profiles") }
         }
         .padding(12)
-        .frame(width: 460, height: 200)
+        .frame(width: 460, height: 320)
         let window = NSWindow(contentViewController: NSHostingController(rootView: content))
         window.title = "Settings"
         window.styleMask = [.titled, .closable]
@@ -34,20 +35,73 @@ struct GeneralSettingsView: View {
     }
 }
 
-/// Arc's Profiles pane, with the one setting Oa has so far.
+/// Arc's Profiles pane, with the settings Oa has so far.
 struct ProfilesSettingsView: View {
     let engine: any BrowserApplication
     let store: SidebarStore
+    let openWindow: (UUID) -> WindowModel?
 
     var body: some View {
         Form {
             ForEach(store.state.profiles) { profile in
                 Section(profile.name) {
-                    DownloadLocationPicker(preferences: engine.browserContext(id: profile.id).preferences)
+                    let preferences = engine.browserContext(id: profile.id).preferences
+                    SearchSettings(
+                        preferences: preferences,
+                        hasSpace: store.state.spaces.contains { $0.profileID == profile.id }
+                    ) { openSearchSettings(in: profile.id) }
+                    DownloadLocationPicker(preferences: preferences)
                 }
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Arc opens it as a tab of some window; Oa's own: the first window showing a Space of the profile, or a new
+    /// window on one when none does, so the page edits that profile's engines. A profile with no Space has no
+    /// window to open it in.
+    private func openSearchSettings(in profileID: UUID) {
+        guard let url = URL(string: "chrome://settings/searchEngines"),
+            let window = store.windows.first(where: { $0.space?.profileID == profileID })
+                ?? store.state.spaces.first(where: { $0.profileID == profileID }).flatMap({ openWindow($0.id) })
+        else { return }
+        window.bringToFront()
+        window.newTab(url)
+    }
+}
+
+/// Arc's search settings for a profile: the default engine, Search Settings… for Chromium's page, and whether the
+/// engine suggests as you type. They wait for the profile's engines to load.
+private struct SearchSettings: View {
+    let preferences: any BrowserContextPreferences
+    let hasSpace: Bool
+    let openSearchSettings: () -> Void
+
+    var body: some View {
+        Picker("Search engine", selection: engine) {
+            ForEach(preferences.searchEngines) { Text($0.name).tag(Optional($0.keyword)) }
+        }
+        .disabled(preferences.searchEngines.isEmpty)
+        LabeledContent("Manage search") {
+            Button("Search Settings…", action: openSearchSettings).disabled(!hasSpace)
+        }
+        Toggle(
+            "Include search engine suggestions",
+            isOn: Binding {
+                preferences.includesSearchSuggestions
+            } set: {
+                preferences.includesSearchSuggestions = $0
+            })
+    }
+
+    private var engine: Binding<String?> {
+        Binding {
+            preferences.defaultSearchEngine?.keyword
+        } set: { keyword in
+            if let engine = preferences.searchEngines.first(where: { $0.keyword == keyword }) {
+                preferences.setDefaultSearchEngine(engine)
+            }
+        }
     }
 }
 
