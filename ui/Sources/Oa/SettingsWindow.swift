@@ -1,12 +1,19 @@
 import AppKit
+import DevKit
 import SwiftUI
 
-/// Arc's Settings ▸ General, with the one setting Oa has so far.
+/// Arc's Settings, with the panes Oa has so far: General and Profiles.
 @MainActor
 final class SettingsWindowController: NSWindowController {
-    init() {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: GeneralSettingsView()))
-        window.title = "General"
+    init(engine: any BrowserApplication, store: SidebarStore) {
+        let content = TabView {
+            GeneralSettingsView().tabItem { Text("General") }
+            ProfilesSettingsView(engine: engine, store: store).tabItem { Text("Profiles") }
+        }
+        .padding(12)
+        .frame(width: 460, height: 200)
+        let window = NSWindow(contentViewController: NSHostingController(rootView: content))
+        window.title = "Settings"
         window.styleMask = [.titled, .closable]
         window.center()
         super.init(window: window)
@@ -24,7 +31,81 @@ struct GeneralSettingsView: View {
             Toggle("Warn before quitting", isOn: $warnsBeforeQuitting)
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 80)
+    }
+}
+
+/// Arc's Profiles pane, with the one setting Oa has so far.
+struct ProfilesSettingsView: View {
+    let engine: any BrowserApplication
+    let store: SidebarStore
+
+    var body: some View {
+        Form {
+            ForEach(store.state.profiles) { profile in
+                Section(profile.name) {
+                    DownloadLocationPicker(context: engine.browserContext(id: profile.id))
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// Arc's "Download location": the folder, Other… to choose one, and Ask every time, which has the engine show its
+/// Save panel for each download.
+private struct DownloadLocationPicker: View {
+    private enum Choice { case folder, other, ask }
+
+    let context: any BrowserContext
+    @State private var directory: URL?
+    @State private var asks = false
+
+    var body: some View {
+        Picker("Download location", selection: choice) {
+            Text(directory.map { FileManager.default.displayName(atPath: $0.path) } ?? "Downloads").tag(Choice.folder)
+            Text("Other…").tag(Choice.other)
+            Divider()
+            Text("Ask every time").tag(Choice.ask)
+        }
+        .disabled(directory == nil)
+        .onAppear(perform: read)
+    }
+
+    private var choice: Binding<Choice> {
+        Binding {
+            asks ? .ask : .folder
+        } set: { choice in
+            switch choice {
+            case .folder: context.asksWhereToSaveDownloads = false
+            case .ask: context.asksWhereToSaveDownloads = true
+            case .other: chooseFolder()
+            }
+            read()
+        }
+    }
+
+    /// After the menu has closed: a panel run from inside its action never becomes key.
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = directory
+        panel.prompt = "Select"
+        DispatchQueue.main.async {
+            guard let window = NSApplication.shared.keyWindow else { return }
+            panel.beginSheetModal(for: window) { response in
+                guard response == .OK, let chosen = panel.url else { return }
+                context.downloadDirectory = chosen
+                context.asksWhereToSaveDownloads = false
+                read()
+            }
+        }
+    }
+
+    private func read() {
+        directory = context.downloadDirectory
+        asks = context.asksWhereToSaveDownloads
     }
 }
 

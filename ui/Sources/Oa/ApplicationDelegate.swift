@@ -9,7 +9,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     private var windows: [BrowserWindowController] = []
     private var mainMenu: MainMenu?
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
-    private lazy var settings = SettingsWindowController()
+    private lazy var settings = SettingsWindowController(engine: engine, store: store)
     private var askingToQuit = false
     private static var current: ApplicationDelegate?
 
