@@ -70,8 +70,11 @@ final class CommandBar {
     /// Chromium's rule: no completion after a deletion, unless the selection is a caret at the end, or while an
     /// input method composes, until the next typing.
     private var suppressesInline = false
-    /// The user's selection in what was typed, in UTF-16 code units.
+    /// The user's selection in the field, in UTF-16 code units.
     private var selection: NSRange
+    /// A completion or a row's text that stays in the field once the user moves the caret or selects in it. As Arc:
+    /// the query and the rows stay those of what was typed until the next edit, which takes the field's text.
+    private var acceptedText: String?
     @ObservationIgnored private let profileID: UUID
     @ObservationIgnored private let picks: CommandBarPicks
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
@@ -103,6 +106,7 @@ final class CommandBar {
 
     func select(_ index: Int) {
         selectedKey = index > 0 && rows.indices.contains(index) ? rows[index].id : nil
+        acceptedText = nil
     }
 
     func moveSelection(_ offset: Int) {
@@ -119,6 +123,7 @@ final class CommandBar {
     /// completion selected after it; on another row, a search's text with the untyped rest selected, a page's URL,
     /// or for a tab the typed text.
     var field: FieldText {
+        if let acceptedText { return FieldText(string: acceptedText, selection: clamped(selection, to: acceptedText)) }
         let typed = (text as NSString).length
         if !edited, destination == .currentTab, selectedKey == nil {
             return FieldText(string: text, selection: NSRange(0..<typed))
@@ -143,9 +148,13 @@ final class CommandBar {
             let length = (completion as NSString).length
             return FieldText(string: text + completion, selection: NSRange(location: typed, length: length))
         }
-        let location = min(selection.location, typed)
-        return FieldText(
-            string: text, selection: NSRange(location: location, length: min(selection.length, typed - location)))
+        return FieldText(string: text, selection: clamped(selection, to: text))
+    }
+
+    private func clamped(_ range: NSRange, to string: String) -> NSRange {
+        let length = (string as NSString).length
+        let location = min(range.location, length)
+        return NSRange(location: location, length: min(range.length, length - location))
     }
 
     /// Chromium's for its default match; for a tab, the rest of its readable URL, as Arc completed "loc" to an open
@@ -169,6 +178,7 @@ final class CommandBar {
     func edit(_ text: String, selection: NSRange, deleting: Bool, composing: Bool = false) {
         edited = true
         selectedKey = nil
+        acceptedText = nil
         self.selection = selection
         suppressesInline = deleting || composing || selection.location < (text as NSString).length
         guard text != self.text else { return }
@@ -178,13 +188,12 @@ final class CommandBar {
         rank()
     }
 
-    /// The user moved the caret or selected text without an edit. What the field showed beyond the typed text, a
-    /// completion or a row's text, is typed from now on, as in Chromium.
+    /// The user moved the caret or selected text without an edit.
     func selectText(_ selection: NSRange, in string: String) {
-        guard string == text else { return edit(string, selection: selection, deleting: false) }
         edited = true
         self.selection = selection
-        if selection.location < (text as NSString).length { suppressesInline = true }
+        acceptedText = string == text ? nil : string
+        if acceptedText == nil, selection.location < (text as NSString).length { suppressesInline = true }
     }
 
     /// As Arc's ⇧⌦: a past search goes, while a page from history stays.
