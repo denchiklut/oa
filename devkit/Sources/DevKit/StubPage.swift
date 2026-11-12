@@ -157,7 +157,7 @@ final class StubPage: Page {
         Self.arrivals.removeAll { $0.page == nil || $0.page === self }
     }
 
-    func open(_ disposition: OpenDisposition) {
+    func open(_ disposition: OpenDisposition, byPage: Bool = true) {
         guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
         StubPage.openedCount += 1
         components.path = "/opened-\(StubPage.openedCount)"
@@ -165,7 +165,7 @@ final class StubPage: Page {
         guard let target = components.url else { return }
         let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads)
         opened.load(target)
-        continuation?.yield(.opened(opened, url: target, disposition: disposition))
+        continuation?.yield(.opened(opened, url: target, disposition: disposition, byPage: byPage))
     }
 
     func clickCrossOriginLink() {
@@ -176,7 +176,7 @@ final class StubPage: Page {
         guard keepsAddress else { return load(target) }
         let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads)
         opened.load(target)
-        continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab))
+        continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab, byPage: true))
     }
 
     func followLink() {

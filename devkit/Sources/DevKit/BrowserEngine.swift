@@ -181,8 +181,9 @@ public protocol Page: AnyObject, Observable {
 
 public enum PageEvent {
     /// The page opened another page, live in this page's window with its opener kept. The app installs it under a
-    /// tab, or drops it.
-    case opened(any Page, url: URL?, disposition: OpenDisposition)
+    /// tab, or drops it. `byPage` tells the page's own open, as a link, a Shift-click or `window.open`, from one the
+    /// engine made for the user, as its page menu's Open Link in New Window.
+    case opened(any Page, url: URL?, disposition: OpenDisposition, byPage: Bool)
     /// The page asked to be shown, as `window.focus()` and a `window.open` reusing a named page do. The app selects
     /// its tab or ignores it.
     case wantsActivation

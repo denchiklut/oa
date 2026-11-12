@@ -85,9 +85,10 @@ final class ChromiumPage: Page {
         updateHostedView()
     }
 
-    fileprivate func opened(_ page: CorePage, url: URL?, disposition: Int) {
+    fileprivate func opened(_ page: CorePage, url: URL?, disposition: Int, byPage: Bool) {
         let opened = ChromiumPage(id: UUID(), page: page, delegate: PageDelegate())
-        continuation.yield(.opened(opened, url: url, disposition: OpenDisposition(core: disposition)))
+        continuation.yield(
+            .opened(opened, url: url, disposition: OpenDisposition(core: disposition), byPage: byPage))
     }
 
     fileprivate func wantsActivation() {
@@ -180,8 +181,8 @@ final class PageDelegate: NSObject, CorePageDelegate {
 
     func pageDidChangeState(_ page: CorePage) { content?.stateChanged() }
 
-    func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int) {
-        content?.opened(openedPage, url: targetURL, disposition: disposition)
+    func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int, byPage: Bool) {
+        content?.opened(openedPage, url: targetURL, disposition: disposition, byPage: byPage)
     }
 
     func pageWantsActivation(_ page: CorePage) { content?.wantsActivation() }
