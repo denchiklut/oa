@@ -51,10 +51,53 @@ import AppKit
     @objc(preferencesDidChange:) func preferencesDidChange(_ preferences: CorePreferences)
 }
 
+@MainActor @objc protocol CoreSearchEngine: NSObjectProtocol {
+    var name: String { get }
+    var keyword: String { get }
+    var url: String { get }
+    var faviconURL: URL? { get }
+    var isPrepopulated: Bool { get }
+}
+
 @MainActor @objc protocol CorePreferences: NSObjectProtocol {
     var delegate: CorePreferencesDelegate? { get set }
     var downloadDirectory: URL? { get set }
     var asksWhereToSaveDownloads: Bool { get set }
+    /// `OASearchEngine`s, which Swift can't check against `CoreSearchEngine`.
+    var searchEngines: [NSObject]? { get }
+    var defaultSearchEngine: CoreSearchEngine? { get }
+    var searchSuggestEnabled: Bool { get set }
+    @objc(setDefaultSearchEngineWithKeyword:) func setDefaultSearchEngine(keyword: String)
+}
+
+@MainActor @objc protocol CoreAutocompleteMatch: NSObjectProtocol {
+    var type: String { get }
+    var contents: String { get }
+    var matchDescription: String { get }
+    var destinationURL: URL? { get }
+    var fillIntoEdit: String { get }
+    var inlineAutocompletion: String { get }
+    var relevance: Int { get }
+    var allowedToBeDefault: Bool { get }
+    var isDeletable: Bool { get }
+    var isFromPrevious: Bool { get }
+    var additionalInfo: [String: String] { get }
+}
+
+@MainActor @objc protocol CoreAutocompleteResult: NSObjectProtocol {
+    /// `OAAutocompleteMatch`es, which Swift can't check against `CoreAutocompleteMatch`.
+    var combinedMatches: [NSObject] { get }
+    var perProviderMatches: [NSObject] { get }
+}
+
+@MainActor @objc protocol CoreAutocomplete: NSObjectProtocol {
+    /// `completion` gets an `OAAutocompleteResult`, which Swift can't check against `CoreAutocompleteResult`.
+    @objc(startWithText:cursorPosition:preventInlineAutocomplete:startFresh:keyword:currentURL:completion:)
+    func start(
+        text: String, cursorPosition: UInt, preventInlineAutocomplete: Bool, startFresh: Bool, keyword: String?,
+        currentURL: URL?, completion: @escaping (NSObject, Bool) -> Void)
+    func stop()
+    @objc(deleteMatch:) func delete(_ match: CoreAutocompleteMatch)
 }
 
 @MainActor @objc protocol CoreProfile: NSObjectProtocol {
@@ -63,6 +106,7 @@ import AppKit
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
+    func makeAutocomplete() -> CoreAutocomplete
     @objc(createPageInWindow:restoringSessionID:delegate:completion:)
     func createPage(
         inWindow windowIdentifier: String, restoringSessionID sessionID: Int32, delegate: CorePageDelegate?,

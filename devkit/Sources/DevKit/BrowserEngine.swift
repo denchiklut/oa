@@ -36,6 +36,8 @@ public protocol BrowserContext: AnyObject {
     var downloads: any Downloads { get }
     /// As ArcCore's `ArcBrowserContextPreferences`: one per profile, kept current by the engine.
     var preferences: any BrowserContextPreferences { get }
+    /// Chromium's omnibox for this profile. ArcCore keeps one per window.
+    func makeAutocomplete() -> any Autocomplete
 }
 
 /// A profile's preferences, observable: the engine reports them once the profile has loaded and after every change,
@@ -46,6 +48,131 @@ public protocol BrowserContextPreferences: AnyObject, Observable {
     var downloadDirectory: URL? { get set }
     /// The engine asks where to save each download in its Save panel, as ArcCore's `promptForDownloadPath`.
     var asksWhereToSaveDownloads: Bool { get set }
+    /// The engines Chrome's settings offer as the default, as ArcCore's `getSearchEngines`; empty until loaded.
+    var searchEngines: [SearchEngine] { get }
+    var defaultSearchEngine: SearchEngine? { get }
+    /// As the user's choice, as ArcCore's `setDefaultSearchEngine:`.
+    func setDefaultSearchEngine(_ engine: SearchEngine)
+    /// Chromium's suggestions from the default engine, as ArcCore's `searchSuggestEnabled`.
+    var includesSearchSuggestions: Bool { get set }
+}
+
+/// As ArcCore's `ArcSearchEngine`.
+public struct SearchEngine: Identifiable, Sendable, Equatable {
+    public var id: String { keyword }
+    public let name: String
+    public let keyword: String
+    /// Chromium's URL template, with `{searchTerms}`.
+    public let url: String
+    public let faviconURL: URL?
+    public let isPrepopulated: Bool
+
+    public init(name: String, keyword: String, url: String, faviconURL: URL? = nil, isPrepopulated: Bool = true) {
+        self.name = name
+        self.keyword = keyword
+        self.url = url
+        self.faviconURL = faviconURL
+        self.isPrepopulated = isPrepopulated
+    }
+}
+
+/// Chromium's omnibox in one profile, as ADK's `ChromiumBrowser` runs it. Observable: each answer replaces the matches.
+@MainActor
+public protocol Autocomplete: AnyObject, Observable {
+    /// As ADK's `rankedResults`: Chromium's combined result in its order, at most 8, only of ADK's kinds.
+    var matches: [AutocompleteMatch] { get }
+    /// As ADK's `additionalResults`: every provider's own matches, which include the ones the combined result left out.
+    var additionalMatches: [AutocompleteMatch] { get }
+    /// The start the matches answer; nil before any start has an answer.
+    var input: AutocompleteInput? { get }
+    /// Every provider has answered `input`.
+    var isDone: Bool { get }
+    /// Replaces a running query.
+    func start(_ input: AutocompleteInput)
+    func stop()
+    /// Has the match's provider forget it, as ADK's `deleteAutocompleteMatch`.
+    func delete(_ match: AutocompleteMatch)
+}
+
+/// The arguments of ArcCore's `autocomplete:cursorPosition:preventInlineAutocomplete:startFresh:keyword:`.
+public struct AutocompleteInput: Sendable, Equatable {
+    public var text: String
+    /// In UTF-16 code units.
+    public var cursorPosition: Int
+    public var preventsInlineAutocomplete: Bool
+    /// The first start of a command bar session.
+    public var startsFresh: Bool
+    /// A search engine's keyword when searching only it.
+    public var keyword: String?
+    /// The page the input edits, when it edits one.
+    public var currentURL: URL?
+
+    public init(
+        text: String, cursorPosition: Int? = nil, preventsInlineAutocomplete: Bool = false, startsFresh: Bool = false,
+        keyword: String? = nil, currentURL: URL? = nil
+    ) {
+        self.text = text
+        self.cursorPosition = cursorPosition ?? text.utf16.count
+        self.preventsInlineAutocomplete = preventsInlineAutocomplete
+        self.startsFresh = startsFresh
+        self.keyword = keyword
+        self.currentURL = currentURL
+    }
+}
+
+/// As ADK's `BrowserSearchResult`.
+public struct AutocompleteMatch: Identifiable, Sendable, Equatable {
+    /// ADK's `BrowserSearchResultType` with Chromium's type strings. ADK has no open-tab kind, and Arc never shows
+    /// bookmark or calculator matches, so those are dropped.
+    public enum Kind: String, Sendable {
+        case urlWhatYouTyped = "url-what-you-typed"
+        case searchWhatYouTyped = "search-what-you-typed"
+        case historyURL = "history-url"
+        case historyTitle = "history-title"
+        case searchHistory = "search-history"
+        case searchSuggest = "search-suggest"
+        case searchSuggestEntity = "search-suggest-entity"
+        case navSuggest = "navsuggest"
+        case searchOtherEngine = "search-other-engine"
+    }
+
+    public let id: Int
+    public let kind: Kind
+    public let contents: String
+    public let description: String
+    public let url: URL?
+    public let fillIntoEdit: String
+    public let inlineAutocompletion: String
+    public let relevance: Int
+    public let allowedToBeDefault: Bool
+    public let isDeletable: Bool
+    /// 1-based, in Chromium's combined result, before ADK's kinds are kept; nil for an additional match.
+    public let chromiumRank: Int?
+    /// From Chromium's history providers, as ADK's `typedCount`, `visitCount` and `lastVisited`.
+    public let typedCount: Int?
+    public let visitCount: Int?
+    public let lastVisited: Date?
+
+    public init(
+        id: Int, kind: Kind, contents: String, description: String = "", url: URL?, fillIntoEdit: String,
+        inlineAutocompletion: String = "", relevance: Int, allowedToBeDefault: Bool = false, isDeletable: Bool = false,
+        chromiumRank: Int? = nil, typedCount: Int? = nil, visitCount: Int? = nil, lastVisited: Date? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.contents = contents
+        self.description = description
+        self.url = url
+        self.fillIntoEdit = fillIntoEdit
+        self.inlineAutocompletion = inlineAutocompletion
+        self.relevance = relevance
+        self.allowedToBeDefault = allowedToBeDefault
+        self.isDeletable = isDeletable
+        self.chromiumRank = chromiumRank
+        self.typedCount = typedCount
+        self.visitCount = visitCount
+        self.lastVisited = lastVisited
+    }
 }
 
 /// A profile's downloads, running and remembered by the engine. Observable: the engine's events change `items`,
