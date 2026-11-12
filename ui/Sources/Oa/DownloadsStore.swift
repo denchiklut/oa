@@ -75,6 +75,29 @@ final class DownloadsStore {
         if let file = entry.download.file { NSWorkspace.shared.activateFileViewerSelecting([file]) }
     }
 
+    /// As a file copied in Finder; what else Arc puts on the pasteboard is unknown.
+    func copy(_ entry: Entry) {
+        guard let file = entry.download.file else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([file as NSURL])
+    }
+
+    func cancel(_ entry: Entry) {
+        engine.browserContext(id: entry.profileID).downloads.cancel(entry.id)
+    }
+
+    /// Arc's Hide: the row goes, from the engine's history too, and a finished file stays.
+    func hide(_ entry: Entry) {
+        engine.browserContext(id: entry.profileID).downloads.remove(entry.id)
+    }
+
+    func trash(_ entry: Entry) {
+        guard let file = entry.download.file,
+            (try? FileManager.default.trashItem(at: file, resultingItemURL: nil)) != nil
+        else { return }
+        hide(entry)
+    }
+
     func share(_ entry: Entry, with service: NSSharingService.Name) {
         if let file = entry.download.file { NSSharingService(named: service)?.perform(withItems: [file]) }
     }
@@ -125,6 +148,11 @@ extension DownloadsStore.Entry {
             return nil
         }
         return FileManager.default.displayName(atPath: app.path).replacingOccurrences(of: ".app", with: "")
+    }
+
+    /// What Arc's Library menu calls it: the type word, else the extension.
+    var menuKind: String {
+        kind ?? download.file.map(\.pathExtension).flatMap { $0.isEmpty ? nil : $0 } ?? "File"
     }
 
     /// Arc's type words; nil for a file it has none for.
