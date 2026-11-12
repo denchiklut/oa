@@ -136,6 +136,8 @@ Implementation details live with their features:
 - <a id="favorites"></a>[Favorites](../../features/favorites/README.md): profile-scoped tiles, selection and placement.
 - <a id="files"></a>[Saved state and recovery](../../features/saved-state/README.md): file formats, favicons,
   backups and Restore Data.
+- <a id="downloads"></a>[Downloads](../../features/downloads/README.md): the Library, its button and flyout,
+  quitting with downloads running and the download location.
 
 The [feature inventory](../../features/README.md) tracks candidate capabilities
 separately; its unchecked entries have not been assessed for implementation.

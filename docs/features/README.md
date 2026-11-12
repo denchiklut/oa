@@ -34,6 +34,7 @@ that every online integration still works.
 - [Peek](peek/README.md)
 - [Favorites](favorites/README.md)
 - [Saved state and recovery](saved-state/README.md)
+- [Downloads](downloads/README.md)
 
 These pages describe existing slices and their product choices. Moving the
 notes here does not assess or change the checklist status below.
@@ -295,15 +296,15 @@ Sources: Arc [account management][arc-account], [account deletion][arc-delete],
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Downloads manager | ✅ | ☐ |
-| Configure download location per profile | ✅ | ☐ |
-| Display download progress † | ✅ | ☐ |
-| Cancel an active download † | ✅ | ☐ |
-| Recent downloads on Library hover † | ✅ | ☐ |
+| Downloads manager | ✅ | ✅ |
+| Configure download location per profile | ✅ | ✅ |
+| Display download progress † | ✅ | ✅ |
+| Cancel an active download † | ✅ | ✅ |
+| Recent downloads on Library hover † | ✅ | ✅ |
 | Library lists downloads outside the Downloads folder † | ✅ | ☐ |
 | Include/exclude screenshots in Library † | ✅ | ☐ |
 | Remember the selected Library section † | ✅ | ☐ |
-| Move Library files to macOS Trash † | ✅ | ☐ |
+| Move Library files to macOS Trash † | ✅ | ✅ |
 
 Sources: Arc native Settings → Profiles; [2022][arc22], [2023][arc23],
 [2024–2026][arc24].
