@@ -9,8 +9,12 @@ import Observation
 @Observable
 final class WindowModel {
     let id: UUID
-    private(set) var selectedSpaceID: UUID
-    private(set) var selectedTabIDs: [UUID: UUID] = [:]
+    private(set) var selectedSpaceID: UUID {
+        didSet { closeCommandBarIfSelectionChanged() }
+    }
+    private(set) var selectedTabIDs: [UUID: UUID] = [:] {
+        didSet { closeCommandBarIfSelectionChanged() }
+    }
     private(set) var pages: [UUID: any Page] = [:]
     /// Last frames of pages that left for another window while their tab stayed selected here.
     private(set) var placeholders: [UUID: NSImage] = [:]
@@ -26,7 +30,9 @@ final class WindowModel {
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
     private(set) var permissionRequests: [UUID: [PagePermissionRequest]] = [:]
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
-    var focusAddressField = 0
+    private(set) var commandBar: CommandBar?
+    /// The selection the command bar was opened over, which its destination is for.
+    @ObservationIgnored private var commandBarSelection: (spaceID: UUID, tabID: UUID?)?
     @ObservationIgnored var bringToFront: () -> Void = {}
     /// Opens another window on this one's Space with the tab selected; the tab's page follows it there.
     @ObservationIgnored var openWindow: (_ tabID: UUID) -> Void = { _ in }
@@ -36,6 +42,8 @@ final class WindowModel {
     @ObservationIgnored private var previousTabID: UUID?
     @ObservationIgnored private var pendingURLs: [UUID: URL] = [:]
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
+    /// By profile: ArcCore keeps one omnibox per window.
+    @ObservationIgnored private var autocompletes: [UUID: any Autocomplete] = [:]
     private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
@@ -76,7 +84,7 @@ final class WindowModel {
     /// As Arc: a restored window comes back on its Space with nothing selected and no page.
     func restore(_ record: WindowRecord) {
         if state.space(record.selectedSpaceID) != nil { selectedSpaceID = record.selectedSpaceID }
-        focusAddressField += 1
+        openCommandBar(.newTab)
     }
 
     /// A pinned tab whose page has left its address reads "/ live title", as in Arc; a Favorite, whose tile has no
@@ -109,7 +117,7 @@ final class WindowModel {
         if isOnlyWindow, let first = state.firstTabID(in: selectedSpaceID) {
             select(first)
         } else {
-            focusAddressField += 1
+            openCommandBar(.newTab)
         }
     }
 
@@ -138,10 +146,61 @@ final class WindowModel {
         selectedTabID.flatMap { state.profile(containing: $0) }.map { engine.browserContext(id: $0.id) }
     }
 
-    func newTab(_ url: URL? = nil) {
+    /// As Arc: at the top of the Space's unpinned tabs.
+    func newTab(_ url: URL) {
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
-        store.edit { $0.appendTab(tab, in: selectedSpaceID) }
+        store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
         select(tab.id)
+    }
+
+    /// As Arc: ⌘L edits the front page, the Peek included, and does nothing over a dialog; with no tab selected it
+    /// makes one as ⌘T does.
+    func openCommandBar(_ destination: CommandBar.Destination) {
+        if destination == .currentTab, dialog != nil { return }
+        let editing = destination == .currentTab && selectedTabID != nil
+        let profileID = editing ? selectedTabID.flatMap { state.profile(containing: $0)?.id } : space?.profileID
+        guard let profileID else { return }
+        commandBar?.autocomplete.stop()
+        let autocomplete = autocompletes[profileID] ?? engine.browserContext(id: profileID).makeAutocomplete()
+        autocompletes[profileID] = autocomplete
+        let bar = CommandBar(
+            destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
+            currentURL: editing ? frontPage?.url ?? address : nil)
+        bar.open = { [weak self, destination = bar.destination] url in self?.open(url, in: destination) }
+        commandBar = bar
+        commandBarSelection = (selectedSpaceID, selectedTabID)
+    }
+
+    func closeCommandBar() {
+        guard let bar = commandBar else { return }
+        bar.autocomplete.stop()
+        commandBar = nil
+        if dialog == nil { frontPage?.activate() }
+    }
+
+    /// Oa's own: ⌘W, ⌘Y or anything else that changes the selection under the bar closes it, rather than leaving
+    /// it to act on a tab it wasn't opened for. Arc's behaviour here is untested.
+    private func closeCommandBarIfSelectionChanged() {
+        guard commandBar != nil, let opened = commandBarSelection,
+            opened.spaceID != selectedSpaceID || opened.tabID != selectedTabID
+        else { return }
+        closeCommandBar()
+    }
+
+    private func open(_ url: URL, in destination: CommandBar.Destination) {
+        closeCommandBar()
+        guard destination == .currentTab, let tabID = selectedTabID else { return newTab(url) }
+        if let peek {
+            peek.load(url)
+            return peek.activate()
+        }
+        ensurePage(tabID)
+        if let page = pages[tabID] {
+            page.load(url)
+            page.activate()
+        } else {
+            pendingURLs[tabID] = url
+        }
     }
 
     func select(_ tabID: UUID, restoring sessionID: PageSessionID? = nil) {
@@ -175,7 +234,7 @@ final class WindowModel {
     func selectSpace(_ spaceID: UUID) {
         guard state.space(spaceID) != nil, spaceID != selectedSpaceID else { return }
         selectedSpaceID = spaceID
-        if let tabID = selectedTabID { ensurePage(tabID) } else { focusAddressField += 1 }
+        if let tabID = selectedTabID { ensurePage(tabID) } else { openCommandBar(.newTab) }
         store.windowStateChanged()
     }
 
@@ -375,30 +434,6 @@ final class WindowModel {
 
     func clearArchive() {
         store.edit { $0.clearArchive() }
-    }
-
-    /// Typed input: a URL as typed, a host, or a search. Search fallback is a product decision for slice 1.
-    func navigate(to input: String) {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        let url: URL
-        if let typed = URL(string: text), typed.scheme != nil, typed.host() != nil || typed.scheme == "file" {
-            url = typed
-        } else if !text.contains(" "), text.contains("."), let host = URL(string: "https://\(text)") {
-            url = host
-        } else {
-            var components = URLComponents(string: "https://www.google.com/search")!
-            components.queryItems = [URLQueryItem(name: "q", value: text)]
-            url = components.url!
-        }
-        guard let tabID = selectedTabID else { return newTab(url) }
-        ensurePage(tabID)
-        if let page = pages[tabID] {
-            page.load(url)
-            page.activate()
-        } else {
-            pendingURLs[tabID] = url
-        }
     }
 
     /// ⌘W. An unpinned tab's page, wherever it lives, is closed as the user would and the tab archived once it is

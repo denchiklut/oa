@@ -41,12 +41,14 @@ struct SidebarView: View {
             .onDrop(of: [.plainText], delegate: TabDrop { model.unfavorite($0) })
             Divider()
             Button {
-                model.newTab()
+                model.openCommandBar(.newTab)
             } label: {
                 Label("New Tab", systemImage: "plus")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
+                    // As Arc: highlighted while the bar makes a new tab.
+                    .background(model.commandBar?.destination == .newTab ? Color.primary.opacity(0.08) : .clear)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

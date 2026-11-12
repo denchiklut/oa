@@ -105,8 +105,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func reload(_ sender: Any?) { model.frontPage?.reload() }
     @objc func stopLoading(_ sender: Any?) { model.frontPage?.stopLoading() }
     @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
-    @objc func openLocation(_ sender: Any?) { model.focusAddressField += 1 }
-    @objc func newTab(_ sender: Any?) { model.newTab() }
+    @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
+    @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
     @objc func selectNextTab(_ sender: Any?) { model.selectAdjacentTab(1) }
     @objc func selectPreviousTab(_ sender: Any?) { model.selectAdjacentTab(-1) }
     @objc func togglePin(_ sender: Any?) { model.togglePin() }
