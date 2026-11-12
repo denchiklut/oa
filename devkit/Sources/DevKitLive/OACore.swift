@@ -47,10 +47,19 @@ import AppKit
     @objc(removeDownloadWithIdentifier:) func removeDownload(identifier: String)
 }
 
-@MainActor @objc protocol CoreProfile: NSObjectProtocol {
-    var downloads: CoreDownloads { get }
+@MainActor @objc protocol CorePreferencesDelegate: NSObjectProtocol {
+    @objc(preferencesDidChange:) func preferencesDidChange(_ preferences: CorePreferences)
+}
+
+@MainActor @objc protocol CorePreferences: NSObjectProtocol {
+    var delegate: CorePreferencesDelegate? { get set }
     var downloadDirectory: URL? { get set }
     var asksWhereToSaveDownloads: Bool { get set }
+}
+
+@MainActor @objc protocol CoreProfile: NSObjectProtocol {
+    var downloads: CoreDownloads { get }
+    var preferences: CorePreferences { get }
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)

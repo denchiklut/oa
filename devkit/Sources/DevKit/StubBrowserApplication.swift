@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Observation
 
 /// An engine without a web engine: pages are placeholders. UI work runs on it without a Chromium build.
 @MainActor
@@ -40,8 +41,7 @@ final class StubBrowserContext: BrowserContext {
     let id: UUID
     private let stubDownloads = StubDownloads()
     var downloads: any Downloads { stubDownloads }
-    var downloadDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-    var asksWhereToSaveDownloads = false
+    let preferences: any BrowserContextPreferences = StubPreferences()
 
     init(id: UUID) { self.id = id }
 
@@ -65,4 +65,11 @@ final class StubBrowserContext: BrowserContext {
         guard let host = url.host() else { return }
         StubPage.siteSettings["\(host) \(type)"] = value == .default ? nil : value
     }
+}
+
+@MainActor
+@Observable
+final class StubPreferences: BrowserContextPreferences {
+    var downloadDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+    var asksWhereToSaveDownloads = false
 }

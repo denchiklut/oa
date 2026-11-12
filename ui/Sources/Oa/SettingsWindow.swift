@@ -43,7 +43,7 @@ struct ProfilesSettingsView: View {
         Form {
             ForEach(store.state.profiles) { profile in
                 Section(profile.name) {
-                    DownloadLocationPicker(context: engine.browserContext(id: profile.id))
+                    DownloadLocationPicker(preferences: engine.browserContext(id: profile.id).preferences)
                 }
             }
         }
@@ -52,35 +52,33 @@ struct ProfilesSettingsView: View {
 }
 
 /// Arc's "Download location": the folder, Other… to choose one, and Ask every time, which has the engine show its
-/// Save panel for each download.
+/// Save panel for each download. It reads the profile's preferences as the engine reports them, so it waits for the
+/// profile to load and follows a change made on Chrome's settings page.
 private struct DownloadLocationPicker: View {
     private enum Choice { case folder, other, ask }
 
-    let context: any BrowserContext
-    @State private var directory: URL?
-    @State private var asks = false
+    let preferences: any BrowserContextPreferences
 
     var body: some View {
         Picker("Download location", selection: choice) {
-            Text(directory.map { FileManager.default.displayName(atPath: $0.path) } ?? "Downloads").tag(Choice.folder)
+            Text(preferences.downloadDirectory.map { FileManager.default.displayName(atPath: $0.path) } ?? "Downloads")
+                .tag(Choice.folder)
             Text("Other…").tag(Choice.other)
             Divider()
             Text("Ask every time").tag(Choice.ask)
         }
-        .disabled(directory == nil)
-        .onAppear(perform: read)
+        .disabled(preferences.downloadDirectory == nil)
     }
 
     private var choice: Binding<Choice> {
         Binding {
-            asks ? .ask : .folder
+            preferences.asksWhereToSaveDownloads ? .ask : .folder
         } set: { choice in
             switch choice {
-            case .folder: context.asksWhereToSaveDownloads = false
-            case .ask: context.asksWhereToSaveDownloads = true
+            case .folder: preferences.asksWhereToSaveDownloads = false
+            case .ask: preferences.asksWhereToSaveDownloads = true
             case .other: chooseFolder()
             }
-            read()
         }
     }
 
@@ -90,22 +88,16 @@ private struct DownloadLocationPicker: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.directoryURL = directory
+        panel.directoryURL = preferences.downloadDirectory
         panel.prompt = "Select"
         DispatchQueue.main.async {
             guard let window = NSApplication.shared.keyWindow else { return }
             panel.beginSheetModal(for: window) { response in
                 guard response == .OK, let chosen = panel.url else { return }
-                context.downloadDirectory = chosen
-                context.asksWhereToSaveDownloads = false
-                read()
+                preferences.downloadDirectory = chosen
+                preferences.asksWhereToSaveDownloads = false
             }
         }
-    }
-
-    private func read() {
-        directory = context.downloadDirectory
-        asks = context.asksWhereToSaveDownloads
     }
 }
 
