@@ -387,6 +387,10 @@ public protocol Page: AnyObject, Observable {
     /// While the page captures from them, as ADK's media session state reports.
     var isCameraOn: Bool { get }
     var isMicrophoneOn: Bool { get }
+    /// While the page plays sound, as ADK's `isAudible`. Read when needed: it isn't observed.
+    var isAudible: Bool { get }
+    /// The page's media, as ADK's media session.
+    var mediaSession: any MediaSession { get }
     /// Why the renderer is gone, nil once a new one is ready, as after a reload.
     var crash: PageCrash? { get }
     /// A page that keeps its address, as a pinned tab does: a link to another host opens a new page instead of
@@ -435,10 +439,73 @@ public enum PageEvent {
     case extensionRequest(PageExtensionRequest)
     /// The engine took the request down unanswered, as when the extension went away meanwhile.
     case extensionRequestClosed(PageExtensionRequest)
+    /// What the engine asks of the app's window for the page's picture-in-picture video.
+    case pictureInPicture(PictureInPictureEvent)
     /// A `beforeunload` handler kept the page after `close()`.
     case closeCancelled
     /// The page is gone, after `close()` or without the app asking, with the engine's record of it if it kept one.
     case closed(PageSessionID?)
+}
+
+/// A page's media as the engine plays it, as ArcCore's `ArcWebContentsMediaSession`.
+@MainActor
+public protocol MediaSession: AnyObject {
+    /// Nil while the page has no media session. Read when needed: it isn't observed yet.
+    var state: MediaSessionState? { get }
+    /// Asks the engine to show the page's video in picture-in-picture; the page's `pictureInPicture` events follow.
+    /// False when the engine refuses: the page has such a video already, or no media session that can enter
+    /// picture-in-picture. Whether the media plays is the app's check, as in Arc.
+    @discardableResult func requestPictureInPicture() -> Bool
+    /// Ends picture-in-picture and pauses the video or leaves it playing in the page, as ArcCore's
+    /// `exitPictureInPicture:`. False when the page has no picture-in-picture video.
+    @discardableResult func exitPictureInPicture(pausing: Bool) -> Bool
+}
+
+/// As ADK's `MediaSessionState` and `MediaContentType`.
+public struct MediaSessionState: Sendable, Equatable {
+    public enum Status: Sendable {
+        case active, ducking, suspended, inactive
+    }
+
+    public enum ContentType: Sendable {
+        case audioOnly, videoOnly, audioVideo
+    }
+
+    public var status: Status
+    /// Nil while the engine can't tell.
+    public var contentType: ContentType?
+
+    public init(status: Status, contentType: ContentType?) {
+        self.status = status
+        self.contentType = contentType
+    }
+}
+
+/// As ADKClient's `WebContentPiPAction`.
+public enum PictureInPictureEvent: Sendable {
+    /// The page's video went to picture-in-picture; `show` follows.
+    case created(PictureInPictureController)
+    case show
+    /// Picture-in-picture ended, by the app's exit or the page's. `show` may follow again for the same controller.
+    case hide
+    case close
+    /// The video's natural size.
+    case resolutionChanged(CGSize)
+    case destroyed
+}
+
+/// As ArcCore's `ArcWebContentsMediaSessionPiPController`.
+@MainActor
+public final class PictureInPictureController {
+    /// Draws the video at whatever size it is given. The engine's until `destroyed`; attach it while it is shown.
+    public let view: NSView
+    /// The video element's bounds in its page.
+    public let sourceBounds: CGRect
+
+    public init(view: NSView, sourceBounds: CGRect) {
+        self.view = view
+        self.sourceBounds = sourceBounds
+    }
 }
 
 /// What a page asked with `alert`, `confirm`, `prompt` or a `beforeunload` handler.

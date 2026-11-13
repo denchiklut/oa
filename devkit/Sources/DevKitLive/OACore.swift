@@ -183,6 +183,9 @@ import AppKit
     var navigationResult: Int { get }
     var isCameraOn: Bool { get }
     var isMicrophoneOn: Bool { get }
+    var isAudible: Bool { get }
+    var mediaSessionStatus: Int { get }
+    var mediaContentType: Int { get }
     var keepsAddress: Bool { get set }
     @objc(loadURL:) func load(_ url: URL)
     func goBack()
@@ -192,6 +195,8 @@ import AppKit
     func activate()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
     @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
+    func requestPictureInPicture() -> Bool
+    @objc(exitPictureInPictureAndPause:) func exitPictureInPicture(pausing: Bool) -> Bool
     func close()
     func drop()
 }
@@ -240,6 +245,8 @@ import AppKit
     func page(_ page: CorePage, didRequestExtension request: CorePageExtensionRequest)
     @objc(page:didCloseExtensionRequest:)
     func page(_ page: CorePage, didCloseExtensionRequest request: CorePageExtensionRequest)
+    @objc(page:pictureInPicture:view:rect:)
+    func page(_ page: CorePage, pictureInPicture event: Int, view: NSView?, rect: NSRect)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
     @objc(page:didCloseWithSessionID:) func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32)
 }

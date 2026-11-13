@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-final class StubPage: Page {
+final class StubPage: Page, MediaSession {
     let id: UUID
     private(set) var url: URL?
     private(set) var title = ""
@@ -26,6 +26,14 @@ final class StubPage: Page {
     private(set) var isCameraOn = false
     private(set) var isMicrophoneOn = false
     var keepsAddress = false
+    /// A video with sound, playing: what the engine's media session reports as active audio and video.
+    var isPlayingVideo = false
+    var isAudible: Bool { isPlayingVideo }
+    var mediaSession: any MediaSession { self }
+    var state: MediaSessionState? {
+        hasPlayedVideo
+            ? MediaSessionState(status: isPlayingVideo ? .active : .suspended, contentType: .audioVideo) : nil
+    }
     /// A `beforeunload` handler that wants to stay, as a page with unsaved changes.
     var asksBeforeClosing = false
     let events: AsyncStream<PageEvent>
@@ -39,6 +47,9 @@ final class StubPage: Page {
     @ObservationIgnored private var pendingDialog: PageDialog?
     @ObservationIgnored private var permissionQueue: [[PermissionKind]] = []
     @ObservationIgnored private var shownPermissionRequest: PagePermissionRequest?
+    @ObservationIgnored private var hasPlayedVideo = false
+    @ObservationIgnored private var pictureInPictureController: PictureInPictureController?
+    @ObservationIgnored private var isInPictureInPicture = false
     @ObservationIgnored private lazy var hostingView: NSView = {
         let view = StubHostingView(rootView: StubPageView(page: self))
         view.sizingOptions = []
@@ -152,8 +163,43 @@ final class StubPage: Page {
         }
     }
 
+    func toggleVideo() {
+        isPlayingVideo.toggle()
+        hasPlayedVideo = true
+    }
+
+    /// As the engine: one controller for the page's life, shown and hidden as picture-in-picture starts and ends,
+    /// and a paused video may enter too.
+    func requestPictureInPicture() -> Bool {
+        guard hasPlayedVideo, !isInPictureInPicture else { return false }
+        if pictureInPictureController == nil {
+            let view = NSHostingView(rootView: StubVideoView())
+            view.sizingOptions = []
+            let controller = PictureInPictureController(
+                view: view, sourceBounds: CGRect(x: 0, y: 0, width: 640, height: 360))
+            pictureInPictureController = controller
+            continuation?.yield(.pictureInPicture(.created(controller)))
+        }
+        isInPictureInPicture = true
+        continuation?.yield(.pictureInPicture(.resolutionChanged(CGSize(width: 1280, height: 720))))
+        continuation?.yield(.pictureInPicture(.show))
+        return true
+    }
+
+    func exitPictureInPicture(pausing: Bool) -> Bool {
+        guard isInPictureInPicture else { return false }
+        isInPictureInPicture = false
+        if pausing { isPlayingVideo = false }
+        continuation?.yield(.pictureInPicture(.hide))
+        return true
+    }
+
     func drop() {
         load?.cancel()
+        if pictureInPictureController != nil {
+            pictureInPictureController = nil
+            continuation?.yield(.pictureInPicture(.destroyed))
+        }
         if Self.activePages[windowID]?.page === self { Self.activePages[windowID] = nil }
         continuation?.finish()
         continuation = nil
@@ -542,6 +588,7 @@ private struct StubPageView: View {
                             Button("Download a file") { page.download() }
                             Button("Download a file that fails") { page.download(failing: true) }
                             Button("Add an extension") { page.addExtension() }
+                            Button(page.isPlayingVideo ? "Pause the video" : "Play a video") { page.toggleVideo() }
                         }
                     }
                     .buttonStyle(.link)
@@ -552,6 +599,17 @@ private struct StubPageView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .textBackgroundColor))
+    }
+}
+
+private struct StubVideoView: View {
+    var body: some View {
+        ZStack {
+            Color.black
+            Text("Stub video")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.7))
+        }
     }
 }
 
