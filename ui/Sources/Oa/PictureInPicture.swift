@@ -54,6 +54,10 @@ final class PictureInPicture {
             if shownPageID == pageID { window.videoSize = size }
         case .show:
             guard let session = sessions[pageID], let controller = session.controller else { return }
+            // The page was shown again while the engine was still entering, when there was nothing to exit.
+            if session.state == .pendingHidden, let page = page(pageID) {
+                return exit(page, pausing: false, to: .pendingHidden)
+            }
             sessions[pageID]?.state = .active
             shownPageID = pageID
             window.show(controller.view, videoSize: session.videoSize)
@@ -123,10 +127,12 @@ final class PictureInPicture {
         exit(page, pausing: true, to: .userRequestedClose)
     }
 
-    /// The engine's `hide` follows and takes the window down.
+    /// The engine's `hide` follows and takes the window down. A request the engine hasn't entered yet can't be
+    /// ended; its state stays, and its `show` ends it.
     private func exit(_ page: any Page, pausing: Bool, to state: SessionState) {
+        let isEntering = sessions[page.id]?.state == .pendingActive
         sessions[page.id]?.state = state
-        if !page.mediaSession.exitPictureInPicture(pausing: pausing) {
+        if !page.mediaSession.exitPictureInPicture(pausing: pausing), !isEntering {
             sessions[page.id]?.state = .closeFailed
             dismiss(page.id)
         }
