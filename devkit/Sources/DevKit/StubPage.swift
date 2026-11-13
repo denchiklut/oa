@@ -589,6 +589,7 @@ private struct StubPageView: View {
                             Button("Download a file that fails") { page.download(failing: true) }
                             Button("Add an extension") { page.addExtension() }
                             Button(page.isPlayingVideo ? "Pause the video" : "Play a video") { page.toggleVideo() }
+                            Button("Ask for picture-in-picture") { _ = page.requestPictureInPicture() }
                         }
                     }
                     .buttonStyle(.link)
