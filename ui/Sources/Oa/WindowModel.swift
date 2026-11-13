@@ -188,6 +188,12 @@ final class WindowModel {
 
     func runExtension(_ id: ExtensionAction.ID) { browser?.runExtensionAction(id) }
 
+    func togglePin(of action: ExtensionAction) {
+        browser?.setExtensionPinned(action.pinnedPosition == nil, id: action.id)
+    }
+
+    func showExtensionMenu(for id: ExtensionAction.ID) { browser?.showExtensionMenu(for: id) }
+
     private func ensureBrowser(for profileID: UUID) {
         guard browsers[profileID] == nil else { return }
         let browser = engine.browserContext(id: profileID).browser(windowID: id)
