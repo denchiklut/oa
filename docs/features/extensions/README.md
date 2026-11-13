@@ -36,10 +36,12 @@ re-enable an extension or grant it more permissions are declined for now.
   Extension…, which opens the store's extensions page in a new tab, and Manage
   Extensions…, which opens `chrome://extensions`.
 - **Site Controls.** An Extensions section as Arc's: 48×32 tiles four to a
-  row, each with a pin badge on its corner that toggles the pin, then "+" for
-  the store. A click runs the action. The "…" menu has Manage Extensions… and
-  Add Extension… too. The badge of an unpinned extension is grey, Oa's own:
-  no Arc capture shows one.
+  row, then "+" for the store. A click runs the action. A pinned extension
+  carries a pin badge on its tile's corner; one that isn't shows a pale badge
+  only while its tile is under the pointer, and a click on either toggles the
+  pin. While the pointer is over the section, "Manage" shows at the end of its
+  header line and opens `chrome://extensions`. The "…" menu has Manage
+  Extensions… and Add Extension… too.
 - **The extension's menu.** A right-click on a tile shows Chrome's own menu
   for the action as a native menu, with Arc's wording and order for the
   removal and the pin: Remove from Oa, then Pin or Unpin.
