@@ -41,13 +41,20 @@ struct BrowserWindowView: View {
                 DialogView(model: model, dialog: dialog).id(ObjectIdentifier(dialog))
             }
         }
+        .overlay {
+            if let request = model.extensionRequest {
+                ExtensionRequestView(model: model, request: request).id(ObjectIdentifier(request))
+            }
+        }
         .onChange(of: model.page?.id) { _, _ in
             DispatchQueue.main.async {
-                guard let page = model.page, model.dialog == nil, model.commandBar == nil else { return }
+                guard let page = model.page, model.dialog == nil, model.extensionRequest == nil,
+                    model.commandBar == nil
+                else { return }
                 (model.peek ?? page).activate()
             }
         }
-        .onChange(of: model.dialog == nil) { _, none in
+        .onChange(of: model.dialog == nil && model.extensionRequest == nil) { _, none in
             if none, model.commandBar == nil { model.frontPage?.activate() }
         }
     }

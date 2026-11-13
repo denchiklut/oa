@@ -33,6 +33,8 @@ final class WindowModel {
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
     private(set) var permissionRequests: [UUID: [PagePermissionRequest]] = [:]
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
+    /// By page, as Arc's ADK queues an install consent on its page.
+    private(set) var extensionRequests: [UUID: [PageExtensionRequest]] = [:]
     /// By profile, as ADK keeps a browser per window and profile: from the window's first page in the profile on.
     private(set) var browsers: [UUID: any Browser] = [:]
     private(set) var commandBar: CommandBar?
@@ -70,6 +72,11 @@ final class WindowModel {
     var permissionRequest: PagePermissionRequest? {
         guard let page = frontPage, answeredPermissionRequest?.pageID != page.id else { return nil }
         return permissionRequests[page.id]?.first
+    }
+    /// Over the whole window, as a dialog is. Oa's own: it waits with its page while another tab is shown; what Arc
+    /// does with it on a tab switch is unknown.
+    var extensionRequest: PageExtensionRequest? {
+        [peek, page].lazy.compactMap { $0.flatMap { self.extensionRequests[$0.id]?.first } }.first
     }
     /// The selected tab's profile, else the Space's: whose extensions the window shows.
     private var profileID: UUID? {
@@ -193,6 +200,18 @@ final class WindowModel {
     }
 
     func showExtensionMenu(for id: ExtensionAction.ID) { browser?.showExtensionMenu(for: id) }
+
+    func respond(to request: PageExtensionRequest, accepted: Bool) {
+        forget(request)
+        request.respond(accepted)
+    }
+
+    private func forget(_ request: PageExtensionRequest) {
+        for (pageID, requests) in extensionRequests where requests.contains(where: { $0 === request }) {
+            extensionRequests[pageID] = requests.filter { $0 !== request }
+            if extensionRequests[pageID]?.isEmpty == true { extensionRequests[pageID] = nil }
+        }
+    }
 
     private func ensureBrowser(for profileID: UUID) {
         guard browsers[profileID] == nil else { return }
@@ -645,6 +664,7 @@ final class WindowModel {
         peeks = [:]
         dialogs = [:]
         permissionRequests = [:]
+        extensionRequests = [:]
         browserListeners.forEach { $0.cancel() }
         browserListeners = []
         browsers = [:]
@@ -885,6 +905,11 @@ final class WindowModel {
         case .permissionRequestClosed(let request):
             for window in store.windows { window.forget(request) }
             return
+        case .extensionRequest(let request):
+            extensionRequests[pageID, default: []].append(request)
+            return
+        case .extensionRequestClosed(let request):
+            return forget(request)
         case .closeCancelled:
             return closeCancelled(pageID)
         default:
@@ -937,6 +962,7 @@ final class WindowModel {
         guard let page = peeks.removeValue(forKey: ownerID) else { return }
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
+        extensionRequests[page.id] = nil
         if store.closing.removeValue(forKey: page.id) != nil, state.tree.tab(ownerID) != nil {
             let spaceID = state.space(containing: ownerID)?.id
             store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
@@ -1038,6 +1064,7 @@ final class WindowModel {
         guard let page = pages[tabID] else { return }
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
+        extensionRequests[page.id] = nil
         let reason = store.closing.removeValue(forKey: page.id)
         if state.isFavorite(tabID) {
             release(tabID)
