@@ -8,6 +8,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "oa/public/autocomplete.h"
+#include "oa/public/browser.h"
 #include "oa/public/downloads.h"
 #include "oa/public/engine.h"
 #include "oa/public/extensions.h"
@@ -69,6 +70,17 @@
 @interface OAExtensions ()
 - (instancetype)initWithProfileIdentifier:(NSString*)identifier;
 - (id<OAExtensionsDelegate>)target;
+@end
+
+@interface OAExtensionToolbarAction ()
+- (instancetype)initWithAction:(const oa::ExtensionToolbarAction&)action;
+@end
+
+@interface OABrowser ()
+- (instancetype)initWithWindowIdentifier:(NSString*)windowIdentifier
+                       profileIdentifier:(NSString*)profileIdentifier
+                                delegate:(id<OABrowserDelegate>)delegate;
+- (id<OABrowserDelegate>)target;
 @end
 
 @interface OAAutocompleteMatch ()
@@ -1122,6 +1134,120 @@ class ExtensionsObserverBridge : public oa::Extensions::Observer {
 
 @end
 
+@implementation OAExtensionToolbarAction
+
+@synthesize identifier = _identifier;
+@synthesize accessibleName = _accessibleName;
+@synthesize tooltip = _tooltip;
+@synthesize icon = _icon;
+@synthesize enabled = _enabled;
+@synthesize pinnedPosition = _pinnedPosition;
+
+- (instancetype)initWithAction:(const oa::ExtensionToolbarAction&)action {
+  if ((self = [super init])) {
+    _identifier = ToNSString(action.id);
+    _accessibleName = ToNSString(action.accessible_name);
+    _tooltip = ToNSString(action.tooltip);
+    _icon = (__bridge NSImage*)action.icon.get();
+    _enabled = action.enabled;
+    _pinnedPosition = action.pinned_position;
+  }
+  return self;
+}
+
+@end
+
+namespace {
+
+class BrowserObserverBridge : public oa::Browser::Observer {
+ public:
+  explicit BrowserObserverBridge(OABrowser* browser) : browser_(browser) {}
+  void OnExtensionToolbarActionsChanged(
+      const std::vector<oa::ExtensionToolbarAction>& actions) override {
+    NSMutableArray<OAExtensionToolbarAction*>* items = [NSMutableArray array];
+    for (const oa::ExtensionToolbarAction& action : actions) {
+      [items
+          addObject:[[OAExtensionToolbarAction alloc] initWithAction:action]];
+    }
+    OABrowser* browser = browser_;
+    [browser.target browser:browser didUpdateExtensionToolbarActions:items];
+  }
+  void OnExtensionPopupOpened(const std::string& extension_id,
+                              void* ns_view,
+                              int width,
+                              int height) override {
+    OABrowser* browser = browser_;
+    [browser.target browser:browser
+        didOpenExtensionPopup:ToNSString(extension_id)
+                         view:(__bridge NSView*)ns_view
+                         size:NSMakeSize(width, height)];
+  }
+  void OnExtensionPopupResized(int width, int height) override {
+    OABrowser* browser = browser_;
+    [browser.target browser:browser
+        didResizeExtensionPopup:NSMakeSize(width, height)];
+  }
+  void OnExtensionPopupClosed() override {
+    OABrowser* browser = browser_;
+    [browser.target browserDidCloseExtensionPopup:browser];
+  }
+
+ private:
+  __weak OABrowser* browser_;
+};
+
+}  // namespace
+
+@implementation OABrowser {
+  __weak id<OABrowserDelegate> _delegate;
+  std::unique_ptr<BrowserObserverBridge> _observer;
+  std::unique_ptr<oa::Browser> _browser;
+}
+
+- (instancetype)initWithWindowIdentifier:(NSString*)windowIdentifier
+                       profileIdentifier:(NSString*)profileIdentifier
+                                delegate:(id<OABrowserDelegate>)delegate {
+  if ((self = [super init])) {
+    _delegate = delegate;
+    _observer = std::make_unique<BrowserObserverBridge>(self);
+    _browser =
+        oa::ObserveBrowser(windowIdentifier.UTF8String ?: "",
+                           profileIdentifier.UTF8String ?: "", _observer.get());
+  }
+  return self;
+}
+
+- (void)dealloc {
+  // Before the observer it reports to.
+  _browser.reset();
+}
+
+- (id<OABrowserDelegate>)target {
+  return _delegate;
+}
+
+- (void)executeExtensionAction:(NSString*)identifier {
+  _browser->ExecuteExtensionAction(identifier.UTF8String ?: "");
+}
+
+- (void)setExtension:(NSString*)identifier pinned:(BOOL)pinned {
+  _browser->SetExtensionPinned(identifier.UTF8String ?: "", pinned);
+}
+
+- (void)showExtensionContextMenu:(NSString*)identifier {
+  _browser->ShowExtensionContextMenu(identifier.UTF8String ?: "");
+}
+
+- (void)focusExtensionPopup {
+  _browser->FocusExtensionPopup();
+}
+
+- (void)closeExtensionPopup {
+  _browser->CloseExtensionPopup();
+}
+
+@end
+
 @implementation OAProfile {
   NSString* _identifier;
 }
@@ -1175,6 +1301,13 @@ class ExtensionsObserverBridge : public oa::Extensions::Observer {
 
 - (OAAutocomplete*)makeAutocomplete {
   return [[OAAutocomplete alloc] initWithProfileIdentifier:_identifier];
+}
+
+- (OABrowser*)browserInWindow:(NSString*)windowIdentifier
+                     delegate:(id<OABrowserDelegate>)delegate {
+  return [[OABrowser alloc] initWithWindowIdentifier:windowIdentifier
+                                   profileIdentifier:_identifier
+                                            delegate:delegate];
 }
 
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url {

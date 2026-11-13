@@ -20,8 +20,10 @@
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "content/public/browser/web_contents.h"
+#include "oa/browser/browser_impl.h"
 #include "oa/browser/page_impl.h"
 #include "oa/browser/ui/browser_window_impl.h"
+#include "oa/browser/ui/extensions_container_impl.h"
 #include "ui/base/window_open_disposition.h"
 
 namespace oa {
@@ -118,6 +120,7 @@ WindowBrowser* WindowBrowser::GetOrCreate(const std::string& window_id,
   BrowserWindowImpl* window = BrowserWindowImpl::FromBrowser(browser);
   CHECK(window) << "BrowserWindowImpl::InstallFactory() wasn't called";
   window->window_browser()->window_id_ = window_id;
+  window->window_browser()->extensions_container_->ReportActions();
   return window->window_browser();
 }
 
@@ -165,12 +168,14 @@ void WindowBrowser::CloseAll() {
 }
 
 WindowBrowser::WindowBrowser(BrowserWindowInterface* browser)
-    : browser_(browser) {
+    : browser_(browser),
+      extensions_container_(std::make_unique<ExtensionsContainerImpl>(this)) {
   browser_->GetTabStripModel()->AddObserver(this);
   AllWindowBrowsers().push_back(this);
 }
 
 WindowBrowser::~WindowBrowser() {
+  extensions_container_.reset();
   std::erase(AllWindowBrowsers(), this);
   browser_->GetTabStripModel()->RemoveObserver(this);
 }
@@ -181,6 +186,12 @@ gfx::NativeWindow WindowBrowser::GetNativeWindow() const {
   }
   return gfx::NativeWindow(
       [AttachedWindows() objectForKey:base::SysUTF8ToNSString(window_id_)]);
+}
+
+Browser::Observer* WindowBrowser::observer() const {
+  return window_id_.empty()
+             ? nullptr
+             : FindBrowserObserver(window_id_, browser_->GetProfile());
 }
 
 bool WindowBrowser::Insert(std::unique_ptr<content::WebContents> contents) {
@@ -277,6 +288,9 @@ void WindowBrowser::OnTabStripModelChanged(
     case TabStripModelChange::kInserted:
     case TabStripModelChange::kMoved:
       break;
+  }
+  if (selection.active_tab_changed()) {
+    extensions_container_->ReportActions();
   }
 }
 

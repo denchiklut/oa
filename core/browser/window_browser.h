@@ -8,6 +8,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "oa/public/browser.h"
 #include "ui/gfx/native_ui_types.h"
 
 class BrowserWindowInterface;
@@ -22,6 +23,8 @@ class TabModel;
 }
 
 namespace oa {
+
+class ExtensionsContainerImpl;
 
 // One Oa window's //chrome Browser in one profile. Owned by its
 // BrowserWindowImpl, so it lives exactly as long as the Browser.
@@ -44,6 +47,11 @@ class WindowBrowser : public TabStripModelObserver {
   BrowserWindowInterface* browser() const { return browser_; }
   const std::string& window_id() const { return window_id_; }
   gfx::NativeWindow GetNativeWindow() const;
+  ExtensionsContainerImpl* extensions_container() const {
+    return extensions_container_.get();
+  }
+  // The app's observer for this window and profile, if it has one now.
+  Browser::Observer* observer() const;
 
   bool Insert(std::unique_ptr<content::WebContents> contents);
   std::unique_ptr<tabs::TabModel> Detach(content::WebContents* contents);
@@ -65,6 +73,7 @@ class WindowBrowser : public TabStripModelObserver {
 
  private:
   const raw_ptr<BrowserWindowInterface> browser_;
+  std::unique_ptr<ExtensionsContainerImpl> extensions_container_;
   std::string window_id_;
   bool closing_ = false;
   bool activating_ = false;

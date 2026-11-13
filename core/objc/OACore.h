@@ -310,6 +310,49 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)uninstallExtensionWithIdentifier:(NSString*)identifier;
 @end
 
+// An extension's toolbar action for a window's active page, as ArcCore's
+// ArcExtensionToolbarAction.
+@interface OAExtensionToolbarAction : NSObject
+@property(nonatomic, readonly) NSString* identifier;
+@property(nonatomic, readonly) NSString* accessibleName;
+@property(nonatomic, readonly) NSString* tooltip;
+// With the badge drawn in.
+@property(nonatomic, readonly, nullable) NSImage* icon;
+@property(nonatomic, readonly, getter=isEnabled) BOOL enabled;
+// Among Chrome's pinned extensions; -1 when it isn't pinned.
+@property(nonatomic, readonly) NSInteger pinnedPosition;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+@class OABrowser;
+
+@protocol OABrowserDelegate <NSObject>
+// The whole list, after any of it changed and when the active page did.
+- (void)browser:(OABrowser*)browser
+    didUpdateExtensionToolbarActions:
+        (NSArray<OAExtensionToolbarAction*>*)actions;
+// An action's popup page has loaded. The engine keeps `view` until the popup
+// closes; one popup shows at a time.
+- (void)browser:(OABrowser*)browser
+    didOpenExtensionPopup:(NSString*)extensionIdentifier
+                     view:(NSView*)view
+                     size:(NSSize)size;
+- (void)browser:(OABrowser*)browser didResizeExtensionPopup:(NSSize)size;
+- (void)browserDidCloseExtensionPopup:(OABrowser*)browser;
+@end
+
+// One window's side in one profile, as ArcCore's ArcBrowser.
+@interface OABrowser : NSObject
+- (instancetype)init NS_UNAVAILABLE;
+// As a click on its toolbar button, for the window's active page.
+- (void)executeExtensionAction:(NSString*)identifier;
+- (void)setExtension:(NSString*)identifier pinned:(BOOL)pinned;
+// Chrome's menu for the action, at the mouse.
+- (void)showExtensionContextMenu:(NSString*)identifier;
+- (void)focusExtensionPopup;
+- (void)closeExtensionPopup;
+@end
+
 @interface OAProfile : NSObject
 @property(nonatomic, readonly) OADownloads* downloads;
 @property(nonatomic, readonly) OAPreferences* preferences;
@@ -320,6 +363,10 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url;
 // Loads the profile if needed. ArcCore keeps one per window.
 - (OAAutocomplete*)makeAutocomplete;
+// Loads the profile if needed and reports to `delegate`, held weakly, until
+// the result is released. The app keeps one per window and profile.
+- (OABrowser*)browserInWindow:(NSString*)windowIdentifier
+                     delegate:(id<OABrowserDelegate>)delegate;
 // Creates a page in the window's Browser for this profile, loading the profile
 // first if needed. The page starts in the background with nothing loaded, or
 // with the history of a closed page's `sessionID` (not -1) and `restored`;
