@@ -107,19 +107,21 @@ struct BrowserWindowView: View {
                         .padding(.horizontal, 2)
                 }
             }
-            // Arc's Site Controls button, which its permission prompt hangs from too. Oa's own: nothing to control
-            // on a page that isn't a website.
+            // Arc's Site Controls button, which its permission prompt hangs from too, on websites and Arc's own
+            // pages. Oa's own: disabled on other pages, which Arc's research didn't cover.
             Button {
                 showingSiteControls = true
             } label: {
                 Image(systemName: "slider.horizontal.3")
             }
-            .disabled(!["http", "https"].contains(page?.url?.scheme))
+            .disabled(!["http", "https", "chrome"].contains(page?.url?.scheme))
             // As Arc: another tab or another site closes it, a navigation within the site doesn't. Where Arc draws
             // the site's edge is unknown; the host is Oa's own.
             .onChange(of: [page?.id.uuidString, page?.url?.host()]) { showingSiteControls = false }
             .popover(isPresented: $showingSiteControls, arrowEdge: .bottom) {
-                SiteControlsView(model: model, isSecure: page?.securityLevel == .secure) {
+                SiteControlsView(
+                    model: model, isSecure: page?.securityLevel == .secure, isInternal: page?.url?.scheme == "chrome"
+                ) {
                     showingSiteControls = false
                 }
             }

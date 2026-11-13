@@ -7,6 +7,7 @@ import SwiftUI
 struct SiteControlsView: View {
     let model: WindowModel
     let isSecure: Bool
+    let isInternal: Bool
     let dismiss: () -> Void
 
     var body: some View {
@@ -14,35 +15,38 @@ struct SiteControlsView: View {
             ExtensionsSection(model: model, dismiss: dismiss)
                 .padding(.bottom, 15)
             SettingsSection(model: model, dismiss: dismiss)
-            Divider().padding(.top, 8).padding(.bottom, 10)
-            HStack {
-                Label(isSecure ? "Secure" : "Insecure", systemImage: isSecure ? "lock.fill" : "lock.slash.fill")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(isSecure ? AnyShapeStyle(.primary) : AnyShapeStyle(Color.orange))
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-                Spacer()
-                Menu {
-                    Button("Manage Extensions…") {
-                        dismiss()
-                        model.manageExtensions()
+            // As Arc: none on its own pages.
+            if !isInternal {
+                Divider().padding(.top, 8).padding(.bottom, 10)
+                HStack {
+                    Label(isSecure ? "Secure" : "Insecure", systemImage: isSecure ? "lock.fill" : "lock.slash.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(isSecure ? AnyShapeStyle(.primary) : AnyShapeStyle(Color.orange))
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                    Spacer()
+                    Menu {
+                        Button("Manage Extensions…") {
+                            dismiss()
+                            model.manageExtensions()
+                        }
+                        Button("Add Extension…") {
+                            dismiss()
+                            model.addExtension()
+                        }
+                        Button("All Site Settings…") { openAllSiteSettings() }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(width: 28, height: 28)
+                            .background(.primary.opacity(0.06), in: Circle())
                     }
-                    Button("Add Extension…") {
-                        dismiss()
-                        model.addExtension()
-                    }
-                    Button("All Site Settings…") { openAllSiteSettings() }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 13, weight: .bold))
-                        .frame(width: 28, height: 28)
-                        .background(.primary.opacity(0.06), in: Circle())
+                    .menuStyle(.button)
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
                 }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
             }
         }
         .padding(10)
