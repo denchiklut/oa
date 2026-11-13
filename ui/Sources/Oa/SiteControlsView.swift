@@ -12,11 +12,7 @@ struct SiteControlsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Extensions")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 10)
-            ExtensionGrid(model: model, dismiss: dismiss)
+            ExtensionsSection(model: model, dismiss: dismiss)
                 .padding(.bottom, 15)
             if !settings.isEmpty {
                 Text("Settings")
@@ -72,41 +68,78 @@ struct SiteControlsView: View {
     }
 }
 
-/// Arc's grid as measured (arc-extensions.md §8b, §9): 48×32 tiles four to a row, 8 pt apart, each extension's
-/// with a 14 pt pin badge on its corner, then "+" for the Chrome Web Store.
-private struct ExtensionGrid: View {
+/// Arc's section as measured (arc-extensions.md §8b, §9): the header, with "Manage" at its end while the pointer is
+/// over the section, then 48×32 tiles four to a row, 8 pt apart, and "+" for the Chrome Web Store.
+private struct ExtensionsSection: View {
     let model: WindowModel
     let dismiss: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        LazyVGrid(
-            columns: Array(repeating: GridItem(.fixed(48), spacing: 8), count: 4), alignment: .leading, spacing: 8
-        ) {
-            ForEach(model.extensionActions) { action in
-                ExtensionTile(help: action.tooltip.isEmpty ? action.name : action.tooltip) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Extensions")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Manage") {
                     dismiss()
-                    model.runExtension(action.id)
-                } menu: {
-                    model.showExtensionMenu(for: action.id)
+                    model.manageExtensions()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .opacity(hovering ? 1 : 0)
+            }
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.fixed(48), spacing: 8), count: 4), alignment: .leading, spacing: 8
+            ) {
+                ForEach(model.extensionActions) { action in
+                    ExtensionActionTile(model: model, action: action, dismiss: dismiss)
+                }
+                ExtensionTile(help: "Add Extension") {
                     dismiss()
+                    model.addExtension()
                 } label: {
-                    if let icon = action.icon {
-                        Image(nsImage: icon).opacity(action.isEnabled ? 1 : 0.4)
-                    } else {
-                        Image(systemName: "puzzlepiece.extension.fill")
-                    }
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    PinBadge(pinned: action.pinnedPosition != nil) { model.togglePin(of: action) }
-                        .offset(x: 4, y: 4)
+                    Image(systemName: "plus").font(.system(size: 13, weight: .semibold))
                 }
             }
-            ExtensionTile(help: "Add Extension") {
-                dismiss()
-                model.addExtension()
-            } label: {
-                Image(systemName: "plus").font(.system(size: 13, weight: .semibold))
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+    }
+}
+
+/// An extension's tile with its pin on the corner: always for a pinned one, only under the pointer otherwise, as Arc
+/// shows it.
+private struct ExtensionActionTile: View {
+    let model: WindowModel
+    let action: ExtensionAction
+    let dismiss: () -> Void
+    @State private var overTile = false
+    @State private var overPin = false
+
+    var body: some View {
+        let pinned = action.pinnedPosition != nil
+        ExtensionTile(help: action.tooltip.isEmpty ? action.name : action.tooltip) {
+            dismiss()
+            model.runExtension(action.id)
+        } menu: {
+            model.showExtensionMenu(for: action.id)
+            dismiss()
+        } label: {
+            if let icon = action.icon {
+                Image(nsImage: icon).opacity(action.isEnabled ? 1 : 0.4)
+            } else {
+                Image(systemName: "puzzlepiece.extension.fill")
             }
+        }
+        .onHover { overTile = $0 }
+        .overlay(alignment: .bottomTrailing) {
+            PinBadge(pinned: pinned) { model.togglePin(of: action) }
+                .onHover { overPin = $0 }
+                .offset(x: 4, y: 4)
+                .opacity(pinned || overTile || overPin ? 1 : 0)
         }
     }
 }
@@ -132,7 +165,7 @@ private struct ExtensionTile<Label: View>: View {
     }
 }
 
-/// Oa's own for an extension that isn't pinned, which no Arc capture shows: the same badge in grey.
+/// Solid for a pinned extension, pale for one that isn't, as Arc draws them.
 private struct PinBadge: View {
     let pinned: Bool
     let toggle: () -> Void
@@ -143,10 +176,10 @@ private struct PinBadge: View {
                 .font(.system(size: 7, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 14, height: 14)
-                .background(pinned ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary), in: Circle())
+                .background(Color.accentColor.opacity(pinned ? 1 : 0.4), in: Circle())
         }
         .buttonStyle(.plain)
-        .help(pinned ? "Unpin Extension" : "Pin Extension")
+        .help(pinned ? "Unpin" : "Pin")
     }
 }
 
