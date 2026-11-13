@@ -48,8 +48,6 @@ struct SidebarArchivedTab: Identifiable, Hashable, Codable {
     let spaceID: UUID?
     let archivedAt: Date
     let reason: Reason
-    /// Its index in the unpinned section; nil for a pinned tab archived with its Space, and for a Favorite.
-    let position: Int?
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
 
@@ -116,6 +114,13 @@ struct SidebarTree {
     }
 
     func tabs(under id: UUID) -> [SidebarTab] { descendants(of: id).compactMap(\.tab) }
+
+    func location(of id: UUID) -> (parentID: UUID, index: Int)? {
+        guard let parentID = items[id]?.parentID, let index = items[parentID]?.childIDs.firstIndex(of: id) else {
+            return nil
+        }
+        return (parentID, index)
+    }
 
     mutating func addRoot(_ container: SidebarItem.Container, id: UUID) {
         items[id] = SidebarItem(id: id, kind: .container(container))
@@ -335,32 +340,37 @@ struct SidebarState {
     mutating func archiveTab(_ id: UUID, reason: SidebarArchivedTab.Reason, at date: Date = .now) {
         guard let tab = tree.tab(id) else { return }
         let space = space(containing: id)
-        let position = space.flatMap { tree[$0.unpinnedRootID]?.childIDs.firstIndex(of: id) }
         tree.remove(id)
         archive.append(
             SidebarArchivedTab(
-                id: id, title: tab.title, url: tab.url, spaceID: space?.id, archivedAt: date, reason: reason,
-                position: position))
+                id: id, title: tab.title, url: tab.url, spaceID: space?.id, archivedAt: date, reason: reason))
     }
 
-    /// A page without a row, a Peek's. No position, so it restores at the top of the section.
+    /// A page without a row, a Peek's.
     mutating func archivePage(id: UUID, title: String, url: URL?, in spaceID: UUID?, at date: Date = .now) {
         archive.append(
-            SidebarArchivedTab(
-                id: id, title: title, url: url, spaceID: spaceID, archivedAt: date, reason: .manual, position: nil))
+            SidebarArchivedTab(id: id, title: title, url: url, spaceID: spaceID, archivedAt: date, reason: .manual))
     }
 
-    /// Into `fallbackSpaceID` when its Space is gone. Returns the Space it went to.
-    @discardableResult
-    mutating func restoreArchived(_ id: UUID, in fallbackSpaceID: UUID, toOldPosition: Bool) -> UUID? {
-        guard let index = archive.firstIndex(where: { $0.id == id }) else { return nil }
+    /// To the top of its Space, as Arc's Restore; into `fallbackSpaceID` when its Space is gone.
+    mutating func restoreArchived(_ id: UUID, in fallbackSpaceID: UUID) {
+        guard let index = archive.firstIndex(where: { $0.id == id }) else { return }
         let entry = archive.remove(at: index)
-        guard let space = entry.spaceID.flatMap({ space($0) }) ?? space(fallbackSpaceID) else { return nil }
+        guard let space = entry.spaceID.flatMap({ space($0) }) ?? space(fallbackSpaceID) else { return }
         let tab = SidebarTab(id: entry.id, title: entry.title, url: entry.url, viewedAt: .now)
-        tree.insert(
-            SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID,
-            at: toOldPosition ? entry.position ?? 0 : 0)
-        return space.id
+        tree.insert(SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID, at: 0)
+    }
+
+    /// As Arc's ⇧⌘T: back where it was, or at the top of `fallbackSpaceID` when that place is gone, and out of the
+    /// Archive if it is still there.
+    mutating func reopenTab(_ tab: SidebarTab, in parentID: UUID, at index: Int, else fallbackSpaceID: UUID) {
+        archive.removeAll { $0.id == tab.id }
+        let item = SidebarItem(id: tab.id, kind: .tab(tab))
+        if tree[parentID] != nil {
+            tree.insert(item, into: parentID, at: index)
+        } else if let space = space(fallbackSpaceID) {
+            tree.insert(item, into: space.unpinnedRootID, at: 0)
+        }
     }
 
     mutating func removeArchived(_ id: UUID) {

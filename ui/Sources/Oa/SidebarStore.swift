@@ -17,11 +17,9 @@ final class SidebarStore {
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
     @ObservationIgnored private var sweep: Task<Void, Never>?
     @ObservationIgnored private var frozen = false
-    /// Pages the user asked to close, by page ID, until the page reports closed or kept.
-    @ObservationIgnored var closing: [UUID: SidebarArchivedTab.Reason] = [:]
+    /// Pages asked to close, by page ID, until the page reports closed or kept.
+    @ObservationIgnored var closing: [UUID: CloseRequest] = [:]
     @ObservationIgnored var deletingSpace: ClosingSpace?
-    /// In memory only, as Arc's ⇧⌘T list is gone after a relaunch.
-    @ObservationIgnored var sessionIDs: [UUID: PageSessionID] = [:]
     @ObservationIgnored let commandBarPicks: CommandBarPicks
 
     init(directory: URL) {
@@ -37,10 +35,6 @@ final class SidebarStore {
         let profiles = state.profiles.map(\.id)
         change(&state)
         if state.profiles.map(\.id) != profiles { commandBarPicks.prune(keeping: state.profiles.map(\.id)) }
-        if !sessionIDs.isEmpty {
-            let archived = Set(state.archive.map(\.id))
-            sessionIDs = sessionIDs.filter { archived.contains($0.key) }
-        }
         for window in windows { window.reconcile() }
         scheduleSave()
     }
@@ -145,6 +139,16 @@ final class SidebarStore {
     private func save() {
         persistence.save(state, windows: windows.map(\.record))
         favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
+    }
+}
+
+/// Who asked a page to close: the user, from a window, or the auto-archive sweep.
+enum CloseRequest: Equatable {
+    case window(UUID)
+    case auto
+
+    var windowID: UUID? {
+        if case .window(let id) = self { id } else { nil }
     }
 }
 

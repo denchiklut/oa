@@ -64,6 +64,9 @@ final class WindowModel {
     /// By profile: ArcCore keeps one omnibox per window.
     @ObservationIgnored private var autocompletes: [UUID: any Autocomplete] = [:]
     @ObservationIgnored private var browserListeners: [Task<Void, Never>] = []
+    /// As Arc's `ClosedSidebarItemsCache`: what the user closed from this window, a group for each close with a step
+    /// for each tab, the last ten, in memory and gone with the window.
+    @ObservationIgnored private var closedGroups: [[ClosedPage]] = []
     private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
@@ -103,6 +106,7 @@ final class WindowModel {
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }
     var selectableTabs: [SidebarTab] { state.selectableTabs(in: selectedSpaceID) }
+    var canRestoreLastClosed: Bool { !closedGroups.isEmpty }
 
     var record: WindowRecord {
         WindowRecord(
@@ -502,9 +506,9 @@ final class WindowModel {
         guard state.isFavorite(tabID) else { return }
         guard let page = store.windows.lazy.compactMap({ $0.pages[tabID] }).first else {
             for window in store.windows { window.placeholders[tabID] = nil }
-            return store.edit { $0.archiveTab(tabID, reason: .manual) }
+            return archive(tabID, reason: .manual, closedFrom: id, sessionID: nil)
         }
-        store.closing[page.id] = .manual
+        store.closing[page.id] = .window(id)
         page.close()
     }
 
@@ -555,7 +559,7 @@ final class WindowModel {
     }
 
     func restoreArchived(_ id: UUID) {
-        store.edit { $0.restoreArchived(id, in: selectedSpaceID, toOldPosition: false) }
+        store.edit { $0.restoreArchived(id, in: selectedSpaceID) }
         createdDates[id] = .now
     }
 
@@ -606,20 +610,24 @@ final class WindowModel {
     /// Closes as the user would, so a `beforeunload` handler can keep the Peek, as Arc does.
     func closePeek() {
         guard let page = peek else { return }
-        if peekOwnerID != archivePeekID { store.closing[page.id] = .manual }
+        if peekOwnerID != archivePeekID { store.closing[page.id] = .window(id) }
         page.close()
     }
 
-    /// As Arc, with its history; Restore and the Archive Peek load fresh.
+    /// As Arc's `reopenLastClosedTab`: the newest step of this window's newest close. A tab that is open again is
+    /// selected; one that is gone returns where it was with its history. Restore and the Archive Peek load fresh.
     func restoreLastClosed() {
-        guard let entry = state.archive.last else { return }
-        let sessionID = store.sessionIDs[entry.id]
-        var spaceID: UUID?
-        store.edit { spaceID = $0.restoreArchived(entry.id, in: selectedSpaceID, toOldPosition: true) }
-        guard let spaceID else { return }
-        createdDates[entry.id] = .now
-        selectSpace(spaceID)
-        select(entry.id, restoring: sessionID)
+        guard var group = closedGroups.popLast(), let closed = group.popLast() else { return }
+        if !group.isEmpty { closedGroups.append(group) }
+        var sessionID: PageSessionID?
+        if state.tree.tab(closed.id) == nil {
+            let tab = SidebarTab(id: closed.id, title: closed.title, url: closed.url, viewedAt: .now)
+            store.edit { $0.reopenTab(tab, in: closed.parentID, at: closed.index, else: selectedSpaceID) }
+            createdDates[closed.id] = .now
+            sessionID = closed.sessionID
+        }
+        if let spaceID = state.space(containing: closed.id)?.id { selectSpace(spaceID) }
+        select(closed.id, restoring: sessionID)
     }
 
     func deleteArchived(_ id: UUID) {
@@ -642,10 +650,11 @@ final class WindowModel {
             return deselect(tabID)
         }
         let page = store.windows.lazy.compactMap { $0.pages[tabID] }.first
+        let request: CloseRequest = reason == .auto ? .auto : .window(id)
         guard let page, !state.isPinned(tabID) else {
-            return end(tabID, reason: reason) { page, _ in page.drop() }
+            return end(tabID, reason: reason, closedFrom: request.windowID) { page, _ in page.drop() }
         }
-        store.closing[page.id] = reason
+        store.closing[page.id] = request
         page.close()
     }
 
@@ -763,7 +772,7 @@ final class WindowModel {
     }
 
     private func end(
-        _ tabID: UUID, reason: SidebarArchivedTab.Reason, sessionID: PageSessionID? = nil,
+        _ tabID: UUID, reason: SidebarArchivedTab.Reason, closedFrom windowID: UUID?, sessionID: PageSessionID? = nil,
         _ finish: (any Page, Bool) -> Void
     ) {
         guard let spaceID = state.space(containing: tabID)?.id else { return }
@@ -776,15 +785,34 @@ final class WindowModel {
             // As Arc's close: a pinned tab keeps when a window last showed it, not when one made it.
             window.createdDates[tabID] = nil
         }
-        if !pinned {
-            store.edit { $0.archiveTab(tabID, reason: reason) }
-            store.sessionIDs[tabID] = sessionID
-        }
+        if !pinned { archive(tabID, reason: reason, closedFrom: windowID, sessionID: sessionID) }
         if let page { finish(page, pinned) }
         if wasSelected {
             selectedTabIDs[spaceID] = next
             if let next, spaceID == selectedSpaceID { ensurePage(next) }
         }
+    }
+
+    /// A close the user asked for goes on the stack of the window they asked in, as Arc's does. The session ID
+    /// goes with it, Oa's own: Arc keeps it in the window that held the page, so a close from another window comes
+    /// back with a fresh load there.
+    private func archive(
+        _ tabID: UUID, reason: SidebarArchivedTab.Reason, closedFrom windowID: UUID?, sessionID: PageSessionID?
+    ) {
+        let closed = state.tree.tab(tabID).flatMap { tab in
+            state.tree.location(of: tabID).map {
+                ClosedPage(
+                    id: tabID, title: tab.title, url: tab.url, parentID: $0.parentID, index: $0.index,
+                    sessionID: sessionID)
+            }
+        }
+        store.edit { $0.archiveTab(tabID, reason: reason) }
+        if let closed { store.windows.first { $0.id == windowID }?.remember(closed) }
+    }
+
+    private func remember(_ closed: ClosedPage) {
+        closedGroups.append([closed])
+        if closedGroups.count > 10 { closedGroups.removeFirst() }
     }
 
     /// A Favorite's page stays as it is, hidden, as Arc keeps it.
@@ -1030,8 +1058,6 @@ final class WindowModel {
         if store.closing.removeValue(forKey: page.id) != nil, state.tree.tab(ownerID) != nil {
             let spaceID = state.space(containing: ownerID)?.id
             store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
-            // Oa's own: ⇧⌘T brings a Peek back with its history; what Arc's does is unknown.
-            store.sessionIDs[page.id] = sessionID
         }
         if ownerID == archivePeekID { archivePeekID = nil }
         self.page?.activate()
@@ -1129,19 +1155,17 @@ final class WindowModel {
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
         extensionRequests[page.id] = nil
-        let reason = store.closing.removeValue(forKey: page.id)
+        let request = store.closing.removeValue(forKey: page.id)
         if state.isFavorite(tabID) {
             release(tabID)
             for window in store.windows { window.placeholders[tabID] = nil }
-            if reason != nil {
-                store.edit { $0.archiveTab(tabID, reason: .manual) }
-                store.sessionIDs[tabID] = sessionID
-            }
+            if let request { archive(tabID, reason: .manual, closedFrom: request.windowID, sessionID: sessionID) }
             deselect(tabID)
         } else if store.deletingSpace?.closing.contains(page.id) == true {
             release(tabID)
         } else {
-            end(tabID, reason: reason ?? .manual, sessionID: sessionID) { _, _ in }
+            let reason: SidebarArchivedTab.Reason = request == .auto ? .auto : .manual
+            end(tabID, reason: reason, closedFrom: request?.windowID, sessionID: sessionID) { _, _ in }
         }
         spaceDeletionEnded(page.id, kept: false)
     }
