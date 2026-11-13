@@ -1,0 +1,124 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Thu, 12 Nov 2026 19:36:02 -0700
+Subject: [PATCH] oa: let an embedder supply the extension install and
+ uninstall dialogs
+
+Adds ExtensionInstallPrompt::SetShowDialogForEmbedder() and ExtensionUninstallDialog::SetFactoryForEmbedder(). Once set, GetDefaultShowDialogCallback() returns the embedder's function for every install, re-enable and permissions prompt, and ExtensionUninstallDialog::Create() returns the embedder's dialog. Chrome's install dialog is a views dialog modal to a views window and its uninstall dialog is anchored to the extensions toolbar or modal to a views window; an embedder whose Browsers sit in its own AppKit windows has neither.
+---
+ .../browser/extensions/extension_install_prompt.h   | 10 ++++++++++
+ .../browser/extensions/extension_uninstall_dialog.h | 10 ++++++++++
+ .../extensions/extension_uninstall_dialog_impl.cc   | 13 +++++++++++++
+ .../extensions/extension_install_dialog_view.cc     | 12 ++++++++++++
+ 4 files changed, 45 insertions(+)
+
+diff --git a/chrome/browser/extensions/extension_install_prompt.h b/chrome/browser/extensions/extension_install_prompt.h
+index 7edcac89efe1e347d695d529b24b94844d475b2a..3adc4fcf2664b083b20c4dda6ed9fa08d6157532 100644
+--- a/chrome/browser/extensions/extension_install_prompt.h
++++ b/chrome/browser/extensions/extension_install_prompt.h
+@@ -60,6 +60,16 @@ class ExtensionInstallPrompt : public extensions::ExtensionInstallPromptClient {
+   // The implementations of this function are platform-specific.
+   static ShowDialogCallback GetDefaultShowDialogCallback();
+ 
++  // For an embedder that draws its own install dialog. Once a function is set,
++  // GetDefaultShowDialogCallback() returns it for every install, re-enable and
++  // permissions prompt and never builds Chrome's view, which is modal to a
++  // views window. Call it before the browser starts.
++  using EmbedderShowDialog =
++      void (*)(std::unique_ptr<ExtensionInstallPromptShowParams>,
++               DoneCallback,
++               std::unique_ptr<extensions::InstallPromptData>);
++  static void SetShowDialogForEmbedder(EmbedderShowDialog show_dialog);
++
+   // Returns the appropriate prompt type for the given `extension`.
+   // TODO(devlin): This method is yucky - callers probably only care about one
+   // prompt type. We just need to comb through and figure out what it is.
+diff --git a/chrome/browser/extensions/extension_uninstall_dialog.h b/chrome/browser/extensions/extension_uninstall_dialog.h
+index 7d4532e1d9fe888a3c54ef008a8d182c279a75b5..b2ba89a90890baf8e0d904fada12d0186b3f7852 100644
+--- a/chrome/browser/extensions/extension_uninstall_dialog.h
++++ b/chrome/browser/extensions/extension_uninstall_dialog.h
+@@ -69,6 +69,16 @@ class ExtensionUninstallDialog : public ChromeAppIconDelegate,
+   static std::unique_ptr<ExtensionUninstallDialog>
+   Create(Profile* profile, gfx::NativeWindow parent, Delegate* delegate);
+ 
++  // For an embedder that draws its own uninstall dialog. Once a factory is
++  // set, Create() returns the factory's dialog and never builds Chrome's,
++  // which is anchored to its toolbar or modal to a views window. Call it
++  // before the browser starts.
++  using EmbedderFactory =
++      std::unique_ptr<ExtensionUninstallDialog> (*)(Profile* profile,
++                                                    gfx::NativeWindow parent,
++                                                    Delegate* delegate);
++  static void SetFactoryForEmbedder(EmbedderFactory factory);
++
+   ExtensionUninstallDialog(const ExtensionUninstallDialog&) = delete;
+   ExtensionUninstallDialog& operator=(const ExtensionUninstallDialog&) = delete;
+ 
+diff --git a/chrome/browser/ui/extensions/extension_uninstall_dialog_impl.cc b/chrome/browser/ui/extensions/extension_uninstall_dialog_impl.cc
+index 9bc109815092ea77bb4266a9ca5f28d7973a272f..9a36466eb7d50e7f224d9cf46e695a4259687a10 100644
+--- a/chrome/browser/ui/extensions/extension_uninstall_dialog_impl.cc
++++ b/chrome/browser/ui/extensions/extension_uninstall_dialog_impl.cc
+@@ -24,6 +24,10 @@ namespace {
+ 
+ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kCheckboxId);
+ 
++// Set by extensions::ExtensionUninstallDialog::SetFactoryForEmbedder().
++extensions::ExtensionUninstallDialog::EmbedderFactory g_embedder_factory =
++    nullptr;
++
+ // The implementation of the uninstall dialog.
+ class ExtensionUninstallDialogImpl
+     : public extensions::ExtensionUninstallDialog {
+@@ -158,11 +162,20 @@ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(extensions::ExtensionUninstallDialog,
+ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(extensions::ExtensionUninstallDialog,
+                                       kOkButtonElementId);
+ 
++// static
++void extensions::ExtensionUninstallDialog::SetFactoryForEmbedder(
++    EmbedderFactory factory) {
++  g_embedder_factory = factory;
++}
++
+ // static
+ std::unique_ptr<extensions::ExtensionUninstallDialog>
+ extensions::ExtensionUninstallDialog::Create(Profile* profile,
+                                              gfx::NativeWindow parent,
+                                              Delegate* delegate) {
++  if (g_embedder_factory) {
++    return g_embedder_factory(profile, parent, delegate);
++  }
+   return std::make_unique<ExtensionUninstallDialogImpl>(profile, parent,
+                                                         delegate);
+ }
+diff --git a/chrome/browser/ui/views/extensions/extension_install_dialog_view.cc b/chrome/browser/ui/views/extensions/extension_install_dialog_view.cc
+index c193579964c366684083bb95f9d09122e08a771c..2fc0a9501319cbf0bbfa432480cc691b650fbb47 100644
+--- a/chrome/browser/ui/views/extensions/extension_install_dialog_view.cc
++++ b/chrome/browser/ui/views/extensions/extension_install_dialog_view.cc
+@@ -82,6 +82,9 @@ std::u16string GetRatingAccessibleName(double rating, int rating_count) {
+       rating, rating_count);
+ }
+ 
++// Set by ExtensionInstallPrompt::SetShowDialogForEmbedder().
++ExtensionInstallPrompt::EmbedderShowDialog g_embedder_show_dialog = nullptr;
++
+ void ShowExtensionInstallDialogImpl(
+     std::unique_ptr<ExtensionInstallPromptShowParams> show_params,
+     ExtensionInstallPrompt::DoneCallback done_callback,
+@@ -756,8 +759,17 @@ void ExtensionInstallDialogView::EnableInstallButton() {
+ BEGIN_METADATA(ExtensionInstallDialogView)
+ END_METADATA
+ 
++// static
++void ExtensionInstallPrompt::SetShowDialogForEmbedder(
++    EmbedderShowDialog show_dialog) {
++  g_embedder_show_dialog = show_dialog;
++}
++
+ // static
+ ExtensionInstallPrompt::ShowDialogCallback
+ ExtensionInstallPrompt::GetDefaultShowDialogCallback() {
++  if (g_embedder_show_dialog) {
++    return base::BindRepeating(g_embedder_show_dialog);
++  }
+   return base::BindRepeating(&ShowExtensionInstallDialogImpl);
+ }
