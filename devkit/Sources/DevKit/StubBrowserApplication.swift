@@ -42,16 +42,28 @@ final class StubBrowserContext: BrowserContext {
     private let stubDownloads = StubDownloads()
     var downloads: any Downloads { stubDownloads }
     let preferences: any BrowserContextPreferences = StubPreferences()
+    private let stubExtensions = StubExtensions()
+    var extensions: any Extensions { stubExtensions }
+    private var browsers: [UUID: WeakBrowser] = [:]
 
     init(id: UUID) { self.id = id }
 
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
         if let sessionID,
-            let page = StubPage.restore(sessionID, id: UUID(), windowID: windowID, downloads: stubDownloads)
+            let page = StubPage.restore(
+                sessionID, id: UUID(), windowID: windowID, downloads: stubDownloads, extensions: stubExtensions)
         {
             return (page, true)
         }
-        return (StubPage(id: UUID(), windowID: windowID, downloads: stubDownloads), false)
+        return (StubPage(id: UUID(), windowID: windowID, downloads: stubDownloads, extensions: stubExtensions), false)
+    }
+
+    func browser(windowID: UUID) -> any Browser {
+        if let browser = browsers[windowID]?.browser { return browser }
+        let browser = StubBrowser(windowID: windowID, extensions: stubExtensions, downloads: stubDownloads)
+        browsers = browsers.filter { $0.value.browser != nil }
+        browsers[windowID] = WeakBrowser(browser: browser)
+        return browser
     }
 
     func makeAutocomplete() -> any Autocomplete { StubAutocomplete(preferences: preferences) }
@@ -67,6 +79,10 @@ final class StubBrowserContext: BrowserContext {
         guard let host = url.host() else { return }
         StubPage.siteSettings["\(host) \(type)"] = value == .default ? nil : value
     }
+}
+
+private struct WeakBrowser {
+    weak var browser: StubBrowser?
 }
 
 @MainActor

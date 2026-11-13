@@ -30,6 +30,7 @@ final class ChromiumPage: Page {
     @ObservationIgnored private let hostingView = PageHostingView()
     @ObservationIgnored private var dialogs: [ObjectIdentifier: PageDialog] = [:]
     @ObservationIgnored private var permissionRequests: [ObjectIdentifier: PagePermissionRequest] = [:]
+    @ObservationIgnored private var extensionRequests: [ObjectIdentifier: PageExtensionRequest] = [:]
 
     var view: NSView { hostingView }
 
@@ -136,6 +137,25 @@ final class ChromiumPage: Page {
         }
     }
 
+    /// The engine declines a request released unanswered, so this page's go with it.
+    fileprivate func extensionRequested(_ core: CorePageExtensionRequest) {
+        let request = PageExtensionRequest(
+            kind: core.kind == 1 ? .uninstall : .install, extensionID: core.extensionIdentifier, name: core.name,
+            icon: core.icon, permissions: core.permissions
+        ) { [weak self] accepted in
+            self?.extensionRequests.removeValue(forKey: ObjectIdentifier(core))
+            core.respond(accepted)
+        }
+        extensionRequests[ObjectIdentifier(core)] = request
+        continuation.yield(.extensionRequest(request))
+    }
+
+    fileprivate func extensionRequestClosed(_ core: CorePageExtensionRequest) {
+        if let request = extensionRequests.removeValue(forKey: ObjectIdentifier(core)) {
+            continuation.yield(.extensionRequestClosed(request))
+        }
+    }
+
     fileprivate func closeCancelled() {
         if page != nil { continuation.yield(.closeCancelled) }
     }
@@ -152,6 +172,7 @@ final class ChromiumPage: Page {
 
     private func finish() {
         page = nil
+        extensionRequests = [:]
         continuation.finish()
         hostingView.show(nil)
     }
@@ -201,6 +222,14 @@ final class PageDelegate: NSObject, CorePageDelegate {
 
     func page(_ page: CorePage, didClosePermissionRequest request: CorePagePermissionRequest) {
         content?.permissionRequestClosed(request)
+    }
+
+    func page(_ page: CorePage, didRequestExtension request: CorePageExtensionRequest) {
+        content?.extensionRequested(request)
+    }
+
+    func page(_ page: CorePage, didCloseExtensionRequest request: CorePageExtensionRequest) {
+        content?.extensionRequestClosed(request)
     }
 
     func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }

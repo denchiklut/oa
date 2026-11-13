@@ -38,6 +38,113 @@ public protocol BrowserContext: AnyObject {
     var preferences: any BrowserContextPreferences { get }
     /// Chromium's omnibox for this profile. ArcCore keeps one per window.
     func makeAutocomplete() -> any Autocomplete
+    /// As ArcCore's `ArcBrowserContextExtensions`: one per profile, kept current by the engine.
+    var extensions: any Extensions { get }
+    /// The app window's side in this profile, as ADK's `Browser`: one per window and profile, alive while the app
+    /// holds it.
+    func browser(windowID: UUID) -> any Browser
+}
+
+/// A profile's extensions as the engine installs and runs them. Observable: the engine's events change `items`.
+@MainActor
+public protocol Extensions: AnyObject, Observable {
+    /// By name; empty until the profile's extension system is ready.
+    var items: [BrowserExtension] { get }
+    func setEnabled(_ enabled: Bool, id: BrowserExtension.ID)
+    /// Without asking. The engine's own removal paths ask through the page.
+    func uninstall(_ id: BrowserExtension.ID)
+}
+
+/// As ADK's `BrowserExtension`.
+public struct BrowserExtension: Identifiable, Sendable, Equatable {
+    public let id: String
+    public var name: String
+    public var description: String
+    public var version: String
+    public var isEnabled: Bool
+    public var hasAction: Bool
+    public var isFromWebStore: Bool
+
+    public init(
+        id: String, name: String, description: String = "", version: String = "", isEnabled: Bool = true,
+        hasAction: Bool = true, isFromWebStore: Bool = true
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.version = version
+        self.isEnabled = isEnabled
+        self.hasAction = hasAction
+        self.isFromWebStore = isFromWebStore
+    }
+}
+
+/// One app window in one profile, as ADK's `Browser`. Observable: the engine's events change the actions and the
+/// popup.
+@MainActor
+public protocol Browser: AnyObject, Observable {
+    /// The extensions' toolbar actions for the window's selected page, by name, as ADK's toolbar action details.
+    var extensionActions: [ExtensionAction] { get }
+    /// The popup an action opened, until it closes. One shows at a time.
+    var extensionPopup: ExtensionPopup? { get }
+    var events: AsyncStream<BrowserEvent> { get }
+    /// As a click on its toolbar button: its popup, its click event or its side panel.
+    func runExtensionAction(_ id: ExtensionAction.ID)
+    func setExtensionPinned(_ pinned: Bool, id: ExtensionAction.ID)
+    /// The engine's menu for the action, at the mouse.
+    func showExtensionMenu(for id: ExtensionAction.ID)
+    func closeExtensionPopup()
+}
+
+public enum BrowserEvent {
+    /// The engine put a page in the window itself, as an extension's `chrome.tabs.create` does. The app installs it
+    /// under a tab, or drops it.
+    case opened(any Page, isActive: Bool)
+}
+
+/// As ADK's `BrowserExtensionToolbarActionDetails` with its toolbar position.
+public struct ExtensionAction: Identifiable, Equatable {
+    public let id: String
+    public var name: String
+    public var tooltip: String
+    /// With the badge drawn in.
+    public var icon: NSImage?
+    public var isEnabled: Bool
+    /// Among the profile's pinned extensions; nil when it isn't pinned.
+    public var pinnedPosition: Int?
+
+    public init(
+        id: String, name: String, tooltip: String = "", icon: NSImage? = nil, isEnabled: Bool = true,
+        pinnedPosition: Int? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.tooltip = tooltip
+        self.icon = icon
+        self.isEnabled = isEnabled
+        self.pinnedPosition = pinnedPosition
+    }
+}
+
+/// An action's popup page, as ADK's `BrowserExtensionPopup`. Observable: the page sizes itself.
+@MainActor
+@Observable
+public final class ExtensionPopup {
+    public let extensionID: String
+    /// The engine's until the popup closes; attach it while the popup is shown.
+    public let view: NSView
+    public var size: CGSize
+    @ObservationIgnored private let focusView: () -> Void
+
+    public init(extensionID: String, view: NSView, size: CGSize, focus: @escaping () -> Void = {}) {
+        self.extensionID = extensionID
+        self.view = view
+        self.size = size
+        focusView = focus
+    }
+
+    /// Gives the page the keyboard once its view is in a window.
+    public func focus() { focusView() }
 }
 
 /// A profile's preferences, observable: the engine reports them once the profile has loaded and after every change,
@@ -323,6 +430,11 @@ public enum PageEvent {
     /// The engine took the request down: after the answer, or on a navigation, a close or a tab switch, which asks
     /// again when the tab is back, as Arc's ADK does.
     case permissionRequestClosed(PagePermissionRequest)
+    /// The engine asks before it installs or removes an extension, as ADK queues the consent on the page; the app
+    /// answers it once.
+    case extensionRequest(PageExtensionRequest)
+    /// The engine took the request down unanswered, as when the extension went away meanwhile.
+    case extensionRequestClosed(PageExtensionRequest)
     /// A `beforeunload` handler kept the page after `close()`.
     case closeCancelled
     /// The page is gone, after `close()` or without the app asking, with the engine's record of it if it kept one.
@@ -430,6 +542,41 @@ public final class PagePermissionRequest {
 
     public func respond(_ response: PermissionResponse) {
         reply?(response)
+        reply = nil
+    }
+}
+
+/// As ADK's `WebContentExtensionInstallRequest`, and its like for a removal.
+@MainActor
+public final class PageExtensionRequest {
+    public enum Kind: Sendable {
+        case install
+        case uninstall
+    }
+
+    public let kind: Kind
+    public let extensionID: String
+    public let name: String
+    /// Nil for a removal.
+    public let icon: NSImage?
+    /// The engine's permission warnings, one line each.
+    public let permissions: [String]
+    private var reply: ((Bool) -> Void)?
+
+    public init(
+        kind: Kind, extensionID: String, name: String, icon: NSImage? = nil, permissions: [String] = [],
+        reply: @escaping (Bool) -> Void
+    ) {
+        self.kind = kind
+        self.extensionID = extensionID
+        self.name = name
+        self.icon = icon
+        self.permissions = permissions
+        self.reply = reply
+    }
+
+    public func respond(_ accepted: Bool) {
+        reply?(accepted)
         reply = nil
     }
 }
