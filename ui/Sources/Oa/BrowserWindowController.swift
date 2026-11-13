@@ -151,11 +151,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if let space = model.space { SpaceDeletion.confirm(space, in: model) }
     }
 
-    @objc func viewArchive(_ sender: Any?) { model.viewArchive() }
+    @objc func toggleArchive(_ sender: Any?) {
+        if model.showingArchive { model.exitLibrary() } else { model.viewLibrary(.archive) }
+    }
     @objc func viewHistory(_ sender: Any?) { model.viewHistory() }
 
     @objc func toggleDownloads(_ sender: Any?) {
-        if model.showingDownloads { model.hideDownloads() } else { model.viewDownloads() }
+        if model.showingDownloads { model.exitLibrary() } else { model.viewLibrary(.downloads) }
     }
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
     @objc func addExtension(_ sender: Any?) { model.addExtension() }
@@ -215,6 +217,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         if item.action == #selector(toggleDownloads(_:)) {
             item.title = model.showingDownloads ? "Hide Downloads" : "View Downloads…"
+            return true
+        }
+        if item.action == #selector(toggleArchive(_:)) {
+            item.title = model.showingArchive ? "Hide Archive" : "View Archive…"
             return true
         }
         if item.action == #selector(closeTab(_:)) {

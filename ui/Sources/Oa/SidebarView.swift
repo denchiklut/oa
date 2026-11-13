@@ -11,18 +11,12 @@ struct SidebarView: View {
     @State private var showingFlyout = false
 
     var body: some View {
-        if model.showingDownloads {
-            LibraryView(model: model)
+        if let section = model.library {
+            LibraryView(model: model, section: section)
         } else {
-            Group {
-                if model.showingArchive {
-                    ArchiveView(model: model)
-                } else {
-                    tabs
-                }
-            }
-            .frame(width: Self.width)
-            .background(Color(nsColor: .windowBackgroundColor))
+            tabs
+                .frame(width: Self.width)
+                .background(Color(nsColor: .windowBackgroundColor))
         }
     }
 
@@ -111,135 +105,6 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-    }
-}
-
-private struct ArchiveView: View {
-    let model: WindowModel
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Button {
-                    model.exitArchive()
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(.borderless)
-                .help("Back to the sidebar")
-                Text("Archived Tabs")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            Divider()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    if model.state.archive.isEmpty {
-                        Text("Nothing here yet")
-                            .foregroundStyle(.secondary)
-                            .padding(10)
-                    }
-                    ForEach(groups, id: \.title) { group in
-                        Text(group.title)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.top, 8)
-                            .padding(.bottom, 2)
-                        ForEach(group.entries) { entry in
-                            ArchiveRow(entry: entry, icon: model.savedFavicon(entry.id)) {
-                                model.peekArchived(entry.id)
-                            } restore: {
-                                model.restoreArchived(entry.id)
-                            } delete: {
-                                model.deleteArchived(entry.id)
-                            }
-                        }
-                    }
-                }
-                .padding(8)
-            }
-        }
-    }
-
-    private var groups: [(title: String, entries: [SidebarArchivedTab])] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: .now)
-        var groups: [(title: String, entries: [SidebarArchivedTab])] = []
-        for entry in model.state.archive.reversed() {
-            let days =
-                calendar.dateComponents([.day], from: calendar.startOfDay(for: entry.archivedAt), to: today).day ?? 0
-            let title = days <= 0 ? "Today" : days == 1 ? "Yesterday" : "\(days) days ago"
-            if groups.last?.title == title {
-                groups[groups.count - 1].entries.append(entry)
-            } else {
-                groups.append((title, [entry]))
-            }
-        }
-        return groups
-    }
-}
-
-private struct ArchiveRow: View {
-    let entry: SidebarArchivedTab
-    let icon: NSImage?
-    let peek: () -> Void
-    let restore: () -> Void
-    let delete: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Group {
-                if let icon {
-                    Image(nsImage: icon).resizable().interpolation(.high)
-                } else {
-                    RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.1))
-                }
-            }
-            .frame(width: 16, height: 16)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(entry.displayTitle)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                if !entry.address.isEmpty {
-                    Text(entry.address)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-            }
-            Spacer(minLength: 0)
-            if hovering {
-                Button(action: delete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 10))
-                        .frame(width: 16, height: 16)
-                }
-                .help("Delete")
-                Button(action: restore) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 10, weight: .semibold))
-                        .frame(width: 16, height: 16)
-                }
-                .help("Restore")
-            }
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(hovering ? 0.06 : 0)))
-        .contentShape(Rectangle())
-        .onTapGesture(perform: peek)
-        .onHover { hovering = $0 }
-        .contextMenu {
-            Button("Restore", action: restore)
-            Button("Delete", action: delete)
-        }
     }
 }
 

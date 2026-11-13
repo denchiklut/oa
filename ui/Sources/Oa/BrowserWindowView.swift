@@ -60,7 +60,7 @@ struct BrowserWindowView: View {
     }
 
     private var sidebarWidth: CGFloat {
-        model.showingArchive ? 0 : model.showingDownloads ? LibraryView.width : SidebarView.width
+        model.showingArchive ? 0 : model.library != nil ? LibraryView.width : SidebarView.width
     }
 
     private var toolbar: some View {

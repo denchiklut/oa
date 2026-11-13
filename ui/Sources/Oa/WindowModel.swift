@@ -30,10 +30,13 @@ final class WindowModel {
     /// Pages shown over the window as Arc's Peek: by the tab they were opened from, whose state they are, or by
     /// the Archive entry they show.
     private(set) var peeks: [UUID: any Page] = [:]
-    private(set) var showingArchive = false {
-        didSet { if !showingArchive { closeArchivePeek() } }
+    private(set) var library: LibrarySection? {
+        didSet {
+            if let library { lastLibrarySection = library }
+            if library != .archive { closeArchivePeek() }
+        }
     }
-    private(set) var showingDownloads = false
+    private var lastLibrarySection = LibrarySection.downloads
     private var previewedDownloadID: Download.ID?
     private(set) var dialogs: [UUID: [PageDialog]] = [:]
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
@@ -383,7 +386,7 @@ final class WindowModel {
 
     func select(_ tabID: UUID, restoring sessionID: PageSessionID? = nil) {
         guard state.isSelectable(tabID, in: selectedSpaceID), selectedTabID != tabID else { return }
-        showingArchive = false
+        library = nil
         if let current = selectedTabID {
             if pages[current] != nil { previousTabID = current }
             placeholders[current] = nil
@@ -512,18 +515,15 @@ final class WindowModel {
         page.close()
     }
 
-    func viewArchive() {
-        showingDownloads = false
-        showingArchive = true
+    var showingArchive: Bool { library == .archive }
+    var showingDownloads: Bool { library == .downloads }
+
+    func viewLibrary(_ section: LibrarySection? = nil) {
+        library = section ?? lastLibrarySection
     }
 
-    func viewDownloads() {
-        showingArchive = false
-        showingDownloads = true
-    }
-
-    func hideDownloads() {
-        showingDownloads = false
+    func exitLibrary() {
+        library = nil
     }
 
     var previewedDownload: DownloadsStore.Entry? {
@@ -552,10 +552,6 @@ final class WindowModel {
             files.indices.contains(index + offset)
         else { return }
         previewedDownloadID = files[index + offset].id
-    }
-
-    func exitArchive() {
-        showingArchive = false
     }
 
     func restoreArchived(_ id: UUID) {
@@ -628,7 +624,7 @@ final class WindowModel {
             sessionID = closed.sessionID
         }
         if let spaceID = state.space(containing: closed.id)?.id { selectSpace(spaceID) }
-        showingArchive = false
+        library = nil
         select(closed.id, restoring: sessionID)
     }
 
@@ -639,7 +635,7 @@ final class WindowModel {
         store.edit { $0.removeArchived(closed.id) }
         guard !store.windows.contains(where: { $0.peeks[ownerID] != nil }) else { return }
         if let spaceID = state.space(containing: ownerID)?.id { selectSpace(spaceID) }
-        showingArchive = false
+        library = nil
         select(ownerID)
         let context = engine.browserContext(id: profile.id)
         ensureBrowser(for: profile.id)
@@ -1008,7 +1004,7 @@ final class WindowModel {
         case .dialog(let dialog):
             dialogs[pageID, default: []].append(dialog)
             if let ownerID = peekOwner(of: pageID), state.tree.tab(ownerID) == nil, archivePeekID != ownerID {
-                showingArchive = true
+                library = .archive
                 archivePeekID = ownerID
             }
             return
@@ -1136,7 +1132,7 @@ final class WindowModel {
         let spaceID = state.space(containing: tabID)?.id ?? selectedSpaceID
         guard state.isSelectable(tabID, in: spaceID) else { return }
         if spaceID != selectedSpaceID {
-            showingArchive = false
+            library = nil
             selectedTabIDs[spaceID] = tabID
             selectSpace(spaceID)
         } else {
