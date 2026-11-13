@@ -535,6 +535,19 @@ void PageImpl::ClosePermissionRequest(const PermissionRequest& request) {
   }
 }
 
+void PageImpl::RequestExtension(const ExtensionRequest& request,
+                                ExtensionReply reply) {
+  if (observer_) {
+    observer_->OnPageExtensionRequest(request, std::move(reply));
+  }
+}
+
+void PageImpl::CloseExtensionRequest(const ExtensionRequest& request) {
+  if (observer_) {
+    observer_->OnPageExtensionRequestClosed(request);
+  }
+}
+
 content::WebContents* PageImpl::OpenURLFromTab(
     content::WebContents* source,
     const content::OpenURLParams& params,

@@ -21,6 +21,8 @@ source_set("oa") {
     "browser/ui/browser_window_impl.mm",
     "browser/ui/context_menu_impl.cc",
     "browser/ui/context_menu_impl.h",
+    "browser/ui/extension_dialogs_impl.h",
+    "browser/ui/extension_dialogs_impl.mm",
     "browser/ui/extensions_container_impl.h",
     "browser/ui/extensions_container_impl.mm",
     "browser/ui/javascript_dialog_impl.cc",

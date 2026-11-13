@@ -167,6 +167,23 @@ void WindowBrowser::CloseAll() {
   }
 }
 
+// static
+PageImpl* WindowBrowser::ActivePage(gfx::NativeWindow window,
+                                    Profile* profile) {
+  NSWindow* ns_window = window ? window.GetNativeNSWindow() : NSApp.keyWindow;
+  for (WindowBrowser* window_browser : AllWindowBrowsers()) {
+    if (window_browser->closing_ ||
+        window_browser->browser_->GetProfile() != profile ||
+        window_browser->GetNativeWindow().GetNativeNSWindow() != ns_window) {
+      continue;
+    }
+    content::WebContents* contents =
+        window_browser->browser_->GetTabStripModel()->GetActiveWebContents();
+    return contents ? PageImpl::FromWebContents(contents) : nullptr;
+  }
+  return nullptr;
+}
+
 WindowBrowser::WindowBrowser(BrowserWindowInterface* browser)
     : browser_(browser),
       extensions_container_(std::make_unique<ExtensionsContainerImpl>(this)) {

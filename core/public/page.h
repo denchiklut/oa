@@ -111,6 +111,23 @@ enum class PermissionResponse {
   kDismiss,
 };
 
+// Chrome asks before it installs or removes an extension, as ArcCore's two
+// consent calls on the page do.
+struct ExtensionRequest {
+  enum class Kind {
+    kInstall,
+    kUninstall,
+  };
+  uint64_t id = 0;
+  Kind kind = Kind::kInstall;
+  std::string extension_id;
+  std::string name;
+  // An NSImage; null for an uninstall.
+  std::shared_ptr<void> icon;
+  // Chrome's permission warnings, one line each.
+  std::vector<std::string> permissions;
+};
+
 class Page {
  public:
   // The NSImage lives only for the call; null if nothing could be copied.
@@ -120,6 +137,8 @@ class Page {
       void(bool accepted, const std::string& text, bool suppress)>;
   // Call once; ignored after the request was closed.
   using PermissionReply = std::function<void(PermissionResponse response)>;
+  // Call once; dropping it unanswered declines.
+  using ExtensionReply = std::function<void(bool accepted)>;
 
   class Observer {
    public:
@@ -148,6 +167,12 @@ class Page {
     // Also after a reply, once Chromium has taken the prompt down.
     virtual void OnPagePermissionRequestClosed(
         const PermissionRequest& request) = 0;
+    virtual void OnPageExtensionRequest(const ExtensionRequest& request,
+                                        ExtensionReply reply) = 0;
+    // The engine took the request down unanswered, as when the extension went
+    // away meanwhile.
+    virtual void OnPageExtensionRequestClosed(
+        const ExtensionRequest& request) = 0;
     // A beforeunload handler kept the page after Close().
     virtual void OnPageCloseCancelled() = 0;
     virtual void OnPageClosed(std::optional<int32_t> session_id) = 0;

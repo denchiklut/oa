@@ -43,6 +43,7 @@
 #include "oa/browser/profile_services.h"
 #include "oa/browser/ui/browser_window_impl.h"
 #include "oa/browser/ui/context_menu_impl.h"
+#include "oa/browser/ui/extension_dialogs_impl.h"
 #include "oa/browser/ui/javascript_dialog_impl.h"
 #include "oa/browser/ui/permission_prompt_impl.h"
 #include "oa/browser/ui/sad_tab_impl.h"
@@ -182,6 +183,7 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   PermissionPromptImpl::InstallFactory();
   SadTabImpl::InstallFactory();
   InstallContextMenuEditor();
+  InstallExtensionDialogs();
 
   [OAApplication sharedApplication];
   SetUpBundleOverrides();

@@ -25,6 +25,7 @@ class TabModel;
 namespace oa {
 
 class ExtensionsContainerImpl;
+class PageImpl;
 
 // One Oa window's //chrome Browser in one profile. Owned by its
 // BrowserWindowImpl, so it lives exactly as long as the Browser.
@@ -38,6 +39,9 @@ class WindowBrowser : public TabStripModelObserver {
   static void AskToLeave(const std::string& window_id,
                          std::function<void(bool leave)> completion);
   static void CloseAll();
+  // The active page of the Browser the app's `window` has for `profile`; of
+  // the key window's when `window` is null.
+  static PageImpl* ActivePage(gfx::NativeWindow window, Profile* profile);
 
   explicit WindowBrowser(BrowserWindowInterface* browser);
   WindowBrowser(const WindowBrowser&) = delete;
