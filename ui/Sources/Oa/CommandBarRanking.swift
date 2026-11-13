@@ -7,9 +7,17 @@ import Foundation
 enum CommandBarRanking {
     struct Tab: Equatable {
         let tab: SidebarTab
+        /// As Arc's `urlForTab`: the live page's, else the saved one.
+        let url: URL
+        /// The owning Space's, for a tab of another Space; Arc offers those only before anything is typed.
+        let spaceName: String?
+        /// When the bar's window last showed it, else when it was made there; nil for a tab the window never had.
+        let activeAt: Date?
         let isVisible: Bool
-        /// Pinned tabs: folders above them; nil for the rest, as ASE2 gives unsaved items its default.
+        /// Pinned tabs and Favorites: folders above them; nil for the rest, as ASE2 gives unsaved items its default.
         let saveLevel: Int?
+
+        var title: String { tab.title.isEmpty ? url.host() ?? readable(url) : tab.title }
     }
 
     struct Pick: Codable, Equatable {
@@ -20,6 +28,8 @@ enum CommandBarRanking {
     /// The `maxSuggestions` Arc's bar gives ASE2. Where Arc cuts the list wasn't traced, so the cut after ranking is
     /// Oa's own.
     static let maxSuggestions = 15
+    /// Arc's `maxNullStateNavigationSuggestions`.
+    static let maxEmptySuggestions = 4
 
     private enum Category: CaseIterable { case match, importance, recency, chromium, save }
 
@@ -117,17 +127,17 @@ enum CommandBarRanking {
         query: String, matches: [AutocompleteMatch], additionalMatches: [AutocompleteMatch], tabs: [Tab],
         lastPick: Pick?, now: Date
     ) -> [CommandBar.Row] {
+        guard !query.isEmpty else { return recent(tabs) }
         let lowered = query.lowercased()
         var candidates: [Candidate] = []
-        // Which open tabs Arc's sidebar provider offers for a query wasn't decoded; Oa's own: those whose title
-        // or URL holds it.
-        for tab in tabs {
-            let row = CommandBar.Row(source: .tab(tab.tab))
+        // As Arc's sidebar provider: the Space's tabs and the profile's Favorites whose title or whole URL holds
+        // the query.
+        for tab in tabs where tab.spaceName == nil {
             guard
-                lowered.isEmpty || row.title.lowercased().contains(lowered)
-                    || readable(row.url).lowercased().contains(lowered)
+                tab.title.localizedStandardContains(query)
+                    || tab.url.absoluteString.localizedStandardContains(query)
             else { continue }
-            var candidate = Candidate(row: row)
+            var candidate = Candidate(row: CommandBar.Row(source: .tab(tab)))
             // As Arc's `SidebarTab.timeLastActiveAt`.
             candidate.values[.lastNavigated] = tab.tab.viewedAt.map { now.timeIntervalSince($0) }
             candidate.values[.saveLevel] = tab.saveLevel.map(Double.init)
@@ -169,8 +179,20 @@ enum CommandBarRanking {
         }
         score(&candidates)
         var rows = dedup(candidates).sorted { $0.score > $1.score }
-        applyPostSortRules(&rows, query: query, lastPick: lastPick, now: now, tabs: tabs)
+        applyPostSortRules(&rows, query: query, lastPick: lastPick, now: now)
         return rows.prefix(maxSuggestions).map(\.row)
+    }
+
+    /// As Arc's null state, which ASE2 never scores: the tabs the window has shown or made, latest first, then the
+    /// rest by their own last view, one row for an address. Arc then adds most visited sites and its onboarding
+    /// links, which Oa doesn't have; a tab never viewed has a creation date in Arc, and comes last here as Oa's own.
+    private static func recent(_ tabs: [Tab]) -> [CommandBar.Row] {
+        let shown = tabs.filter { $0.activeAt != nil }.sorted { $0.activeAt! > $1.activeAt! }
+        let rest = tabs.filter { $0.activeAt == nil }
+            .sorted { $0.tab.viewedAt ?? .distantPast > $1.tab.viewedAt ?? .distantPast }
+        var addresses: Set<String> = []
+        let rows = (shown + rest).map { CommandBar.Row(source: .tab($0)) }.filter { addresses.insert($0.id).inserted }
+        return Array(rows.prefix(maxEmptySuggestions))
     }
 
     private static func score(_ candidates: inout [Candidate]) {
@@ -253,11 +275,9 @@ enum CommandBarRanking {
         return result
     }
 
-    private static func applyPostSortRules(
-        _ rows: inout [Candidate], query: String, lastPick: Pick?, now: Date, tabs: [Tab]
-    ) {
-        if rows.count > 1, case .tab(let tab) = rows[0].row.source, !rows[1].row.isTab,
-            tabs.first(where: { $0.tab.id == tab.id })?.isVisible == false, rows[0].value(.lastNavigated) > 604_800
+    private static func applyPostSortRules(_ rows: inout [Candidate], query: String, lastPick: Pick?, now: Date) {
+        if rows.count > 1, case .tab(let tab) = rows[0].row.source, !rows[1].row.isTab, !tab.isVisible,
+            rows[0].value(.lastNavigated) > 604_800
         {
             rows.swapAt(0, 1)
         }
@@ -285,7 +305,7 @@ enum CommandBarRanking {
     private static func mergeTabsWithHistory(_ rows: inout [Candidate]) {
         func address(_ candidate: Candidate) -> String { readable(candidate.row.url).lowercased() }
         func tabID(_ candidate: Candidate) -> UUID? {
-            if case .tab(let tab) = candidate.row.source { tab.id } else { nil }
+            if case .tab(let tab) = candidate.row.source { tab.tab.id } else { nil }
         }
         let tabs = Dictionary(grouping: rows.filter(\.row.isTab), by: address)
         var placed: Set<UUID> = []

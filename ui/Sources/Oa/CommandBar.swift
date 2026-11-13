@@ -15,11 +15,11 @@ final class CommandBar {
         case switchTo(UUID)
     }
 
-    /// One of Chromium's matches, or one of the Space's open tabs as Arc's sidebar provider offers them.
+    /// One of Chromium's matches, or one of the profile's tabs as Arc's sidebar offers them.
     struct Row: Identifiable, Equatable {
         enum Source: Equatable {
             case match(AutocompleteMatch)
-            case tab(SidebarTab)
+            case tab(CommandBarRanking.Tab)
         }
 
         let source: Source
@@ -40,7 +40,7 @@ final class CommandBar {
 
         var title: String {
             switch source {
-            case .tab(let tab): tab.displayTitle
+            case .tab(let tab): tab.title
             case .match(let match):
                 isHistory || kind == .navSuggest
                     ? (match.description.isEmpty ? match.contents : match.description) : match.contents
@@ -228,7 +228,7 @@ final class CommandBar {
         let row = rows[selectedIndex]
         if !text.isEmpty { picks.record(row.id, for: text, in: profileID) }
         switch row.source {
-        case .tab(let tab): perform(.switchTo(tab.id))
+        case .tab(let tab): perform(.switchTo(tab.tab.id))
         case .match(let match):
             if let url = match.url { perform(.open(url, background: modifiers.contains(.command))) }
         }
@@ -337,7 +337,7 @@ struct CommandBarView: View {
     }
 
     private func favicon(for row: CommandBar.Row) -> NSImage? {
-        if case .tab(let tab) = row.source { model.favicon(for: tab) } else { nil }
+        if case .tab(let tab) = row.source { model.favicon(for: tab.tab) } else { nil }
     }
 
     private func icon(for row: CommandBar.Row?) -> String {
@@ -374,8 +374,9 @@ private struct CommandBarRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            if row.isTab {
-                Text("Switch to Tab")
+            if case .tab(let tab) = row.source {
+                // As Arc: a tab of another Space names its Space; the arrow beside it is Oa's own.
+                Text(tab.spaceName ?? "Switch to Tab")
                     .foregroundStyle(.secondary)
                 Image(systemName: "arrow.right")
                     .foregroundStyle(.secondary)
