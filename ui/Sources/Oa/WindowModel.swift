@@ -85,6 +85,7 @@ final class WindowModel {
     var browser: (any Browser)? { profileID.flatMap { browsers[$0] } }
     var extensions: [BrowserExtension] { profileID.map { engine.browserContext(id: $0).extensions.items } ?? [] }
     var extensionActions: [ExtensionAction] { browser?.extensionActions ?? [] }
+    var extensionPopup: ExtensionPopup? { browsers.values.lazy.compactMap(\.extensionPopup).first }
     /// What the prompt draws: the answered request stays until its popover has closed.
     var promptedPermissionRequest: PagePermissionRequest? { permissionRequest ?? answeredPermissionRequest?.request }
     private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
@@ -200,6 +201,10 @@ final class WindowModel {
     }
 
     func showExtensionMenu(for id: ExtensionAction.ID) { browser?.showExtensionMenu(for: id) }
+
+    func closeExtensionPopup() {
+        for browser in browsers.values { browser.closeExtensionPopup() }
+    }
 
     func respond(to request: PageExtensionRequest, accepted: Bool) {
         forget(request)
@@ -665,6 +670,7 @@ final class WindowModel {
         dialogs = [:]
         permissionRequests = [:]
         extensionRequests = [:]
+        closeExtensionPopup()
         browserListeners.forEach { $0.cancel() }
         browserListeners = []
         browsers = [:]
