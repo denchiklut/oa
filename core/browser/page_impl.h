@@ -57,6 +57,9 @@ class PageImpl : public Page,
   void RequestPermission(const PermissionRequest& request,
                          PermissionReply reply);
   void ClosePermissionRequest(const PermissionRequest& request);
+  // From Chrome's extension install prompt and uninstall dialog.
+  void RequestExtension(const ExtensionRequest& request, ExtensionReply reply);
+  void CloseExtensionRequest(const ExtensionRequest& request);
   // Runs the beforeunload handler as quitting does and keeps the page either
   // way. A handler-less page answers at once.
   void AskToLeave(std::function<void(bool leave)> callback);

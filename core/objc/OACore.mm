@@ -24,6 +24,9 @@
 - (void)pagePermissionRequest:(const oa::PermissionRequest&)request
                         reply:(oa::Page::PermissionReply)reply;
 - (void)pagePermissionRequestClosed:(const oa::PermissionRequest&)request;
+- (void)pageExtensionRequest:(const oa::ExtensionRequest&)request
+                       reply:(oa::Page::ExtensionReply)reply;
+- (void)pageExtensionRequestClosed:(const oa::ExtensionRequest&)request;
 - (void)pageCloseCancelled;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
@@ -210,6 +213,14 @@ class PageObserverBridge : public oa::Page::Observer {
       const oa::PermissionRequest& request) override {
     [page_ pagePermissionRequestClosed:request];
   }
+  void OnPageExtensionRequest(const oa::ExtensionRequest& request,
+                              oa::Page::ExtensionReply reply) override {
+    [page_ pageExtensionRequest:request reply:std::move(reply)];
+  }
+  void OnPageExtensionRequestClosed(
+      const oa::ExtensionRequest& request) override {
+    [page_ pageExtensionRequestClosed:request];
+  }
   void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
   void OnPageClosed(std::optional<int32_t> session_id) override {
     [page_ pageClosedWithSessionID:session_id.value_or(-1)];
@@ -325,11 +336,54 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 @end
 
+@interface OAPageExtensionRequest ()
+- (instancetype)initWithRequest:(const oa::ExtensionRequest&)request
+                          reply:(oa::Page::ExtensionReply)reply;
+@end
+
+@implementation OAPageExtensionRequest {
+  oa::Page::ExtensionReply _reply;
+}
+
+@synthesize kind = _kind;
+@synthesize extensionIdentifier = _extensionIdentifier;
+@synthesize name = _name;
+@synthesize icon = _icon;
+@synthesize permissions = _permissions;
+
+- (instancetype)initWithRequest:(const oa::ExtensionRequest&)request
+                          reply:(oa::Page::ExtensionReply)reply {
+  if ((self = [super init])) {
+    _kind = request.kind == oa::ExtensionRequest::Kind::kInstall
+                ? OAPageExtensionRequestKindInstall
+                : OAPageExtensionRequestKindUninstall;
+    _extensionIdentifier = ToNSString(request.extension_id);
+    _name = ToNSString(request.name);
+    _icon = (__bridge NSImage*)request.icon.get();
+    NSMutableArray<NSString*>* permissions = [NSMutableArray array];
+    for (const std::string& permission : request.permissions) {
+      [permissions addObject:ToNSString(permission)];
+    }
+    _permissions = permissions;
+    _reply = std::move(reply);
+  }
+  return self;
+}
+
+- (void)respond:(BOOL)accepted {
+  if (oa::Page::ExtensionReply reply = std::exchange(_reply, nullptr)) {
+    reply(accepted);
+  }
+}
+
+@end
+
 @implementation OAPage {
   std::unique_ptr<PageObserverBridge> _observer;
   std::unique_ptr<oa::Page> _page;
   NSMutableDictionary<NSNumber*, OAPageDialog*>* _dialogs;
   NSMutableDictionary<NSNumber*, OAPagePermissionRequest*>* _permissionRequests;
+  NSMapTable<NSNumber*, OAPageExtensionRequest*>* _extensionRequests;
   BOOL _keepsAddress;
 }
 
@@ -341,6 +395,8 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
     _observer = std::make_unique<PageObserverBridge>(self);
     _dialogs = [[NSMutableDictionary alloc] init];
     _permissionRequests = [[NSMutableDictionary alloc] init];
+    // Weakly: a request the app let go of is declined.
+    _extensionRequests = [NSMapTable strongToWeakObjectsMapTable];
   }
   return self;
 }
@@ -566,6 +622,22 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   }
   [_permissionRequests removeObjectForKey:key];
   [self.delegate page:self didClosePermissionRequest:shown];
+}
+
+- (void)pageExtensionRequest:(const oa::ExtensionRequest&)request
+                       reply:(oa::Page::ExtensionReply)reply {
+  OAPageExtensionRequest* shown =
+      [[OAPageExtensionRequest alloc] initWithRequest:request
+                                                reply:std::move(reply)];
+  [_extensionRequests setObject:shown forKey:@(request.id)];
+  [self.delegate page:self didRequestExtension:shown];
+}
+
+- (void)pageExtensionRequestClosed:(const oa::ExtensionRequest&)request {
+  if (OAPageExtensionRequest* shown =
+          [_extensionRequests objectForKey:@(request.id)]) {
+    [self.delegate page:self didCloseExtensionRequest:shown];
+  }
 }
 
 - (void)pageCloseCancelled {

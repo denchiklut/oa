@@ -76,6 +76,26 @@ typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
 - (void)respond:(OAPagePermissionResponse)response;
 @end
 
+typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
+  OAPageExtensionRequestKindInstall,
+  OAPageExtensionRequestKindUninstall,
+};
+
+// Chrome asking before it installs or removes an extension, as ArcCore's two
+// consent calls on the page.
+@interface OAPageExtensionRequest : NSObject
+@property(nonatomic, readonly) OAPageExtensionRequestKind kind;
+@property(nonatomic, readonly) NSString* extensionIdentifier;
+@property(nonatomic, readonly) NSString* name;
+// Nil for an uninstall.
+@property(nonatomic, readonly, nullable) NSImage* icon;
+// Chrome's permission warnings, one line each.
+@property(nonatomic, readonly) NSArray<NSString*>* permissions;
+- (instancetype)init NS_UNAVAILABLE;
+// Once; a request released unanswered is declined.
+- (void)respond:(BOOL)accepted;
+@end
+
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
 // `openedPage` has no delegate yet; releasing it drops the page.
@@ -93,6 +113,9 @@ typedef NS_ENUM(NSInteger, OAPagePermissionResponse) {
     didRequestPermission:(OAPagePermissionRequest*)request;
 - (void)page:(OAPage*)page
     didClosePermissionRequest:(OAPagePermissionRequest*)request;
+- (void)page:(OAPage*)page didRequestExtension:(OAPageExtensionRequest*)request;
+- (void)page:(OAPage*)page
+    didCloseExtensionRequest:(OAPageExtensionRequest*)request;
 - (void)pageDidCancelClose:(OAPage*)page;
 // `sessionID` is -1 when Chrome kept no record of the tab.
 - (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;
