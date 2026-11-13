@@ -896,9 +896,10 @@ final class WindowModel {
             return previousTabID
         }
         guard !pinned else { return nil }
-        let tabs = state.selectableTabs(in: spaceID).filter { !others.contains($0.id) }
+        let tabs = state.selectableTabs(in: spaceID)
         guard let index = tabs.firstIndex(where: { $0.id == tabID }) else { return nil }
-        return index > 0 ? tabs[index - 1].id : tabs.count > 1 ? tabs[1].id : nil
+        let staying = { (tab: SidebarTab) in !others.contains(tab.id) }
+        return (tabs[..<index].last(where: staying) ?? tabs[(index + 1)...].first(where: staying))?.id
     }
 
     /// As Arc's ingest, in one step: the last window to select a tab takes its page from the window that holds it, or
