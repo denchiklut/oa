@@ -9,6 +9,7 @@ struct SidebarView: View {
     @State private var overLibraryButton = false
     @State private var overFlyout = false
     @State private var showingFlyout = false
+    @State private var overTabs = false
 
     var body: some View {
         if let section = model.library {
@@ -27,11 +28,12 @@ struct SidebarView: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(model.pinnedTabs) { TabRow(model: model, tab: $0) }
-                    if !model.pinnedTabs.isEmpty { Divider().padding(.vertical, 6) }
+                    if !model.unpinnedTabs.isEmpty { clearDivider }
                     ForEach(model.unpinnedTabs) { TabRow(model: model, tab: $0) }
                 }
                 .padding(8)
             }
+            .onHover { overTabs = $0 }
             .onDrop(of: [.plainText], delegate: TabDrop { model.unfavorite($0) })
             Divider()
             Button {
@@ -71,6 +73,25 @@ struct SidebarView: View {
             overFlyout = false
             showingFlyout = false
         }
+    }
+
+    /// Arc's divider above the unpinned tabs, with Clear while the pointer is over the sidebar.
+    private var clearDivider: some View {
+        HStack(spacing: 8) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.1))
+                .frame(height: 1)
+            if overTabs {
+                Button("Clear") { model.clearTabs() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .help("Clear unselected Today tabs")
+            }
+        }
+        .frame(height: 16)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
     }
 
     private var spaces: some View {
