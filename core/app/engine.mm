@@ -24,12 +24,14 @@
 #include "chrome/app/startup_timestamps.h"
 #include "chrome/browser/chrome_browser_application_mac.h"
 #include "chrome/browser/chrome_browser_main_mac.h"
+#include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/profiler/main_thread_stack_sampling_profiler.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/lens/lens_features.h"
@@ -47,6 +49,7 @@
 #include "oa/browser/ui/javascript_dialog_impl.h"
 #include "oa/browser/ui/permission_prompt_impl.h"
 #include "oa/browser/ui/sad_tab_impl.h"
+#include "oa/browser/ui/video_overlay_window_impl.h"
 #include "oa/browser/window_browser.h"
 
 // The app's NSApplication: Chrome's event handling without its AppController.
@@ -103,11 +106,30 @@ void EnableFeature(base::CommandLine& command_line,
   command_line.AppendSwitchASCII(switches::kEnableFeatures, enabled + feature);
 }
 
+// Chrome's video picture-in-picture window is a views widget with its own
+// controls. ArcCore replaces it too.
+class ContentBrowserClient : public ChromeContentBrowserClient {
+ public:
+  std::unique_ptr<content::VideoOverlayWindow>
+  CreateWindowForVideoPictureInPicture(
+      content::VideoPictureInPictureWindowController* controller) override {
+    return std::make_unique<VideoOverlayWindowImpl>(controller);
+  }
+};
+
 class MainDelegate : public ChromeMainDelegate {
  public:
   using ChromeMainDelegate::ChromeMainDelegate;
 
  protected:
+  // ChromeMainDelegate's, with the client's class changed.
+  content::ContentBrowserClient* CreateContentBrowserClient() override {
+    chrome_content_browser_client_ = std::make_unique<ContentBrowserClient>();
+    chrome_content_browser_client_->SetSamplingProfiler(
+        std::move(sampling_profiler_));
+    return chrome_content_browser_client_.get();
+  }
+
   std::variant<int, content::MainFunctionParams> RunProcess(
       const std::string& process_type,
       content::MainFunctionParams main_function_params) override {

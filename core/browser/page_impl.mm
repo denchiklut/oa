@@ -561,6 +561,13 @@ void PageImpl::CloseExtensionRequest(const ExtensionRequest& request) {
   }
 }
 
+void PageImpl::NotifyPictureInPicture(const PictureInPictureEvent& event,
+                                      void* ns_view) {
+  if (observer_) {
+    observer_->OnPagePictureInPicture(event, ns_view);
+  }
+}
+
 content::WebContents* PageImpl::OpenURLFromTab(
     content::WebContents* source,
     const content::OpenURLParams& params,

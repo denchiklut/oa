@@ -128,6 +128,26 @@ struct ExtensionRequest {
   std::vector<std::string> permissions;
 };
 
+// What Chromium asks of the window that shows a page's video in
+// picture-in-picture, as ArcCore's media session delegate reports it.
+struct PictureInPictureEvent {
+  enum class Kind {
+    kCreated,
+    kShow,
+    kHide,
+    kClose,
+    kResolutionChanged,
+    kDestroyed,
+  };
+  Kind kind = Kind::kCreated;
+  // kCreated: the video element's bounds in the page. kResolutionChanged: the
+  // video's natural size.
+  double x = 0;
+  double y = 0;
+  double width = 0;
+  double height = 0;
+};
+
 class Page {
  public:
   // The NSImage lives only for the call; null if nothing could be copied.
@@ -173,6 +193,11 @@ class Page {
     // away meanwhile.
     virtual void OnPageExtensionRequestClosed(
         const ExtensionRequest& request) = 0;
+    // `ns_view` comes with kCreated: an NSView that draws the video, the
+    // engine's until kDestroyed. The app hosts it in a window of its own and
+    // sizes it.
+    virtual void OnPagePictureInPicture(const PictureInPictureEvent& event,
+                                        void* ns_view) = 0;
     // A beforeunload handler kept the page after Close().
     virtual void OnPageCloseCancelled() = 0;
     virtual void OnPageClosed(std::optional<int32_t> session_id) = 0;
