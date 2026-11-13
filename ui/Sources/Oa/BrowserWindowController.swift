@@ -230,7 +230,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)): !model.selectableTabs.isEmpty
         case #selector(selectTab(_:)): tabIndex(for: item) != nil
         case #selector(deleteSpace(_:)): model.state.spaces.count > 1
-        case #selector(restoreLastClosed(_:)), #selector(clearArchive(_:)): !model.state.archive.isEmpty
+        case #selector(restoreLastClosed(_:)): model.canRestoreLastClosed
+        case #selector(clearArchive(_:)): !model.state.archive.isEmpty
         default: true
         }
     }
