@@ -100,9 +100,65 @@ import AppKit
     @objc(deleteMatch:) func delete(_ match: CoreAutocompleteMatch)
 }
 
+@MainActor @objc protocol CoreExtension: NSObjectProtocol {
+    var identifier: String { get }
+    var name: String { get }
+    var extensionDescription: String { get }
+    var version: String { get }
+    var isEnabled: Bool { get }
+    var hasAction: Bool { get }
+    var isFromWebstore: Bool { get }
+}
+
+@MainActor @objc protocol CoreExtensionsDelegate: NSObjectProtocol {
+    /// `OAExtension`s, which Swift can't check against `CoreExtension`.
+    @objc(extensionsDidInitialize:) func extensionsDidInitialize(_ extensions: [NSObject])
+    @objc(extensionWasInstalled:) func extensionWasInstalled(_ extension: CoreExtension)
+    @objc(extensionWasUninstalledWithIdentifier:) func extensionWasUninstalled(identifier: String)
+    @objc(extensionWasEnabled:) func extensionWasEnabled(_ extension: CoreExtension)
+    @objc(extensionWasDisabled:) func extensionWasDisabled(_ extension: CoreExtension)
+}
+
+@MainActor @objc protocol CoreExtensions: NSObjectProtocol {
+    var delegate: CoreExtensionsDelegate? { get set }
+    @objc(setExtensionWithIdentifier:enabled:) func setExtension(identifier: String, enabled: Bool)
+    @objc(uninstallExtensionWithIdentifier:) func uninstallExtension(identifier: String)
+}
+
+@MainActor @objc protocol CoreExtensionToolbarAction: NSObjectProtocol {
+    var identifier: String { get }
+    var accessibleName: String { get }
+    var tooltip: String { get }
+    var icon: NSImage? { get }
+    var isEnabled: Bool { get }
+    var pinnedPosition: Int { get }
+}
+
+@MainActor @objc protocol CoreBrowserDelegate: NSObjectProtocol {
+    /// `OAExtensionToolbarAction`s, which Swift can't check against `CoreExtensionToolbarAction`.
+    @objc(browser:didUpdateExtensionToolbarActions:)
+    func browser(_ browser: CoreBrowser, didUpdateExtensionToolbarActions actions: [NSObject])
+    @objc(browser:didOpenExtensionPopup:view:size:)
+    func browser(_ browser: CoreBrowser, didOpenExtensionPopup extensionIdentifier: String, view: NSView, size: NSSize)
+    @objc(browser:didResizeExtensionPopup:) func browser(_ browser: CoreBrowser, didResizeExtensionPopup size: NSSize)
+    @objc(browserDidCloseExtensionPopup:) func browserDidCloseExtensionPopup(_ browser: CoreBrowser)
+    @objc(browser:didOpenPage:active:) func browser(_ browser: CoreBrowser, didOpen page: CorePage, active: Bool)
+}
+
+@MainActor @objc protocol CoreBrowser: NSObjectProtocol {
+    @objc(executeExtensionAction:) func executeExtensionAction(_ identifier: String)
+    @objc(setExtension:pinned:) func setExtension(_ identifier: String, pinned: Bool)
+    @objc(showExtensionContextMenu:) func showExtensionContextMenu(_ identifier: String)
+    func focusExtensionPopup()
+    func closeExtensionPopup()
+}
+
 @MainActor @objc protocol CoreProfile: NSObjectProtocol {
     var downloads: CoreDownloads { get }
     var preferences: CorePreferences { get }
+    var extensions: CoreExtensions { get }
+    @objc(browserInWindow:delegate:)
+    func browser(inWindow windowIdentifier: String, delegate: CoreBrowserDelegate) -> CoreBrowser
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
@@ -158,6 +214,15 @@ import AppKit
     @objc(respond:) func respond(_ response: Int)
 }
 
+@MainActor @objc protocol CorePageExtensionRequest: NSObjectProtocol {
+    var kind: Int { get }
+    var extensionIdentifier: String { get }
+    var name: String { get }
+    var icon: NSImage? { get }
+    var permissions: [String] { get }
+    @objc(respond:) func respond(_ accepted: Bool)
+}
+
 @MainActor @objc protocol CorePageDelegate: NSObjectProtocol {
     @objc(pageDidChangeState:) func pageDidChangeState(_ page: CorePage)
     @objc(page:didOpenPage:targetURL:disposition:byPage:)
@@ -171,6 +236,10 @@ import AppKit
     func page(_ page: CorePage, didRequestPermission request: CorePagePermissionRequest)
     @objc(page:didClosePermissionRequest:)
     func page(_ page: CorePage, didClosePermissionRequest request: CorePagePermissionRequest)
+    @objc(page:didRequestExtension:)
+    func page(_ page: CorePage, didRequestExtension request: CorePageExtensionRequest)
+    @objc(page:didCloseExtensionRequest:)
+    func page(_ page: CorePage, didCloseExtensionRequest request: CorePageExtensionRequest)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
     @objc(page:didCloseWithSessionID:) func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32)
 }

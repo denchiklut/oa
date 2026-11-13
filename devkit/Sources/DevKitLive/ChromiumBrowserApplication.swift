@@ -104,6 +104,10 @@ final class ChromiumBrowserContext: BrowserContext {
     var downloads: any Downloads { chromiumDownloads }
     private lazy var chromiumPreferences = ChromiumPreferences(core: profile()?.preferences)
     var preferences: any BrowserContextPreferences { chromiumPreferences }
+    private lazy var chromiumExtensions = ChromiumExtensions(core: profile()?.extensions)
+    var extensions: any Extensions { chromiumExtensions }
+    /// Weakly, as ADK's `browsers`: the window that asked holds its browser.
+    private var browsers: [UUID: WeakBrowser] = [:]
 
     init(id: UUID, profile: @escaping @MainActor () -> CoreProfile?) {
         self.id = id
@@ -133,6 +137,14 @@ final class ChromiumBrowserContext: BrowserContext {
         ChromiumAutocomplete(core: profile()?.makeAutocomplete())
     }
 
+    func browser(windowID: UUID) -> any Browser {
+        if let browser = browsers[windowID]?.browser { return browser }
+        let browser = ChromiumBrowser(profile: profile(), windowID: windowID)
+        browsers = browsers.filter { $0.value.browser != nil }
+        browsers[windowID] = WeakBrowser(browser: browser)
+        return browser
+    }
+
     func changedSiteSettings(for url: URL) -> [SiteSetting]? {
         profile()?.changedSiteSettings(for: url)?.compactMap { object in
             let setting = unsafeBitCast(object, to: CoreSiteSetting.self)
@@ -144,6 +156,10 @@ final class ChromiumBrowserContext: BrowserContext {
     func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL) {
         profile()?.setSiteSetting(type.rawValue, to: value.rawValue, for: url)
     }
+}
+
+private struct WeakBrowser {
+    weak var browser: ChromiumBrowser?
 }
 
 @MainActor

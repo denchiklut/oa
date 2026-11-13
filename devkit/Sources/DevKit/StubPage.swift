@@ -50,11 +50,13 @@ final class StubPage: Page {
     var view: NSView { hostingView }
 
     @ObservationIgnored private let downloads: StubDownloads
+    @ObservationIgnored private let extensions: StubExtensions
 
-    init(id: UUID, windowID: UUID, downloads: StubDownloads) {
+    init(id: UUID, windowID: UUID, downloads: StubDownloads, extensions: StubExtensions) {
         self.id = id
         self.windowID = windowID
         self.downloads = downloads
+        self.extensions = extensions
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
         Self.arrive(self)
     }
@@ -164,7 +166,7 @@ final class StubPage: Page {
         components.path = "/opened-\(StubPage.openedCount)"
         components.query = nil
         guard let target = components.url else { return }
-        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads)
+        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: disposition, byPage: byPage))
     }
@@ -175,7 +177,7 @@ final class StubPage: Page {
         components.path = "/linked"
         guard let target = components.url else { return }
         guard keepsAddress else { return load(target) }
-        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads)
+        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab, byPage: true))
     }
@@ -205,6 +207,28 @@ final class StubPage: Page {
         downloads.start(from: url, pageID: id, failing: failing)
     }
 
+    /// As the Chrome Web Store's Add button: the engine asks through the page before it installs.
+    func addExtension() {
+        guard let entry = extensions.nextToInstall else { return }
+        let request = PageExtensionRequest(
+            kind: .install, extensionID: entry.item.id, name: entry.item.name,
+            icon: StubExtensions.icon(for: entry.item.id), permissions: entry.permissions
+        ) { [extensions] accepted in
+            if accepted { extensions.install(entry.item) }
+        }
+        continuation?.yield(.extensionRequest(request))
+    }
+
+    func askToRemove(_ item: BrowserExtension) {
+        let request = PageExtensionRequest(kind: .uninstall, extensionID: item.id, name: item.name) {
+            [extensions] accepted in
+            if accepted { extensions.uninstall(item.id) }
+        }
+        continuation?.yield(.extensionRequest(request))
+    }
+
+    static func active(in windowID: UUID) -> StubPage? { activePages[windowID]?.page }
+
     func crashRenderer() {
         load?.cancel()
         isLoading = false
@@ -222,10 +246,12 @@ final class StubPage: Page {
         drop()
     }
 
-    static func restore(_ sessionID: PageSessionID, id: UUID, windowID: UUID, downloads: StubDownloads) -> StubPage? {
+    static func restore(
+        _ sessionID: PageSessionID, id: UUID, windowID: UUID, downloads: StubDownloads, extensions: StubExtensions
+    ) -> StubPage? {
         guard let record = records.removeValue(forKey: sessionID), record.history.indices.contains(record.position)
         else { return nil }
-        let page = StubPage(id: id, windowID: windowID, downloads: downloads)
+        let page = StubPage(id: id, windowID: windowID, downloads: downloads, extensions: extensions)
         page.history = record.history
         page.position = record.position
         page.show(record.history[record.position])
@@ -418,7 +444,7 @@ final class StubPage: Page {
     }
 
     /// None for an address without a host, as a page with no icon has in Chromium.
-    private static func icon(for url: URL) -> NSImage? {
+    static func icon(for url: URL) -> NSImage? {
         guard let host = url.host()?.replacingOccurrences(of: "www.", with: "") else { return nil }
         let hue = Double(host.unicodeScalars.reduce(0) { ($0 * 31 + Int($1.value)) % 360 }) / 360
         let letter = String(host.prefix(1)).uppercased()
@@ -437,7 +463,7 @@ final class StubPage: Page {
     }
 }
 
-private final class StubMenuItem: NSMenuItem {
+final class StubMenuItem: NSMenuItem {
     private var run: () -> Void = {}
 
     convenience init(_ title: String, enabled: Bool = true, run: @escaping () -> Void) {
@@ -515,6 +541,7 @@ private struct StubPageView: View {
                         HStack(spacing: 16) {
                             Button("Download a file") { page.download() }
                             Button("Download a file that fails") { page.download(failing: true) }
+                            Button("Add an extension") { page.addExtension() }
                         }
                     }
                     .buttonStyle(.link)
