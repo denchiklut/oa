@@ -38,6 +38,7 @@ that every online integration still works.
 - [Page context menu](context-menu/README.md)
 - [Command bar and history](command-bar/README.md)
 - [Extensions](extensions/README.md)
+- [Picture-in-picture](picture-in-picture/README.md)
 
 These pages describe existing slices and their product choices. Moving the
 notes here does not assess or change the checklist status below.
@@ -378,7 +379,7 @@ Sources: Arc native General → Previews and Profiles settings;
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Picture-in-Picture / automatic video mini-player | ✅ | ☐ |
+| Picture-in-Picture / automatic video mini-player | ✅ | ✅ |
 | Sidebar audio player and media controls | ✅ | ☐ |
 | Mute a tab from the browser UI | ✅ | ☐ |
 | Cast a browser tab | ✅ | ☐ |
