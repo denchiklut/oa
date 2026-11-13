@@ -56,7 +56,7 @@ final class MainMenu {
         archive.addItem(item("Forward", #selector(BrowserWindowController.goForward(_:)), key: "]"))
         archive.addItem(.separator())
         archive.addItem(item("View History", #selector(BrowserWindowController.viewHistory(_:)), key: "y"))
-        archive.addItem(item("View Archive…", #selector(BrowserWindowController.viewArchive(_:))))
+        archive.addItem(item("View Archive…", #selector(BrowserWindowController.toggleArchive(_:))))
         archive.addItem(item("Clear Archive", #selector(BrowserWindowController.clearArchive(_:))))
 
         let tabs = submenu("Tabs", in: menu)
