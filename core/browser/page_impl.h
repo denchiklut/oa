@@ -64,6 +64,9 @@ class PageImpl : public Page,
   // From Chrome's extension install prompt and uninstall dialog.
   void RequestExtension(const ExtensionRequest& request, ExtensionReply reply);
   void CloseExtensionRequest(const ExtensionRequest& request);
+  // From the window Chromium shows this page's picture-in-picture video in.
+  void NotifyPictureInPicture(const PictureInPictureEvent& event,
+                              void* ns_view = nullptr);
   // Runs the beforeunload handler as quitting does and keeps the page either
   // way. A handler-less page answers at once.
   void AskToLeave(std::function<void(bool leave)> callback);

@@ -41,6 +41,15 @@ typedef NS_ENUM(NSInteger, OAPageRendererExit) {
   OAPageRendererExitEvictedForMemory,
 };
 
+typedef NS_ENUM(NSInteger, OAPagePictureInPictureEvent) {
+  OAPagePictureInPictureEventCreated,
+  OAPagePictureInPictureEventShow,
+  OAPagePictureInPictureEventHide,
+  OAPagePictureInPictureEventClose,
+  OAPagePictureInPictureEventResolutionChanged,
+  OAPagePictureInPictureEventDestroyed,
+};
+
 typedef NS_ENUM(NSInteger, OAPageDialogKind) {
   OAPageDialogKindAlert,
   OAPageDialogKindConfirm,
@@ -116,6 +125,13 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)page:(OAPage*)page didRequestExtension:(OAPageExtensionRequest*)request;
 - (void)page:(OAPage*)page
     didCloseExtensionRequest:(OAPageExtensionRequest*)request;
+// `view` comes with Created and draws the page's picture-in-picture video,
+// the engine's until Destroyed. `rect` is the video element's bounds in the
+// page for Created and holds the video's natural size for ResolutionChanged.
+- (void)page:(OAPage*)page
+    pictureInPicture:(OAPagePictureInPictureEvent)event
+                view:(nullable NSView*)view
+                rect:(NSRect)rect;
 - (void)pageDidCancelClose:(OAPage*)page;
 // `sessionID` is -1 when Chrome kept no record of the tab.
 - (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;

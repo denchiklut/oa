@@ -27,6 +27,8 @@
 - (void)pageExtensionRequest:(const oa::ExtensionRequest&)request
                        reply:(oa::Page::ExtensionReply)reply;
 - (void)pageExtensionRequestClosed:(const oa::ExtensionRequest&)request;
+- (void)pagePictureInPicture:(const oa::PictureInPictureEvent&)event
+                        view:(nullable NSView*)view;
 - (void)pageCloseCancelled;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
@@ -220,6 +222,10 @@ class PageObserverBridge : public oa::Page::Observer {
   void OnPageExtensionRequestClosed(
       const oa::ExtensionRequest& request) override {
     [page_ pageExtensionRequestClosed:request];
+  }
+  void OnPagePictureInPicture(const oa::PictureInPictureEvent& event,
+                              void* ns_view) override {
+    [page_ pagePictureInPicture:event view:(__bridge NSView*)ns_view];
   }
   void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
   void OnPageClosed(std::optional<int32_t> session_id) override {
@@ -638,6 +644,35 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
           [_extensionRequests objectForKey:@(request.id)]) {
     [self.delegate page:self didCloseExtensionRequest:shown];
   }
+}
+
+- (void)pagePictureInPicture:(const oa::PictureInPictureEvent&)event
+                        view:(nullable NSView*)view {
+  OAPagePictureInPictureEvent kind;
+  switch (event.kind) {
+    case oa::PictureInPictureEvent::Kind::kCreated:
+      kind = OAPagePictureInPictureEventCreated;
+      break;
+    case oa::PictureInPictureEvent::Kind::kShow:
+      kind = OAPagePictureInPictureEventShow;
+      break;
+    case oa::PictureInPictureEvent::Kind::kHide:
+      kind = OAPagePictureInPictureEventHide;
+      break;
+    case oa::PictureInPictureEvent::Kind::kClose:
+      kind = OAPagePictureInPictureEventClose;
+      break;
+    case oa::PictureInPictureEvent::Kind::kResolutionChanged:
+      kind = OAPagePictureInPictureEventResolutionChanged;
+      break;
+    case oa::PictureInPictureEvent::Kind::kDestroyed:
+      kind = OAPagePictureInPictureEventDestroyed;
+      break;
+  }
+  [self.delegate page:self
+      pictureInPicture:kind
+                  view:view
+                  rect:NSMakeRect(event.x, event.y, event.width, event.height)];
 }
 
 - (void)pageCloseCancelled {
