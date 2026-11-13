@@ -13,12 +13,18 @@ final class WindowModel {
         didSet {
             closeCommandBarIfSelectionChanged()
             loadExtensions()
+            presentationChanged()
         }
     }
     private(set) var selectedTabIDs: [UUID: UUID] = [:] {
-        didSet { closeCommandBarIfSelectionChanged() }
+        didSet {
+            closeCommandBarIfSelectionChanged()
+            presentationChanged()
+        }
     }
-    private(set) var pages: [UUID: any Page] = [:]
+    private(set) var pages: [UUID: any Page] = [:] {
+        didSet { presentationChanged() }
+    }
     /// Last frames of pages that left for another window while their tab stayed selected here.
     private(set) var placeholders: [UUID: NSImage] = [:]
     /// Pages shown over the window as Arc's Peek: by the tab they were opened from, whose state they are, or by
@@ -48,6 +54,8 @@ final class WindowModel {
     /// Opens another window on this one's Space with the tab selected; the tab's page follows it there.
     @ObservationIgnored var openWindow: (_ tabID: UUID) -> Void = { _ in }
     @ObservationIgnored let downloads: DownloadsStore
+    @ObservationIgnored private let pictureInPicture: PictureInPicture
+    @ObservationIgnored private var presentedPage: (any Page)?
     @ObservationIgnored private let engine: any BrowserApplication
     @ObservationIgnored private let store: SidebarStore
     @ObservationIgnored private var previousTabID: UUID?
@@ -101,11 +109,15 @@ final class WindowModel {
             id: id, selectedSpaceID: selectedSpaceID, lastActiveDates: lastActiveDates, createdDates: createdDates)
     }
 
-    init(id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore, spaceID: UUID) {
+    init(
+        id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore,
+        pictureInPicture: PictureInPicture, spaceID: UUID
+    ) {
         self.id = id
         self.engine = engine
         self.store = store
         self.downloads = downloads
+        self.pictureInPicture = pictureInPicture
         selectedSpaceID = spaceID
         loadExtensions()
     }
@@ -173,6 +185,21 @@ final class WindowModel {
         else { return }
         components.queryItems = [URLQueryItem(name: "site", value: url.absoluteString)]
         if let settings = components.url { newTab(settings) }
+    }
+
+    func siteSetting(_ type: SiteSettingType, ofPage pageID: UUID) -> SiteSettingValue? {
+        guard let tabID = tabID(of: pageID), let url = pages[tabID]?.url,
+            let profile = state.profile(containing: tabID)
+        else { return nil }
+        return engine.browserContext(id: profile.id).changedSiteSettings(for: url)?.first { $0.type == type }?.value
+    }
+
+    /// As Arc's presentation updates, which its picture-in-picture rule answers: the page the window shows changed.
+    private func presentationChanged() {
+        let page = page
+        guard presentedPage?.id != page?.id else { return }
+        for changed in [presentedPage, page] { changed.map(pictureInPicture.presentationChanged) }
+        presentedPage = page
     }
 
     private var siteContext: (any BrowserContext)? {
@@ -883,10 +910,16 @@ final class WindowModel {
     /// The stream has one consumer, so a page gets one loop for its life, delivering to whichever window holds it.
     private func listen(to page: any Page) {
         let store = store
+        let pictureInPicture = pictureInPicture
         let pageID = page.id
         Task {
             for await event in page.events {
-                store.windows.first { $0.holds(pageID) }?.handle(event, for: pageID)
+                // The app's one window for it, whichever window holds the page, or none any more.
+                if case .pictureInPicture(let event) = event {
+                    pictureInPicture.handle(event, for: pageID)
+                } else {
+                    store.windows.first { $0.holds(pageID) }?.handle(event, for: pageID)
+                }
             }
         }
     }
@@ -897,6 +930,14 @@ final class WindowModel {
 
     private func tabID(of pageID: UUID) -> UUID? {
         pages.first { $0.value.id == pageID }?.key
+    }
+
+    func page(id pageID: UUID) -> (any Page)? {
+        pages.values.first { $0.id == pageID }
+    }
+
+    func showPage(_ pageID: UUID) {
+        if let tabID = tabID(of: pageID) { show(tabID) }
     }
 
     private func peekOwner(of pageID: UUID) -> UUID? {
