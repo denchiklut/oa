@@ -183,7 +183,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         // Arc takes Archive Tab out of the menu while a download's preview shows.
         if item.action == #selector(closeTab(_:)) { item.isHidden = model.previewedDownload != nil }
-        if model.dialog != nil || item.isHidden { return false }
+        if model.dialog != nil || model.extensionRequest != nil || item.isHidden { return false }
         if item.action == #selector(runExtension(_:)) {
             return model.extensionActions.contains { $0.id == item.representedObject as? String }
         }
