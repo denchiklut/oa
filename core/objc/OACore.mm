@@ -490,6 +490,58 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   return _page && _page->IsMicrophoneOn();
 }
 
+- (BOOL)isAudible {
+  return _page && _page->IsAudible();
+}
+
+- (OAPageMediaSessionStatus)mediaSessionStatus {
+  std::optional<oa::MediaSessionState> state;
+  if (_page) {
+    state = _page->GetMediaSessionState();
+  }
+  if (!state) {
+    return OAPageMediaSessionStatusNone;
+  }
+  switch (state->status) {
+    case oa::MediaSessionState::Status::kActive:
+      return OAPageMediaSessionStatusActive;
+    case oa::MediaSessionState::Status::kDucking:
+      return OAPageMediaSessionStatusDucking;
+    case oa::MediaSessionState::Status::kSuspended:
+      return OAPageMediaSessionStatusSuspended;
+    case oa::MediaSessionState::Status::kInactive:
+      return OAPageMediaSessionStatusInactive;
+  }
+}
+
+- (OAPageMediaContentType)mediaContentType {
+  std::optional<oa::MediaSessionState> state;
+  if (_page) {
+    state = _page->GetMediaSessionState();
+  }
+  if (!state) {
+    return OAPageMediaContentTypeUnknown;
+  }
+  switch (state->content_type) {
+    case oa::MediaSessionState::ContentType::kUnknown:
+      return OAPageMediaContentTypeUnknown;
+    case oa::MediaSessionState::ContentType::kAudioOnly:
+      return OAPageMediaContentTypeAudioOnly;
+    case oa::MediaSessionState::ContentType::kVideoOnly:
+      return OAPageMediaContentTypeVideoOnly;
+    case oa::MediaSessionState::ContentType::kAudioVideo:
+      return OAPageMediaContentTypeAudioVideo;
+  }
+}
+
+- (BOOL)requestPictureInPicture {
+  return _page && _page->RequestPictureInPicture();
+}
+
+- (BOOL)exitPictureInPictureAndPause:(BOOL)pause {
+  return _page && _page->EndPictureInPicture(pause);
+}
+
 - (void)loadURL:(NSURL*)url {
   if (_page) {
     _page->Load(url.absoluteString.UTF8String ?: "");

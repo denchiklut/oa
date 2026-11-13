@@ -86,6 +86,8 @@ class PageImpl : public Page,
   NavigationResult GetNavigationResult() const override;
   bool IsCameraOn() const override;
   bool IsMicrophoneOn() const override;
+  bool IsAudible() const override;
+  std::optional<MediaSessionState> GetMediaSessionState() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -95,6 +97,8 @@ class PageImpl : public Page,
   void SetKeepsAddress(bool keeps_address) override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
+  bool RequestPictureInPicture() override;
+  bool EndPictureInPicture(bool pause_video) override;
   void Close() override;
   void Drop() override;
 

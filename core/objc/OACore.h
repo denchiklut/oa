@@ -41,6 +41,21 @@ typedef NS_ENUM(NSInteger, OAPageRendererExit) {
   OAPageRendererExitEvictedForMemory,
 };
 
+typedef NS_ENUM(NSInteger, OAPageMediaSessionStatus) {
+  OAPageMediaSessionStatusNone,
+  OAPageMediaSessionStatusActive,
+  OAPageMediaSessionStatusDucking,
+  OAPageMediaSessionStatusSuspended,
+  OAPageMediaSessionStatusInactive,
+};
+
+typedef NS_ENUM(NSInteger, OAPageMediaContentType) {
+  OAPageMediaContentTypeUnknown,
+  OAPageMediaContentTypeAudioOnly,
+  OAPageMediaContentTypeVideoOnly,
+  OAPageMediaContentTypeAudioVideo,
+};
+
 typedef NS_ENUM(NSInteger, OAPagePictureInPictureEvent) {
   OAPagePictureInPictureEventCreated,
   OAPagePictureInPictureEventShow,
@@ -153,6 +168,10 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 @property(nonatomic, readonly) OAPageNavigationResult navigationResult;
 @property(nonatomic, readonly, getter=isCameraOn) BOOL cameraOn;
 @property(nonatomic, readonly, getter=isMicrophoneOn) BOOL microphoneOn;
+@property(nonatomic, readonly, getter=isAudible) BOOL audible;
+// None while the page has no media session.
+@property(nonatomic, readonly) OAPageMediaSessionStatus mediaSessionStatus;
+@property(nonatomic, readonly) OAPageMediaContentType mediaContentType;
 // Links to another host open a new page instead of navigating this one.
 @property(nonatomic) BOOL keepsAddress;
 - (instancetype)init NS_UNAVAILABLE;
@@ -165,6 +184,11 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
 // Nil while the page has nothing drawn, for example when no window shows it.
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable image))completion;
+// NO when the engine refuses: the page has a picture-in-picture video already,
+// or no media session that can enter picture-in-picture.
+- (BOOL)requestPictureInPicture;
+// NO when the page has no picture-in-picture video.
+- (BOOL)exitPictureInPictureAndPause:(BOOL)pause;
 - (void)close;
 - (void)drop;
 @end
