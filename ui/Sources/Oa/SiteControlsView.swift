@@ -1,32 +1,20 @@
 import DevKit
 import SwiftUI
 
-/// Arc's Site Controls as open-arch E23 recorded it: the profile's extensions, the site's changed settings, each
-/// toggled between allowed and blocked in place, then whether the connection is secure and "…" for every setting of
-/// the site. Arc's page actions, Developer Mode and Automatic Picture-In-Picture rows are left out until Oa has them.
+/// Arc's Site Controls as open-arch E23 recorded it: the profile's extensions, the site's settings, each toggled
+/// between allowed and blocked in place, then whether the connection is secure and "…" for every setting of the site.
+/// Arc's page actions are left out until Oa has them.
 struct SiteControlsView: View {
     let model: WindowModel
     let isSecure: Bool
     let dismiss: () -> Void
-    @State private var settings: [SiteSetting] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ExtensionsSection(model: model, dismiss: dismiss)
                 .padding(.bottom, 15)
-            if !settings.isEmpty {
-                Text("Settings")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 6)
-                ForEach(settings, id: \.type) { setting in
-                    SiteSettingRow(setting: setting) {
-                        model.toggle(setting)
-                        settings = model.siteSettings()
-                    }
-                }
-                Divider().padding(.top, 8).padding(.bottom, 10)
-            }
+            SettingsSection(model: model, dismiss: dismiss)
+            Divider().padding(.top, 8).padding(.bottom, 10)
             HStack {
                 Label(isSecure ? "Secure" : "Insecure", systemImage: isSecure ? "lock.fill" : "lock.slash.fill")
                     .font(.system(size: 13, weight: .medium))
@@ -59,7 +47,6 @@ struct SiteControlsView: View {
         }
         .padding(10)
         .frame(width: 236)
-        .onAppear { settings = model.siteSettings() }
     }
 
     private func openAllSiteSettings() {
@@ -107,6 +94,54 @@ private struct ExtensionsSection: View {
         }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+    }
+}
+
+/// Arc's section (arc-site-controls.md): "More" at the header's end while the pointer is over the section, the whole
+/// header opening every setting of the site; the site's changed settings, then Developer Mode, then Automatic
+/// Picture-In-Picture.
+private struct SettingsSection: View {
+    let model: WindowModel
+    let dismiss: () -> Void
+    @State private var settings: [SiteSetting] = []
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                dismiss()
+                model.openAllSiteSettings()
+            } label: {
+                HStack {
+                    Text("Settings")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("More")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .opacity(hovering ? 1 : 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            ForEach(settings.filter { $0.type != .automaticPictureInPicture }, id: \.type) { setting in
+                SiteSettingRow(setting: setting) { toggle(setting) }
+            }
+            // Developer Mode is its own feature; the row stands as Arc's, off, until it lands.
+            SiteSettingRow(title: "Developer Mode", value: "Off", symbol: "hammer.fill", isOn: false) {}
+            if let setting = settings.first(where: { $0.type == .automaticPictureInPicture }) {
+                SiteSettingRow(setting: setting) { toggle(setting) }
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onAppear { settings = model.siteSettings() }
+    }
+
+    private func toggle(_ setting: SiteSetting) {
+        model.toggle(setting)
+        settings = model.siteSettings()
     }
 }
 
@@ -207,37 +242,45 @@ private struct SecondaryClick: NSViewRepresentable {
     }
 }
 
-/// A setting's symbol in a circle, filled when allowed, then its name and "Allowed" or "Blocked".
+/// Arc's row: a white symbol in a circle of the accent, pale when off, then the name and its state.
 private struct SiteSettingRow: View {
-    let setting: SiteSetting
+    let title: String
+    let value: String
+    let symbol: String
+    let isOn: Bool
     let toggle: () -> Void
-    @State private var hovering = false
 
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: 9) {
-                Image(systemName: setting.type.symbol)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(setting.value.isAllowed ? Color(nsColor: .windowBackgroundColor) : .primary)
-                    .frame(width: 32, height: 32)
-                    .background(.primary.opacity(setting.value.isAllowed ? 0.92 : 0.16), in: Circle())
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(Color.accentColor.opacity(isOn ? 1 : 0.3), in: Circle())
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(setting.type.title).font(.system(size: 13, weight: .semibold))
-                    Text(setting.value.isAllowed ? "Allowed" : "Blocked")
+                    Text(title).font(.system(size: 13, weight: .semibold))
+                    Text(value)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .frame(height: 33)
             .contentShape(Rectangle())
-            .background(.primary.opacity(hovering ? 0.06 : 0), in: RoundedRectangle(cornerRadius: 8))
-            .padding(.horizontal, -6)
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+    }
+}
+
+extension SiteSettingRow {
+    /// Arc draws every content setting with a gear.
+    init(setting: SiteSetting, toggle: @escaping () -> Void) {
+        let isOn = setting.value.isAllowed
+        self.init(
+            title: setting.type.title, value: isOn ? "Allowed" : "Blocked", symbol: "gearshape.fill", isOn: isOn,
+            toggle: toggle)
     }
 }
 
@@ -286,45 +329,6 @@ extension SiteSettingType {
         case .webAppInstallation: "Web App Installations"
         case .localNetwork: "Local Network"
         case .loopbackNetwork: "Apps on Device"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .geolocation, .geolocationWithOptions: "location.fill"
-        case .camera: "camera.fill"
-        case .cameraPanTiltZoom: "camera.aperture"
-        case .microphone: "mic.fill"
-        case .sensors: "gyroscope"
-        case .notifications: "bell.fill"
-        case .javascript: "curlybraces"
-        case .images: "photo.fill"
-        case .popups: "arrow.up.forward.app.fill"
-        case .windowManagement: "macwindow.on.rectangle"
-        case .ads: "megaphone.fill"
-        case .backgroundSync: "arrow.triangle.2.circlepath"
-        case .sound: "speaker.wave.2.fill"
-        case .automaticDownloads: "arrow.down.circle.fill"
-        case .midiSysex: "pianokeys"
-        case .clipboardReadWrite: "doc.on.clipboard.fill"
-        case .usbGuard, .serialGuard: "cable.connector"
-        case .hidGuard: "gamecontroller.fill"
-        case .fileSystemWriteGuard: "folder.fill"
-        case .localFonts: "textformat"
-        case .bluetoothGuard, .bluetoothScanning: "antenna.radiowaves.left.and.right"
-        case .handTracking: "hand.raised.fill"
-        case .vr: "eyeglasses"
-        case .ar: "cube.transparent"
-        case .idleDetection: "moon.zzz.fill"
-        case .federatedIdentityAPI: "person.badge.key.fill"
-        case .automaticPictureInPicture: "pip.fill"
-        case .capturedSurfaceControl: "rectangle.on.rectangle"
-        case .automaticFullscreen: "arrow.up.left.and.arrow.down.right"
-        case .keyboardLock: "keyboard.fill"
-        case .pointerLock: "cursorarrow"
-        case .webAppInstallation: "square.and.arrow.down.fill"
-        case .localNetwork: "network"
-        case .loopbackNetwork: "desktopcomputer"
         }
     }
 }
