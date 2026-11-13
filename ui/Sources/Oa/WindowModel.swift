@@ -30,6 +30,8 @@ final class WindowModel {
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
     private(set) var permissionRequests: [UUID: [PagePermissionRequest]] = [:]
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
+    /// By profile, as ADK keeps a browser per window and profile: from the window's first page in the profile on.
+    private(set) var browsers: [UUID: any Browser] = [:]
     private(set) var commandBar: CommandBar?
     /// When this window last showed a tab and when a tab was made through it, as Arc's per-window
     /// `itemLastActiveDates` and `itemCreatedDates`, which order its empty command bar.
@@ -48,6 +50,7 @@ final class WindowModel {
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
     /// By profile: ArcCore keeps one omnibox per window.
     @ObservationIgnored private var autocompletes: [UUID: any Autocomplete] = [:]
+    @ObservationIgnored private var browserListeners: [Task<Void, Never>] = []
     private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
@@ -155,6 +158,34 @@ final class WindowModel {
 
     private var siteContext: (any BrowserContext)? {
         selectedTabID.flatMap { state.profile(containing: $0) }.map { engine.browserContext(id: $0.id) }
+    }
+
+    private func ensureBrowser(for profileID: UUID) {
+        guard browsers[profileID] == nil else { return }
+        let browser = engine.browserContext(id: profileID).browser(windowID: id)
+        browsers[profileID] = browser
+        browserListeners.append(
+            Task { [weak self] in
+                for await event in browser.events {
+                    guard let self, case .opened(let page, let isActive) = event else { continue }
+                    place(page, isActive: isActive, in: profileID)
+                }
+            })
+    }
+
+    /// A page the engine made itself, as an extension's `chrome.tabs.create`. Oa's own: at the top of the shown Space
+    /// when it is the profile's, else of the profile's first; where Arc puts one is unknown.
+    private func place(_ page: any Page, isActive: Bool, in profileID: UUID) {
+        let shown = space?.profileID == profileID ? selectedSpaceID : nil
+        guard let spaceID = shown ?? state.spaces.first(where: { $0.profileID == profileID })?.id else {
+            return page.drop()
+        }
+        let tab = SidebarTab(id: UUID(), url: page.url, viewedAt: .now)
+        store.edit { $0.insertTab(tab, atTopOf: spaceID) }
+        createdDates[tab.id] = .now
+        install(page, for: tab.id)
+        listen(to: page)
+        if isActive { show(tab.id) }
     }
 
     /// As Arc: at the top of the Space's unpinned tabs.
@@ -580,6 +611,9 @@ final class WindowModel {
         peeks = [:]
         dialogs = [:]
         permissionRequests = [:]
+        browserListeners.forEach { $0.cancel() }
+        browserListeners = []
+        browsers = [:]
         archivePeekID = nil
         creating = [:]
     }
@@ -702,6 +736,7 @@ final class WindowModel {
         let token = UUID()
         creating[tabID] = token
         let context = engine.browserContext(id: profile.id)
+        ensureBrowser(for: profile.id)
         Task { [store, id] in
             let made = await context.makePage(windowID: id, restoring: sessionID)
             let owner = store.windows.first { $0.creating[tabID] == token }
@@ -770,6 +805,7 @@ final class WindowModel {
     /// reports changes and a page opened by script may have its title before it arrives here.
     private func install(_ page: any Page, for tabID: UUID) {
         pages[tabID] = page
+        if let profile = state.profile(containing: tabID) { ensureBrowser(for: profile.id) }
         page.keepsAddress = state.keepsAddress(tabID)
         save(page, for: tabID)
         observe(page, for: tabID)
