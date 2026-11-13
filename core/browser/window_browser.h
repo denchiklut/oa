@@ -76,6 +76,10 @@ class WindowBrowser : public TabStripModelObserver {
       const TabStripSelectionChange& selection) override;
 
  private:
+  // Hands a tab Chrome put in the strip itself to the app, as ArcCore's
+  // browser delegate hears of one.
+  void AdoptInserted(base::WeakPtr<content::WebContents> contents);
+
   const raw_ptr<BrowserWindowInterface> browser_;
   std::unique_ptr<ExtensionsContainerImpl> extensions_container_;
   std::string window_id_;

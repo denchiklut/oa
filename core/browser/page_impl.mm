@@ -154,6 +154,19 @@ std::unique_ptr<PageImpl> PageImpl::Restore(WindowBrowser* window_browser,
 }
 
 // static
+std::unique_ptr<PageImpl> PageImpl::AdoptInserted(
+    WindowBrowser* window_browser,
+    content::WebContents* contents) {
+  // As for a restored tab: Chrome hides a background tab's view until a
+  // BrowserView shows it.
+  contents->GetNativeView().GetNativeNSView().hidden = NO;
+  std::unique_ptr<PageImpl> page(
+      new PageImpl(window_browser, /*observer=*/nullptr));
+  page->Adopt(contents);
+  return page;
+}
+
+// static
 PageImpl* PageImpl::FromWebContents(content::WebContents* contents) {
   auto* marker =
       static_cast<PageMarker*>(contents->GetUserData(kPageMarkerKey));

@@ -7,9 +7,12 @@
 
 #include "base/auto_reset.h"
 #include "base/check.h"
+#include "base/functional/bind.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/strings/sys_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_removed_reason.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -211,6 +214,21 @@ Browser::Observer* WindowBrowser::observer() const {
              : FindBrowserObserver(window_id_, browser_->GetProfile());
 }
 
+void WindowBrowser::AdoptInserted(
+    base::WeakPtr<content::WebContents> contents) {
+  Browser::Observer* observer = this->observer();
+  TabStripModel* model = browser_->GetTabStripModel();
+  // The app's own pages were adopted as they went in.
+  if (!contents || !observer || closing_ ||
+      PageImpl::FromWebContents(contents.get()) ||
+      model->GetIndexOfWebContents(contents.get()) == TabStripModel::kNoTab) {
+    return;
+  }
+  observer->OnBrowserOpenedPage(
+      PageImpl::AdoptInserted(this, contents.get()),
+      model->GetActiveWebContents() == contents.get());
+}
+
 bool WindowBrowser::Insert(std::unique_ptr<content::WebContents> contents) {
   if (closing_) {
     return false;
@@ -301,8 +319,17 @@ void WindowBrowser::OnTabStripModelChanged(
         }
       }
       break;
-    case TabStripModelChange::kSelectionOnly:
     case TabStripModelChange::kInserted:
+      // From a task: the app's own page is adopted right after it goes in.
+      for (const TabStripModelChange::ContentsWithIndex& inserted :
+           change.GetInsert()->contents) {
+        base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+            FROM_HERE, base::BindOnce(&WindowBrowser::AdoptInserted,
+                                      weak_factory_.GetWeakPtr(),
+                                      inserted.contents->GetWeakPtr()));
+      }
+      break;
+    case TabStripModelChange::kSelectionOnly:
     case TabStripModelChange::kMoved:
       break;
   }

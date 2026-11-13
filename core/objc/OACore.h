@@ -362,6 +362,11 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
                      size:(NSSize)size;
 - (void)browser:(OABrowser*)browser didResizeExtensionPopup:(NSSize)size;
 - (void)browserDidCloseExtensionPopup:(OABrowser*)browser;
+// Chromium put `page` in the window itself, as an extension's
+// chrome.tabs.create does. It has no delegate yet; releasing it drops it.
+- (void)browser:(OABrowser*)browser
+    didOpenPage:(OAPage*)page
+         active:(BOOL)active;
 @end
 
 // One window's side in one profile, as ArcCore's ArcBrowser.

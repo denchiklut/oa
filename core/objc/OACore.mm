@@ -1263,6 +1263,13 @@ class BrowserObserverBridge : public oa::Browser::Observer {
     OABrowser* browser = browser_;
     [browser.target browserDidCloseExtensionPopup:browser];
   }
+  void OnBrowserOpenedPage(std::unique_ptr<oa::Page> page,
+                           bool is_active) override {
+    OABrowser* browser = browser_;
+    OAPage* opened = [[OAPage alloc] initWithDelegate:nil];
+    [opened setPage:std::move(page)];
+    [browser.target browser:browser didOpenPage:opened active:is_active];
+  }
 
  private:
   __weak OABrowser* browser_;
