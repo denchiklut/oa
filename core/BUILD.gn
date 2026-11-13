@@ -82,6 +82,7 @@ source_set("oa") {
     "//content/public/common",
     "//extensions/browser",
     "//extensions/common",
+    "//services/media_session/public/mojom",
     "//skia",
     "//third_party/blink/public/common",
     "//third_party/metrics_proto",

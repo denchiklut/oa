@@ -2,6 +2,7 @@
 
 #import <AppKit/AppKit.h>
 
+#include <algorithm>
 #include <set>
 #include <utility>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
+#include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/ssl/chrome_security_state_util.h"
@@ -28,6 +30,7 @@
 #include "components/sessions/core/tab_restore_service.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/frame_tree_node_id.h"
+#include "content/public/browser/media_session.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/page_navigator.h"
@@ -38,6 +41,7 @@
 #include "content/public/common/referrer.h"
 #include "content/public/common/url_constants.h"
 #include "oa/browser/window_browser.h"
+#include "services/media_session/public/mojom/media_session.mojom.h"
 #include "skia/ext/skia_utils_mac.h"
 #include "third_party/blink/public/common/renderer_preferences/renderer_preferences.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -342,6 +346,60 @@ bool PageImpl::IsMicrophoneOn() const {
                                ->IsCapturingAudio(web_contents());
 }
 
+bool PageImpl::IsAudible() const {
+  return web_contents() && web_contents()->IsCurrentlyAudible();
+}
+
+std::optional<MediaSessionState> PageImpl::GetMediaSessionState() const {
+  content::MediaSession* session =
+      web_contents() ? content::MediaSession::GetIfExists(web_contents())
+                     : nullptr;
+  if (!session) {
+    return std::nullopt;
+  }
+  media_session::mojom::MediaSessionInfoPtr info =
+      session->GetMediaSessionInfoSync();
+  MediaSessionState state;
+  switch (info->state) {
+    case media_session::mojom::MediaSessionInfo::SessionState::kActive:
+      state.status = MediaSessionState::Status::kActive;
+      break;
+    case media_session::mojom::MediaSessionInfo::SessionState::kDucking:
+      state.status = MediaSessionState::Status::kDucking;
+      break;
+    case media_session::mojom::MediaSessionInfo::SessionState::kSuspended:
+      state.status = MediaSessionState::Status::kSuspended;
+      break;
+    case media_session::mojom::MediaSessionInfo::SessionState::kInactive:
+      state.status = MediaSessionState::Status::kInactive;
+      break;
+  }
+  // Chromium reports a kind per player; the richest stands for the session.
+  // How ADK folds ArcCore's list into one is not known.
+  if (info->audio_video_states) {
+    for (media_session::mojom::MediaAudioVideoState kind :
+         *info->audio_video_states) {
+      MediaSessionState::ContentType type =
+          MediaSessionState::ContentType::kUnknown;
+      switch (kind) {
+        case media_session::mojom::MediaAudioVideoState::kAudioOnly:
+          type = MediaSessionState::ContentType::kAudioOnly;
+          break;
+        case media_session::mojom::MediaAudioVideoState::kVideoOnly:
+          type = MediaSessionState::ContentType::kVideoOnly;
+          break;
+        case media_session::mojom::MediaAudioVideoState::kAudioVideo:
+          type = MediaSessionState::ContentType::kAudioVideo;
+          break;
+        case media_session::mojom::MediaAudioVideoState::kDeprecatedUnknown:
+          break;
+      }
+      state.content_type = std::max(state.content_type, type);
+    }
+  }
+  return state;
+}
+
 void PageImpl::Load(const std::string& url) {
   GURL gurl(url);
   if (!web_contents() || !gurl.is_valid()) {
@@ -458,6 +516,40 @@ void PageImpl::Snapshot(SnapshotCallback callback) {
             callback((__bridge void*)image);
           },
           std::move(callback))));
+}
+
+bool PageImpl::RequestPictureInPicture() {
+  content::WebContents* contents = web_contents();
+  if (!contents || contents->HasPictureInPictureVideo()) {
+    return false;
+  }
+  // The action is listed when the page handles it or its one player can enter
+  // picture-in-picture, which a disablepictureinpicture video can't.
+  content::MediaSession* session = content::MediaSession::GetIfExists(contents);
+  if (!session ||
+      !std::ranges::contains(
+          session->GetMediaSessionActionsSync(),
+          media_session::mojom::MediaSessionAction::kEnterPictureInPicture)) {
+    return false;
+  }
+  session->EnterPictureInPicture();
+  return true;
+}
+
+// As ArcCore: Chrome's close from the window's own controls, which tells the
+// page's auto picture-in-picture helper the user closed it.
+bool PageImpl::EndPictureInPicture(bool pause_video) {
+  content::WebContents* contents = web_contents();
+  PictureInPictureWindowManager* manager =
+      PictureInPictureWindowManager::GetInstance();
+  if (!contents || !contents->HasPictureInPictureVideo() ||
+      manager->GetWebContents() != contents) {
+    return false;
+  }
+  return manager->ExitPictureInPictureViaWindowUi(
+      pause_video
+          ? PictureInPictureWindowManager::UiBehavior::kCloseWindowAndPauseVideo
+          : PictureInPictureWindowManager::UiBehavior::kCloseWindowOnly);
 }
 
 void PageImpl::AskToLeave(std::function<void(bool leave)> callback) {

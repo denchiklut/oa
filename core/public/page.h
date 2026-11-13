@@ -128,6 +128,25 @@ struct ExtensionRequest {
   std::vector<std::string> permissions;
 };
 
+// Chromium's media session for the page, as ADK's media session state and
+// content type report it.
+struct MediaSessionState {
+  enum class Status {
+    kActive,
+    kDucking,
+    kSuspended,
+    kInactive,
+  };
+  enum class ContentType {
+    kUnknown,
+    kAudioOnly,
+    kVideoOnly,
+    kAudioVideo,
+  };
+  Status status = Status::kInactive;
+  ContentType content_type = ContentType::kUnknown;
+};
+
 // What Chromium asks of the window that shows a page's video in
 // picture-in-picture, as ArcCore's media session delegate reports it.
 struct PictureInPictureEvent {
@@ -223,6 +242,9 @@ class Page {
   // While the page captures from them, as ArcCore's media session reports.
   virtual bool IsCameraOn() const = 0;
   virtual bool IsMicrophoneOn() const = 0;
+  virtual bool IsAudible() const = 0;
+  // Null while the page has no media session.
+  virtual std::optional<MediaSessionState> GetMediaSessionState() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;
@@ -238,6 +260,12 @@ class Page {
   // Fails while the page has nothing drawn, for example when no window shows
   // it.
   virtual void Snapshot(SnapshotCallback callback) = 0;
+  // Through the page's media session, as ArcCore's request: false when the
+  // page has a picture-in-picture video already, has no media session, or the
+  // session can't enter picture-in-picture. Playing or not is the app's check.
+  virtual bool RequestPictureInPicture() = 0;
+  // False when the page has no picture-in-picture video.
+  virtual bool EndPictureInPicture(bool pause_video) = 0;
   // Closes as the user would: unload handlers run and Chrome records the tab.
   virtual void Close() = 0;
   // Destroys the page without unload handlers or a closed-tab entry.
