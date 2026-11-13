@@ -86,20 +86,31 @@ context menu, and the page stays live beside it. Restore puts the tab back at th
 top of its Space's unpinned section, not selected, with its page made on first
 selection from the saved URL and no history; a tab whose Space is gone returns to
 the window's Space. Clicking the row itself shows the page in a Peek over the
-list; see [Peek](../peek/README.md). File ▸ Restore Last Closed Tab ⇧⌘T brings the newest entry
-back at its old index, selected, switching the window to its Space, and, as in
-Arc, with its back and forward history and the page from Chromium's cache while
-Chromium still keeps the closed tab; that record lasts until quit, so after a
-relaunch the tab loads its saved URL. Archive ▸
+list; see [Peek](../peek/README.md). Archive ▸
 Clear Archive empties it after a confirmation. Each tab carries the time a
 window last selected it; a sweep at launch and every 15 minutes archives
 unpinned tabs idle for 12 hours, Arc's default, unless a window has them
 selected, and there is no setting to turn it off. A due tab with a live page is
 closed as the user would, so a `beforeunload` handler can keep it; a kept tab
 counts as viewed now and is not asked again for another 12 hours, Oa's own rule,
-after Arc's idle unload, which never prompts. Arc's ⇧⌘T walks a separate
-session-only stack and switches to a tab that is open again; Oa's walks the
-Archive, a follow-up.
+after Arc's idle unload, which never prompts.
+
+File ▸ Restore Last Closed Tab ⇧⌘T walks the window's own closed tabs, not the
+Archive, as Arc's does. Each window keeps the last ten closes the user made
+from it, in memory: ⌘W, a row's ✕, Remove Favorite and a closed Peek, whichever
+window held the page. The list goes with the window and at quit. A page that
+closes itself and a deleted Space's tabs are not in it, as in Arc; neither are
+auto-archived tabs, Oa's own choice, Arc's being unknown. The item is enabled
+only while the window has something to bring back. A press takes the newest. A
+tab that is open again, restored from the Archive or expanded from a Peek, is
+selected, switching the window to its Space. One that is gone returns where it
+was, selected, even after its Archive entry was deleted, and leaves the
+Archive; when its Space is gone it lands at the top of the shown Space. It
+comes back with its back and forward history and the page from Chromium's
+cache while Chromium still keeps the closed tab. That holds whichever window
+held the page, Oa's own choice: Arc keeps the session ID in the window that
+held the page, so a tab closed from another window loads fresh there. Arc also
+selects a pinned tab again when its ⌘W left nothing selected; Oa doesn't yet.
 
 A page a page opens, with a `target=_blank` link, `window.open` or a ⌘-click,
 keeps the page the engine made for it, so `window.opener`, session storage and a

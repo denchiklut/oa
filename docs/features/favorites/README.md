@@ -21,7 +21,8 @@ as Arc inserts at the drop position, or by Tabs ▸ Favorite Tab, which appends,
 standing in for Arc's command-bar command; Arc's row menu has no such item and
 neither has Oa. Tiles move by the same drag. The tile's Remove Favorite
 archives the tab under no Space with its page closed and leaves nothing
-selected, as Arc does. Tabs ▸ Unfavorite Tab, the tile's Unfavorite and a tile
+selected, as Arc does; ⇧⌘T then brings it back as a tile in its old slot, as
+Arc's does. Tabs ▸ Unfavorite Tab, the tile's Unfavorite and a tile
 dropped on the tab list make it a tab of the shown Space at the top of the
 unpinned section; Arc has the command, the tile item, the drop and the position
 are Oa's own. Favorites are never auto-archived, and deleting a Space leaves

@@ -50,8 +50,13 @@ the last window and quitting; a page that closes itself leaves no entry. When
 another window takes the tab's page, on selection or because its window closed,
 the Peek goes with it, as Arc's does. A tab has
 one Peek: a new request while one is up closes the current one as ✕ would and
-archives it at once, Oa's own choice. The entry has no position, so it restores at the top of the
-unpinned section, also Oa's own: Arc's entries carry no visible position.
+archives it at once, Oa's own choice. ⇧⌘T in the window that closed a Peek
+selects its tab and brings the Peek back over it with its history, removing
+the entry, as Arc does; nothing shows when the tab already has a Peek, or when
+the tab is gone, which also keeps the entry. A Peek that closed itself, one
+replaced by a new request and one archived with its opener are not brought
+back. Restore in the Archive makes the entry a tab at the top of the unpinned
+section.
 Nothing about a Peek is saved, so none survives a relaunch, as in Arc.
 
 Clicking an Archive row shows the entry's page in a Peek over the list, made
