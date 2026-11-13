@@ -10,6 +10,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let didClose: (BrowserWindowController) -> Void
     private var asking = false
     private let downloadPreview = DownloadPreviewWindow()
+    private var viewTimer: Task<Void, Never>?
 
     init(
         id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore, spaceID: UUID,
@@ -53,6 +54,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.makeKeyAndOrderFront(nil)
         observeTitle()
         observeDownloadPreview()
+        // As Arc's per-window timer: each minute the shown tab counts as viewed, unless the window is fully hidden.
+        viewTimer = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self, !Task.isCancelled else { return }
+                if self.window?.occlusionState.contains(.visible) == true { model.markShownViewed() }
+            }
+        }
     }
 
     private func observeDownloadPreview() {
@@ -93,6 +102,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        viewTimer?.cancel()
         downloadPreview.close()
         model.dropAll(handingOff: true)
         store.removeWindow(model)
