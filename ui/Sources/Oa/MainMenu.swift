@@ -78,6 +78,7 @@ final class MainMenu {
         tabs.addItem(last)
         tabs.addItem(.separator())
         tabs.addItem(item("Favorite Tab", #selector(BrowserWindowController.toggleFavorite(_:))))
+        tabs.addItem(item("Clear Today", #selector(BrowserWindowController.clearTabs(_:))))
         tabs.addItem(.separator())
         tabs.addItem(item("Expand Peek", #selector(BrowserWindowController.expandPeek(_:)), key: "o"))
 

@@ -160,6 +160,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if model.showingDownloads { model.exitLibrary() } else { model.viewLibrary(.downloads) }
     }
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
+    @objc func clearTabs(_ sender: Any?) { model.clearTabs() }
     @objc func addExtension(_ sender: Any?) { model.addExtension() }
     @objc func manageExtensions(_ sender: Any?) { model.manageExtensions() }
 
@@ -237,6 +238,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(selectTab(_:)): tabIndex(for: item) != nil
         case #selector(deleteSpace(_:)): model.state.spaces.count > 1
         case #selector(restoreLastClosed(_:)): model.canRestoreLastClosed
+        case #selector(clearTabs(_:)): model.canClearTabs
         case #selector(clearArchive(_:)): !model.state.archive.isEmpty
         default: true
         }

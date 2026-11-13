@@ -16,3 +16,25 @@ struct ClosedPage {
     let place: Place
     let sessionID: PageSessionID?
 }
+
+/// An entry of Arc's stack: one close, of a tab or of several at once, whose steps go back one per press.
+struct ClosedGroup {
+    let id = UUID()
+    /// The tabs of a close of several, in the order their steps go on, whatever order their pages end in.
+    var order: [UUID] = []
+    /// Their list as it was before the close, so each goes back between its old neighbours in any order.
+    var siblings: [UUID] = []
+    var steps: [ClosedPage] = []
+
+    mutating func add(_ step: ClosedPage) {
+        let order = order
+        let rank = { (id: UUID) in order.firstIndex(of: id) ?? order.count }
+        steps.insert(step, at: steps.firstIndex { rank($0.id) > rank(step.id) } ?? steps.count)
+    }
+
+    /// Where a step goes back: after the nearest of its old neighbours above that is there again, else at the top.
+    func index(of id: UUID, among present: [UUID]) -> Int? {
+        guard let old = siblings.firstIndex(of: id) else { return nil }
+        return siblings[..<old].reversed().lazy.compactMap { present.firstIndex(of: $0) }.first.map { $0 + 1 } ?? 0
+    }
+}
