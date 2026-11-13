@@ -932,12 +932,18 @@ final class WindowModel {
         pages.first { $0.value.id == pageID }?.key
     }
 
+    /// A tab's page or a Peek's.
     func page(id pageID: UUID) -> (any Page)? {
-        pages.values.first { $0.id == pageID }
+        pages.values.first { $0.id == pageID } ?? peeks.values.first { $0.id == pageID }
     }
 
+    /// As for a page that asks to be shown: its tab, or the tab its Peek is over.
     func showPage(_ pageID: UUID) {
-        if let tabID = tabID(of: pageID) { show(tabID) }
+        if let ownerID = peekOwner(of: pageID) {
+            if ownerID != archivePeekID { show(ownerID) } else { bringToFront() }
+        } else if let tabID = tabID(of: pageID) {
+            show(tabID)
+        }
     }
 
     private func peekOwner(of pageID: UUID) -> UUID? {
@@ -968,6 +974,8 @@ final class WindowModel {
             return forget(request)
         case .closeCancelled:
             return closeCancelled(pageID)
+        case .wantsActivation:
+            return showPage(pageID)
         default:
             break
         }
@@ -975,8 +983,6 @@ final class WindowModel {
             switch event {
             case .opened(let opened, let url, let disposition, let byPage):
                 place(opened, url: url, disposition: disposition, byPage: byPage, from: ownerID, insidePeek: true)
-            case .wantsActivation:
-                if ownerID != archivePeekID { show(ownerID) } else { bringToFront() }
             case .closed(let sessionID):
                 peekEnded(ownerID, sessionID: sessionID)
             default:
@@ -988,8 +994,6 @@ final class WindowModel {
         switch event {
         case .opened(let opened, let url, let disposition, let byPage):
             place(opened, url: url, disposition: disposition, byPage: byPage, from: tabID, insidePeek: false)
-        case .wantsActivation:
-            show(tabID)
         case .closed(let sessionID):
             pageEnded(tabID, sessionID: sessionID)
         default:

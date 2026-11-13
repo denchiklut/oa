@@ -111,17 +111,15 @@ final class PictureInPicture {
     /// As Arc's Back to Tab: the source tab is selected and the page plays on there.
     private func backToTab() {
         guard let pageID = shownPageID else { return }
-        guard let holder = store.windows.first(where: { $0.page(id: pageID) != nil }),
-            let page = holder.page(id: pageID)
-        else { return dismiss(pageID) }
-        holder.showPage(pageID)
+        guard let page = page(pageID) else { return dismiss(pageID) }
+        store.windows.first { $0.page(id: pageID) != nil }?.showPage(pageID)
         exit(page, pausing: false, to: .pendingHidden)
     }
 
     /// As Arc's Close: the video pauses, and the selection stays where it is.
     private func close() {
         guard let pageID = shownPageID else { return }
-        guard let page = store.windows.lazy.compactMap({ $0.page(id: pageID) }).first else { return dismiss(pageID) }
+        guard let page = page(pageID) else { return dismiss(pageID) }
         exit(page, pausing: true, to: .userRequestedClose)
     }
 
@@ -132,6 +130,10 @@ final class PictureInPicture {
             sessions[page.id]?.state = .closeFailed
             dismiss(page.id)
         }
+    }
+
+    private func page(_ pageID: UUID) -> (any Page)? {
+        store.windows.lazy.compactMap { $0.page(id: pageID) }.first
     }
 
     private func dismiss(_ pageID: UUID) {
