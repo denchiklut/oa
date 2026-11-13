@@ -142,6 +142,8 @@ Implementation details live with their features:
   page, the items kept and where the pages it opens go.
 - <a id="command-bar"></a>[Command bar and history](../../features/command-bar/README.md): the bar, its rows and
   ranking, Return and its modifiers, search engines and View History.
+- <a id="extensions"></a>[Extensions](../../features/extensions/README.md): the Extensions menu, the Site
+  Controls section, the consent panels, action popups and the pages an extension opens.
 
 The [feature inventory](../../features/README.md) tracks candidate capabilities
 separately; its unchecked entries have not been assessed for implementation.
