@@ -142,6 +142,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if model.showingDownloads { model.hideDownloads() } else { model.viewDownloads() }
     }
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
+    @objc func addExtension(_ sender: Any?) { model.addExtension() }
+    @objc func manageExtensions(_ sender: Any?) { model.manageExtensions() }
+
+    @objc func runExtension(_ sender: NSMenuItem) {
+        if let id = sender.representedObject as? String { model.runExtension(id) }
+    }
 
     @objc func clearArchive(_ sender: Any?) {
         let alert = NSAlert()
@@ -178,6 +184,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // Arc takes Archive Tab out of the menu while a download's preview shows.
         if item.action == #selector(closeTab(_:)) { item.isHidden = model.previewedDownload != nil }
         if model.dialog != nil || item.isHidden { return false }
+        if item.action == #selector(runExtension(_:)) {
+            return model.extensionActions.contains { $0.id == item.representedObject as? String }
+        }
         if item.action == #selector(togglePin(_:)) {
             guard let tabID = model.selectedTabID, !model.state.isFavorite(tabID) else { return false }
             item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"

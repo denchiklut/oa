@@ -10,7 +10,10 @@ import Observation
 final class WindowModel {
     let id: UUID
     private(set) var selectedSpaceID: UUID {
-        didSet { closeCommandBarIfSelectionChanged() }
+        didSet {
+            closeCommandBarIfSelectionChanged()
+            loadExtensions()
+        }
     }
     private(set) var selectedTabIDs: [UUID: UUID] = [:] {
         didSet { closeCommandBarIfSelectionChanged() }
@@ -68,6 +71,13 @@ final class WindowModel {
         guard let page = frontPage, answeredPermissionRequest?.pageID != page.id else { return nil }
         return permissionRequests[page.id]?.first
     }
+    /// The selected tab's profile, else the Space's: whose extensions the window shows.
+    private var profileID: UUID? {
+        selectedTabID.flatMap { state.profile(containing: $0)?.id } ?? space?.profileID
+    }
+    var browser: (any Browser)? { profileID.flatMap { browsers[$0] } }
+    var extensions: [BrowserExtension] { profileID.map { engine.browserContext(id: $0).extensions.items } ?? [] }
+    var extensionActions: [ExtensionAction] { browser?.extensionActions ?? [] }
     /// What the prompt draws: the answered request stays until its popover has closed.
     var promptedPermissionRequest: PagePermissionRequest? { permissionRequest ?? answeredPermissionRequest?.request }
     private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
@@ -89,6 +99,7 @@ final class WindowModel {
         self.store = store
         self.downloads = downloads
         selectedSpaceID = spaceID
+        loadExtensions()
     }
 
     /// As Arc: a restored window comes back on its Space with nothing selected and no page. Its dates come back
@@ -159,6 +170,23 @@ final class WindowModel {
     private var siteContext: (any BrowserContext)? {
         selectedTabID.flatMap { state.profile(containing: $0) }.map { engine.browserContext(id: $0.id) }
     }
+
+    /// Read as a Space is shown, so the engine has reported its profile's by the time the Extensions menu opens.
+    private func loadExtensions() {
+        if let profileID = space?.profileID { _ = engine.browserContext(id: profileID).extensions.items }
+    }
+
+    /// As Arc: the Chrome Web Store's extensions page in a new tab.
+    func addExtension() {
+        if let url = URL(string: "https://chromewebstore.google.com/category/extensions") { newTab(url) }
+    }
+
+    /// As Arc's Manage Extensions…: Chrome's page in a new tab.
+    func manageExtensions() {
+        if let url = URL(string: "chrome://extensions/") { newTab(url) }
+    }
+
+    func runExtension(_ id: ExtensionAction.ID) { browser?.runExtensionAction(id) }
 
     private func ensureBrowser(for profileID: UUID) {
         guard browsers[profileID] == nil else { return }

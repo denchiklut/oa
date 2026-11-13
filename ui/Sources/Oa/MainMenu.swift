@@ -3,6 +3,7 @@ import AppKit
 @MainActor
 final class MainMenu {
     static let lastTabTag = 9
+    private let extensionsMenu = ExtensionsMenu()
 
     func install(in application: NSApplication) {
         let menu = NSMenu()
@@ -84,6 +85,8 @@ final class MainMenu {
         spaces.addItem(item("New Space…", #selector(BrowserWindowController.newSpace(_:))))
         spaces.addItem(item("Rename Space…", #selector(BrowserWindowController.renameSpace(_:))))
         spaces.addItem(item("Delete Space", #selector(BrowserWindowController.deleteSpace(_:))))
+
+        submenu("Extensions", in: menu).delegate = extensionsMenu
 
         let window = submenu("Window", in: menu)
         window.addItem(item("Minimize", #selector(NSWindow.performMiniaturize(_:)), key: "m"))
