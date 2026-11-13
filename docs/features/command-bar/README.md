@@ -43,24 +43,48 @@ DevKit keeps the kinds ADK keeps: typed URL and search, history, past searches,
 search and navigation suggestions and other engines. Chromium's open-tab,
 bookmark and calculator matches are dropped; Arc never shows them.
 
-Open tabs come from Oa's sidebar instead, as Arc's sidebar provider gives
-them: the Space's tabs other than the selected one, with "Switch to Tab", only
-when the bar makes a new tab. With nothing typed, they are the only rows. A
-tab and the history entry of its page are one row, the tab, at the better of
-their two places. Pinned tabs are offered and Favorites aren't, as Oa's own:
-neither was tested in Arc.
+Open tabs come from Oa's sidebar instead, as Arc's sidebar gives them, only
+when the bar makes a new tab, and never the selected tab. A tab needs an
+address, its live page's or else its saved one; its title doesn't matter.
+
+- **With text typed**, as Arc's sidebar provider: the Space's tabs and the
+  profile's Favorites whose title or whole URL holds the text. A tab and the
+  history entry of its page are one row, the tab, at the better of their two
+  places. A tab of another Space isn't offered, so its page shows as history.
+- **With nothing typed**, as Arc's null state: the profile's Favorites and the
+  tabs of all its Spaces, at most four rows and one for an address. They are
+  the only rows; Arc fills up to five with most visited sites and its
+  onboarding links, which Oa doesn't have.
 
 Each row is one line: the icon, the title, then "— host/path" for a page or
-"Switch to Tab ➜" for a tab.
+"Switch to Tab ➜" for a tab. A tab of another Space names its Space there
+instead, and Return switches to it in its Space.
 
 ## Ranking
 
-The rows are ranked with Arc's own scorer, ASE2, and its compiled-in weights.
-Every row gets all of ASE2's features, each is normalised over the query's
-rows, and the categories are weighted: kind 35, Chromium's rank and relevance
-25, recency 15, saved-ness 15, visit and typed counts 10, text match 2. An
-additional match has no Chromium rank and takes ASE2's default, 11. Boosts join
-the weighted mean:
+With nothing typed nothing is scored, as in Arc. Each window keeps when it
+last showed a tab and when a tab was made through it, as Arc's windows do. The
+tabs with such a date come first, latest first, by the last showing or else
+the making; then the rest, by when they were last selected in any window. A
+window stamps a tab it shows by a selection, a Space switch included, and each
+minute the one it is showing unless the window is fully hidden; the tab itself
+is stamped with it. A pinned tab that is closed loses when it was made.
+
+Oa's own here, because Arc's isn't known or its sources are missing:
+
+- the tab that takes a closed tab's place isn't stamped until the minute
+  passes: Arc's code reads as if it were, and Arc's bar showed it wasn't;
+- a tab moved or dropped into a window isn't dated as made there, and a tab
+  never selected comes last: Oa's tabs have no creation date;
+- the dates are restored with the window and dropped when their tab is gone;
+- the arrow beside a Space's name.
+
+With text, the rows are ranked with Arc's own scorer, ASE2, and its
+compiled-in weights. Every row gets all of ASE2's features, each is normalised
+over the query's rows, and the categories are weighted: kind 35, Chromium's
+rank and relevance 25, recency 15, saved-ness 15, visit and typed counts 10,
+text match 2. An additional match has no Chromium rank and takes ASE2's
+default, 11. Boosts join the weighted mean:
 
 - a tab shown in the last hour;
 - a tab or page whose URL starts with what was typed, and a search suggestion
@@ -83,8 +107,7 @@ The list ends at 15 rows, the limit Arc's bar gives ASE2.
 
 Oa's own, because Arc's isn't known:
 
-- the text matcher (prefix, word start, inside a word), and which open tabs a
-  query offers: those whose title or URL holds it;
+- the text matcher (prefix, word start, inside a word);
 - two boosts are narrower than ASE2's code reads, to match the orders Arc
   showed: the typed search gets no search boost, and a navigation suggestion
   none for its bare host;
