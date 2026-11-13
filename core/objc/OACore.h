@@ -278,9 +278,42 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)deleteMatch:(OAAutocompleteMatch*)match;
 @end
 
+// An installed extension, as ArcCore's ArcExtensionInfo.
+@interface OAExtension : NSObject
+@property(nonatomic, readonly) NSString* identifier;
+@property(nonatomic, readonly) NSString* name;
+@property(nonatomic, readonly) NSString* extensionDescription;
+@property(nonatomic, readonly) NSString* version;
+@property(nonatomic, readonly, getter=isEnabled) BOOL enabled;
+@property(nonatomic, readonly) BOOL hasAction;
+@property(nonatomic, readonly, getter=isFromWebstore) BOOL fromWebstore;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+@protocol OAExtensionsDelegate <NSObject>
+// Once, when the profile's extension system is ready.
+- (void)extensionsDidInitialize:(NSArray<OAExtension*>*)extensions;
+// Also for an update, which replaces the one with its identifier.
+- (void)extensionWasInstalled:(OAExtension*)extension;
+- (void)extensionWasUninstalledWithIdentifier:(NSString*)identifier;
+- (void)extensionWasEnabled:(OAExtension*)extension;
+- (void)extensionWasDisabled:(OAExtension*)extension;
+@end
+
+// A profile's extensions, as ArcCore's ArcBrowserContextExtensions.
+@interface OAExtensions : NSObject
+// Setting it the first time loads the profile and starts the events.
+@property(nonatomic, weak, nullable) id<OAExtensionsDelegate> delegate;
+- (instancetype)init NS_UNAVAILABLE;
+- (void)setExtensionWithIdentifier:(NSString*)identifier enabled:(BOOL)enabled;
+// Without asking; Chromium's own removal paths ask through the page.
+- (void)uninstallExtensionWithIdentifier:(NSString*)identifier;
+@end
+
 @interface OAProfile : NSObject
 @property(nonatomic, readonly) OADownloads* downloads;
 @property(nonatomic, readonly) OAPreferences* preferences;
+@property(nonatomic, readonly) OAExtensions* extensions;
 - (instancetype)init NS_UNAVAILABLE;
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;

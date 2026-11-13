@@ -10,6 +10,7 @@
 #include "oa/public/autocomplete.h"
 #include "oa/public/downloads.h"
 #include "oa/public/engine.h"
+#include "oa/public/extensions.h"
 #include "oa/public/page.h"
 #include "oa/public/preferences.h"
 #include "oa/public/site_settings.h"
@@ -59,6 +60,15 @@
 - (void)downloadCreated:(const oa::Download&)download page:(oa::Page*)page;
 - (void)downloadUpdated:(const oa::Download&)download page:(oa::Page*)page;
 - (void)downloadRemoved:(const std::string&)identifier;
+@end
+
+@interface OAExtension ()
+- (instancetype)initWithExtension:(const oa::Extension&)extension;
+@end
+
+@interface OAExtensions ()
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier;
+- (id<OAExtensionsDelegate>)target;
 @end
 
 @interface OAAutocompleteMatch ()
@@ -1009,18 +1019,123 @@ NSArray<OAAutocompleteMatch*>* ToNSArray(
 
 @end
 
+@implementation OAExtension
+
+@synthesize identifier = _identifier;
+@synthesize name = _name;
+@synthesize extensionDescription = _extensionDescription;
+@synthesize version = _version;
+@synthesize enabled = _enabled;
+@synthesize hasAction = _hasAction;
+@synthesize fromWebstore = _fromWebstore;
+
+- (instancetype)initWithExtension:(const oa::Extension&)extension {
+  if ((self = [super init])) {
+    _identifier = ToNSString(extension.id);
+    _name = ToNSString(extension.name);
+    _extensionDescription = ToNSString(extension.description);
+    _version = ToNSString(extension.version);
+    _enabled = extension.enabled;
+    _hasAction = extension.has_action;
+    _fromWebstore = extension.from_webstore;
+  }
+  return self;
+}
+
+@end
+
+namespace {
+
+class ExtensionsObserverBridge : public oa::Extensions::Observer {
+ public:
+  explicit ExtensionsObserverBridge(OAExtensions* extensions)
+      : extensions_(extensions) {}
+  void OnExtensionsInitialized(
+      const std::vector<oa::Extension>& extensions) override {
+    NSMutableArray<OAExtension*>* items = [NSMutableArray array];
+    for (const oa::Extension& extension : extensions) {
+      [items addObject:[[OAExtension alloc] initWithExtension:extension]];
+    }
+    [extensions_.target extensionsDidInitialize:items];
+  }
+  void OnExtensionInstalled(const oa::Extension& extension) override {
+    [extensions_.target extensionWasInstalled:[[OAExtension alloc]
+                                                  initWithExtension:extension]];
+  }
+  void OnExtensionUninstalled(const std::string& id) override {
+    [extensions_.target extensionWasUninstalledWithIdentifier:ToNSString(id)];
+  }
+  void OnExtensionEnabled(const oa::Extension& extension) override {
+    [extensions_.target
+        extensionWasEnabled:[[OAExtension alloc] initWithExtension:extension]];
+  }
+  void OnExtensionDisabled(const oa::Extension& extension) override {
+    [extensions_.target
+        extensionWasDisabled:[[OAExtension alloc] initWithExtension:extension]];
+  }
+
+ private:
+  __weak OAExtensions* extensions_;
+};
+
+}  // namespace
+
+@implementation OAExtensions {
+  NSString* _profileIdentifier;
+  std::unique_ptr<ExtensionsObserverBridge> _observer;
+  std::unique_ptr<oa::Extensions> _extensions;
+}
+
+@synthesize delegate = _delegate;
+
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier {
+  if ((self = [super init])) {
+    _profileIdentifier = [identifier copy];
+    _observer = std::make_unique<ExtensionsObserverBridge>(self);
+  }
+  return self;
+}
+
+- (id<OAExtensionsDelegate>)target {
+  return _delegate;
+}
+
+- (void)setDelegate:(nullable id<OAExtensionsDelegate>)delegate {
+  _delegate = delegate;
+  if (delegate && !_extensions) {
+    _extensions = oa::ObserveExtensions(_profileIdentifier.UTF8String ?: "",
+                                        _observer.get());
+  }
+}
+
+- (void)setExtensionWithIdentifier:(NSString*)identifier enabled:(BOOL)enabled {
+  if (_extensions) {
+    _extensions->SetEnabled(identifier.UTF8String ?: "", enabled);
+  }
+}
+
+- (void)uninstallExtensionWithIdentifier:(NSString*)identifier {
+  if (_extensions) {
+    _extensions->Uninstall(identifier.UTF8String ?: "");
+  }
+}
+
+@end
+
 @implementation OAProfile {
   NSString* _identifier;
 }
 
 @synthesize downloads = _downloads;
 @synthesize preferences = _preferences;
+@synthesize extensions = _extensions;
 
 - (instancetype)initWithIdentifier:(NSString*)identifier {
   if ((self = [super init])) {
     _identifier = [identifier copy];
     _downloads = [[OADownloads alloc] initWithProfileIdentifier:identifier];
     _preferences = [[OAPreferences alloc] initWithProfileIdentifier:identifier];
+    _extensions = [[OAExtensions alloc] initWithProfileIdentifier:identifier];
   }
   return self;
 }
