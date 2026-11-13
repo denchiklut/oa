@@ -443,8 +443,9 @@ bool BrowserWindowImpl::IsTabStripEditable() const {
 
 void BrowserWindowImpl::DisableTabStripEditingForTesting() {}
 
+// The app's toolbar; chrome.action.openPopup() asks before it opens a popup.
 bool BrowserWindowImpl::IsToolbarVisible() const {
-  return false;
+  return true;
 }
 
 bool BrowserWindowImpl::IsLocationBarVisible() const {

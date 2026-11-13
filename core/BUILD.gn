@@ -4,10 +4,13 @@ source_set("oa") {
   sources = [
     "app/engine.mm",
     "browser/autocomplete_impl.cc",
+    "browser/browser_impl.cc",
+    "browser/browser_impl.h",
     "browser/downloads_impl.cc",
     "browser/extensions_impl.cc",
     "browser/forwarding_web_contents_delegate.cc",
     "browser/forwarding_web_contents_delegate.h",
+    "browser/image_handle.h",
     "browser/page_impl.h",
     "browser/page_impl.mm",
     "browser/preferences_impl.cc",
@@ -18,6 +21,8 @@ source_set("oa") {
     "browser/ui/browser_window_impl.mm",
     "browser/ui/context_menu_impl.cc",
     "browser/ui/context_menu_impl.h",
+    "browser/ui/extensions_container_impl.h",
+    "browser/ui/extensions_container_impl.mm",
     "browser/ui/javascript_dialog_impl.cc",
     "browser/ui/javascript_dialog_impl.h",
     "browser/ui/permission_prompt_impl.cc",
@@ -31,6 +36,7 @@ source_set("oa") {
     "objc/OACore.h",
     "objc/OACore.mm",
     "public/autocomplete.h",
+    "public/browser.h",
     "public/downloads.h",
     "public/engine.h",
     "public/extensions.h",
@@ -77,6 +83,7 @@ source_set("oa") {
     "//third_party/metrics_proto",
     "//ui/base",
     "//ui/gfx",
+    "//ui/menus",
     "//url",
   ]
 
