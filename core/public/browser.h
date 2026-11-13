@@ -30,7 +30,8 @@ struct ExtensionToolbarAction {
 
 class Browser {
  public:
-  // The toolbar actions are posted; a popup's events come as they happen.
+  // The toolbar actions and opened pages are posted; a popup's events come as
+  // they happen.
   class Observer {
    public:
     // The whole list, after any of it changed and when the active page did.
@@ -46,6 +47,10 @@ class Browser {
     // The view is about to go: the page closed itself, another popup opened or
     // CloseExtensionPopup() was called.
     virtual void OnExtensionPopupClosed() = 0;
+    // Chromium put a page in the window's tab strip itself, as an extension's
+    // chrome.tabs.create does. The observer owns it; destroying it drops it.
+    virtual void OnBrowserOpenedPage(std::unique_ptr<Page> page,
+                                     bool is_active) = 0;
 
    protected:
     virtual ~Observer() = default;

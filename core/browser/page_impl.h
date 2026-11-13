@@ -41,6 +41,10 @@ class PageImpl : public Page,
                                            int32_t session_id,
                                            Page::Observer* observer);
   static PageImpl* FromWebContents(content::WebContents* contents);
+  // A page for a tab Chrome put in `window_browser`'s strip itself.
+  static std::unique_ptr<PageImpl> AdoptInserted(
+      WindowBrowser* window_browser,
+      content::WebContents* contents);
   static void CloseAll();
 
   PageImpl(const PageImpl&) = delete;
