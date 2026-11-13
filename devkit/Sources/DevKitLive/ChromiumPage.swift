@@ -5,7 +5,7 @@ import Observation
 
 @MainActor
 @Observable
-final class ChromiumPage: Page {
+final class ChromiumPage: Page, MediaSession {
     let id: UUID
     private(set) var url: URL?
     private(set) var title = ""
@@ -31,8 +31,19 @@ final class ChromiumPage: Page {
     @ObservationIgnored private var dialogs: [ObjectIdentifier: PageDialog] = [:]
     @ObservationIgnored private var permissionRequests: [ObjectIdentifier: PagePermissionRequest] = [:]
     @ObservationIgnored private var extensionRequests: [ObjectIdentifier: PageExtensionRequest] = [:]
+    @ObservationIgnored private var hasPictureInPictureController = false
 
     var view: NSView { hostingView }
+    var isAudible: Bool { page?.isAudible ?? false }
+    var mediaSession: any MediaSession { self }
+
+    var state: MediaSessionState? {
+        guard let page, let status = MediaSessionState.Status(core: page.mediaSessionStatus) else { return nil }
+        return MediaSessionState(status: status, contentType: .init(core: page.mediaContentType))
+    }
+
+    func requestPictureInPicture() -> Bool { page?.requestPictureInPicture() ?? false }
+    func exitPictureInPicture(pausing: Bool) -> Bool { page?.exitPictureInPicture(pausing: pausing) ?? false }
 
     init(id: UUID, page: CorePage, delegate: PageDelegate) {
         self.id = id
@@ -156,6 +167,13 @@ final class ChromiumPage: Page {
         }
     }
 
+    fileprivate func pictureInPicture(_ event: Int, view: NSView?, rect: NSRect) {
+        guard page != nil, let event = PictureInPictureEvent(core: event, view: view, rect: rect) else { return }
+        if case .created = event { hasPictureInPictureController = true }
+        if case .destroyed = event { hasPictureInPictureController = false }
+        continuation.yield(.pictureInPicture(event))
+    }
+
     fileprivate func closeCancelled() {
         if page != nil { continuation.yield(.closeCancelled) }
     }
@@ -170,9 +188,15 @@ final class ChromiumPage: Page {
         hostingView.show(page?.view)
     }
 
+    /// The engine destroys a closing page's picture-in-picture after the page reports closed, so that event is sent
+    /// for it here.
     private func finish() {
         page = nil
         extensionRequests = [:]
+        if hasPictureInPictureController {
+            hasPictureInPictureController = false
+            continuation.yield(.pictureInPicture(.destroyed))
+        }
         continuation.finish()
         hostingView.show(nil)
     }
@@ -232,6 +256,10 @@ final class PageDelegate: NSObject, CorePageDelegate {
         content?.extensionRequestClosed(request)
     }
 
+    func page(_ page: CorePage, pictureInPicture event: Int, view: NSView?, rect: NSRect) {
+        content?.pictureInPicture(event, view: view, rect: rect)
+    }
+
     func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }
 
     func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32) {
@@ -257,6 +285,48 @@ extension NavigationResult {
         switch core {
         case 1: self = .loaded
         case 2: self = .failed
+        default: return nil
+        }
+    }
+}
+
+extension MediaSessionState.Status {
+    /// `OAPageMediaSessionStatus` in `core/objc/OACore.h`; nil for no media session.
+    init?(core: Int) {
+        switch core {
+        case 1: self = .active
+        case 2: self = .ducking
+        case 3: self = .suspended
+        case 4: self = .inactive
+        default: return nil
+        }
+    }
+}
+
+extension MediaSessionState.ContentType {
+    /// `OAPageMediaContentType` in `core/objc/OACore.h`.
+    init?(core: Int) {
+        switch core {
+        case 1: self = .audioOnly
+        case 2: self = .videoOnly
+        case 3: self = .audioVideo
+        default: return nil
+        }
+    }
+}
+
+extension PictureInPictureEvent {
+    /// `OAPagePictureInPictureEvent` in `core/objc/OACore.h`.
+    @MainActor init?(core: Int, view: NSView?, rect: NSRect) {
+        switch core {
+        case 0:
+            guard let view else { return nil }
+            self = .created(PictureInPictureController(view: view, sourceBounds: rect))
+        case 1: self = .show
+        case 2: self = .hide
+        case 3: self = .close
+        case 4: self = .resolutionChanged(rect.size)
+        case 5: self = .destroyed
         default: return nil
         }
     }
