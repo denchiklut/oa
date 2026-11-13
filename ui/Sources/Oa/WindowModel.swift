@@ -109,7 +109,7 @@ final class WindowModel {
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }
     var selectableTabs: [SidebarTab] { state.selectableTabs(in: selectedSpaceID) }
-    var canRestoreLastClosed: Bool { closedGroups.contains { !$0.steps.isEmpty } }
+    var canRestoreLastClosed: Bool { !closedGroups.isEmpty }
 
     var record: WindowRecord {
         WindowRecord(
@@ -613,7 +613,6 @@ final class WindowModel {
     /// As Arc's `reopenLastClosedTab`: the newest step of this window's newest close. A tab that is open again is
     /// selected; one that is gone returns where it was with its history. Restore and the Archive Peek load fresh.
     func restoreLastClosed() {
-        while closedGroups.last?.steps.isEmpty == true { closedGroups.removeLast() }
         guard var group = closedGroups.popLast(), let closed = group.steps.popLast() else { return }
         if !group.steps.isEmpty { closedGroups.append(group) }
         guard case .tab(let parentID, let index) = closed.place else { return reopenPeek(closed) }
@@ -662,7 +661,7 @@ final class WindowModel {
     /// gone, so a `beforeunload` handler can keep both, as Arc does; a pinned one keeps its entry and drops its
     /// page; a Favorite is only deselected, its page reloading the saved URL in the background when it has left
     /// it, as Arc does.
-    func close(_ tabID: UUID, reason: SidebarArchivedTab.Reason = .manual, group: UUID? = nil) {
+    func close(_ tabID: UUID, reason: SidebarArchivedTab.Reason = .manual, group: ClosedGroup? = nil) {
         if state.isFavorite(tabID) {
             if let tab = state.tree.tab(tabID), let url = tab.url, let page = pages[tabID], !tab.isAt(page.url) {
                 page.load(url)
@@ -699,14 +698,13 @@ final class WindowModel {
     private func closeTogether(_ tabIDs: [UUID]) {
         guard !tabIDs.isEmpty else { return }
         let group = ClosedGroup(order: tabIDs, siblings: unpinnedTabs.map(\.id))
-        push(group)
         let closing = Set(tabIDs)
         if let selected = selectedTabID, closing.contains(selected) {
             let next = nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
             selectedTabIDs[selectedSpaceID] = next
             if let next { ensurePage(next) }
         }
-        for tabID in tabIDs { close(tabID, group: group.id) }
+        for tabID in tabIDs { close(tabID, group: group) }
     }
 
     func respond(to request: PagePermissionRequest, with response: PermissionResponse) {
@@ -832,7 +830,7 @@ final class WindowModel {
         // As Arc: a close of several picks the next selection up front, so a tab of it shown later by its "Leave
         // site?" leaves none.
         let next =
-            wasSelected && request?.groupID == nil ? nextSelection(closing: tabID, pinned: pinned, in: spaceID) : nil
+            wasSelected && request?.group == nil ? nextSelection(closing: tabID, pinned: pinned, in: spaceID) : nil
         let page = store.windows.compactMap { $0.release(tabID) }.first
         for window in store.windows {
             window.placeholders[tabID] = nil
@@ -861,12 +859,12 @@ final class WindowModel {
             }
         }
         store.edit { $0.archiveTab(tabID, reason: reason) }
-        if let closed { store.windows.first { $0.id == request?.windowID }?.remember(closed, in: request?.groupID) }
+        if let closed { store.windows.first { $0.id == request?.windowID }?.remember(closed, in: request?.group) }
     }
 
-    private func remember(_ closed: ClosedPage, in groupID: UUID? = nil) {
-        if let index = closedGroups.firstIndex(where: { $0.id == groupID }) { return closedGroups[index].add(closed) }
-        var group = ClosedGroup()
+    private func remember(_ closed: ClosedPage, in group: ClosedGroup? = nil) {
+        if let group, let index = closedGroups.firstIndex(of: group) { return closedGroups[index].add(closed) }
+        var group = group ?? ClosedGroup()
         group.add(closed)
         push(group)
     }

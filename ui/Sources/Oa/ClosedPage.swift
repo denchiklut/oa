@@ -17,14 +17,17 @@ struct ClosedPage {
     let sessionID: PageSessionID?
 }
 
-/// An entry of Arc's stack: one close, of a tab or of several at once, whose steps go back one per press.
-struct ClosedGroup {
+/// An entry of Arc's stack: one close, of a tab or of several at once, whose steps go back one per press. It goes
+/// on the stack with its first step, so a close that every page refused leaves the stack as it was.
+struct ClosedGroup: Equatable {
     let id = UUID()
     /// The tabs of a close of several, in the order their steps go on, whatever order their pages end in.
     var order: [UUID] = []
     /// Their list as it was before the close, so each goes back between its old neighbours in any order.
     var siblings: [UUID] = []
     var steps: [ClosedPage] = []
+
+    static func == (lhs: ClosedGroup, rhs: ClosedGroup) -> Bool { lhs.id == rhs.id }
 
     mutating func add(_ step: ClosedPage) {
         let order = order

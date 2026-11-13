@@ -144,14 +144,14 @@ final class SidebarStore {
 
 /// Who asked a page to close: the user, from a window and maybe with other tabs at once, or the auto-archive sweep.
 enum CloseRequest: Equatable {
-    case window(UUID, group: UUID? = nil)
+    case window(UUID, group: ClosedGroup? = nil)
     case auto
 
     var windowID: UUID? {
         if case .window(let id, _) = self { id } else { nil }
     }
 
-    var groupID: UUID? {
+    var group: ClosedGroup? {
         if case .window(_, let group) = self { group } else { nil }
     }
 }
