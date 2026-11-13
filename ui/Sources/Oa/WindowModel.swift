@@ -628,6 +628,7 @@ final class WindowModel {
             sessionID = closed.sessionID
         }
         if let spaceID = state.space(containing: closed.id)?.id { selectSpace(spaceID) }
+        showingArchive = false
         select(closed.id, restoring: sessionID)
     }
 
