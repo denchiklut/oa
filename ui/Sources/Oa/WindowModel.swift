@@ -167,10 +167,14 @@ final class WindowModel {
     }
 
     /// As Arc's Site Controls: read when it opens and after each change, for the page's site in its tab's profile;
-    /// only a secure page lists its settings.
+    /// only a secure page lists its settings. Automatic picture-in-picture is always among them and allowed unless
+    /// blocked, Chrome's Ask included.
     func siteSettings() -> [SiteSetting] {
         guard let page, page.securityLevel == .secure, let url = page.url, let context = siteContext else { return [] }
-        return context.changedSiteSettings(for: url) ?? []
+        let changed = context.changedSiteSettings(for: url) ?? []
+        let pictureInPicture = changed.first { $0.type == .automaticPictureInPicture }?.value
+        return changed.filter { $0.type != .automaticPictureInPicture }
+            + [SiteSetting(type: .automaticPictureInPicture, value: pictureInPicture == .block ? .block : .allow)]
     }
 
     /// As Arc: allowed becomes blocked and anything else allowed, with no reload.
