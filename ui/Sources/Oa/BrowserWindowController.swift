@@ -10,6 +10,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let didClose: (BrowserWindowController) -> Void
     private var asking = false
     private let downloadPreview = DownloadPreviewWindow()
+    private let extensionPopup = ExtensionPopupWindow()
     private var viewTimer: Task<Void, Never>?
 
     init(
@@ -54,6 +55,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.makeKeyAndOrderFront(nil)
         observeTitle()
         observeDownloadPreview()
+        observeExtensionPopup()
         // As Arc's per-window timer: each minute the shown tab counts as viewed, unless the window is fully hidden.
         viewTimer = Task { [weak self] in
             while !Task.isCancelled {
@@ -72,6 +74,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         guard let window else { return }
         if shown { downloadPreview.show(over: window, model: model) } else { downloadPreview.close() }
+    }
+
+    private func observeExtensionPopup() {
+        let popup = withObservationTracking {
+            _ = model.extensionPopup?.size
+            return model.extensionPopup
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeExtensionPopup() }
+        }
+        guard let window, let popup else { return extensionPopup.close() }
+        extensionPopup.show(popup, over: window) { [weak self] in self?.model.closeExtensionPopup() }
     }
 
     private func observeTitle() {
@@ -104,6 +117,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowWillClose(_ notification: Notification) {
         viewTimer?.cancel()
         downloadPreview.close()
+        extensionPopup.close()
         model.dropAll(handingOff: true)
         store.removeWindow(model)
         engine.closeWindow(id: model.id)
