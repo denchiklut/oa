@@ -828,12 +828,21 @@ final class WindowModel {
     /// The tab's Peek comes along, as Arc's does.
     private func adopt(_ page: any Page, for tabID: UUID, from holder: WindowModel) {
         page.move(toWindow: id)
+        takeExtensionRequests(of: page, from: holder)
         if let peek = holder.releasePeek(tabID) {
             peek.move(toWindow: id)
             peeks[tabID] = peek
+            takeExtensionRequests(of: peek, from: holder)
         }
         placeholders[tabID] = nil
         install(page, for: tabID)
+    }
+
+    /// The engine's question isn't tied to the window that showed it, so it goes where its page goes.
+    private func takeExtensionRequests(of page: any Page, from holder: WindowModel) {
+        if let requests = holder.extensionRequests.removeValue(forKey: page.id) {
+            extensionRequests[page.id] = requests
+        }
     }
 
     /// Asked before the page leaves, while it still draws here, and not waited for, as Arc's ingest does.
