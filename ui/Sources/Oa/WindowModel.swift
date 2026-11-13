@@ -688,6 +688,13 @@ final class WindowModel {
         closeTogether(tabIDs.sorted { lastActiveDates[$0] ?? .distantPast < lastActiveDates[$1] ?? .distantPast })
     }
 
+    /// As Arc's: the unpinned tabs below this one, the selected one included; ⇧⌘T brings them back from the top.
+    func archiveTabs(below tabID: UUID) {
+        let tabIDs = unpinnedTabs.map(\.id)
+        guard let index = tabIDs.firstIndex(of: tabID) else { return }
+        closeTogether(tabIDs[(index + 1)...].reversed())
+    }
+
     /// One close of several tabs from this window, one entry on its stack, the steps going back from the last.
     private func closeTogether(_ tabIDs: [UUID]) {
         guard !tabIDs.isEmpty else { return }

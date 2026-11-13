@@ -327,5 +327,12 @@ private struct TabRow: View {
         .onTapGesture { model.select(tab.id) }
         .onHover { hovering = $0 }
         .onDrag { NSItemProvider(object: tab.id.uuidString as NSString) }
+        .contextMenu {
+            if !model.state.isPinned(tab.id) {
+                Button("Archive Tab") { model.close(tab.id) }
+                Button("Archive Tabs Below") { model.archiveTabs(below: tab.id) }
+                    .disabled(model.unpinnedTabs.last?.id == tab.id)
+            }
+        }
     }
 }
