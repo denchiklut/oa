@@ -619,15 +619,35 @@ final class WindowModel {
     func restoreLastClosed() {
         guard var group = closedGroups.popLast(), let closed = group.popLast() else { return }
         if !group.isEmpty { closedGroups.append(group) }
+        guard case .tab(let parentID, let index) = closed.place else { return reopenPeek(closed) }
         var sessionID: PageSessionID?
         if state.tree.tab(closed.id) == nil {
             let tab = SidebarTab(id: closed.id, title: closed.title, url: closed.url, viewedAt: .now)
-            store.edit { $0.reopenTab(tab, in: closed.parentID, at: closed.index, else: selectedSpaceID) }
+            store.edit { $0.reopenTab(tab, in: parentID, at: index, else: selectedSpaceID) }
             createdDates[closed.id] = .now
             sessionID = closed.sessionID
         }
         if let spaceID = state.space(containing: closed.id)?.id { selectSpace(spaceID) }
         select(closed.id, restoring: sessionID)
+    }
+
+    /// As Arc: the Peek's tab is selected and the Peek returns over it with its history, its Archive entry gone.
+    /// Nothing shows when the tab already has a Peek, or when the tab is gone, which also keeps the entry.
+    private func reopenPeek(_ closed: ClosedPage) {
+        guard case .peek(let ownerID) = closed.place, let profile = state.profile(containing: ownerID) else { return }
+        store.edit { $0.removeArchived(closed.id) }
+        guard !store.windows.contains(where: { $0.peeks[ownerID] != nil }) else { return }
+        if let spaceID = state.space(containing: ownerID)?.id { selectSpace(spaceID) }
+        showingArchive = false
+        select(ownerID)
+        let context = engine.browserContext(id: profile.id)
+        ensureBrowser(for: profile.id)
+        Task { [weak self, id] in
+            guard let made = await context.makePage(windowID: id, restoring: closed.sessionID), let self else { return }
+            guard state.tree.tab(ownerID) != nil, peeks[ownerID] == nil else { return made.page.drop() }
+            peek(made.page, from: ownerID)
+            if !made.restored, let url = closed.url { made.page.load(url) }
+        }
     }
 
     func deleteArchived(_ id: UUID) {
@@ -802,7 +822,7 @@ final class WindowModel {
         let closed = state.tree.tab(tabID).flatMap { tab in
             state.tree.location(of: tabID).map {
                 ClosedPage(
-                    id: tabID, title: tab.title, url: tab.url, parentID: $0.parentID, index: $0.index,
+                    id: tabID, title: tab.title, url: tab.url, place: .tab(parentID: $0.parentID, index: $0.index),
                     sessionID: sessionID)
             }
         }
@@ -1055,9 +1075,13 @@ final class WindowModel {
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
         extensionRequests[page.id] = nil
-        if store.closing.removeValue(forKey: page.id) != nil, state.tree.tab(ownerID) != nil {
+        if let request = store.closing.removeValue(forKey: page.id), state.tree.tab(ownerID) != nil {
             let spaceID = state.space(containing: ownerID)?.id
             store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
+            store.windows.first { $0.id == request.windowID }?.remember(
+                ClosedPage(
+                    id: page.id, title: page.title, url: page.url, place: .peek(ownerID: ownerID),
+                    sessionID: sessionID))
         }
         if ownerID == archivePeekID { archivePeekID = nil }
         self.page?.activate()
