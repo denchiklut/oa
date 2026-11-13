@@ -31,6 +31,10 @@ final class WindowModel {
     private(set) var permissionRequests: [UUID: [PagePermissionRequest]] = [:]
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
     private(set) var commandBar: CommandBar?
+    /// When this window last showed a tab and when a tab was made through it, as Arc's per-window
+    /// `itemLastActiveDates` and `itemCreatedDates`.
+    private(set) var lastActiveDates: [UUID: Date] = [:]
+    private(set) var createdDates: [UUID: Date] = [:]
     /// The selection the command bar was opened over, which its destination is for.
     @ObservationIgnored private var commandBarSelection: (spaceID: UUID, tabID: UUID?)?
     @ObservationIgnored var bringToFront: () -> Void = {}
@@ -71,7 +75,10 @@ final class WindowModel {
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }
     var selectableTabs: [SidebarTab] { state.selectableTabs(in: selectedSpaceID) }
 
-    var record: WindowRecord { WindowRecord(id: id, selectedSpaceID: selectedSpaceID) }
+    var record: WindowRecord {
+        WindowRecord(
+            id: id, selectedSpaceID: selectedSpaceID, lastActiveDates: lastActiveDates, createdDates: createdDates)
+    }
 
     init(id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore, spaceID: UUID) {
         self.id = id
@@ -81,9 +88,12 @@ final class WindowModel {
         selectedSpaceID = spaceID
     }
 
-    /// As Arc: a restored window comes back on its Space with nothing selected and no page.
+    /// As Arc: a restored window comes back on its Space with nothing selected and no page. Its dates come back
+    /// too, as Oa's own: Arc saves them with the window, and what its restore does with them is unknown.
     func restore(_ record: WindowRecord) {
         if state.space(record.selectedSpaceID) != nil { selectedSpaceID = record.selectedSpaceID }
+        lastActiveDates = record.lastActiveDates
+        createdDates = record.createdDates
         openCommandBar(.newTab)
     }
 
@@ -150,6 +160,7 @@ final class WindowModel {
     func newTab(_ url: URL) {
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
         store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
+        createdDates[tab.id] = .now
         select(tab.id)
     }
 
@@ -220,6 +231,7 @@ final class WindowModel {
         case .open(let url, background: true):
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
+            createdDates[tab.id] = .now
             ensurePage(tab.id)
         case .open(let url, background: false):
             guard destination == .currentTab, let tabID = selectedTabID else { return newTab(url) }
@@ -246,8 +258,20 @@ final class WindowModel {
             handOff(current)
         }
         selectedTabIDs[selectedSpaceID] = tabID
-        store.markViewed(tabID)
+        markViewed(tabID)
         ensurePage(tabID, restoring: sessionID)
+    }
+
+    /// As Arc's `selectItem`: a tab the window shows by a selection is stamped for the window and for itself. The
+    /// tab that takes a closed one's place isn't: Arc's code reads as if it were, and Arc's bar showed it wasn't.
+    private func markViewed(_ tabID: UUID) {
+        lastActiveDates[tabID] = .now
+        store.markViewed(tabID)
+    }
+
+    /// Arc's pass each minute over what a window shows.
+    func markShownViewed() {
+        if !showingArchive, let tabID = selectedTabID { markViewed(tabID) }
     }
 
     /// Wraps at either end. With no selection, forward selects the first tab and backward the last.
@@ -268,7 +292,12 @@ final class WindowModel {
     func selectSpace(_ spaceID: UUID) {
         guard state.space(spaceID) != nil, spaceID != selectedSpaceID else { return }
         selectedSpaceID = spaceID
-        if let tabID = selectedTabID { ensurePage(tabID) } else { openCommandBar(.newTab) }
+        if let tabID = selectedTabID {
+            ensurePage(tabID)
+            markViewed(tabID)
+        } else {
+            openCommandBar(.newTab)
+        }
         store.windowStateChanged()
     }
 
@@ -399,6 +428,7 @@ final class WindowModel {
 
     func restoreArchived(_ id: UUID) {
         store.edit { $0.restoreArchived(id, in: selectedSpaceID, toOldPosition: false) }
+        createdDates[id] = .now
     }
 
     /// As Arc: no history, and the entry stays.
@@ -440,6 +470,7 @@ final class WindowModel {
             tab.openerID = ownerID
             store.edit { $0.openTab(tab, from: ownerID, in: selectedSpaceID) }
         }
+        createdDates[tab.id] = .now
         install(page, for: tab.id)
         select(tab.id)
     }
@@ -458,6 +489,7 @@ final class WindowModel {
         var spaceID: UUID?
         store.edit { spaceID = $0.restoreArchived(entry.id, in: selectedSpaceID, toOldPosition: true) }
         guard let spaceID else { return }
+        createdDates[entry.id] = .now
         selectSpace(spaceID)
         select(entry.id, restoring: sessionID)
     }
@@ -574,6 +606,9 @@ final class WindowModel {
         }
         for tabID in Array(creating.keys) where state.tree.tab(tabID) == nil { release(tabID) }
         for tabID in Array(placeholders.keys) where state.tree.tab(tabID) == nil { placeholders[tabID] = nil }
+        // Oa's own: Arc's last-active dates were never seen to be removed.
+        for tabID in Array(lastActiveDates.keys) where state.tree.tab(tabID) == nil { lastActiveDates[tabID] = nil }
+        for tabID in Array(createdDates.keys) where state.tree.tab(tabID) == nil { createdDates[tabID] = nil }
         if let previousTabID, state.tree.tab(previousTabID) == nil { self.previousTabID = nil }
     }
 
@@ -603,7 +638,11 @@ final class WindowModel {
         let wasSelected = selectedTabIDs[spaceID] == tabID
         let next = wasSelected ? nextSelection(closing: tabID, pinned: pinned, in: spaceID) : nil
         let page = store.windows.compactMap { $0.release(tabID) }.first
-        for window in store.windows { window.placeholders[tabID] = nil }
+        for window in store.windows {
+            window.placeholders[tabID] = nil
+            // As Arc's close: a pinned tab keeps when a window last showed it, not when one made it.
+            window.createdDates[tabID] = nil
+        }
         if !pinned {
             store.edit { $0.archiveTab(tabID, reason: reason) }
             store.sessionIDs[tabID] = sessionID
@@ -843,6 +882,7 @@ final class WindowModel {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
+            createdDates[tab.id] = .now
             install(page, for: tab.id)
             listen(to: page)
             return inWindow ? openWindow(tab.id) : select(tab.id)
@@ -853,6 +893,7 @@ final class WindowModel {
         }
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now, openerID: openerID)
         store.edit { $0.openTab(tab, from: openerID, in: selectedSpaceID) }
+        createdDates[tab.id] = .now
         install(page, for: tab.id)
         listen(to: page)
         guard state.isSelectable(tab.id, in: selectedSpaceID) else { return }
@@ -878,7 +919,6 @@ final class WindowModel {
             showingArchive = false
             selectedTabIDs[spaceID] = tabID
             selectSpace(spaceID)
-            store.markViewed(tabID)
         } else {
             select(tabID)
         }

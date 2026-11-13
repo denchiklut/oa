@@ -155,6 +155,41 @@ extension SidebarState {
 struct WindowRecord: Codable {
     let id: UUID
     var selectedSpaceID: UUID
+    var lastActiveDates: [UUID: Date]
+    var createdDates: [UUID: Date]
+
+    private enum Key: String, CodingKey { case id, selectedSpaceID, lastActiveDates, createdDates }
+
+    init(id: UUID, selectedSpaceID: UUID, lastActiveDates: [UUID: Date], createdDates: [UUID: Date]) {
+        self.id = id
+        self.selectedSpaceID = selectedSpaceID
+        self.lastActiveDates = lastActiveDates
+        self.createdDates = createdDates
+    }
+
+    /// The dates are by tab ID string, so each is a JSON object; a file from before them has none.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: Key.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        selectedSpaceID = try values.decode(UUID.self, forKey: .selectedSpaceID)
+        func dates(_ key: Key) throws -> [UUID: Date] {
+            let stored = try values.decodeIfPresent([String: Date].self, forKey: key) ?? [:]
+            return Dictionary(stored.compactMap { id, date in UUID(uuidString: id).map { ($0, date) } }) { $1 }
+        }
+        lastActiveDates = try dates(.lastActiveDates)
+        createdDates = try dates(.createdDates)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: Key.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(selectedSpaceID, forKey: .selectedSpaceID)
+        func stored(_ dates: [UUID: Date]) -> [String: Date] {
+            Dictionary(uniqueKeysWithValues: dates.map { ($0.key.uuidString, $0.value) })
+        }
+        try values.encode(stored(lastActiveDates), forKey: .lastActiveDates)
+        try values.encode(stored(createdDates), forKey: .createdDates)
+    }
 }
 
 struct WindowsSnapshot: Codable {
