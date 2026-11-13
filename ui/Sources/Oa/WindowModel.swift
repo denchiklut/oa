@@ -32,7 +32,7 @@ final class WindowModel {
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
     private(set) var commandBar: CommandBar?
     /// When this window last showed a tab and when a tab was made through it, as Arc's per-window
-    /// `itemLastActiveDates` and `itemCreatedDates`.
+    /// `itemLastActiveDates` and `itemCreatedDates`, which order its empty command bar.
     private(set) var lastActiveDates: [UUID: Date] = [:]
     private(set) var createdDates: [UUID: Date] = [:]
     /// The selection the command bar was opened over, which its destination is for.
@@ -109,16 +109,17 @@ final class WindowModel {
 
     /// The live page's favicon, wherever the page lives, else the saved one, as Arc shows it.
     func favicon(for tab: SidebarTab) -> NSImage? {
-        (pages[tab.id] ?? store.windows.lazy.compactMap { $0.pages[tab.id] }.first)?.favicon
-            ?? store.savedFavicon(tab.id)
+        livePage(for: tab.id)?.favicon ?? store.savedFavicon(tab.id)
+    }
+
+    private func livePage(for tabID: UUID) -> (any Page)? {
+        pages[tabID] ?? store.windows.lazy.compactMap { $0.pages[tabID] }.first
     }
 
     func savedFavicon(_ id: UUID) -> NSImage? { store.savedFavicon(id) }
 
     func isRecording(_ tab: SidebarTab) -> Bool {
-        guard let page = pages[tab.id] ?? store.windows.lazy.compactMap({ $0.pages[tab.id] }).first else {
-            return false
-        }
+        guard let page = livePage(for: tab.id) else { return false }
         return page.isCameraOn || page.isMicrophoneOn
     }
 
@@ -204,13 +205,20 @@ final class WindowModel {
         closeCommandBar()
     }
 
-    /// As Arc's sidebar provider: the Space's open tabs but the selected one. Whether Arc offers pinned tabs and
-    /// Favorites as rows is untested; Oa's own: pinned tabs are offered, Favorites aren't.
+    /// As Arc's command bar: the profile's Favorites and the tabs of all its Spaces but the selected tab, each with
+    /// an address.
     var commandBarTabs: [CommandBarRanking.Tab] {
-        (pinnedTabs + unpinnedTabs).filter { $0.id != selectedTabID }.map { tab in
-            CommandBarRanking.Tab(
-                tab: tab, isVisible: store.windows.contains { $0.selectedTabID == tab.id },
-                saveLevel: state.isPinned(tab.id) ? folderDepth(of: tab.id) : nil)
+        guard let space else { return [] }
+        let others = state.spaces.filter { $0.profileID == space.profileID && $0.id != space.id }
+        let tabs: [(SidebarTab, String?)] =
+            selectableTabs.map { ($0, nil) }
+            + others.flatMap { other in state.tabs(in: other.id).map { ($0, other.name) } }
+        return tabs.compactMap { tab, spaceName in
+            guard tab.id != selectedTabID, let url = livePage(for: tab.id)?.url ?? tab.url else { return nil }
+            return CommandBarRanking.Tab(
+                tab: tab, url: url, spaceName: spaceName, activeAt: lastActiveDates[tab.id] ?? createdDates[tab.id],
+                isVisible: store.windows.contains { $0.selectedTabID == tab.id },
+                saveLevel: state.keepsAddress(tab.id) ? folderDepth(of: tab.id) : nil)
         }
     }
 
@@ -227,7 +235,7 @@ final class WindowModel {
     private func perform(_ action: CommandBar.Action, in destination: CommandBar.Destination) {
         closeCommandBar()
         switch action {
-        case .switchTo(let tabID): select(tabID)
+        case .switchTo(let tabID): show(tabID)
         case .open(let url, background: true):
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
@@ -911,7 +919,8 @@ final class WindowModel {
         listen(to: page)
     }
 
-    /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown.
+    /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown and for another
+    /// Space's tab picked in the command bar.
     private func show(_ tabID: UUID) {
         let spaceID = state.space(containing: tabID)?.id ?? selectedSpaceID
         guard state.isSelectable(tabID, in: spaceID) else { return }
