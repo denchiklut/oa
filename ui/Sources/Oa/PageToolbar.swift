@@ -5,8 +5,6 @@ import SwiftUI
 struct PageToolbar: View {
     /// Arc's key. LIKELY kept across launches as Arc's default is; one setting for every window, as seen in Arc.
     static let key = "topBarURLEnabled"
-    static let height: CGFloat = 32
-
     static var isShown: Bool {
         get { UserDefaults.standard.bool(forKey: key) }
         set { UserDefaults.standard.set(newValue, forKey: key) }
@@ -16,36 +14,38 @@ struct PageToolbar: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        ZStack {
-            HStack(spacing: 0) {
-                NavigationButtons(page: model.page, size: CGSize(width: 32, height: 24), spacing: 5)
-                Spacer()
-                SiteControlsButton(model: model, size: CGSize(width: 32, height: 28))
-            }
-            .padding(.leading, 5)
-            .padding(.trailing, 41)
-            // The host is centred: Arc balances copy link with a second button after it.
-            HStack(spacing: 3) {
-                CopyLinkButton(model: model, size: 24)
-                    .opacity(model.address == nil ? 0 : 1)
-                // As Arc: the URL opens the command bar to edit it, rather than being edited in place.
-                Button {
-                    model.openCommandBar(.currentTab)
-                } label: {
-                    Text(model.addressLabel ?? "Search or Enter URL…")
-                        .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1)
-                        .foregroundStyle(model.address == nil ? theme.secondaryText : theme.addressText)
-                        .frame(height: 24)
-                        .contentShape(Rectangle())
+        VStack(spacing: 0) {
+            ZStack {
+                HStack(spacing: 0) {
+                    NavigationButtons(page: model.page, size: CGSize(width: 32, height: 24), spacing: 5)
+                    Spacer()
+                    SiteControlsButton(model: model, size: CGSize(width: 32, height: 28))
                 }
-                .buttonStyle(.plain)
-                Color.clear.frame(width: 24)
+                .padding(.leading, 5)
+                .padding(.trailing, 41)
+                // The host is centred: Arc balances copy link with a second button after it.
+                HStack(spacing: 3) {
+                    CopyLinkButton(model: model, size: 24)
+                        .opacity(model.address == nil ? 0 : 1)
+                    // As Arc: the URL opens the command bar to edit it, rather than being edited in place.
+                    Button {
+                        model.openCommandBar(.currentTab)
+                    } label: {
+                        Text(model.addressLabel ?? "Search or Enter URL…")
+                            .font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1)
+                            .foregroundStyle(model.address == nil ? theme.secondaryText : theme.addressText)
+                            .frame(height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    Color.clear.frame(width: 24)
+                }
+                .padding(.horizontal, 130)
             }
-            .padding(.horizontal, 130)
+            .frame(height: 32)
+            Color.primary.opacity(0.05).frame(height: 1)
         }
-        .frame(height: Self.height)
-        .overlay(alignment: .bottom) { LoadProgress(page: model.page) }
         .background(Color(nsColor: .textBackgroundColor))
         .background(WindowDragRegion())
     }

@@ -15,9 +15,7 @@ struct SidebarView: View {
         if let section = model.library {
             LibraryView(model: model, section: section)
         } else {
-            tabs
-                .frame(width: Self.width)
-                .background(Color(nsColor: .windowBackgroundColor))
+            tabs.frame(width: Self.width)
         }
     }
 

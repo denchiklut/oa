@@ -70,17 +70,3 @@ extension WindowModel {
         address.map { url in url.host().flatMap { $0.isEmpty ? nil : $0 } ?? url.absoluteString }
     }
 }
-
-/// The linear bar the address has carried so far, on its bottom edge.
-struct LoadProgress: View {
-    let page: (any Page)?
-
-    var body: some View {
-        if let page, page.isLoading {
-            ProgressView(value: page.loadProgress)
-                .progressViewStyle(.linear)
-                .frame(height: 2)
-                .padding(.horizontal, 2)
-        }
-    }
-}

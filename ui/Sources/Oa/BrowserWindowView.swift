@@ -9,21 +9,11 @@ struct BrowserWindowView: View {
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(model: model)
-            VStack(spacing: 0) {
-                if showsToolbar {
-                    PageToolbar(model: model)
-                        .environment(\.theme, .toolbar)
-                    Color.primary.opacity(0.05).frame(height: 1)
-                }
-                if let placeholder = model.placeholder {
-                    PlaceholderView(image: placeholder)
-                } else if let page = model.page {
-                    PageContentView(page: page)
-                } else {
-                    Color(nsColor: .windowBackgroundColor)
-                }
-            }
+            card
+                .padding([.top, .trailing, .bottom], 10)
+                .background(WindowDragRegion())
         }
+        .background { WindowSurface() }
         .overlay {
             if let peek = model.peek {
                 PeekView(model: model, page: peek, sidebarWidth: sidebarWidth)
@@ -58,6 +48,37 @@ struct BrowserWindowView: View {
         }
         .environment(\.theme, colorScheme == .dark ? .dark : .light)
         .ignoresSafeArea()
+    }
+
+    /// Arc's page as measured: a card flush with the sidebar and 10 pt in from the window's other edges, with 6 pt
+    /// corners, no border and a soft shadow.
+    private var card: some View {
+        VStack(spacing: 0) {
+            if showsToolbar {
+                PageToolbar(model: model)
+                    .environment(\.theme, .toolbar)
+                    .opacity(model.placeholder == nil ? 1 : 0)
+            }
+            if let placeholder = model.placeholder {
+                PlaceholderView(image: placeholder)
+            } else if let page = model.page {
+                PageContentView(page: page)
+            } else {
+                Color(nsColor: .windowBackgroundColor)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        // What casts the shadow sits a point inside the card, so it never tints the card's edge.
+        .background {
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .padding(1)
+                .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
+        }
+        // Oa's own place, in the margin over the card: Arc's with the sidebar showing wasn't measured.
+        .overlay(alignment: .top) {
+            LoadingIndicator(isLoading: model.page?.isLoading == true).offset(y: -7)
+        }
     }
 
     private var sidebarWidth: CGFloat {

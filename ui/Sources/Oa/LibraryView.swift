@@ -31,7 +31,6 @@ struct LibraryView: View {
             .frame(maxWidth: .infinity)
         }
         .frame(width: Self.width)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var rail: some View {

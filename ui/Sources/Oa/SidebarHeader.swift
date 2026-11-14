@@ -69,7 +69,6 @@ private struct SidebarAddressField: View {
                 .padding(.trailing, 4)
             }
         }
-        .overlay(alignment: .bottom) { LoadProgress(page: model.page) }
         .onHover { hovering = $0 }
     }
 }
