@@ -171,11 +171,19 @@ drawn and the request waits. Oa shows it when the Library closes; Arc holds it
 until the sidebar is next shown or hidden. With the sidebar hidden Arc slides it
 in for the prompt, which Oa will do once its sidebar can hide.
 
-Stand-ins, each waiting for its own slice: the surface is a gradient through
-the colours measured on Arc's default theme, light or dark with the system,
-until Spaces carry themes; the toolbar takes the system's colours until Oa
-reads the page's top band; and the sidebar's field opens the centred command
-bar, where Arc anchors a narrow one over the field.
+The surface is the Space's theme, drawn as Arc draws it. At the bottom is the
+window's material, which shows the blurred desktop while the window is active
+and is opaque otherwise. Over it lie an underlay, the theme's colours at the
+alpha its intensity gives, and its texture. A theme is a value in the shape Arc
+stores (`WindowTheme`): a gradient or a single colour with its intensity,
+texture and translucency style, the appearance of the chrome over it, and the
+palettes the chrome's colours come from. Until Spaces carry their own, every
+window shows Arc's default theme: a light and a dark gradient, chosen by the
+system's appearance. The four textures are Oa's own, generated to match Arc's.
+
+Stand-ins, each waiting for its own slice: the toolbar takes the system's
+colours until Oa reads the page's top band; and the sidebar's field opens the
+centred command bar, where Arc anchors a narrow one over the field.
 
 ## Page presentation and recovery
 
