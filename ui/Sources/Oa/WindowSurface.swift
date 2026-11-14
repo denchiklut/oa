@@ -285,24 +285,34 @@ private enum WindowTexture {
             return (0..<side * side).map { index in
                 let x = Double(index % side) + 0.5
                 let y = Double(index / side) + 0.5
-                var nearest = (distance: Double.infinity, tone: 0.0)
+                var nearest = (distance: Double.infinity, tone: 0.0, offset: SIMD2<Double>.zero)
+                var neighbors: [SIMD2<Double>] = []
                 var next = Double.infinity
                 for row in -2...2 {
                     for column in -2...2 {
                         let seed = seeds[
                             (Int(y / pitch) + row + count) % count * count + (Int(x / pitch) + column + count) % count]
-                        let across = min(abs(seed.x - x), Double(side) - abs(seed.x - x))
-                        let down = min(abs(seed.y - y), Double(side) - abs(seed.y - y))
-                        let distance = (across * across + down * down).squareRoot()
+                        var offset = SIMD2(seed.x - x, seed.y - y)
+                        offset.x -= Double(side) * (offset.x / Double(side)).rounded()
+                        offset.y -= Double(side) * (offset.y / Double(side)).rounded()
+                        neighbors.append(offset)
+                        let distance = simd_length(offset)
                         if distance < nearest.distance {
-                            (next, nearest) = (nearest.distance, (distance, seed.tone))
+                            (next, nearest) = (nearest.distance, (distance, seed.tone, offset))
                         } else if distance < next {
                             next = distance
                         }
                     }
                 }
-                let inside = min((next - nearest.distance) / 2.1, 1)
-                // Steep sides keep Arc's dark crevices between light pebbles instead of broad grey borders.
+                // Close seeds can darken a whole pebble; distance to the cell boundary limits those spots.
+                let boundary = neighbors.reduce(Double.infinity) { boundary, offset in
+                    let separation = simd_distance(offset, nearest.offset)
+                    guard separation > 0.000001 else { return boundary }
+                    let distance =
+                        (simd_length_squared(offset) - nearest.distance * nearest.distance) / (2 * separation)
+                    return min(boundary, max(0, distance))
+                }
+                let inside = min(max((next - nearest.distance) / 2.1, boundary / 2.6), 1)
                 return nearest.tone * cbrt(inside * inside * (3 - 2 * inside)) + 0.06 * unit()
             }
         }
@@ -318,7 +328,7 @@ private enum WindowTexture {
             channels = (0..<3).map { _ in noise((0.27, 0.27)).map { 0.735 + 0.24 * $0 } }
         case .sand:
             alpha = 1
-            channels = [softened(pebbles(), (0.15, 0.15)).map { 0.658 + 0.207 * $0 }]
+            channels = [softened(pebbles(), (0.2, 0.2)).map { 0.658 + 0.207 * $0 }]
         case .denim:
             // A twill: diagonal ribs five texels apart.
             alpha = 1
