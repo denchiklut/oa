@@ -156,12 +156,20 @@ The header row and that frame drag the window, and a double-click there does
 what System Settings asks of a title bar.
 
 Back, forward and reload sit in the header beside the window buttons, over a
-field that shows the page's host. A click on the field opens the command bar,
-and the pointer over it shows copy link and Site Controls, which the permission
-prompt hangs from. View ▸ Show Toolbar (⇧⌘D) moves all of that into a 32 pt bar
-along the top of the card. The setting is one for every window and kept across
-launches, under Arc's key `topBarURLEnabled`. A page's loading shows as Arc's
-pill, in the margin above the card; that place is Oa's own.
+field that shows the page's host without a leading `www.`. A click on the field
+opens the command bar, and the pointer over it shows copy link and Site
+Controls, which the permission prompt hangs from. As in Arc, both stay drawn
+while the prompt or Site Controls is up. View ▸ Show Toolbar (⇧⌘D) moves all of
+that into a 32 pt bar along the top of the card. The setting is one for every
+window and kept across launches, under Arc's key `topBarURLEnabled`. A page's
+loading shows as Arc's pill, in the margin above the card; that place is Oa's
+own.
+
+The prompt always hangs from wherever the address is. With the toolbar hidden
+and the Library open there is no address on screen, so, as in Arc, no prompt is
+drawn and the request waits. Oa shows it when the Library closes; Arc holds it
+until the sidebar is next shown or hidden. With the sidebar hidden Arc slides it
+in for the prompt, which Oa will do once its sidebar can hide.
 
 Stand-ins, each waiting for its own slice: the surface is a gradient through
 the colours measured on Arc's default theme, light or dark with the system,
