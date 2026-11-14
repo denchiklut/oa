@@ -4,16 +4,24 @@ import SwiftUI
 struct BrowserWindowView: View {
     let model: WindowModel
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(PageToolbar.key) private var showsToolbar = false
 
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(model: model)
-            if let placeholder = model.placeholder {
-                PlaceholderView(image: placeholder)
-            } else if let page = model.page {
-                PageContentView(page: page)
-            } else {
-                Color(nsColor: .windowBackgroundColor)
+            VStack(spacing: 0) {
+                if showsToolbar {
+                    PageToolbar(model: model)
+                        .environment(\.theme, .toolbar)
+                    Color.primary.opacity(0.05).frame(height: 1)
+                }
+                if let placeholder = model.placeholder {
+                    PlaceholderView(image: placeholder)
+                } else if let page = model.page {
+                    PageContentView(page: page)
+                } else {
+                    Color(nsColor: .windowBackgroundColor)
+                }
             }
         }
         .overlay {

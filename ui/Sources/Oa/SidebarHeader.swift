@@ -2,20 +2,26 @@ import DevKit
 import SwiftUI
 
 /// Arc's header beside the window buttons: back, forward and reload, 32 pt buttons from x 135 on the line 23.5 pt
-/// below the window's top, over the URL field. Arc's sidebar toggle at x 77 waits for the hidden sidebar.
+/// below the window's top, over the URL field. With the toolbar shown they are on the page, and the header ends 36 pt
+/// down. Arc's sidebar toggle at x 77 waits for the hidden sidebar.
 struct SidebarHeader: View {
     let model: WindowModel
+    @AppStorage(PageToolbar.key) private var showsToolbar = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            NavigationButtons(page: model.page, size: CGSize(width: 32, height: 32), spacing: 2)
-                .padding(.leading, 135)
-                .padding(.top, 7.5)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .frame(height: 46, alignment: .top)
-                .background(WindowDragRegion())
-            SidebarAddressField(model: model)
-                .padding(.horizontal, 8)
+        if showsToolbar {
+            WindowDragRegion().frame(height: 36)
+        } else {
+            VStack(spacing: 0) {
+                NavigationButtons(page: model.page, size: CGSize(width: 32, height: 32), spacing: 2)
+                    .padding(.leading, 135)
+                    .padding(.top, 7.5)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .frame(height: 46, alignment: .top)
+                    .background(WindowDragRegion())
+                SidebarAddressField(model: model)
+                    .padding(.horizontal, 8)
+            }
         }
     }
 }

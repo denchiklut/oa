@@ -16,6 +16,12 @@ struct Theme {
     static let dark = Theme(
         icon: Color(hex: 0xA6A6AE), disabledIcon: Color(hex: 0x5C5B6A), addressText: Color(hex: 0xB0B0B8),
         secondaryText: Color(hex: 0x888892), fieldFill: .white.opacity(0.1))
+    /// On the page's toolbar, which Arc colours from the page's top band: the system's colours stand in until Oa
+    /// reads that band.
+    static let toolbar = Theme(
+        icon: Color(nsColor: .secondaryLabelColor), disabledIcon: Color(nsColor: .tertiaryLabelColor),
+        addressText: Color(nsColor: .secondaryLabelColor), secondaryText: Color(nsColor: .tertiaryLabelColor),
+        fieldFill: .clear)
 }
 
 extension EnvironmentValues {

@@ -2,7 +2,7 @@ import AppKit
 import DevKit
 
 @MainActor
-final class ApplicationDelegate: NSObject, NSApplicationDelegate {
+final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let engine: any BrowserApplication
     private let store: SidebarStore
     private let downloads: DownloadsStore
@@ -84,6 +84,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
 
     @objc func newWindow(_ sender: Any?) { openWindow() }
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
+    @objc func toggleToolbar(_ sender: Any?) { PageToolbar.isShown.toggle() }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(toggleToolbar(_:)) {
+            item.title = PageToolbar.isShown ? "Hide Toolbar" : "Show Toolbar"
+        }
+        return true
+    }
 
     /// As Arc: ⌘Q and Quit ask first while the warning is on, before any page is asked; quitting from the Dock or
     /// at logout doesn't.
