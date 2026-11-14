@@ -226,8 +226,11 @@ private enum WindowTexture {
         if let image = images[overlay] { return image }
         var random = SystemRandomNumberGenerator()
         func unit() -> Double { Double.random(in: 0..<1, using: &random) }
-        // A field softened towards its neighbours by `spread`, wrapping at the tile's edges, then brought to a mean
-        // of zero and a deviation of one.
+        func standardized(_ field: [Double]) -> [Double] {
+            let average = field.reduce(0, +) / Double(field.count)
+            let scale = (field.reduce(0) { $0 + ($1 - average) * ($1 - average) } / Double(field.count)).squareRoot()
+            return field.map { ($0 - average) / scale }
+        }
         func softened(_ field: [Double], _ spread: (x: Double, y: Double), passes: Int = 1) -> [Double] {
             var field = field
             for _ in 0..<passes {
@@ -241,22 +244,42 @@ private enum WindowTexture {
                     }
                 }
             }
-            let average = field.reduce(0, +) / Double(field.count)
-            let scale = (field.reduce(0) { $0 + ($1 - average) * ($1 - average) } / Double(field.count)).squareRoot()
-            return field.map { ($0 - average) / scale }
+            return standardized(field)
         }
         func noise(_ spread: (x: Double, y: Double), passes: Int = 1) -> [Double] {
             softened(
                 (0..<side * side).map { _ in (0..<4).reduce(0.0) { sum, _ in sum + unit() } }, spread, passes: passes)
         }
-        // Pebbles: each texel takes the tone of its nearest seed, darkened towards the border with the next one.
+        func broadNoise(radius: Int) -> [Double] {
+            var field = (0..<side * side).map { _ in (0..<4).reduce(0.0) { sum, _ in sum + unit() } }
+            // Sliding box filters give the broad variations without dozens of full-resolution softening passes.
+            for _ in 0..<3 {
+                for (step, lineStep) in [(1, side), (side, 1)] {
+                    var blurred = field
+                    for line in 0..<side {
+                        let start = line * lineStep
+                        var sum = (-radius...radius).reduce(0.0) { sum, offset in
+                            sum + field[start + (offset + side) % side * step]
+                        }
+                        for position in 0..<side {
+                            blurred[start + position * step] = sum / Double(2 * radius + 1)
+                            sum +=
+                                field[start + (position + radius + 1) % side * step]
+                                - field[start + (position - radius + side) % side * step]
+                        }
+                    }
+                    field = blurred
+                }
+            }
+            return standardized(field)
+        }
         func pebbles() -> [Double] {
-            let count = 46
+            let count = 45
             let pitch = Double(side) / Double(count)
             let seeds = (0..<count * count).map { index in
                 (
-                    x: (Double(index % count) + 1.2 * unit() - 0.1) * pitch,
-                    y: (Double(index / count) + 1.2 * unit() - 0.1) * pitch, tone: 1 - 0.35 * unit()
+                    x: (Double(index % count) + 1.25 * unit() - 0.125) * pitch,
+                    y: (Double(index / count) + 1.25 * unit() - 0.125) * pitch, tone: 1 - 0.1 * unit()
                 )
             }
             return (0..<side * side).map { index in
@@ -278,8 +301,9 @@ private enum WindowTexture {
                         }
                     }
                 }
-                let inside = min((next - nearest.distance) / 1.7, 1)
-                return nearest.tone * inside * inside * (3 - 2 * inside) + 0.06 * unit()
+                let inside = min((next - nearest.distance) / 2.1, 1)
+                // Steep sides keep Arc's dark crevices between light pebbles instead of broad grey borders.
+                return nearest.tone * cbrt(inside * inside * (3 - 2 * inside)) + 0.06 * unit()
             }
         }
         func wave(_ index: Int, _ across: Double, _ down: Double, drift: Double = 0) -> Double {
@@ -294,24 +318,27 @@ private enum WindowTexture {
             channels = (0..<3).map { _ in noise((0.27, 0.27)).map { 0.735 + 0.24 * $0 } }
         case .sand:
             alpha = 1
-            channels = [softened(pebbles(), (0.15, 0.15)).map { 0.656 + 0.207 * $0 }]
+            channels = [softened(pebbles(), (0.15, 0.15)).map { 0.658 + 0.207 * $0 }]
         case .denim:
             // A twill: diagonal ribs five texels apart.
             alpha = 1
             let fine = noise((0.2, 0.2))
             channels = [fine.indices.map { 0.841 + 0.022 * fine[$0] + 0.062 * wave($0, 40, -44) }]
         case .tweed:
-            // Fine noise over slow blotches, with a faint weave whose threads drift rather than run straight.
             alpha = 1
-            let fine = noise((0.15, 0.22))
-            let slow = (0..<3).map { _ in noise((0.5, 0.5), passes: 12) }
-            channels = [
+            let fine = noise((0.17, 0.22))
+            let medium = noise((0.5, 0.5), passes: 12)
+            let broad = broadNoise(radius: 7)
+            let drift = [broadNoise(radius: 6), broadNoise(radius: 6)]
+            // Crossing threads preserve Arc's five-pixel and eight-pixel repeats in both directions.
+            let weave = standardized(
                 fine.indices.map { index in
-                    0.706 + 0.041 * fine[index] + 0.012 * slow[0][index]
-                        + 0.015
-                        * (wave(index, 38, 0, drift: 1.2 * slow[1][index])
-                            + wave(index, 0, 25, drift: 1.2 * slow[2][index]))
-                }
+                    fine[index] + 0.36 * medium[index] + 0.22 * broad[index]
+                        + 0.74 * wave(index, 38, 0, drift: 0.18 * drift[0][index])
+                        * wave(index, 0, 25, drift: 0.18 * drift[1][index])
+                })
+            channels = [
+                standardized(weave.map { $0 - 0.04 * ($0 * $0 - 1) }).map { 0.7075 + 0.046 * $0 }
             ]
         }
         let pixels = (0..<side * side).flatMap { index in
