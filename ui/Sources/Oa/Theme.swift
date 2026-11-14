@@ -5,9 +5,17 @@ import SwiftUI
 struct Theme {
     let icon: Color
     let disabledIcon: Color
+    let addressText: Color
+    let secondaryText: Color
+    /// Arc's fills are overlays on the theme: black in a light one, white in a dark one.
+    let fieldFill: Color
 
-    static let light = Theme(icon: Color(hex: 0x5F5F69), disabledIcon: Color(hex: 0xAAAABD))
-    static let dark = Theme(icon: Color(hex: 0xA6A6AE), disabledIcon: Color(hex: 0x5C5B6A))
+    static let light = Theme(
+        icon: Color(hex: 0x5F5F69), disabledIcon: Color(hex: 0xAAAABD), addressText: Color(hex: 0x52535C),
+        secondaryText: Color(hex: 0x9A99A7), fieldFill: .black.opacity(0.04))
+    static let dark = Theme(
+        icon: Color(hex: 0xA6A6AE), disabledIcon: Color(hex: 0x5C5B6A), addressText: Color(hex: 0xB0B0B8),
+        secondaryText: Color(hex: 0x888892), fieldFill: .white.opacity(0.1))
 }
 
 extension EnvironmentValues {
