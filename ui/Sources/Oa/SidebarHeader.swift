@@ -27,10 +27,11 @@ struct SidebarHeader: View {
 }
 
 /// Arc's URL field as measured: 36 pt tall, 8 pt in from the sidebar's edges, showing the page's host; copy link and
-/// Site Controls at its end while the pointer is over it.
+/// Site Controls at its end while the pointer is over it, or while Site Controls or a permission prompt hangs from it.
 private struct SidebarAddressField: View {
     let model: WindowModel
     @State private var hovering = false
+    @State private var showingSiteControls = false
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -63,10 +64,13 @@ private struct SidebarAddressField: View {
             if model.address != nil {
                 HStack(spacing: -2) {
                     CopyLinkButton(model: model, size: 30)
-                        .opacity(hovering ? 1 : 0)
-                    SiteControlsButton(model: model, size: CGSize(width: 30, height: 30), isShown: hovering)
+                    SiteControlsButton(
+                        model: model, size: CGSize(width: 30, height: 30), showingSiteControls: $showingSiteControls)
                 }
                 .padding(.trailing, 4)
+                .opacity(
+                    hovering || showingSiteControls || model.permissionPromptBinding(forPeek: false).wrappedValue
+                        ? 1 : 0)
             }
         }
         .onHover { hovering = $0 }

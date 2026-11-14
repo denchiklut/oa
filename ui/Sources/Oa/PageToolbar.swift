@@ -11,6 +11,7 @@ struct PageToolbar: View {
     }
 
     let model: WindowModel
+    @State private var showingSiteControls = false
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -19,7 +20,8 @@ struct PageToolbar: View {
                 HStack(spacing: 0) {
                     NavigationButtons(page: model.page, size: CGSize(width: 32, height: 24), spacing: 5)
                     Spacer()
-                    SiteControlsButton(model: model, size: CGSize(width: 32, height: 28))
+                    SiteControlsButton(
+                        model: model, size: CGSize(width: 32, height: 28), showingSiteControls: $showingSiteControls)
                 }
                 .padding(.leading, 5)
                 .padding(.trailing, 41)

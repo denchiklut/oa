@@ -7,9 +7,7 @@ import SwiftUI
 struct SiteControlsButton: View {
     let model: WindowModel
     let size: CGSize
-    /// The popovers hang from the button's place while it is hidden. Oa's own: it stays while its popover is up.
-    var isShown = true
-    @State private var showingSiteControls = false
+    @Binding var showingSiteControls: Bool
 
     var body: some View {
         let page = model.page
@@ -23,7 +21,6 @@ struct SiteControlsButton: View {
         .buttonStyle(ChromeButtonStyle())
         .accessibilityLabel("Site Control Center")
         .disabled(!["http", "https", "chrome"].contains(page?.url?.scheme))
-        .opacity(isShown || showingSiteControls ? 1 : 0)
         // As Arc: another tab or another site closes it, a navigation within the site doesn't. Where Arc draws
         // the site's edge is unknown; the host is Oa's own.
         .onChange(of: [page?.id.uuidString, page?.url?.host()]) { showingSiteControls = false }
@@ -65,8 +62,12 @@ struct CopyLinkButton: View {
 }
 
 extension WindowModel {
-    /// As Arc's field: the host and nothing else. Oa's own: the whole address of a page without a host.
+    /// As Arc's field: the host without a leading `www.`, and nothing else. Oa's own: the whole address of a page
+    /// without a host.
     var addressLabel: String? {
-        address.map { url in url.host().flatMap { $0.isEmpty ? nil : $0 } ?? url.absoluteString }
+        address.map { url in
+            guard let host = url.host(), !host.isEmpty else { return url.absoluteString }
+            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        }
     }
 }
