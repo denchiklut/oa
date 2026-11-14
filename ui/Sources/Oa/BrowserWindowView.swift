@@ -7,13 +7,19 @@ struct BrowserWindowView: View {
     @AppStorage(PageToolbar.key) private var showsToolbar = false
 
     var body: some View {
+        // As Arc: a theme with a light and a dark side shows the one the window's appearance asks for, and the
+        // chrome over it takes that side's own appearance.
+        let theme = WindowTheme.default
+        let background = theme.background[colorScheme]
+        let appearance = background.contentOverBackgroundAppearance
         HStack(spacing: 0) {
             SidebarView(model: model)
+                .environment(\.colorScheme, appearance.colorScheme)
             card
                 .padding([.top, .trailing, .bottom], 10)
                 .background(WindowDragRegion())
         }
-        .background { WindowSurface() }
+        .background { WindowSurface(background: background) }
         .overlay {
             if let peek = model.peek {
                 PeekView(model: model, page: peek, sidebarWidth: sidebarWidth)
@@ -46,7 +52,9 @@ struct BrowserWindowView: View {
         .onChange(of: model.dialog == nil && model.extensionRequest == nil) { _, none in
             if none, model.commandBar == nil { model.frontPage?.activate() }
         }
-        .environment(\.theme, colorScheme == .dark ? .dark : .light)
+        .environment(
+            \.theme, Theme(palette: theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
+        )
         .ignoresSafeArea()
     }
 
