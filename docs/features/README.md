@@ -70,7 +70,7 @@ notes here does not assess or change the checklist status below.
 | --- | :---: | :---: |
 | Vertical sidebar | ✅ | ☐ |
 | Hide/reveal and resize the sidebar | ✅ | ☐ |
-| Optional top toolbar | ✅ | ☐ |
+| Optional top toolbar | ✅ | ✅ |
 | Favorites | ✅ | ✅ |
 | Pinned tabs | ✅ | ☐ |
 | Ordinary / Today tabs | ✅ | ☐ |

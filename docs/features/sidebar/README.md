@@ -143,6 +143,32 @@ same way, so Oa raises the window for that too. Chromium grants the request
 only to a caller with a recent gesture or to the page's opener, so a page
 can't pull the selection to itself from the background.
 
+## Window frame
+
+The window has no title bar. As in Arc, the system's close, minimize and zoom
+buttons are kept and moved into the sidebar's header, their centres 24 pt down
+at x 20, 43 and 66. AppKit puts them back whenever it lays its title bar out,
+so `WindowButtons` places them again before the window draws; in full screen
+they are the system's. The sidebar is 241 pt wide and drawn straight on the
+window's surface, which also frames the page: a card flush with the sidebar and
+10 pt in from the other edges, with 6 pt corners, no border and a soft shadow.
+The header row and that frame drag the window, and a double-click there does
+what System Settings asks of a title bar.
+
+Back, forward and reload sit in the header beside the window buttons, over a
+field that shows the page's host. A click on the field opens the command bar,
+and the pointer over it shows copy link and Site Controls, which the permission
+prompt hangs from. View ▸ Show Toolbar (⇧⌘D) moves all of that into a 32 pt bar
+along the top of the card. The setting is one for every window and kept across
+launches, under Arc's key `topBarURLEnabled`. A page's loading shows as Arc's
+pill, in the margin above the card; that place is Oa's own.
+
+Stand-ins, each waiting for its own slice: the surface is a gradient through
+the colours measured on Arc's default theme, light or dark with the system,
+until Spaces carry themes; the toolbar takes the system's colours until Oa
+reads the page's top band; and the sidebar's field opens the centred command
+bar, where Arc anchors a narrow one over the field.
+
 ## Page presentation and recovery
 
 Only the only window selects a tab when it opens: the first unpinned, else the
