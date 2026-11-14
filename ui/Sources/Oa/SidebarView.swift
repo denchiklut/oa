@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SidebarView: View {
-    static let width: CGFloat = 220
+    static let width: CGFloat = 241
 
     let model: WindowModel
     @State private var overLibraryButton = false
@@ -23,6 +23,7 @@ struct SidebarView: View {
 
     private var tabs: some View {
         VStack(spacing: 0) {
+            SidebarHeader(model: model)
             FavoritesGrid(model: model)
                 .padding(8)
             ScrollView {

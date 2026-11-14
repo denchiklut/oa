@@ -12,6 +12,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let downloadPreview = DownloadPreviewWindow()
     private let extensionPopup = ExtensionPopupWindow()
     private var viewTimer: Task<Void, Never>?
+    private var windowButtons: WindowButtons?
 
     init(
         id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore,
@@ -25,12 +26,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             spaceID: spaceID)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
         window.contentMinSize = NSSize(width: 640, height: 320)
         super.init(window: window)
         let content = NSHostingController(rootView: BrowserWindowView(model: model))
@@ -38,6 +41,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.contentViewController = content
         window.setContentSize(NSSize(width: 1100, height: 760))
         window.delegate = self
+        windowButtons = WindowButtons(window: window)
         model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
     }
 
