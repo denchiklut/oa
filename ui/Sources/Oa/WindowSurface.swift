@@ -225,28 +225,65 @@ private enum WindowTexture {
     static func image(_ overlay: WindowTheme.Overlay) -> CGImage {
         if let image = images[overlay] { return image }
         var random = SystemRandomNumberGenerator()
-        // Noise softened towards its neighbours by `spread`, wrapping at the tile's edges, at the given tone.
-        func noise(
-            mean: Double, deviation: Double, spread: (x: Double, y: Double),
-            wave: (Int, Int) -> Double = { _, _ in 0 }
-        ) -> [Double] {
-            var field = (0..<side * side).map { _ in
-                (0..<4).reduce(0.0) { sum, _ in sum + Double.random(in: -1...1, using: &random) }
-            }
-            for (step, spread) in [(1, spread.x), (side, spread.y)] {
-                let row = step == 1 ? side : side * side
-                field = field.indices.map { index in
-                    let line = index / row * row
-                    let before = line + (index - line - step + row) % row
-                    let after = line + (index - line + step) % row
-                    return field[index] + spread * (field[before] + field[after])
+        func unit() -> Double { Double.random(in: 0..<1, using: &random) }
+        // A field softened towards its neighbours by `spread`, wrapping at the tile's edges, then brought to a mean
+        // of zero and a deviation of one.
+        func softened(_ field: [Double], _ spread: (x: Double, y: Double), passes: Int = 1) -> [Double] {
+            var field = field
+            for _ in 0..<passes {
+                for (step, spread) in [(1, spread.x), (side, spread.y)] {
+                    let row = step == 1 ? side : side * side
+                    field = field.indices.map { index in
+                        let line = index / row * row
+                        let before = line + (index - line - step + row) % row
+                        let after = line + (index - line + step) % row
+                        return field[index] + spread * (field[before] + field[after])
+                    }
                 }
             }
             let average = field.reduce(0, +) / Double(field.count)
             let scale = (field.reduce(0) { $0 + ($1 - average) * ($1 - average) } / Double(field.count)).squareRoot()
-            return field.indices.map { index in
-                mean + wave(index % side, index / side) + deviation * (field[index] - average) / scale
+            return field.map { ($0 - average) / scale }
+        }
+        func noise(_ spread: (x: Double, y: Double), passes: Int = 1) -> [Double] {
+            softened(
+                (0..<side * side).map { _ in (0..<4).reduce(0.0) { sum, _ in sum + unit() } }, spread, passes: passes)
+        }
+        // Pebbles: each texel takes the tone of its nearest seed, darkened towards the border with the next one.
+        func pebbles() -> [Double] {
+            let count = 46
+            let pitch = Double(side) / Double(count)
+            let seeds = (0..<count * count).map { index in
+                (
+                    x: (Double(index % count) + 1.2 * unit() - 0.1) * pitch,
+                    y: (Double(index / count) + 1.2 * unit() - 0.1) * pitch, tone: 1 - 0.35 * unit()
+                )
             }
+            return (0..<side * side).map { index in
+                let x = Double(index % side) + 0.5
+                let y = Double(index / side) + 0.5
+                var nearest = (distance: Double.infinity, tone: 0.0)
+                var next = Double.infinity
+                for row in -2...2 {
+                    for column in -2...2 {
+                        let seed = seeds[
+                            (Int(y / pitch) + row + count) % count * count + (Int(x / pitch) + column + count) % count]
+                        let across = min(abs(seed.x - x), Double(side) - abs(seed.x - x))
+                        let down = min(abs(seed.y - y), Double(side) - abs(seed.y - y))
+                        let distance = (across * across + down * down).squareRoot()
+                        if distance < nearest.distance {
+                            (next, nearest) = (nearest.distance, (distance, seed.tone))
+                        } else if distance < next {
+                            next = distance
+                        }
+                    }
+                }
+                let inside = min((next - nearest.distance) / 1.7, 1)
+                return nearest.tone * inside * inside * (3 - 2 * inside) + 0.06 * unit()
+            }
+        }
+        func wave(_ index: Int, _ across: Double, _ down: Double, drift: Double = 0) -> Double {
+            cos(2 * .pi * (Double(index % side) * across + Double(index / side) * down) / Double(side) + drift)
         }
         let alpha: Double
         let channels: [[Double]]
@@ -254,21 +291,28 @@ private enum WindowTexture {
         case .grain:
             // Arc's grain is a faint film: each channel its own noise.
             alpha = 0.26
-            channels = (0..<3).map { _ in noise(mean: 0.735, deviation: 0.24, spread: (0.27, 0.27)) }
+            channels = (0..<3).map { _ in noise((0.27, 0.27)).map { 0.735 + 0.24 * $0 } }
         case .sand:
             alpha = 1
-            channels = [noise(mean: 0.656, deviation: 0.207, spread: (0.34, 0.34))]
+            channels = [softened(pebbles(), (0.15, 0.15)).map { 0.656 + 0.207 * $0 }]
         case .denim:
             // A twill: diagonal ribs five texels apart.
             alpha = 1
+            let fine = noise((0.2, 0.2))
+            channels = [fine.indices.map { 0.841 + 0.022 * fine[$0] + 0.062 * wave($0, 40, -44) }]
+        case .tweed:
+            // Fine noise over slow blotches, with a faint weave whose threads drift rather than run straight.
+            alpha = 1
+            let fine = noise((0.15, 0.22))
+            let slow = (0..<3).map { _ in noise((0.5, 0.5), passes: 12) }
             channels = [
-                noise(mean: 0.841, deviation: 0.022, spread: (0.2, 0.2)) { x, y in
-                    0.062 * cos(2 * .pi * (Double(x) / 5 - Double(y) * 44 / Double(side)))
+                fine.indices.map { index in
+                    0.706 + 0.041 * fine[index] + 0.012 * slow[0][index]
+                        + 0.015
+                        * (wave(index, 38, 0, drift: 1.2 * slow[1][index])
+                            + wave(index, 0, 25, drift: 1.2 * slow[2][index]))
                 }
             ]
-        case .tweed:
-            alpha = 1
-            channels = [noise(mean: 0.706, deviation: 0.046, spread: (0.23, 0.3))]
         }
         let pixels = (0..<side * side).flatMap { index in
             (0..<3).map { UInt8(min(max(channels[$0 % channels.count][index], 0), 1) * alpha * 255) }
