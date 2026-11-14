@@ -50,6 +50,11 @@ final class MainMenu {
         let view = submenu("View", in: menu)
         view.addItem(item("Reload Page", #selector(BrowserWindowController.reload(_:)), key: "r"))
         view.addItem(item("Stop Loading", #selector(BrowserWindowController.stopLoading(_:)), key: "."))
+        view.addItem(.separator())
+        view.addItem(
+            item(
+                "Show Toolbar", #selector(ApplicationDelegate.toggleToolbar(_:)), key: "d",
+                modifiers: [.command, .shift]))
 
         let archive = submenu("Archive", in: menu)
         archive.addItem(item("Back", #selector(BrowserWindowController.goBack(_:)), key: "["))
