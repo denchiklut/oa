@@ -12,7 +12,8 @@ let package = Package(
             dependencies: [
                 .product(name: "DevKit", package: "devkit"),
                 .product(name: "DevKitLive", package: "devkit"),
-            ]
+            ],
+            resources: [.copy("Resources/ThemeTextures")]
         )
     ]
 )
