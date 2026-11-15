@@ -51,11 +51,6 @@ Chromium build, so your existing `~/chromium` setup is unaffected.
 `scripts/build.sh --check` checks prerequisites without downloading or building.
 The Chromium version and build flags are in `chromium/`.
 
-The window textures are original PNGs generated offline. Regenerate them with
-`swift scripts/generate_theme_textures.swift` and commit the outputs in
-`ui/Sources/Oa/Resources/ThemeTextures/`. Fixed seeds keep their patterns stable;
-the app loads and caches the images without running the generator.
-
 ## Change Chromium
 
 Code goes in `core/` (`//oa`) whenever it can. A change to Chromium itself is a
