@@ -7,16 +7,21 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController: NSWindowController {
     private let tabs = NSTabViewController()
+    private let state = PreferencesState()
 
-    /// `openWindow` opens a browser window on a Space and gives its model.
-    init(engine: any BrowserApplication, store: SidebarStore, openWindow: @escaping (UUID) -> WindowModel?) {
+    /// `openWindow` opens a browser window on a Space and gives its model; `openHelp` shows a help page.
+    init(
+        engine: any BrowserApplication, store: SidebarStore, openWindow: @escaping (UUID) -> WindowModel?,
+        openHelp: @escaping (URL) -> Void
+    ) {
         super.init(window: nil)
         tabs.tabStyle = .toolbar
         add("General", symbol: "gearshape") {
             GeneralPreferencePane(adBlocker: engine.adBlocker) { [weak tabs] in tabs?.selectedTabViewItemIndex = 1 }
         }
         add("Profiles", symbol: "person") {
-            ProfilePreferencePane(engine: engine, store: store, openWindow: openWindow)
+            ProfilePreferencePane(
+                engine: engine, store: store, state: state, openWindow: openWindow, openHelp: openHelp)
         }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
@@ -28,9 +33,12 @@ final class SettingsWindowController: NSWindowController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Arc's opens on its first pane each time; Oa's first is General.
+    /// Arc's opens on its first pane and on the default profile each time; Oa's first pane is General.
     override func showWindow(_ sender: Any?) {
-        if window?.isVisible != true { tabs.selectedTabViewItemIndex = 0 }
+        if window?.isVisible != true {
+            tabs.selectedTabViewItemIndex = 0
+            state.currentProfileID = SidebarProfile.defaultID
+        }
         super.showWindow(sender)
     }
 
@@ -42,4 +50,11 @@ final class SettingsWindowController: NSWindowController {
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         tabs.addTabViewItem(item)
     }
+}
+
+/// As Arc's `PreferencesFeature.State.currentProfile`: the profile the Profiles pane shows.
+@MainActor
+@Observable
+final class PreferencesState {
+    var currentProfileID = SidebarProfile.defaultID
 }
