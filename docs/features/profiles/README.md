@@ -49,14 +49,23 @@ Three sheets on a browser window, as in Arc:
    stays off until one is ticked. Back keeps the name.
 3. **Switch to your ‹name› Profile?** The profile exists by now, with an empty
    Favorites root, and is selected in Settings. "Switch it up" moves the ticked
-   Spaces to it; Cancel leaves it unused.
+   Spaces to it; Cancel leaves it unused. Ticked Spaces without a tab move at
+   once, with no third sheet.
 
 The sheet opens from Settings ▸ Profiles ▸ `+` on the last key browser window,
 with nothing ticked; from File ▸ New Profile with the window's Space ticked;
-and from a Space's menu ▸ Set Profile ▸ New Profile… with that Space ticked.
-With no browser window open, `+` does nothing. Arc also opens it from the
-command bar and from Spaces ▸ Change Profile, and has a one-step form in its
-Create a Space panel; Oa has none of the three yet.
+and from a Space's menu ▸ Set Profile ▸ New Profile… and Spaces ▸ Change
+Profile ▸ New Profile, each with that Space ticked. With no browser window
+open, `+` does nothing. Arc also opens it from the command bar
+([#99](https://github.com/denchiklut/oa/issues/99)), and has a one-step form in
+its Create a Space panel
+([#100](https://github.com/denchiklut/oa/issues/100)); Oa has neither yet.
+
+An open Settings window comes back in front when the create sheet ends with no
+third sheet after it: on Cancel, and on Create Profile for Spaces without tabs.
+That holds for every entry point, not only `+`. After the third sheet, Settings
+stays behind the browser window, and a closed Settings is never opened. This is
+what Arc does; nothing in Arc's code makes the call, so the call is Oa's own.
 
 The sheets use Arc's wording, sizes and colours as measured in light
 appearance. The dark colours are Oa's own, and so are the symbols in place of
@@ -65,8 +74,18 @@ themes of their own.
 
 ## Moving a Space to another profile
 
-A Space's menu ▸ Set Profile lists the profiles with a tick on the current one.
-Choosing another asks with the same "Switch to your ‹name› Profile?" sheet.
+A Space's menu ▸ Set Profile lists the profiles by name with a tick on the
+current one; the pane and the Change Profile picker keep the engine's order, as
+in Arc. Spaces ▸ Change Profile opens "Change ‹Space›’s Profile" on the window:
+a picker with the profiles, unticked, and "New Profile". Change Profile is
+always on. With the Space's own profile it closes the sheet and nothing more;
+with "New Profile" the create sheet takes its place and doesn't give it back on
+Cancel.
+
+Choosing another profile either way asks with the same "Switch to your ‹name›
+Profile?" sheet, whose button reads "Switch them up" for several Spaces. A
+Space without tabs moves without the question, and one already on the profile
+stays as it is.
 
 A page can't change profile, so a move keeps nothing of the Space's pages, as
 in Arc: every live page of the Space is dropped without asking, and its Peeks
@@ -81,6 +100,22 @@ tab to select; that part is Oa's own.
 Arc leaves the pages a second window holds alive in the old profile, where they
 show blank. In Oa a tab has one page, and it is dropped whichever window holds
 it.
+
+## A profile the engine no longer has
+
+At launch, before any window opens, every Space whose profile the engine
+doesn't list goes to the default profile, as in Arc. A second after the windows
+are back, an alert names those Spaces: "Missing Profile!". Only the Space's
+profile changes. The sidebar keeps the lost profile's Favorites, as Arc keeps
+their container, and nothing shows them.
+
+Two profiles are never missing. The default one, because a new install's engine
+lists it only once it has loaded it. And one whose name an older `sidebar.json`
+still carries, because the engine loads it during that same launch.
+
+The Library's downloads and their filter read the profiles the engine lists, not
+the sidebar's records. Asking the engine for a lost profile's downloads would
+make Chromium create it again, empty and unnamed.
 
 ## Renaming
 
