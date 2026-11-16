@@ -2,66 +2,8 @@ import AppKit
 import DevKit
 import SwiftUI
 
-/// Arc's Settings, with the panes Oa has so far: General and Profiles.
-@MainActor
-final class SettingsWindowController: NSWindowController {
-    /// `openWindow` opens a browser window on a Space and gives its model.
-    init(engine: any BrowserApplication, store: SidebarStore, openWindow: @escaping (UUID) -> WindowModel?) {
-        let content = TabView {
-            GeneralSettingsView(adBlocker: engine.adBlocker).tabItem { Text("General") }
-            ProfilesSettingsView(engine: engine, store: store, openWindow: openWindow).tabItem { Text("Profiles") }
-        }
-        .padding(12)
-        .frame(width: 460, height: 380)
-        let window = NSWindow(contentViewController: NSHostingController(rootView: content))
-        window.title = "Settings"
-        window.styleMask = [.titled, .closable]
-        window.center()
-        super.init(window: window)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-}
-
-struct GeneralSettingsView: View {
-    let adBlocker: AdBlocker
-    @AppStorage(QuitWarning.key) private var warnsBeforeQuitting = QuitWarning.isOnByDefault
-
-    var body: some View {
-        Form {
-            Toggle("Warn before quitting", isOn: $warnsBeforeQuitting)
-            Section("Oa’s Ad Blocker") {
-                Toggle("Block ads and trackers", isOn: Binding(get: { adBlocker.isEnabled }, set: adBlocker.setEnabled))
-                Toggle(
-                    "Block Ads",
-                    isOn: Binding(
-                        get: { adBlocker.selectedLists.contains("EasyList") },
-                        set: { adBlocker.setList("EasyList", enabled: $0) }
-                    )
-                ).disabled(!adBlocker.isEnabled)
-                Toggle(
-                    "Block Trackers",
-                    isOn: Binding(
-                        get: { adBlocker.selectedLists.contains("EasyPrivacy") },
-                        set: { adBlocker.setList("EasyPrivacy", enabled: $0) }
-                    )
-                ).disabled(!adBlocker.isEnabled)
-                Text("Applies to all profiles.").font(.caption).foregroundStyle(.secondary)
-                if adBlocker.isDownloading {
-                    Text("Downloading filters…").font(.caption).foregroundStyle(.secondary)
-                } else if adBlocker.isApplying {
-                    ProgressView().controlSize(.small)
-                }
-                if let error = adBlocker.error { Text(error).font(.caption).foregroundStyle(.secondary) }
-            }
-        }
-        .formStyle(.grouped)
-    }
-}
-
 /// Arc's Profiles pane, with the settings Oa has so far.
-struct ProfilesSettingsView: View {
+struct ProfilePreferencePane: View {
     let engine: any BrowserApplication
     let store: SidebarStore
     let openWindow: (UUID) -> WindowModel?
@@ -177,17 +119,5 @@ private struct DownloadLocationPicker: View {
                 preferences.asksWhereToSaveDownloads = false
             }
         }
-    }
-}
-
-/// Arc's key. On by default is LIKELY Arc's: it stores only changed settings, and an install was seen holding this
-/// one off beside the auto-update setting, which ships on.
-enum QuitWarning {
-    static let key = "shouldWarnBeforeQuitting"
-    static let isOnByDefault = true
-
-    static var isOn: Bool {
-        get { UserDefaults.standard.object(forKey: key) as? Bool ?? isOnByDefault }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
     }
 }
