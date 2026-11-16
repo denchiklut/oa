@@ -12,7 +12,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
     private lazy var settings = SettingsWindowController(
         engine: engine, store: store, openSettings: { [weak self] in self?.openSettings($0, in: $1) },
-        openHelp: { [weak self] in self?.openHelp($0) }, createProfile: { [weak self] in self?.createProfile() })
+        openHelp: { [weak self] in self?.openHelp($0) }, createProfile: { [weak self] in self?.createProfile() },
+        frontProfile: { [weak self] in self?.frontWindows.first?.space?.profileID })
     private var askingToQuit = false
     private var isLaunching = true
     private static var current: ApplicationDelegate?

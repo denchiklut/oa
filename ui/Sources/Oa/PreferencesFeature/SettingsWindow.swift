@@ -8,14 +8,18 @@ import SwiftUI
 final class SettingsWindowController: NSWindowController {
     private let tabs = NSTabViewController()
     private let engine: any BrowserApplication
+    private let store: SidebarStore
+    private let frontProfile: () -> UUID?
     private let state: PreferencesState
 
     init(
         engine: any BrowserApplication, store: SidebarStore,
         openSettings: @escaping (ChromiumSettings, UUID) -> Void, openHelp: @escaping (URL) -> Void,
-        createProfile: @escaping () -> Void
+        createProfile: @escaping () -> Void, frontProfile: @escaping () -> UUID?
     ) {
         self.engine = engine
+        self.store = store
+        self.frontProfile = frontProfile
         state = PreferencesState(engine: engine)
         super.init(window: nil)
         tabs.tabStyle = .toolbar
@@ -25,7 +29,8 @@ final class SettingsWindowController: NSWindowController {
         add("Profiles", symbol: "person") {
             ProfilePreferencePane(
                 engine: engine, store: store, state: state, openSettings: openSettings, openHelp: openHelp,
-                create: createProfile, rename: { [weak self] in self?.rename($0) })
+                create: createProfile, delete: { [weak self] in self?.delete($0) },
+                rename: { [weak self] in self?.rename($0) })
         }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
@@ -51,6 +56,21 @@ final class SettingsWindowController: NSWindowController {
     func profileCreated(_ id: UUID) {
         state.reload()
         state.currentProfileID = id
+    }
+
+    /// As Arc: a sheet on Settings; then the pane shows the profile of the frontmost browser window's Space.
+    private func delete(_ profile: ProfileState) {
+        guard let window else { return }
+        DialogSheet.present(on: window) { dismiss in
+            DeleteProfileDialog(profileName: profile.name) { [engine, store, state, frontProfile] in
+                dismiss()
+                guard store.deleteProfile(profile.id, from: engine) else { return }
+                state.reload()
+                state.currentProfileID = frontProfile() ?? SidebarProfile.defaultID
+            } cancel: {
+                dismiss()
+            }
+        }
     }
 
     /// As Arc: a sheet on Settings, and the engine takes the name with no word back.

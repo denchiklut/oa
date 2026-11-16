@@ -53,6 +53,18 @@ final class SidebarStore {
         }
     }
 
+    /// As Arc: never the default profile, and the UI offers it only for a profile without a Space. Every window lets
+    /// go of the profile first, as ADK does, so the engine can delete its data at once.
+    func deleteProfile(_ id: UUID, from engine: any BrowserApplication) -> Bool {
+        guard id != SidebarProfile.defaultID, !state.spaces.contains(where: { $0.profileID == id }) else {
+            return false
+        }
+        for window in windows { window.forgetProfile(id) }
+        guard engine.deleteBrowserContext(id: id) else { return false }
+        edit { $0.removeProfile(id) }
+        return true
+    }
+
     func setSavedPage(_ tabID: UUID, title: String, url: URL?) {
         state.setSavedPage(tabID, title: title, url: url)
     }

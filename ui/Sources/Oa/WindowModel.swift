@@ -67,7 +67,7 @@ final class WindowModel {
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
     /// By profile: ArcCore keeps one omnibox per window.
     @ObservationIgnored private var autocompletes: [UUID: any Autocomplete] = [:]
-    @ObservationIgnored private var browserListeners: [Task<Void, Never>] = []
+    @ObservationIgnored private var browserListeners: [UUID: Task<Void, Never>] = [:]
     /// As Arc's `ClosedSidebarItemsCache`: what the user closed from this window, a group for each close with a step
     /// for each tab, the last ten, in memory and gone with the window.
     @ObservationIgnored private var closedGroups: [ClosedGroup] = []
@@ -265,13 +265,12 @@ final class WindowModel {
         guard browsers[profileID] == nil else { return }
         let browser = engine.browserContext(id: profileID).browser(windowID: id)
         browsers[profileID] = browser
-        browserListeners.append(
-            Task { [weak self] in
-                for await event in browser.events {
-                    guard let self, case .opened(let page, let isActive) = event else { continue }
-                    place(page, isActive: isActive, in: profileID)
-                }
-            })
+        browserListeners[profileID] = Task { [weak self] in
+            for await event in browser.events {
+                guard let self, case .opened(let page, let isActive) = event else { continue }
+                place(page, isActive: isActive, in: profileID)
+            }
+        }
     }
 
     /// A page the engine made itself, as an extension's `chrome.tabs.create`. Oa's own: at the top of the shown Space
@@ -481,6 +480,14 @@ final class WindowModel {
             window.selectedTabIDs[window.selectedSpaceID] = nil
             if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last { window.select(bottom.id) }
         }
+    }
+
+    /// Before a profile is deleted: its Favorites' pages and the window's browser and omnibox for it.
+    func forgetProfile(_ id: UUID) {
+        if let profile = state.profile(id) { dropPages(of: state.tree.tabs(under: profile.favoritesRootID).map(\.id)) }
+        browserListeners.removeValue(forKey: id)?.cancel()
+        browsers[id] = nil
+        autocompletes[id] = nil
     }
 
     private func dropPages(of tabIDs: [UUID]) {
@@ -800,8 +807,8 @@ final class WindowModel {
         permissionRequests = [:]
         extensionRequests = [:]
         closeExtensionPopup()
-        browserListeners.forEach { $0.cancel() }
-        browserListeners = []
+        browserListeners.values.forEach { $0.cancel() }
+        browserListeners = [:]
         browsers = [:]
         archivePeekID = nil
         creating = [:]
