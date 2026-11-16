@@ -12,6 +12,7 @@ struct ProfilePreferencePane: View {
     let create: () -> Void
     let delete: (ProfileState) -> Void
     let rename: (ProfileState) -> Void
+    let askAboutArchive: (AutoArchiveInactiveThreshold, UUID) -> Void
 
     private static let blurb: LocalizedStringKey =
         """
@@ -58,7 +59,8 @@ struct ProfilePreferencePane: View {
             SearchSettingsSection(preferences: preferences) { openSettings(.searchEngines, profile) }
             PreferencesPaneSection {
                 AutoArchiveView(
-                    profileID: profile, hasSeveralProfiles: state.profiles.count > 1, openHelp: openHelp
+                    profileID: profile, profiles: state.profiles.map(\.id), openHelp: openHelp,
+                    ask: { askAboutArchive($0, profile) }
                 )
                 .id(profile)
                 PreferenceRowDivider()
