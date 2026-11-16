@@ -31,6 +31,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private init(engine: any BrowserApplication) {
         self.engine = engine
         store = SidebarStore(directory: AppEngine.dataDirectory)
+        store.handProfileNames(to: engine)
         downloads = DownloadsStore(engine: engine, sidebar: store)
         pictureInPicture = PictureInPicture(store: store)
     }

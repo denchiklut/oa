@@ -39,6 +39,19 @@ final class SidebarStore {
         scheduleSave()
     }
 
+    /// The engine owns profile names, as Arc's does. Once, it takes those an older sidebar.json kept and a new
+    /// install's "Personal", as Arc names its default profile once.
+    func handProfileNames(to engine: any BrowserApplication) {
+        guard state.profiles.contains(where: { $0.pendingName != nil }) else { return }
+        edit { state in
+            for index in state.profiles.indices {
+                guard let name = state.profiles[index].pendingName else { continue }
+                engine.browserContext(id: state.profiles[index].id).setUserVisibleName(name)
+                state.profiles[index].pendingName = nil
+            }
+        }
+    }
+
     func setSavedPage(_ tabID: UUID, title: String, url: URL?) {
         state.setSavedPage(tabID, title: title, url: url)
     }

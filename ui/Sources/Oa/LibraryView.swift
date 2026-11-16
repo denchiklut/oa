@@ -135,7 +135,7 @@ private struct DownloadsPage: View {
                     Button {
                         profileID = chosen ? nil : profile.id
                     } label: {
-                        Text(profile.name)
+                        Text(model.profileName(profile.id))
                             .font(.system(size: 12, weight: chosen ? .semibold : .regular))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
