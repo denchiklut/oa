@@ -1,27 +1,63 @@
-import AppKit
 import DevKit
 import SwiftUI
 
-/// Arc's Profiles pane, with the settings Oa has so far.
+/// Arc's Profiles pane at Arc's measures: the profiles on the left, the chosen one's settings on the right. The
+/// list shows with one profile too, Oa's own: Arc's layout for a single profile is unknown.
 struct ProfilePreferencePane: View {
     let engine: any BrowserApplication
     let store: SidebarStore
+    @Bindable var state: PreferencesState
     let openWindow: (UUID) -> WindowModel?
+    let openHelp: (URL) -> Void
+
+    private static let blurb: LocalizedStringKey =
+        """
+        Profiles help keep your data separate across Spaces — like history, logins, cookies, and extensions. You can \
+        use any Profile across one or more Spaces. \
+        [Learn more.](https://resources.arc.net/hc/en-us/articles/19227964556183-Profiles-Separate-Work-Personal-Browsing)
+        """
 
     var body: some View {
-        Form {
-            ForEach(store.state.profiles) { profile in
-                Section(profile.name) {
-                    let preferences = engine.browserContext(id: profile.id).preferences
-                    SearchSettings(
-                        preferences: preferences,
-                        hasSpace: store.state.spaces.contains { $0.profileID == profile.id }
-                    ) { openSearchSettings(in: profile.id) }
-                    DownloadLocationPicker(preferences: preferences)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(Self.blurb)
+                    .environment(
+                        \.openURL,
+                        OpenURLAction {
+                            openHelp($0); return .handled
+                        })
+                HStack(alignment: .top, spacing: 10) {
+                    ProfileList(profiles: profiles, spaceCount: spaceCount, selection: $state.currentProfileID)
+                        .frame(width: 205)
+                    if let profile { contents(of: profile).frame(width: 341) }
                 }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 64)
+            .padding(.vertical, 20)
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    /// By name, capitals first, as Arc lists them.
+    private var profiles: [SidebarProfile] { store.state.profiles.sorted { $0.name < $1.name } }
+
+    private var profile: SidebarProfile? { store.state.profile(state.currentProfileID) ?? profiles.first }
+
+    private func spaceCount(_ profileID: UUID) -> Int {
+        store.state.spaces.count { $0.profileID == profileID }
+    }
+
+    private func contents(of profile: SidebarProfile) -> some View {
+        let preferences = engine.browserContext(id: profile.id).preferences
+        return VStack(alignment: .leading, spacing: 8) {
+            SearchSettingsSection(preferences: preferences, hasSpace: spaceCount(profile.id) > 0) {
+                openSearchSettings(in: profile.id)
+            }
+            PreferencesPaneSection {
+                DownloadLocationView(preferences: preferences)
             }
         }
-        .formStyle(.grouped)
     }
 
     /// Arc opens it as a tab of some window; Oa's own: the first window showing a Space of the profile, or a new
@@ -37,87 +73,108 @@ struct ProfilePreferencePane: View {
     }
 }
 
-/// Arc's search settings for a profile: the default engine, Search Settings… for Chromium's page, and whether the
-/// engine suggests as you type. They wait for the profile's engines to load.
-private struct SearchSettings: View {
-    let preferences: any BrowserContextPreferences
-    let hasSpace: Bool
-    let openSearchSettings: () -> Void
+private struct ProfileList: View {
+    let profiles: [SidebarProfile]
+    let spaceCount: (UUID) -> Int
+    @Binding var selection: UUID
 
     var body: some View {
-        Picker("Search engine", selection: engine) {
-            ForEach(preferences.searchEngines) { Text($0.name).tag(Optional($0.keyword)) }
+        VStack(spacing: 0) {
+            Text("Your Profiles")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                .padding(.leading, 16)
+            Divider()
+            VStack(spacing: 0) {
+                ForEach(profiles) { profile in
+                    if profile.id != profiles.first?.id { Divider() }
+                    row(profile)
+                }
+            }
+            .padding(10)
+            Spacer(minLength: 0)
         }
-        .disabled(preferences.searchEngines.isEmpty)
-        LabeledContent("Manage search") {
-            Button("Search Settings…", action: openSearchSettings).disabled(!hasSpace)
-        }
-        Toggle(
-            "Include search engine suggestions",
-            isOn: Binding {
-                preferences.includesSearchSuggestions
-            } set: {
-                preferences.includesSearchSuggestions = $0
-            })
+        .background(PreferencesPaneSectionBackground(fill: .clear))
     }
 
-    private var engine: Binding<String?> {
-        Binding {
-            preferences.defaultSearchEngine?.keyword
-        } set: { keyword in
-            if let engine = preferences.searchEngines.first(where: { $0.keyword == keyword }) {
-                preferences.setDefaultSearchEngine(engine)
+    private func row(_ profile: SidebarProfile) -> some View {
+        Button {
+            selection = profile.id
+        } label: {
+            HStack(spacing: 8) {
+                Text(profile.name).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 0)
+                Text(usage(spaceCount(profile.id))).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize()
             }
+            .padding(.horizontal, 12)
+            .frame(height: 31)
+            .background(profile.id == selection ? PaneColor.selection : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .frame(height: 40)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(profile.id == selection ? .isSelected : [])
+    }
+
+    private func usage(_ spaces: Int) -> String {
+        switch spaces {
+        case 0: "Not used"
+        case 1: "1 Space"
+        default: "\(spaces) Spaces"
         }
     }
 }
 
-/// Arc's "Download location": the folder, Other… to choose one, and Ask every time, which has the engine show its
-/// Save panel for each download. It reads the profile's preferences as the engine reports them, so it waits for the
-/// profile to load and follows a change made on Chrome's settings page.
-private struct DownloadLocationPicker: View {
-    private enum Choice { case folder, other, ask }
-
-    let preferences: any BrowserContextPreferences
+struct PreferencesPaneSection<Content: View>: View {
+    @ViewBuilder let content: Content
 
     var body: some View {
-        Picker("Download location", selection: choice) {
-            Text(preferences.downloadDirectory.map { FileManager.default.displayName(atPath: $0.path) } ?? "Downloads")
-                .tag(Choice.folder)
-            Text("Other…").tag(Choice.other)
-            Divider()
-            Text("Ask every time").tag(Choice.ask)
-        }
-        .disabled(preferences.downloadDirectory == nil)
+        VStack(spacing: 0) { content }.background(PreferencesPaneSectionBackground())
     }
+}
 
-    private var choice: Binding<Choice> {
-        Binding {
-            preferences.asksWhereToSaveDownloads ? .ask : .folder
-        } set: { choice in
-            switch choice {
-            case .folder: preferences.asksWhereToSaveDownloads = false
-            case .ask: preferences.asksWhereToSaveDownloads = true
-            case .other: chooseFolder()
-            }
-        }
-    }
+struct PreferencesPaneSectionBackground: View {
+    var fill = PaneColor.section
 
-    /// After the menu has closed: a panel run from inside its action never becomes key.
-    private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.directoryURL = preferences.downloadDirectory
-        panel.prompt = "Select"
-        DispatchQueue.main.async {
-            guard let window = NSApplication.shared.keyWindow else { return }
-            panel.beginSheetModal(for: window) { response in
-                guard response == .OK, let chosen = panel.url else { return }
-                preferences.downloadDirectory = chosen
-                preferences.asksWhereToSaveDownloads = false
-            }
-        }
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6).fill(fill)
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(nsColor: .separatorColor)))
     }
+}
+
+struct PreferenceRow<Label: View, Control: View>: View {
+    var height: CGFloat = 42
+    @ViewBuilder let label: Label
+    @ViewBuilder let control: Control
+
+    var body: some View {
+        HStack(spacing: 8) {
+            label
+            Spacer(minLength: 0)
+            control
+        }
+        .padding(.horizontal, 10)
+        .frame(height: height)
+    }
+}
+
+extension View {
+    /// Arc's popups: 136 to 155 wide by their title, centred in a column of 180 at the row's right edge.
+    func preferencePopup() -> some View { labelsHidden().frame(width: 150).frame(width: 180) }
+}
+
+struct PreferenceRowDivider: View {
+    var body: some View { Divider().padding(.horizontal, 10) }
+}
+
+/// Arc's colours as measured in light; the dark ones are Oa's own, Arc's dark pane wasn't captured.
+enum PaneColor {
+    static let section = Color.primary.opacity(0.01)
+    static let selection = Color(
+        nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? .controlAccentColor.withAlphaComponent(0.3)
+                : NSColor(srgbRed: 0xF1 / 255, green: 0xF6 / 255, blue: 0xFE / 255, alpha: 1)
+        })
 }

@@ -10,9 +10,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private var windows: [BrowserWindowController] = []
     private var mainMenu: MainMenu?
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
-    private lazy var settings = SettingsWindowController(engine: engine, store: store) { [weak self] spaceID in
-        self?.openWindow(on: spaceID)
-    }
+    private lazy var settings = SettingsWindowController(
+        engine: engine, store: store, openWindow: { [weak self] in self?.openWindow(on: $0) },
+        openHelp: { [weak self] in self?.openHelp($0) })
     private var askingToQuit = false
     private var isLaunching = true
     private static var current: ApplicationDelegate?
@@ -131,6 +131,18 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         }
     }
     @objc func restoreData(_ sender: Any?) { restoreData.show() }
+
+    /// As Arc's help links in Settings: a new tab in the frontmost window's Space, which comes forward while
+    /// Settings stays open. A new window when none is open is Oa's own.
+    private func openHelp(_ url: URL) {
+        let model = frontWindows.first ?? openWindow()
+        model.bringToFront()
+        model.newTab(url)
+    }
+
+    private var frontWindows: [WindowModel] {
+        NSApplication.shared.orderedWindows.compactMap { window in windows.first { $0.window === window }?.model }
+    }
 
     /// Quits and opens the bundle again once this process is gone, with the engine and data directory it was
     /// given, as Arc does after a restore.
