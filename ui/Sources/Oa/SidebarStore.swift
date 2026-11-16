@@ -79,7 +79,9 @@ final class SidebarStore {
     /// A tab with a live page is closed as the user would, so a `beforeunload` handler can keep it, as Arc's idle
     /// unload lets a page stay; the rest are archived outright.
     private func autoArchive() {
-        let due = state.tabsDueForArchive(shown: Set(windows.compactMap(\.selectedTabID)))
+        let due = state.tabsDueForArchive(shown: Set(windows.compactMap(\.selectedTabID))) {
+            AutoArchiveThresholds.threshold(for: $0).seconds
+        }
         guard !due.isEmpty else { return }
         for tabID in due {
             if let holder = windows.first(where: { $0.pages[tabID] != nil }) {

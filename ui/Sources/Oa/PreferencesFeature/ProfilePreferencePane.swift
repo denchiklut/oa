@@ -55,6 +55,11 @@ struct ProfilePreferencePane: View {
                 openSearchSettings(in: profile.id)
             }
             PreferencesPaneSection {
+                AutoArchiveView(
+                    profileID: profile.id, hasSeveralProfiles: store.state.profiles.count > 1, openHelp: openHelp
+                )
+                .id(profile.id)
+                PreferenceRowDivider()
                 DownloadLocationView(preferences: preferences)
             }
         }

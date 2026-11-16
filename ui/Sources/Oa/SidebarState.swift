@@ -187,9 +187,6 @@ struct SidebarTree {
 
 /// The app's source of truth for the sidebar. Windows hold selection only.
 struct SidebarState {
-    /// Arc's default; unpinned tabs idle this long are archived, and there is no off.
-    static let autoArchiveAge: TimeInterval = 12 * 60 * 60
-
     var profiles: [SidebarProfile] = []
     var spaces: [SidebarSpace] = []
     var tree = SidebarTree()
@@ -391,14 +388,14 @@ struct SidebarState {
 
     /// Tabs in `shown`, and tabs without a stamp yet, are stamped instead of archived.
     @discardableResult
-    /// The unpinned tabs idle for `autoArchiveAge` and not shown anywhere; shown and new tabs count as viewed now.
-    mutating func tabsDueForArchive(shown: Set<UUID>, at now: Date = .now) -> [UUID] {
+    /// The unpinned tabs idle for their profile's `age` and not shown anywhere; shown and new tabs count as viewed
+    /// now. Arc has no off.
+    mutating func tabsDueForArchive(shown: Set<UUID>, at now: Date = .now, age: (UUID) -> TimeInterval) -> [UUID] {
         var due: [UUID] = []
         for space in spaces {
+            let age = age(space.profileID)
             for tab in tabs(in: space.id, pinned: false) {
-                if let viewedAt = tab.viewedAt, !shown.contains(tab.id),
-                    now.timeIntervalSince(viewedAt) > SidebarState.autoArchiveAge
-                {
+                if let viewedAt = tab.viewedAt, !shown.contains(tab.id), now.timeIntervalSince(viewedAt) > age {
                     due.append(tab.id)
                 } else if tab.viewedAt == nil || shown.contains(tab.id) {
                     markViewed(tab.id, at: now)
