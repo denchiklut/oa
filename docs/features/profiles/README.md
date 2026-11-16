@@ -113,6 +113,10 @@ Two profiles are never missing. The default one, because a new install's engine
 lists it only once it has loaded it. And one whose name an older `sidebar.json`
 still carries, because the engine loads it during that same launch.
 
+The stub engine never runs the check. It lists only the profiles made through
+it and shares its data directory with Chromium by default, so a profile made on
+the live engine would look lost to it.
+
 The Library's downloads and their filter read the profiles the engine lists, not
 the sidebar's records. Asking the engine for a lost profile's downloads would
 make Chromium create it again, empty and unnamed.
