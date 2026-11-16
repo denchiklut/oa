@@ -77,16 +77,17 @@ struct DialogText: View {
     }
 }
 
-/// The dialogs' one-line field: 14 pt text in a rounded box.
+/// The dialogs' one-line field in a rounded box.
 struct DialogTextField: View {
     let placeholder: String
     @Binding var text: String
+    var size: CGFloat = 14
     var verticalPadding: CGFloat = 10
 
     var body: some View {
         TextField(placeholder, text: $text)
             .textFieldStyle(.plain)
-            .font(.system(size: 14))
+            .font(.system(size: size))
             .padding(.horizontal, 8)
             .padding(.vertical, verticalPadding)
             .background(DialogColor.field, in: RoundedRectangle(cornerRadius: 6))

@@ -10,6 +10,7 @@ struct ProfilePreferencePane: View {
     let openSettings: (ChromiumSettings, UUID) -> Void
     let openHelp: (URL) -> Void
     let create: () -> Void
+    let delete: (ProfileState) -> Void
     let rename: (ProfileState) -> Void
 
     private static let blurb: LocalizedStringKey =
@@ -30,7 +31,11 @@ struct ProfilePreferencePane: View {
                         })
                 HStack(alignment: .top, spacing: 10) {
                     ProfileList(profiles: state.profiles, spaceCount: spaceCount, selection: $state.currentProfileID) {
-                        EditProfilesFooterView(add: create, edit: { state.currentProfile.map(rename) })
+                        EditProfilesFooterView(
+                            selectedProfile: state.currentProfile?.id,
+                            inUse: state.currentProfile.map { spaceCount($0.id) > 0 } ?? true,
+                            add: create, delete: { state.currentProfile.map(delete) },
+                            edit: { state.currentProfile.map(rename) })
                     }
                     .frame(width: 205)
                     if let profile = state.currentProfile { contents(of: profile.id).frame(width: 341) }
@@ -167,12 +172,23 @@ private struct ProfileList<Footer: View>: View {
 
 /// Arc's strip under the profile list. Its glyphs have no hover look and lighten while pressed.
 struct EditProfilesFooterView: View {
+    let selectedProfile: UUID?
+    let inUse: Bool
     let add: () -> Void
+    let delete: () -> Void
     let edit: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
             Button(action: add) { Image(systemName: "plus").padding(8).contentShape(Rectangle()) }
+            Divider().padding(.vertical, 4)
+            Button(action: delete) { Image(systemName: "minus").padding(8).contentShape(Rectangle()) }
+                .disabled(inUse || selectedProfile == SidebarProfile.defaultID)
+                // As Arc's: on a disabled button the text is never drawn and reaches only accessibility.
+                .help(
+                    selectedProfile == SidebarProfile.defaultID
+                        ? "The Default Profile cannot be deleted."
+                        : inUse ? "Only Profiles not assigned to any Spaces can be deleted." : "")
             Divider().padding(.vertical, 4)
             Button(action: edit) {
                 Image(systemName: "rectangle.and.pencil.and.ellipsis").offset(y: -2).padding(8).contentShape(

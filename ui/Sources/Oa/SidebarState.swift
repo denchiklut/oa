@@ -280,6 +280,13 @@ struct SidebarState {
         return profile
     }
 
+    /// As Arc: the profile's Favorites go with it, not to the Archive. A profile with a Space stays.
+    mutating func removeProfile(_ id: UUID) {
+        guard !spaces.contains(where: { $0.profileID == id }), let index = profiles.firstIndex(where: { $0.id == id })
+        else { return }
+        tree.removeRoot(profiles.remove(at: index).favoritesRootID)
+    }
+
     @discardableResult
     mutating func addSpace(name: String, profileID: UUID) -> SidebarSpace {
         let space = SidebarSpace(
