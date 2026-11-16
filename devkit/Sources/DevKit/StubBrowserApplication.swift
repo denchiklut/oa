@@ -42,6 +42,7 @@ public final class StubBrowserApplication: BrowserApplication {
     }
 
     public func allProfiles() -> [UUID] { profiles.map(\.id) }
+    public let listsEveryProfile = false
 
     public func userVisibleName(of profileID: UUID) -> String? { profiles.first { $0.id == profileID }?.name }
 

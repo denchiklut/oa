@@ -44,6 +44,7 @@ final class SidebarStore {
     /// else changes. The default profile is never missing, as Arc takes it for granted, nor is one whose name is
     /// still to be handed over: the engine lists that one only once it has loaded it. Returns the Spaces' names.
     func resetMissingProfiles(in engine: any BrowserApplication) -> [String] {
+        guard engine.listsEveryProfile else { return [] }
         let known = Set(
             engine.allProfiles() + state.profiles.filter { $0.pendingName != nil }.map(\.id)
                 + [SidebarProfile.defaultID])

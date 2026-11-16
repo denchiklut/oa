@@ -78,6 +78,8 @@ public final class ChromiumBrowserApplication: BrowserApplication {
         return context
     }
 
+    public let listsEveryProfile = true
+
     public func allProfiles() -> [UUID] {
         attributes.compactMap { UUID(uuidString: $0.identifier) }.filter { !deletedProfiles.contains($0) }
     }
