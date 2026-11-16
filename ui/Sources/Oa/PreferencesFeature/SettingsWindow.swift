@@ -53,6 +53,13 @@ final class SettingsWindowController: NSWindowController {
         super.showWindow(sender)
     }
 
+    /// As Arc: an open Settings comes back in front, key, once a create sheet ends with no question about Spaces
+    /// after it, wherever the sheet was opened from. Arc makes no call for it; making one is Oa's own.
+    static func bringForwardIfOpen() {
+        NSApplication.shared.windows.first { $0.windowController is SettingsWindowController && $0.isVisible }?
+            .makeKeyAndOrderFront(nil)
+    }
+
     /// As Arc: the list is read again and shows the new profile.
     func profileCreated(_ id: UUID) {
         state.reload()
