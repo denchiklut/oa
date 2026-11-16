@@ -11,7 +11,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private var mainMenu: MainMenu?
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
     private lazy var settings = SettingsWindowController(
-        engine: engine, store: store, openWindow: { [weak self] in self?.openWindow(on: $0) },
+        engine: engine, store: store, openSettings: { [weak self] in self?.openSettings($0, in: $1) },
         openHelp: { [weak self] in self?.openHelp($0) })
     private var askingToQuit = false
     private var isLaunching = true
@@ -138,6 +138,19 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let model = frontWindows.first ?? openWindow()
         model.bringToFront()
         model.newTab(url)
+    }
+
+    /// As Arc: Settings closes, then the page opens as a new tab at the top of a Space of the profile, in a window
+    /// showing one, else in the frontmost window, which moves to one. A profile without a Space gets no page. Which
+    /// of its Spaces, and a new window when none is open, are Oa's own.
+    private func openSettings(_ page: ChromiumSettings, in profileID: UUID) {
+        settings.close()
+        guard let space = store.state.spaces.first(where: { $0.profileID == profileID }) else { return }
+        let model =
+            frontWindows.first { $0.space?.profileID == profileID } ?? frontWindows.first ?? openWindow(on: space.id)
+        if model.space?.profileID != profileID { model.selectSpace(space.id) }
+        model.bringToFront()
+        model.newTab(page.url)
     }
 
     private var frontWindows: [WindowModel] {

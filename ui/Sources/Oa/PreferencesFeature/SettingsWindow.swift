@@ -9,10 +9,9 @@ final class SettingsWindowController: NSWindowController {
     private let tabs = NSTabViewController()
     private let state = PreferencesState()
 
-    /// `openWindow` opens a browser window on a Space and gives its model; `openHelp` shows a help page.
     init(
-        engine: any BrowserApplication, store: SidebarStore, openWindow: @escaping (UUID) -> WindowModel?,
-        openHelp: @escaping (URL) -> Void
+        engine: any BrowserApplication, store: SidebarStore,
+        openSettings: @escaping (ChromiumSettings, UUID) -> Void, openHelp: @escaping (URL) -> Void
     ) {
         super.init(window: nil)
         tabs.tabStyle = .toolbar
@@ -21,7 +20,7 @@ final class SettingsWindowController: NSWindowController {
         }
         add("Profiles", symbol: "person") {
             ProfilePreferencePane(
-                engine: engine, store: store, state: state, openWindow: openWindow, openHelp: openHelp)
+                engine: engine, store: store, state: state, openSettings: openSettings, openHelp: openHelp)
         }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
