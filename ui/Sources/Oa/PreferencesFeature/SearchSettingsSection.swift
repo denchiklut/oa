@@ -5,7 +5,6 @@ import SwiftUI
 /// engine suggests as you type. They wait for the profile's engines to load.
 struct SearchSettingsSection: View {
     let preferences: any BrowserContextPreferences
-    let hasSpace: Bool
     let openSearchSettings: () -> Void
 
     var body: some View {
@@ -23,7 +22,7 @@ struct SearchSettingsSection: View {
             PreferenceRow {
                 Text("Manage search")
             } control: {
-                Button("Search Settings…", action: openSearchSettings).disabled(!hasSpace)
+                Button("Search Settings…", action: openSearchSettings)
             }
             PreferenceRowDivider()
             PreferenceRow {

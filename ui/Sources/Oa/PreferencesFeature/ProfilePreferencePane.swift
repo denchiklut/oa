@@ -7,7 +7,7 @@ struct ProfilePreferencePane: View {
     let engine: any BrowserApplication
     let store: SidebarStore
     @Bindable var state: PreferencesState
-    let openWindow: (UUID) -> WindowModel?
+    let openSettings: (ChromiumSettings, UUID) -> Void
     let openHelp: (URL) -> Void
 
     private static let blurb: LocalizedStringKey =
@@ -51,9 +51,7 @@ struct ProfilePreferencePane: View {
     private func contents(of profile: SidebarProfile) -> some View {
         let preferences = engine.browserContext(id: profile.id).preferences
         return VStack(alignment: .leading, spacing: 8) {
-            SearchSettingsSection(preferences: preferences, hasSpace: spaceCount(profile.id) > 0) {
-                openSearchSettings(in: profile.id)
-            }
+            SearchSettingsSection(preferences: preferences) { openSettings(.searchEngines, profile.id) }
             PreferencesPaneSection {
                 AutoArchiveView(
                     profileID: profile.id, hasSeveralProfiles: store.state.profiles.count > 1, openHelp: openHelp
@@ -62,19 +60,53 @@ struct ProfilePreferencePane: View {
                 PreferenceRowDivider()
                 DownloadLocationView(preferences: preferences)
             }
+            DataActionButtonsView { openSettings($0, profile.id) }
         }
     }
+}
 
-    /// Arc opens it as a tab of some window; Oa's own: the first window showing a Space of the profile, or a new
-    /// window on one when none does, so the page edits that profile's engines. A profile with no Space has no
-    /// window to open it in.
-    private func openSearchSettings(in profileID: UUID) {
-        guard let url = URL(string: "chrome://settings/searchEngines"),
-            let window = store.windows.first(where: { $0.space?.profileID == profileID })
-                ?? store.state.spaces.first(where: { $0.profileID == profileID }).flatMap({ openWindow($0.id) })
-        else { return }
-        window.bringToFront()
-        window.newTab(url)
+/// Arc's "Your Data and Settings": each row opens one of Chromium's pages for the profile. Clear Browsing Data opens
+/// the privacy page, as Arc's does.
+private struct DataActionButtonsView: View {
+    let open: (ChromiumSettings) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Your Data and Settings").font(.system(size: 11)).foregroundStyle(.secondary).padding(.leading, 10)
+            VStack(spacing: 0) {
+                button("lock.fill", PaneColor.blue, "Privacy and Security", .privacy)
+                button("key.fill", PaneColor.green, "Passwords", .passwords)
+                button("creditcard.and.123", PaneColor.yellow, "Credit Cards", .creditCards)
+                button("bell.fill", PaneColor.orange, "Notifications", .notifications)
+                button("trash.fill", PaneColor.red, "Clear Browsing Data", .privacy)
+            }
+            .padding(.vertical, 5)
+            .background(PreferencesPaneSectionBackground())
+        }
+        .padding(.top, 4)
+    }
+
+    private func button(_ icon: String, _ color: Color, _ label: String, _ page: ChromiumSettings) -> some View {
+        Button {
+            open(page)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(color, in: RoundedRectangle(cornerRadius: 6))
+                Text(label)
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(PaneColor.arrow)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -154,7 +186,7 @@ struct PreferenceRow<Label: View, Control: View>: View {
     @ViewBuilder let control: Control
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             label
             Spacer(minLength: 0)
             control
@@ -173,9 +205,23 @@ struct PreferenceRowDivider: View {
     var body: some View { Divider().padding(.horizontal, 10) }
 }
 
+extension Color {
+    fileprivate init(hex: UInt32) {
+        self.init(
+            .sRGB, red: Double(hex >> 16 & 0xFF) / 255, green: Double(hex >> 8 & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255)
+    }
+}
+
 /// Arc's colours as measured in light; the dark ones are Oa's own, Arc's dark pane wasn't captured.
 enum PaneColor {
     static let section = Color.primary.opacity(0.01)
+    static let arrow = Color(hex: 0x63A1F9)
+    static let blue = Color(hex: 0x69AAFA)
+    static let green = Color(hex: 0x8BD38E)
+    static let yellow = Color(hex: 0xFADB74)
+    static let orange = Color(hex: 0xF6B171)
+    static let red = Color(hex: 0xF37D74)
     static let selection = Color(
         nsColor: NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
