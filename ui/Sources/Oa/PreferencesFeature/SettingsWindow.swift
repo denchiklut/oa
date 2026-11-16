@@ -30,7 +30,8 @@ final class SettingsWindowController: NSWindowController {
             ProfilePreferencePane(
                 engine: engine, store: store, state: state, openSettings: openSettings, openHelp: openHelp,
                 create: createProfile, delete: { [weak self] in self?.delete($0) },
-                rename: { [weak self] in self?.rename($0) })
+                rename: { [weak self] in self?.rename($0) },
+                askAboutArchive: { [weak self] in self?.askAboutArchive($0, for: $1) })
         }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
@@ -68,6 +69,20 @@ final class SettingsWindowController: NSWindowController {
                 state.reload()
                 state.currentProfileID = frontProfile() ?? SidebarProfile.defaultID
             } cancel: {
+                dismiss()
+            }
+        }
+    }
+
+    /// Arc's question once profiles archive at different intervals: the profile's own value is already written.
+    private func askAboutArchive(_ threshold: AutoArchiveInactiveThreshold, for profileID: UUID) {
+        guard let window else { return }
+        let profiles = state.profiles.map(\.id)
+        DialogSheet.present(on: window) { [engine] dismiss in
+            AutoArchiveProfilesDialog(
+                threshold: threshold, profileName: engine.userVisibleName(of: profileID) ?? ""
+            ) { all in
+                if all { AutoArchiveThresholds.setForAll(threshold, profiles: profiles) }
                 dismiss()
             }
         }
