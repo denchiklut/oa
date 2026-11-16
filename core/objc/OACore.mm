@@ -15,6 +15,7 @@
 #include "oa/public/extensions.h"
 #include "oa/public/page.h"
 #include "oa/public/preferences.h"
+#include "oa/public/profiles.h"
 #include "oa/public/site_settings.h"
 
 @interface OAPage ()
@@ -41,6 +42,10 @@
 - (void)pageRendererGone:(oa::RendererExit)exit;
 - (void)pageRendererReady;
 - (void)pageClosedWithSessionID:(int32_t)sessionID;
+@end
+
+@interface OAProfileAttributes ()
+- (instancetype)initWithAttributes:(const oa::ProfileAttributes&)attributes;
 @end
 
 @interface OASiteSetting ()
@@ -1415,6 +1420,21 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 
 @end
 
+@implementation OAProfileAttributes
+
+@synthesize identifier = _identifier;
+@synthesize name = _name;
+
+- (instancetype)initWithAttributes:(const oa::ProfileAttributes&)attributes {
+  if ((self = [super init])) {
+    _identifier = @(attributes.id.c_str());
+    _name = @(attributes.name.c_str());
+  }
+  return self;
+}
+
+@end
+
 @implementation OAProfile {
   NSString* _identifier;
 }
@@ -1484,6 +1504,10 @@ class BrowserObserverBridge : public oa::Browser::Observer {
                      static_cast<oa::SiteSettingValue>(value));
 }
 
+- (void)setUserVisibleName:(NSString*)name {
+  oa::SetProfileName(_identifier.UTF8String ?: "", name.UTF8String ?: "");
+}
+
 @end
 
 @implementation OAEngine {
@@ -1509,6 +1533,30 @@ class BrowserObserverBridge : public oa::Browser::Observer {
     _profiles[identifier] = profile;
   }
   return profile;
+}
+
+- (NSArray<OAProfileAttributes*>*)availableProfileAttributes {
+  NSMutableArray<OAProfileAttributes*>* result = [NSMutableArray array];
+  for (const oa::ProfileAttributes& attributes :
+       oa::GetAvailableProfileAttributes()) {
+    [result
+        addObject:[[OAProfileAttributes alloc] initWithAttributes:attributes]];
+  }
+  return result;
+}
+
+- (void)createProfileWithName:(NSString*)name
+                   completion:(void (^)(NSString* _Nullable))completion {
+  void (^handler)(NSString* _Nullable) = [completion copy];
+  oa::CreateProfile(name.UTF8String ?: "",
+                    [handler](const std::string& identifier) {
+                      handler(identifier.empty() ? nil : @(identifier.c_str()));
+                    });
+}
+
+- (BOOL)deleteProfileWithIdentifier:(NSString*)identifier {
+  [_profiles removeObjectForKey:identifier];
+  return oa::DeleteProfile(identifier.UTF8String ?: "");
 }
 
 - (void)attachWindow:(NSWindow*)window withIdentifier:(NSString*)identifier {

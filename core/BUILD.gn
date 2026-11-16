@@ -58,6 +58,7 @@ source_set("oa") {
     "public/extensions.h",
     "public/page.h",
     "public/preferences.h",
+    "public/profiles.h",
     "public/site_settings.h",
     "renderer/content_renderer_client.cc",
     "renderer/content_renderer_client.h",
