@@ -73,6 +73,7 @@ final class WindowModel {
     private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
+    var adBlocker: AdBlocker { engine.adBlocker }
     var space: SidebarSpace? { state.space(selectedSpaceID) }
     var selectedTabID: UUID? { selectedTabIDs[selectedSpaceID] }
     var selectedTab: SidebarTab? { selectedTabID.flatMap { state.tree.tab($0) } }

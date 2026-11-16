@@ -40,7 +40,9 @@
 #include "components/security_interstitials/core/features.h"
 #include "content/public/app/content_main.h"
 #include "content/public/browser/browser_main_runner.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/common/main_function_params.h"
+#include "oa/browser/ad_blocker_service.h"
 #include "oa/browser/page_impl.h"
 #include "oa/browser/profile_services.h"
 #include "oa/browser/ui/browser_window_impl.h"
@@ -51,6 +53,7 @@
 #include "oa/browser/ui/sad_tab_impl.h"
 #include "oa/browser/ui/video_overlay_window_impl.h"
 #include "oa/browser/window_browser.h"
+#include "oa/public/ad_blocker.h"
 
 // The app's NSApplication: Chrome's event handling without its AppController.
 @interface OAApplication : BrowserCrApplication
@@ -110,6 +113,31 @@ void EnableFeature(base::CommandLine& command_line,
 // controls. ArcCore replaces it too.
 class ContentBrowserClient : public ChromeContentBrowserClient {
  public:
+  void RenderProcessWillLaunch(content::RenderProcessHost* host) override {
+    ChromeContentBrowserClient::RenderProcessWillLaunch(host);
+    BindAdBlockRenderer(host);
+  }
+
+  std::vector<std::unique_ptr<blink::URLLoaderThrottle>>
+  CreateURLLoaderThrottles(
+      const network::ResourceRequest& request,
+      content::BrowserContext* context,
+      const base::RepeatingCallback<content::WebContents*()>& get_contents,
+      content::NavigationUIData* navigation_data,
+      content::FrameTreeNodeId frame_id,
+      std::optional<int64_t> navigation_id) override {
+    auto throttles = ChromeContentBrowserClient::CreateURLLoaderThrottles(
+        request, context, get_contents, navigation_data, frame_id,
+        navigation_id);
+    auto* contents = get_contents.is_null() ? nullptr : get_contents.Run();
+    auto origin = contents
+                      ? url::Origin::Create(contents->GetLastCommittedURL())
+                      : url::Origin();
+    throttles.push_back(
+        std::make_unique<AdBlockThrottle>(BrowserAdBlockState(), origin, true));
+    return throttles;
+  }
+
   std::unique_ptr<content::VideoOverlayWindow>
   CreateWindowForVideoPictureInPicture(
       content::VideoPictureInPictureWindowController* controller) override {
@@ -154,6 +182,7 @@ class MainDelegate : public ChromeMainDelegate {
     }
     exit_code = runner->Run();
     State().running = false;
+    ShutdownAdBlocker();
     PageImpl::CloseAll();
     WindowBrowser::CloseAll();
     UnloadBrowserProfiles();

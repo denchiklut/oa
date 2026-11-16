@@ -108,6 +108,7 @@ private struct SettingsSection: View {
     let model: WindowModel
     let dismiss: () -> Void
     @State private var settings: [SiteSetting] = []
+    @State private var offersReload = false
     @State private var hovering = false
 
     var body: some View {
@@ -131,6 +132,29 @@ private struct SettingsSection: View {
             .buttonStyle(.plain)
             ForEach(settings.filter { $0.type != .automaticPictureInPicture }, id: \.type) { setting in
                 SiteSettingRow(setting: setting) { toggle(setting) }
+            }
+            if let url = model.frontPage?.url, ["http", "https"].contains(url.scheme ?? ""), url.host() != nil {
+                let blocker = model.adBlocker
+                let on = blocker.isEnabled && !blocker.isExcluded(url)
+                SiteSettingRow(title: "Block Ads & Trackers", value: on ? "On" : "Off", symbol: "shield.fill", isOn: on)
+                {
+                    blocker.setExcluded(on, for: url)
+                    offersReload = true
+                }
+                .disabled(!blocker.isEnabled)
+                .help(
+                    !blocker.isEnabled
+                        ? "The built-in ad blocker is off. You can change this in Settings."
+                        : on
+                            ? "The built-in ad blocker is turned on for this site."
+                            : "The built-in ad blocker is disabled for this site.")
+                if offersReload {
+                    Button("Reload Page") {
+                        model.frontPage?.reload()
+                        offersReload = false
+                        dismiss()
+                    }.buttonStyle(.plain).padding(.horizontal, 10)
+                }
             }
             // Developer Mode is its own feature; the row stands as Arc's, off, until it lands.
             SiteSettingRow(title: "Developer Mode", value: "Off", symbol: "hammer.fill", isOn: false) {}

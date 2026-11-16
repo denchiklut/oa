@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/memory/raw_ptr.h"
+#include "oa/public/ad_blocker.h"
 #include "oa/public/autocomplete.h"
 #include "oa/public/browser.h"
 #include "oa/public/downloads.h"
@@ -1527,6 +1528,25 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 
 - (void)quit {
   oa::QuitEngine();
+}
+
+- (void)setBlockLists:(NSArray<NSString*>*)lists
+           completion:(void (^)(BOOL))completion {
+  std::vector<std::string> texts;
+  for (NSString* text in lists) {
+    texts.emplace_back(text.UTF8String ?: "");
+  }
+  void (^handler)(BOOL) = [completion copy];
+  oa::SetBlockLists(std::move(texts),
+                    [handler](bool success) { handler(success); });
+}
+
+- (void)setAdBlockExcludedHosts:(NSArray<NSString*>*)hosts {
+  std::vector<std::string> values;
+  for (NSString* host in hosts) {
+    values.emplace_back(host.UTF8String ?: "");
+  }
+  oa::SetAdBlockExcludedHosts(std::move(values));
 }
 
 @end

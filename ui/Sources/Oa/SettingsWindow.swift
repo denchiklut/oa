@@ -8,11 +8,11 @@ final class SettingsWindowController: NSWindowController {
     /// `openWindow` opens a browser window on a Space and gives its model.
     init(engine: any BrowserApplication, store: SidebarStore, openWindow: @escaping (UUID) -> WindowModel?) {
         let content = TabView {
-            GeneralSettingsView().tabItem { Text("General") }
+            GeneralSettingsView(adBlocker: engine.adBlocker).tabItem { Text("General") }
             ProfilesSettingsView(engine: engine, store: store, openWindow: openWindow).tabItem { Text("Profiles") }
         }
         .padding(12)
-        .frame(width: 460, height: 320)
+        .frame(width: 460, height: 380)
         let window = NSWindow(contentViewController: NSHostingController(rootView: content))
         window.title = "Settings"
         window.styleMask = [.titled, .closable]
@@ -25,11 +25,32 @@ final class SettingsWindowController: NSWindowController {
 }
 
 struct GeneralSettingsView: View {
+    let adBlocker: AdBlocker
     @AppStorage(QuitWarning.key) private var warnsBeforeQuitting = QuitWarning.isOnByDefault
 
     var body: some View {
         Form {
             Toggle("Warn before quitting", isOn: $warnsBeforeQuitting)
+            Section("Oa’s Ad Blocker") {
+                Toggle("Block ads and trackers", isOn: Binding(get: { adBlocker.isEnabled }, set: adBlocker.setEnabled))
+                Toggle(
+                    "Block Ads",
+                    isOn: Binding(
+                        get: { adBlocker.selectedLists.contains("EasyList") },
+                        set: { adBlocker.setList("EasyList", enabled: $0) }
+                    )
+                ).disabled(!adBlocker.isEnabled)
+                Toggle(
+                    "Block Trackers",
+                    isOn: Binding(
+                        get: { adBlocker.selectedLists.contains("EasyPrivacy") },
+                        set: { adBlocker.setList("EasyPrivacy", enabled: $0) }
+                    )
+                ).disabled(!adBlocker.isEnabled)
+                Text("Applies to all profiles.").font(.caption).foregroundStyle(.secondary)
+                if adBlocker.isApplying { ProgressView().controlSize(.small) }
+                if let error = adBlocker.error { Text(error).font(.caption).foregroundStyle(.secondary) }
+            }
         }
         .formStyle(.grouped)
     }

@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Sun, 15 Nov 2026 19:39:12 -0700
+Subject: [PATCH] feat(core): install oa renderer client in chromium helpers
+
+---
+ chrome/app/chrome_main_delegate.cc | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegate.cc
+index 0447c4084b0cbddf4d5b2c230a1a704437254701..8a3430ad934b143fc4580709f34e8fb37942f347 100644
+--- a/chrome/app/chrome_main_delegate.cc
++++ b/chrome/app/chrome_main_delegate.cc
+@@ -25,6 +25,7 @@
+ #include "base/immediate_crash.h"
+ #include "base/lazy_instance.h"
+ #include "base/metrics/histogram_macros.h"
++#include "base/no_destructor.h"
+ #include "base/notreached.h"
+ #include "base/path_service.h"
+ #include "base/process/memory.h"
+@@ -125,6 +126,7 @@
+ #include "chrome/browser/mac/code_sign_clone_manager.h"
+ #include "chrome/browser/mac/relauncher.h"
+ #include "components/crash/core/common/objc_zombie.h"
++#include "oa/renderer/content_renderer_client.h"
+ #include "ui/base/l10n/l10n_util_mac.h"
+ #endif  // BUILDFLAG(IS_MAC)
+ 
+@@ -261,8 +263,10 @@
+ base::LazyInstance<ChromeContentGpuClient>::DestructorAtExit
+     g_chrome_content_gpu_client = LAZY_INSTANCE_INITIALIZER;
+ #endif  // !defined(BUILDING_CHROME_RENDERER)
++#if !BUILDFLAG(IS_MAC)
+ base::LazyInstance<ChromeContentRendererClient>::DestructorAtExit
+     g_chrome_content_renderer_client = LAZY_INSTANCE_INITIALIZER;
++#endif
+ 
+ // static
+ base::span<const char* const>
+@@ -1915,7 +1919,13 @@ content::ContentGpuClient* ChromeMainDelegate::CreateContentGpuClient() {
+ 
+ content::ContentRendererClient*
+ ChromeMainDelegate::CreateContentRendererClient() {
++#if BUILDFLAG(IS_MAC)
++  static base::NoDestructor<std::unique_ptr<content::ContentRendererClient>>
++      client(oa::CreateRendererClient());
++  return client->get();
++#else
+   return g_chrome_content_renderer_client.Pointer();
++#endif
+ }
+ 
+ content::ContentUtilityClient*

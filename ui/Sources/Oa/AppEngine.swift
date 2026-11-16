@@ -12,7 +12,7 @@ enum AppEngine {
         {
             return chromium
         }
-        return StubBrowserApplication()
+        return StubBrowserApplication(directory: dataDirectory)
     }
 
     static var dataDirectory: URL {
