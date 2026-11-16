@@ -14,6 +14,9 @@ public protocol BrowserApplication: AnyObject {
     func browserContext(id: UUID) -> any BrowserContext
     /// The profiles the engine has, loaded or not, in the engine's own order, as ADK's `allProfiles()`.
     func allProfiles() -> [UUID]
+    /// Whether a profile absent from `allProfiles()` is gone. Not for the stub, which lists only the profiles made
+    /// through it and may share its data directory with Chromium's.
+    var listsEveryProfile: Bool { get }
     /// Asked of the engine each time, as ADK's: the engine owns the name and the app keeps no copy.
     func userVisibleName(of profileID: UUID) -> String?
     /// A new profile, loaded; nil if the engine can't make one.
