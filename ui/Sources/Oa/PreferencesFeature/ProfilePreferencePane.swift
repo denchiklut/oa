@@ -9,6 +9,7 @@ struct ProfilePreferencePane: View {
     @Bindable var state: PreferencesState
     let openSettings: (ChromiumSettings, UUID) -> Void
     let openHelp: (URL) -> Void
+    let rename: (ProfileState) -> Void
 
     private static let blurb: LocalizedStringKey =
         """
@@ -27,9 +28,11 @@ struct ProfilePreferencePane: View {
                             openHelp($0); return .handled
                         })
                 HStack(alignment: .top, spacing: 10) {
-                    ProfileList(profiles: profiles, spaceCount: spaceCount, selection: $state.currentProfileID)
-                        .frame(width: 205)
-                    if let profile { contents(of: profile).frame(width: 341) }
+                    ProfileList(profiles: state.profiles, spaceCount: spaceCount, selection: $state.currentProfileID) {
+                        EditProfilesFooterView(edit: { state.currentProfile.map(rename) })
+                    }
+                    .frame(width: 205)
+                    if let profile = state.currentProfile { contents(of: profile.id).frame(width: 341) }
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -37,16 +40,6 @@ struct ProfilePreferencePane: View {
             .padding(.vertical, 20)
         }
         .background(Color(nsColor: .textBackgroundColor))
-    }
-
-    /// In the engine's order with the engine's names, read on each render as Arc does; it keeps no copy.
-    private var profiles: [ProfileList.Item] {
-        engine.allProfiles().map { ProfileList.Item(id: $0, name: engine.userVisibleName(of: $0) ?? "") }
-    }
-
-    private var profile: UUID? {
-        let profiles = engine.allProfiles()
-        return profiles.contains(state.currentProfileID) ? state.currentProfileID : profiles.first
     }
 
     private func spaceCount(_ profileID: UUID) -> Int {
@@ -59,7 +52,7 @@ struct ProfilePreferencePane: View {
             SearchSettingsSection(preferences: preferences) { openSettings(.searchEngines, profile) }
             PreferencesPaneSection {
                 AutoArchiveView(
-                    profileID: profile, hasSeveralProfiles: engine.allProfiles().count > 1, openHelp: openHelp
+                    profileID: profile, hasSeveralProfiles: state.profiles.count > 1, openHelp: openHelp
                 )
                 .id(profile)
                 PreferenceRowDivider()
@@ -115,15 +108,11 @@ private struct DataActionButtonsView: View {
     }
 }
 
-private struct ProfileList: View {
-    struct Item: Identifiable, Equatable {
-        let id: UUID
-        let name: String
-    }
-
-    let profiles: [Item]
+private struct ProfileList<Footer: View>: View {
+    let profiles: [ProfileState]
     let spaceCount: (UUID) -> Int
     @Binding var selection: UUID
+    @ViewBuilder let footer: Footer
 
     var body: some View {
         VStack(spacing: 0) {
@@ -141,11 +130,13 @@ private struct ProfileList: View {
             }
             .padding(10)
             Spacer(minLength: 0)
+            Divider()
+            footer
         }
         .background(PreferencesPaneSectionBackground(fill: .clear))
     }
 
-    private func row(_ profile: Item) -> some View {
+    private func row(_ profile: ProfileState) -> some View {
         Button {
             selection = profile.id
         } label: {
@@ -169,6 +160,33 @@ private struct ProfileList: View {
         case 0: "Not used"
         case 1: "1 Space"
         default: "\(spaces) Spaces"
+        }
+    }
+}
+
+/// Arc's strip under the profile list. Its glyphs have no hover look and lighten while pressed.
+struct EditProfilesFooterView: View {
+    let edit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: edit) {
+                Image(systemName: "rectangle.and.pencil.and.ellipsis").offset(y: -2).padding(8).contentShape(
+                    Rectangle())
+            }
+            Spacer(minLength: 0)
+        }
+        .buttonStyle(GlyphStyle())
+        .frame(height: 32)
+    }
+
+    private struct GlyphStyle: ButtonStyle {
+        @Environment(\.isEnabled) private var isEnabled
+
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label.foregroundStyle(
+                !isEnabled
+                    ? PaneColor.glyphDisabled : configuration.isPressed ? PaneColor.glyphPressed : PaneColor.glyph)
         }
     }
 }
@@ -232,6 +250,9 @@ enum PaneColor {
     static let yellow = Color(hex: 0xFADB74)
     static let orange = Color(hex: 0xF6B171)
     static let red = Color(hex: 0xF37D74)
+    static let glyph = Color.primary.opacity(0.65)
+    static let glyphPressed = Color.primary.opacity(0.47)
+    static let glyphDisabled = Color.primary.opacity(0.3)
     static let selection = Color(
         nsColor: NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
