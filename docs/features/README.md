@@ -33,6 +33,7 @@ that every online integration still works.
 - [Sidebar state](sidebar/README.md)
 - [Peek](peek/README.md)
 - [Favorites](favorites/README.md)
+- [Profiles](profiles/README.md)
 - [Saved state and recovery](saved-state/README.md)
 - [Downloads](downloads/README.md)
 - [Page context menu](context-menu/README.md)
@@ -111,9 +112,9 @@ Sources: Arc [2022][arc22], [2023][arc23], [2024–2026][arc24].
 | Switch Spaces by gesture or keyboard | ✅ | ☐ |
 | Spaces overview / management | ✅ | ☐ |
 | Space colors, gradients, texture and appearance | ✅ | ☐ |
-| Separate browsing profiles | ✅ | ☐ |
-| Assign profiles to Spaces | ✅ | ☐ |
-| Create, rename and delete profiles | ✅ | ☐ |
+| Separate browsing profiles | ✅ | ✅ |
+| Assign profiles to Spaces | ✅ | ✅ |
+| Create, rename and delete profiles | ✅ | ✅ |
 | Multiple browser windows | ✅ | ☐ |
 | Separate blank-window command | ✅ | ☐ |
 | Move an active page between windows | ✅ | ☐ |
