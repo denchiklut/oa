@@ -10,7 +10,11 @@ public final class StubBrowserApplication: BrowserApplication {
     private let profilesFile: URL
     /// What Chromium's profile storage is to the live engine: the stub's profiles and names, kept across launches.
     private var profiles: [StubProfile] {
-        didSet { try? JSONEncoder().encode(profiles).write(to: profilesFile, options: .atomic) }
+        didSet {
+            try? FileManager.default.createDirectory(
+                at: profilesFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? JSONEncoder().encode(profiles).write(to: profilesFile, options: .atomic)
+        }
     }
 
     public init(directory: URL) {
