@@ -31,7 +31,9 @@ final class DownloadsStore {
     /// Newest first. A download the engine hasn't placed yet has no row, as none shows in Arc for a Save sheet
     /// that was cancelled.
     var entries: [Entry] {
-        sidebar.state.profiles.flatMap { profile in
+        // Not a profile the engine lost and the sidebar still records: asking for its downloads would make it anew.
+        let listed = Set(engine.allProfiles() + [SidebarProfile.defaultID])
+        return sidebar.state.profiles.filter { listed.contains($0.id) }.flatMap { profile in
             engine.browserContext(id: profile.id).downloads.items.filter { $0.file != nil }
                 .map { Entry(download: $0, profileID: profile.id) }
         }

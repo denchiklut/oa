@@ -130,12 +130,12 @@ private struct DownloadsPage: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
             HStack(spacing: 6) {
-                ForEach(model.state.profiles) { profile in
+                ForEach(model.profiles) { profile in
                     let chosen = profileID == profile.id
                     Button {
                         profileID = chosen ? nil : profile.id
                     } label: {
-                        Text(model.profileName(profile.id))
+                        Text(profile.name)
                             .font(.system(size: 12, weight: chosen ? .semibold : .regular))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
