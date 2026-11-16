@@ -84,7 +84,7 @@ notes here does not assess or change the checklist status below.
 | Close tabs and reopen the last closed tab | ✅ | ☐ |
 | Clear all ordinary tabs | ✅ | ☐ |
 | Automatic tab archiving | ✅ | ☐ |
-| Configure auto-archive interval per profile | ✅ | ☐ |
+| Configure auto-archive interval per profile | ✅ |✅ |
 | Archive browser and archived-tab restoration | ✅ | ☐ |
 | Search archived tabs † | ✅ | ☐ |
 | Clear the entire Archive † | ✅ | ☐ |
@@ -271,10 +271,10 @@ Sources: Arc [2021][arc21], [2022][arc22], [2023][arc23],
 | Permission prompts for camera, microphone, location, etc. | ✅ | ✅ |
 | Connection-security indicator | ✅ | ☐ |
 | JavaScript alert, confirm and prompt dialogs | ✅ | ✅ |
-| Clear browsing data / privacy settings UI | ✅ | ☐ |
+| Clear browsing data / privacy settings UI | ✅ |✅ |
 | Password manager | ✅ | ☐ |
 | Address and payment autofill UI | ✅ | ☐ |
-| Per-profile notifications settings | ✅ | ☐ |
+| Per-profile notifications settings | ✅ |✅ |
 
 Sources: Arc [2022][arc22], [2023][arc23], [2024–2026][arc24],
 [ad-blocker troubleshooting][arc-troubleshoot], [data clearing][arc-clear],
