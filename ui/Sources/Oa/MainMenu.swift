@@ -26,6 +26,7 @@ final class MainMenu {
         let file = submenu("File", in: menu)
         file.addItem(item("New Window", #selector(ApplicationDelegate.newWindow(_:)), key: "n"))
         file.addItem(item("New Tab", #selector(BrowserWindowController.newTab(_:)), key: "t"))
+        file.addItem(item("New Profile", #selector(BrowserWindowController.newProfile(_:))))
         file.addItem(item("Open Location…", #selector(BrowserWindowController.openLocation(_:)), key: "l"))
         file.addItem(.separator())
         file.addItem(item("Pin Tab", #selector(BrowserWindowController.togglePin(_:)), key: "d"))

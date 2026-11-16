@@ -12,7 +12,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private lazy var restoreData = RestoreDataController(store: store) { Self.relaunch() }
     private lazy var settings = SettingsWindowController(
         engine: engine, store: store, openSettings: { [weak self] in self?.openSettings($0, in: $1) },
-        openHelp: { [weak self] in self?.openHelp($0) })
+        openHelp: { [weak self] in self?.openHelp($0) }, createProfile: { [weak self] in self?.createProfile() })
     private var askingToQuit = false
     private var isLaunching = true
     private static var current: ApplicationDelegate?
@@ -34,6 +34,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         store.handProfileNames(to: engine)
         downloads = DownloadsStore(engine: engine, sidebar: store)
         pictureInPicture = PictureInPicture(store: store)
+        super.init()
+        store.didCreateProfile = { [weak self] in self?.settings.profileCreated($0) }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -152,6 +154,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if model.space?.profileID != profileID { model.selectSpace(space.id) }
         model.bringToFront()
         model.newTab(page.url)
+    }
+
+    /// As Arc's + in Settings: the create sheet goes on the last key browser window, which comes forward. With no
+    /// browser window there is none.
+    private func createProfile() {
+        guard let model = frontWindows.first else { return }
+        model.bringToFront()
+        ProfileDialogUtils.createProfile(in: model)
     }
 
     private var frontWindows: [WindowModel] {

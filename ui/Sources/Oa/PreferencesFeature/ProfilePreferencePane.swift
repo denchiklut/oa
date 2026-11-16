@@ -9,6 +9,7 @@ struct ProfilePreferencePane: View {
     @Bindable var state: PreferencesState
     let openSettings: (ChromiumSettings, UUID) -> Void
     let openHelp: (URL) -> Void
+    let create: () -> Void
     let rename: (ProfileState) -> Void
 
     private static let blurb: LocalizedStringKey =
@@ -29,7 +30,7 @@ struct ProfilePreferencePane: View {
                         })
                 HStack(alignment: .top, spacing: 10) {
                     ProfileList(profiles: state.profiles, spaceCount: spaceCount, selection: $state.currentProfileID) {
-                        EditProfilesFooterView(edit: { state.currentProfile.map(rename) })
+                        EditProfilesFooterView(add: create, edit: { state.currentProfile.map(rename) })
                     }
                     .frame(width: 205)
                     if let profile = state.currentProfile { contents(of: profile.id).frame(width: 341) }
@@ -166,10 +167,13 @@ private struct ProfileList<Footer: View>: View {
 
 /// Arc's strip under the profile list. Its glyphs have no hover look and lighten while pressed.
 struct EditProfilesFooterView: View {
+    let add: () -> Void
     let edit: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
+            Button(action: add) { Image(systemName: "plus").padding(8).contentShape(Rectangle()) }
+            Divider().padding(.vertical, 4)
             Button(action: edit) {
                 Image(systemName: "rectangle.and.pencil.and.ellipsis").offset(y: -2).padding(8).contentShape(
                     Rectangle())
