@@ -421,6 +421,14 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)closeExtensionPopup;
 @end
 
+// A profile as Chromium lists it, loaded or not, as ArcCore's browser context
+// attributes. Chromium keeps the name; the app stores none.
+@interface OAProfileAttributes : NSObject
+@property(nonatomic, readonly) NSString* identifier;
+@property(nonatomic, readonly) NSString* name;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
 @interface OAProfile : NSObject
 @property(nonatomic, readonly) OADownloads* downloads;
 @property(nonatomic, readonly) OAPreferences* preferences;
@@ -444,6 +452,8 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
                   delegate:(nullable id<OAPageDelegate>)delegate
                 completion:
                     (void (^)(OAPage* _Nullable page, BOOL restored))completion;
+// Chrome's local profile name, as ArcCore's setUserVisibleName:.
+- (void)setUserVisibleName:(NSString*)name;
 @end
 
 @interface OAEngine : NSObject
@@ -452,6 +462,15 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)setAdBlockExcludedHosts:(NSArray<NSString*>*)hosts;
 - (instancetype)init NS_UNAVAILABLE;
 - (OAProfile*)profileWithIdentifier:(NSString*)identifier;
+// In Chromium's order, as ArcCore's availableBrowserContextAttributes.
+- (NSArray<OAProfileAttributes*>*)availableProfileAttributes;
+// `completion` gets the new profile's identifier once it has loaded, or nil.
+- (void)createProfileWithName:(NSString*)name
+                   completion:
+                       (void (^)(NSString* _Nullable identifier))completion;
+// Lets go of the profile, then has Chrome delete it and its directory. YES if
+// the deletion is scheduled. The app drops what it holds of the profile first.
+- (BOOL)deleteProfileWithIdentifier:(NSString*)identifier;
 // Binds the window once; a later call for the same identifier is ignored.
 - (void)attachWindow:(NSWindow*)window withIdentifier:(NSString*)identifier;
 // Drops the window's pages; its Browsers then close.

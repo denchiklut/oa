@@ -3,6 +3,7 @@
 
 #include <map>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "base/functional/bind.h"
@@ -10,14 +11,19 @@
 #include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
+#include "base/uuid.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/delete_profile_helper.h"
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_attributes_entry.h"
+#include "chrome/browser/profiles/profile_attributes_init_params.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_metrics.h"
+#include "oa/public/profiles.h"
 
 namespace oa {
 namespace {
@@ -27,6 +33,8 @@ struct ProfileEntry {
   std::vector<base::OnceCallback<void(Profile*)>> callbacks;
   bool ready = false;
 };
+constexpr char kDirectoryPrefix[] = "Oa-";
+
 auto& Entries() {
   static base::NoDestructor<std::map<std::string, ProfileEntry>> entries;
   return *entries;
@@ -40,7 +48,19 @@ bool IsValidIdentifier(const std::string& identifier) {
 
 base::FilePath ProfilePath(const std::string& identifier) {
   return g_browser_process->profile_manager()->user_data_dir().AppendASCII(
-      "Oa-" + identifier);
+      kDirectoryPrefix + identifier);
+}
+
+bool SetLocalName(const std::string& identifier, const std::string& name) {
+  ProfileAttributesEntry* entry =
+      g_browser_process->profile_manager()
+          ->GetProfileAttributesStorage()
+          .GetProfileAttributesWithPath(ProfilePath(identifier));
+  if (entry) {
+    entry->SetLocalProfileName(base::UTF8ToUTF16(name),
+                               /*is_default_name=*/false);
+  }
+  return entry != nullptr;
 }
 }  // namespace
 
@@ -93,32 +113,84 @@ Profile* GetLoadedBrowserProfile(const std::string& identifier) {
   return found->second.profile;
 }
 
-void DeleteBrowserProfile(const std::string& identifier) {
-  if (!IsValidIdentifier(identifier)) {
+std::vector<ProfileAttributes> GetAvailableProfileAttributes() {
+  std::vector<ProfileAttributes> profiles;
+  for (ProfileAttributesEntry* entry : g_browser_process->profile_manager()
+                                           ->GetProfileAttributesStorage()
+                                           .GetAllProfilesAttributes()) {
+    const std::string directory = entry->GetPath().BaseName().AsUTF8Unsafe();
+    // Chrome's initial profile is there too; the app never uses it.
+    if (auto identifier = base::RemovePrefix(directory, kDirectoryPrefix)) {
+      profiles.push_back({.id = std::string(*identifier),
+                          .name = base::UTF16ToUTF8(entry->GetName())});
+    }
+  }
+  return profiles;
+}
+
+void CreateProfile(const std::string& name,
+                   std::function<void(const std::string&)> completion) {
+  const std::string identifier =
+      base::ToUpperASCII(base::Uuid::GenerateRandomV4().AsLowercaseString());
+  // The entry first, so the profile starts with the name: Chrome reads it from
+  // there when it sets up the new profile's preferences.
+  ProfileAttributesInitParams params;
+  params.profile_path = ProfilePath(identifier);
+  params.profile_name = base::UTF8ToUTF16(name);
+  g_browser_process->profile_manager()
+      ->GetProfileAttributesStorage()
+      .AddProfile(std::move(params));
+  LoadBrowserProfile(identifier,
+                     base::BindOnce(
+                         [](std::string identifier,
+                            std::function<void(const std::string&)> completion,
+                            Profile* profile) {
+                           completion(profile ? identifier : std::string());
+                         },
+                         identifier, std::move(completion)));
+}
+
+void SetProfileName(const std::string& profile_id, const std::string& name) {
+  if (!IsValidIdentifier(profile_id)) {
     return;
   }
-  // Callbacks still waiting for it get no profile.
-  auto found = Entries().find(identifier);
+  if (SetLocalName(profile_id, name)) {
+    return;
+  }
+  LoadBrowserProfile(profile_id, base::BindOnce(
+                                     [](std::string identifier,
+                                        std::string name, Profile* profile) {
+                                       if (profile) {
+                                         SetLocalName(identifier, name);
+                                       }
+                                     },
+                                     profile_id, name));
+}
+
+bool DeleteProfile(const std::string& profile_id) {
+  if (!IsValidIdentifier(profile_id)) {
+    return false;
+  }
+  auto* manager = g_browser_process->profile_manager();
+  const base::FilePath path = ProfilePath(profile_id);
+  if (!manager->GetProfileByPath(path) &&
+      !manager->GetProfileAttributesStorage().GetProfileAttributesWithPath(
+          path)) {
+    return false;
+  }
+  // As ArcCore: its own hold on the profile goes first, so Chrome can unload
+  // it and wipe the directory now rather than at the next launch.
+  auto found = Entries().find(profile_id);
   if (found != Entries().end()) {
     auto callbacks = std::move(found->second.callbacks);
-    // Releases the keep-alive, so Chrome can unload the profile.
     Entries().erase(found);
     for (auto& callback : callbacks) {
       std::move(callback).Run(nullptr);
     }
   }
-  auto* manager = g_browser_process->profile_manager();
-  const base::FilePath path = ProfilePath(identifier);
-  // A profile never loaded has no directory or attributes to delete.
-  if (!manager->GetProfileByPath(path) &&
-      !manager->GetProfileAttributesStorage().GetProfileAttributesWithPath(
-          path)) {
-    return;
-  }
-  // Closes the profile's Browsers, forgets it and wipes its directory: at once
-  // if it can, else at the next launch (CleanUpDeletedProfiles).
   manager->GetDeleteProfileHelper().MaybeScheduleProfileForDeletion(
       path, base::DoNothing(), ProfileMetrics::DELETE_PROFILE_SETTINGS);
+  return true;
 }
 
 void UnloadBrowserProfiles() {
