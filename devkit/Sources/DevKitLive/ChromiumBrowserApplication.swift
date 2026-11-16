@@ -10,6 +10,8 @@ public final class ChromiumBrowserApplication: BrowserApplication {
     private let arguments: [String]
     private var engine: CoreEngine?
     private var contexts: [UUID: ChromiumBrowserContext] = [:]
+    /// As ADK's `deletedProfiles`: Chromium still lists a profile until it has unloaded it.
+    private var deletedProfiles: Set<UUID> = []
     private let dataDirectory: URL
     public lazy var adBlocker = AdBlocker(
         directory: dataDirectory,
@@ -74,6 +76,34 @@ public final class ChromiumBrowserApplication: BrowserApplication {
             id: id, profile: { [weak self] in self?.engine?.profile(identifier: id.uuidString) })
         contexts[id] = context
         return context
+    }
+
+    public func allProfiles() -> [UUID] {
+        attributes.compactMap { UUID(uuidString: $0.identifier) }.filter { !deletedProfiles.contains($0) }
+    }
+
+    public func userVisibleName(of profileID: UUID) -> String? {
+        attributes.first { UUID(uuidString: $0.identifier) == profileID }?.name
+    }
+
+    private var attributes: [CoreProfileAttributes] {
+        engine?.availableProfileAttributes().map { unsafeBitCast($0, to: CoreProfileAttributes.self) } ?? []
+    }
+
+    public func createBrowserContext(userVisibleName: String) async -> UUID? {
+        guard let engine else { return nil }
+        let identifier = await withCheckedContinuation { continuation in
+            engine.createProfile(name: userVisibleName) { continuation.resume(returning: $0) }
+        }
+        return identifier.flatMap(UUID.init)
+    }
+
+    public func deleteBrowserContext(id: UUID) -> Bool {
+        guard id != BrowserProfile.initialID, let engine else { return false }
+        contexts[id] = nil
+        guard engine.deleteProfile(identifier: id.uuidString) else { return false }
+        deletedProfiles.insert(id)
+        return true
     }
 
     public func attachWindow(_ window: NSWindow, id: UUID) {
@@ -148,6 +178,8 @@ final class ChromiumBrowserContext: BrowserContext {
     func makeAutocomplete() -> any Autocomplete {
         ChromiumAutocomplete(core: profile()?.makeAutocomplete())
     }
+
+    func setUserVisibleName(_ name: String) { profile()?.setUserVisibleName(name) }
 
     func browser(windowID: UUID) -> any Browser {
         if let browser = browsers[windowID]?.browser { return browser }

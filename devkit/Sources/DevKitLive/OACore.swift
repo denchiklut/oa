@@ -7,11 +7,20 @@ import AppKit
     @objc(setBlockLists:completion:) func setBlockLists(_ lists: [String], completion: @escaping (Bool) -> Void)
     @objc(setAdBlockExcludedHosts:) func setAdBlockExcludedHosts(_ hosts: [String])
     @objc(profileWithIdentifier:) func profile(identifier: String) -> CoreProfile
+    /// `OAProfileAttributes`, which Swift can't check against `CoreProfileAttributes`.
+    func availableProfileAttributes() -> [NSObject]
+    @objc(createProfileWithName:completion:) func createProfile(name: String, completion: @escaping (String?) -> Void)
+    @objc(deleteProfileWithIdentifier:) func deleteProfile(identifier: String) -> Bool
     @objc(attachWindow:withIdentifier:) func attach(_ window: NSWindow, identifier: String)
     @objc(closeWindowWithIdentifier:) func closeWindow(identifier: String)
     @objc(askToLeaveWindowWithIdentifier:completion:) func askToLeaveWindow(
         identifier: String, completion: @escaping (Bool) -> Void)
     func quit()
+}
+
+@MainActor @objc protocol CoreProfileAttributes: NSObjectProtocol {
+    var identifier: String { get }
+    var name: String { get }
 }
 
 @MainActor @objc protocol CoreSiteSetting: NSObjectProtocol {
@@ -169,6 +178,7 @@ import AppKit
     func createPage(
         inWindow windowIdentifier: String, restoringSessionID sessionID: Int32, delegate: CorePageDelegate?,
         completion: @escaping (CorePage?, Bool) -> Void)
+    func setUserVisibleName(_ name: String)
 }
 
 @MainActor @objc protocol CorePage: NSObjectProtocol {

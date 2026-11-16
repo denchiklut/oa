@@ -12,6 +12,15 @@ public protocol BrowserApplication: AnyObject {
     /// Finishes quitting after the app answered `applicationShouldTerminate` with `.terminateLater`.
     func terminate()
     func browserContext(id: UUID) -> any BrowserContext
+    /// The profiles the engine has, loaded or not, in the engine's own order, as ADK's `allProfiles()`.
+    func allProfiles() -> [UUID]
+    /// Asked of the engine each time, as ADK's: the engine owns the name and the app keeps no copy.
+    func userVisibleName(of profileID: UUID) -> String?
+    /// A new profile, loaded; nil if the engine can't make one.
+    func createBrowserContext(userVisibleName: String) async -> UUID?
+    /// Lets go of the profile's engine objects, then deletes it with its data. True once the deletion is under way;
+    /// never for `BrowserProfile.initialID`. The app drops the profile's pages and browsers first.
+    func deleteBrowserContext(id: UUID) -> Bool
     /// Binds the app's window to the pages made for its `id`, once. Call it when the window opens.
     func attachWindow(_ window: NSWindow, id: UUID)
     /// Drops the window's remaining pages. Call it when the window closes.
@@ -21,10 +30,17 @@ public protocol BrowserApplication: AnyObject {
     func askToLeave(windowID: UUID) async -> Bool
 }
 
+public enum BrowserProfile {
+    /// As ADK's `Profile.initial`: the profile every install has. It can't be deleted.
+    public static let initialID = UUID(uuidString: "6B0F3E1A-0A5C-4F7B-9C1D-0A0A0A0A0A01")!
+}
+
 /// A profile's engine side: separate cookies, storage and history.
 @MainActor
 public protocol BrowserContext: AnyObject {
     var id: UUID { get }
+    /// Without an event back, as ADK's: the next `userVisibleName(of:)` reads it.
+    func setUserVisibleName(_ name: String)
     /// A page with an `id` of its own in the app's window `windowID`, in the background; nil if the engine can't.
     /// A closed page's `sessionID` brings its history back where it can (`restored`); else the app issues the `load`.
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)?
