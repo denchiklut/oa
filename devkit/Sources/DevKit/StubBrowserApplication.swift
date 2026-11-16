@@ -7,9 +7,16 @@ import Observation
 public final class StubBrowserApplication: BrowserApplication {
     private var contexts: [UUID: StubBrowserContext] = [:]
     public let adBlocker: AdBlocker
+    private let profilesFile: URL
+    /// What Chromium's profile storage is to the live engine: the stub's profiles and names, kept across launches.
+    private var profiles: [StubProfile] {
+        didSet { try? JSONEncoder().encode(profiles).write(to: profilesFile, options: .atomic) }
+    }
 
     public init(directory: URL) {
         adBlocker = AdBlocker(directory: directory, apply: { _ in true }, exclude: { _ in })
+        profilesFile = directory.appendingPathComponent("StubProfiles.json")
+        profiles = (try? JSONDecoder().decode([StubProfile].self, from: Data(contentsOf: profilesFile))) ?? []
     }
 
     public func run(ready: @escaping @MainActor () -> Void) -> Int32 {
@@ -25,9 +32,34 @@ public final class StubBrowserApplication: BrowserApplication {
 
     public func browserContext(id: UUID) -> any BrowserContext {
         if let context = contexts[id] { return context }
-        let context = StubBrowserContext(id: id)
+        let context = StubBrowserContext(id: id) { [weak self] in self?.name(id, $0) }
         contexts[id] = context
         return context
+    }
+
+    public func allProfiles() -> [UUID] { profiles.map(\.id) }
+
+    public func userVisibleName(of profileID: UUID) -> String? { profiles.first { $0.id == profileID }?.name }
+
+    public func createBrowserContext(userVisibleName: String) async -> UUID? {
+        let profile = StubProfile(id: UUID(), name: userVisibleName)
+        profiles.append(profile)
+        return profile.id
+    }
+
+    public func deleteBrowserContext(id: UUID) -> Bool {
+        guard id != BrowserProfile.initialID, profiles.contains(where: { $0.id == id }) else { return false }
+        contexts[id] = nil
+        profiles.removeAll { $0.id == id }
+        return true
+    }
+
+    private func name(_ id: UUID, _ name: String) {
+        if let index = profiles.firstIndex(where: { $0.id == id }) {
+            profiles[index].name = name
+        } else {
+            profiles.append(StubProfile(id: id, name: name))
+        }
     }
 
     public func attachWindow(_ window: NSWindow, id: UUID) {}
@@ -39,9 +71,15 @@ public final class StubBrowserApplication: BrowserApplication {
     }
 }
 
+private struct StubProfile: Codable {
+    let id: UUID
+    var name: String
+}
+
 @MainActor
 final class StubBrowserContext: BrowserContext {
     let id: UUID
+    private let name: (String) -> Void
     private let stubDownloads = StubDownloads()
     var downloads: any Downloads { stubDownloads }
     let preferences: any BrowserContextPreferences = StubPreferences()
@@ -49,7 +87,12 @@ final class StubBrowserContext: BrowserContext {
     var extensions: any Extensions { stubExtensions }
     private var browsers: [UUID: WeakBrowser] = [:]
 
-    init(id: UUID) { self.id = id }
+    init(id: UUID, name: @escaping (String) -> Void) {
+        self.id = id
+        self.name = name
+    }
+
+    func setUserVisibleName(_ name: String) { self.name(name) }
 
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
         if let sessionID,
