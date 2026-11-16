@@ -74,7 +74,9 @@ with it. The window showing the Space then selects its bottom-most unpinned tab
 and loads it in the new profile. Every other tab loads when it is next
 selected, a pinned tab at its pinned address and an unpinned one at its last
 address, with no history. The Favorites row shows the new profile's Favorites;
-the old profile keeps its own.
+the old profile keeps its own. A command bar open over the Space closes, since
+it searches the old profile, and opens again for a new tab when the Space has no
+tab to select; that part is Oa's own.
 
 Arc leaves the pages a second window holds alive in the old profile, where they
 show blank. In Oa a tab has one page, and it is dropped whichever window holds

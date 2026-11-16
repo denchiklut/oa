@@ -470,15 +470,22 @@ final class WindowModel {
     /// As Arc's `didSetProfileForSpaceIDs`. A page can't change profile, so the Spaces' pages go with nothing kept
     /// and each tab loads again in the new profile once selected, at its saved address. A window showing a moved
     /// Space selects its bottom-most unpinned tab. Arc leaves the pages another window holds alive in the old
-    /// profile and blank; in Oa a tab has one page, which goes wherever it is.
+    /// profile and blank; in Oa a tab has one page, which goes wherever it is. Oa's own: an open command bar, which
+    /// searches the old profile, closes, and comes back for a new tab where nothing is left to select, as on
+    /// arriving at such a Space.
     func setProfile(_ profileID: UUID, forSpaces spaceIDs: [UUID]) {
         let spaceIDs = spaceIDs.filter { state.space($0).map { $0.profileID != profileID } ?? false }
         let tabIDs = spaceIDs.flatMap { state.tabs(in: $0).map(\.id) }
         for window in store.windows { window.dropPages(of: tabIDs) }
         store.edit { $0.setProfile(profileID, forSpaces: spaceIDs) }
         for window in store.windows.filter({ $0 !== self }) + [self] where spaceIDs.contains(window.selectedSpaceID) {
+            window.closeCommandBar()
             window.selectedTabIDs[window.selectedSpaceID] = nil
-            if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last { window.select(bottom.id) }
+            if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last {
+                window.select(bottom.id)
+            } else {
+                window.openCommandBar(.newTab)
+            }
         }
     }
 
