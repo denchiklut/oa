@@ -10,7 +10,8 @@ folder, as sorted pretty JSON written atomically into a `0700` directory; a save
 with unchanged bytes is skipped.
 
 `sidebar.json` carries `version`, `profiles`, `spaces`, `tree` and `archive`,
-where `tree` lists `rootIDs` and `items` in display order. Each item has `id`,
+where `tree` lists `rootIDs` and `items` in display order. A profile has its
+`id` and `favoritesRootID`; its name is Chromium's. Each item has `id`,
 optional `parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
 `splitView`, and for a container its `container` kind, for a tab its `title`,
 `url`, `viewedAt` and `openerID`, the tab whose page opened it. Each `archive` entry has `id`, `title`, `url`, `spaceID`,

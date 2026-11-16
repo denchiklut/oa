@@ -13,7 +13,8 @@ implied to be implemented.
 
 `SidebarState` is the app's source of truth: profiles, Spaces and an item tree.
 A profile owns a favorites root; a Space owns a pinned root and an unpinned
-root. Tree nodes are containers, tabs, folders and split views; only containers
+root. The engine owns the profiles' names and the list of them; see
+[Profiles](../profiles/README.md). Tree nodes are containers, tabs, folders and split views; only containers
 and tabs are implemented. A tab entry takes its tab's ID, so pinning is a move
 to the end of the other section and the entry keeps its identity. A tab's live
 page has an ID of its own, a fresh one per page as Arc gives its contents, so
@@ -92,8 +93,9 @@ window last selected it; a sweep at launch and every 15 minutes archives
 unpinned tabs idle for their profile's interval, unless a window has them
 selected. Settings ▸ Profiles ▸ "Archive tabs after" offers Arc's 12 hours (the
 default), 24 hours, 7 days and 30 days, and there is no setting to turn it off.
-The value is kept as Arc keeps it, in the app's defaults: an entry per profile
-once there are several, else one value for every profile. A due tab with a live
+The value is kept as Arc keeps it, in the app's defaults, as an entry per
+profile and one value for the profiles without one; see
+[Profiles](../profiles/README.md). A due tab with a live
 page is closed as the user would, so a `beforeunload` handler can keep it; a
 kept tab counts as viewed now and is not asked again for another interval, Oa's
 own rule, after Arc's idle unload, which never prompts.
