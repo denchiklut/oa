@@ -109,6 +109,17 @@ struct SidebarView: View {
                                     model.renameSpace(space.id, to: name)
                                 }
                             }
+                            Menu("Set Profile") {
+                                ForEach(model.profiles) { profile in
+                                    Toggle(
+                                        profile.name,
+                                        isOn: Binding {
+                                            profile.id == space.profileID
+                                        } set: { _ in
+                                            ProfileDialogUtils.confirmSwitch([space.id], to: profile.id, in: model)
+                                        })
+                                }
+                            }
                             Button("Delete") { SpaceDeletion.confirm(space, in: model) }
                                 .disabled(model.state.spaces.count == 1)
                         }

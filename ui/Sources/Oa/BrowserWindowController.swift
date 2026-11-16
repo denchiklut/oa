@@ -43,6 +43,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.delegate = self
         windowButtons = WindowButtons(window: window)
         model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
+        model.window = window
     }
 
     @available(*, unavailable)

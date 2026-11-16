@@ -54,6 +54,7 @@ final class WindowModel {
     /// The selection the command bar was opened over, which its destination is for.
     @ObservationIgnored private var commandBarSelection: (spaceID: UUID, tabID: UUID?)?
     @ObservationIgnored var bringToFront: () -> Void = {}
+    @ObservationIgnored weak var window: NSWindow?
     /// Opens another window on this one's Space with the tab selected; the tab's page follows it there.
     @ObservationIgnored var openWindow: (_ tabID: UUID) -> Void = { _ in }
     @ObservationIgnored let downloads: DownloadsStore
@@ -99,6 +100,8 @@ final class WindowModel {
     }
     var browser: (any Browser)? { profileID.flatMap { browsers[$0] } }
     func profileName(_ id: UUID) -> String { engine.userVisibleName(of: id) ?? "" }
+    /// The engine's profiles in its order, read when asked, as Arc's menus list them.
+    var profiles: [ProfileState] { engine.allProfiles().map { ProfileState(id: $0, name: profileName($0)) } }
     var extensions: [BrowserExtension] { profileID.map { engine.browserContext(id: $0).extensions.items } ?? [] }
     var extensionActions: [ExtensionAction] { browser?.extensionActions ?? [] }
     var extensionPopup: ExtensionPopup? { browsers.values.lazy.compactMap(\.extensionPopup).first }
@@ -455,6 +458,33 @@ final class WindowModel {
 
     func renameSpace(_ spaceID: UUID, to name: String) {
         store.edit { $0.renameSpace(spaceID, to: name) }
+    }
+
+    /// As Arc's `didSetProfileForSpaceIDs`. A page can't change profile, so the Spaces' pages go with nothing kept
+    /// and each tab loads again in the new profile once selected, at its saved address. A window showing a moved
+    /// Space selects its bottom-most unpinned tab. Arc leaves the pages another window holds alive in the old
+    /// profile and blank; in Oa a tab has one page, which goes wherever it is.
+    func setProfile(_ profileID: UUID, forSpaces spaceIDs: [UUID]) {
+        let spaceIDs = spaceIDs.filter { state.space($0).map { $0.profileID != profileID } ?? false }
+        let tabIDs = spaceIDs.flatMap { state.tabs(in: $0).map(\.id) }
+        for window in store.windows { window.dropPages(of: tabIDs) }
+        store.edit { $0.setProfile(profileID, forSpaces: spaceIDs) }
+        for window in store.windows.filter({ $0 !== self }) + [self] where spaceIDs.contains(window.selectedSpaceID) {
+            window.selectedTabIDs[window.selectedSpaceID] = nil
+            if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last { window.select(bottom.id) }
+        }
+    }
+
+    private func dropPages(of tabIDs: [UUID]) {
+        for tabID in tabIDs {
+            if let peek = peeks.removeValue(forKey: tabID) {
+                dialogs[peek.id] = nil
+                permissionRequests[peek.id] = nil
+                peek.drop()
+            }
+            placeholders[tabID] = nil
+            release(tabID)?.drop()
+        }
     }
 
     /// As Arc: every live page of the Space closes at once as the user would; the ones that ask come forward one
