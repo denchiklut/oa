@@ -40,6 +40,19 @@ final class SidebarStore {
         scheduleSave()
     }
 
+    /// Arc's launch check: a Space whose profile the engine no longer has goes to the default profile, and nothing
+    /// else changes. The default profile is never missing, as Arc takes it for granted, nor is one whose name is
+    /// still to be handed over: the engine lists that one only once it has loaded it. Returns the Spaces' names.
+    func resetMissingProfiles(in engine: any BrowserApplication) -> [String] {
+        let known = Set(
+            engine.allProfiles() + state.profiles.filter { $0.pendingName != nil }.map(\.id)
+                + [SidebarProfile.defaultID])
+        let missing = state.spaces.filter { !known.contains($0.profileID) }
+        guard !missing.isEmpty else { return [] }
+        edit { $0.setProfile(SidebarProfile.defaultID, forSpaces: missing.map(\.id)) }
+        return missing.map(\.name)
+    }
+
     /// The engine owns profile names, as Arc's does. Once, it takes those an older sidebar.json kept and a new
     /// install's "Personal", as Arc names its default profile once.
     func handProfileNames(to engine: any BrowserApplication) {
