@@ -145,9 +145,10 @@ dropped, and so are the picks of a profile that is gone.
 
 Each profile has its search engine, Chromium's list for the region, and
 whether the engine suggests as you type, in Settings ▸ Profiles. Search
-Settings… opens Chromium's search engines page in a tab of the first window
-showing a Space of that profile, or of a new window on one when none does, Oa's
-own; Arc opened it in any window.
+Settings… closes Settings and opens Chromium's search engines page as Arc does:
+a new tab at the top of a Space of that profile, in a window showing one, else
+in the frontmost window, which moves to one. A profile with no Space gets no
+page.
 
 **View History ⌘Y** in the Archive menu opens Chromium's History page in a new
 tab at the top of the Space, for the Space's profile. Deleting a page there
