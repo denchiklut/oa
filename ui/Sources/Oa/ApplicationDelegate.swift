@@ -14,6 +14,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         engine: engine, store: store, openSettings: { [weak self] in self?.openSettings($0, in: $1) },
         openHelp: { [weak self] in self?.openHelp($0) }, createProfile: { [weak self] in self?.createProfile() },
         frontProfile: { [weak self] in self?.frontWindows.first?.space?.profileID })
+    private let spaceNamesWithMissingProfiles: [String]
     private var askingToQuit = false
     private var isLaunching = true
     private static var current: ApplicationDelegate?
@@ -32,6 +33,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private init(engine: any BrowserApplication) {
         self.engine = engine
         store = SidebarStore(directory: AppEngine.dataDirectory)
+        spaceNamesWithMissingProfiles = store.resetMissingProfiles(in: engine)
         store.handProfileNames(to: engine)
         downloads = DownloadsStore(engine: engine, sidebar: store)
         pictureInPicture = PictureInPicture(store: store)
@@ -54,6 +56,25 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         }
         store.startAutoArchive()
         NSApplication.shared.activate(ignoringOtherApps: true)
+        // From the run loop, so the pages go on working under the alert: they run on the main queue.
+        if !spaceNamesWithMissingProfiles.isEmpty {
+            perform(#selector(warnAboutMissingProfiles), with: nil, afterDelay: 1)
+        }
+    }
+
+    /// Arc's alert, with its words and its second's wait after the windows are back.
+    @objc private func warnAboutMissingProfiles() {
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa"
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Missing Profile!"
+        alert.informativeText = """
+            Looks like one or more of your Profiles is missing from this computer. \(name) has reverted to using \
+            your Default profile for space(s):
+
+            \(spaceNamesWithMissingProfiles.joined(separator: ", "))
+            """
+        alert.runModal()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
