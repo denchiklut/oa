@@ -108,6 +108,8 @@ bool AdBlockRules::Blocks(const network::ResourceRequest& request,
     return false;
   }
   IndexedRulesetMatcher matcher(mapping_.GetMemoryAsSpan<const uint8_t>());
+  // As Arc: $document and $genericblock are matched against the request's URL,
+  // not its document's.
   if (matcher.ShouldDisableFilteringForDocument(
           request.url, origin, proto::ACTIVATION_TYPE_DOCUMENT)) {
     return false;
