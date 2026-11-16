@@ -26,6 +26,27 @@ enum ProfileDialogUtils {
         }
     }
 
+    /// Arc's Spaces ▸ Change Profile: the Space's own profile closes it with nothing done, another one asks as
+    /// every move does, and "New Profile" gives way to the create sheet with the Space ticked.
+    static func changeProfile(of space: SidebarSpace, in model: WindowModel) {
+        guard let window = model.window else { return }
+        DialogSheet.present(on: window) { dismiss in
+            ChangeProfileDialog(
+                focusedSpaceName: space.name, profiles: model.profiles, selectedProfile: space.profileID
+            ) { [weak model] profileID in
+                dismiss()
+                guard let model else { return }
+                if let profileID {
+                    confirmSwitch([space.id], to: profileID, in: model)
+                } else {
+                    createProfile(checking: [space.id], in: model)
+                }
+            } onDismiss: {
+                dismiss()
+            }
+        }
+    }
+
     /// Arc's confirm before Spaces change profile, on the window that started it. As Arc, Spaces already on the
     /// profile stay as they are, and Spaces without tabs change without asking. False when it didn't ask.
     @discardableResult

@@ -35,6 +35,9 @@ enum DialogColor {
     static let secondaryBorder = dynamic(0xDCDCDC, .separatorColor)
     static let hint = dynamic(0xEAEAEA, .quaternaryLabelColor)
     static let hintText = dynamic(0x858585, .secondaryLabelColor)
+    /// Arc's `ProfilePicker` chip: measured in light, and in dark the values of its asset catalog.
+    static let picker = dynamic(0xEBEDFE, NSColor(srgbRed: 0.192, green: 0.224, blue: 0.984, alpha: 0.898))
+    static let pickerText = dynamic(0x505872, NSColor(srgbRed: 0.892, green: 0.885, blue: 0.933, alpha: 1))
 
     private static func dynamic(_ light: UInt32, _ dark: NSColor) -> Color {
         Color(

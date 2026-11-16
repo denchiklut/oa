@@ -157,6 +157,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         model.renameSpace(space.id, to: name)
     }
 
+    @objc func changeProfile(_ sender: Any?) {
+        if let space = model.space { ProfileDialogUtils.changeProfile(of: space, in: model) }
+    }
+
     @objc func deleteSpace(_ sender: Any?) {
         if let space = model.space { SpaceDeletion.confirm(space, in: model) }
     }
