@@ -143,6 +143,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func togglePin(_ sender: Any?) { model.togglePin() }
     @objc func toggleFavorite(_ sender: Any?) { model.toggleFavorite() }
 
+    /// As Arc's File ▸ New Profile: the create sheet with the window's Space ticked.
+    @objc func newProfile(_ sender: Any?) {
+        ProfileDialogUtils.createProfile(checking: [model.selectedSpaceID], in: model)
+    }
+
     @objc func newSpace(_ sender: Any?) {
         if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
     }

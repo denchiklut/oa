@@ -12,7 +12,8 @@ final class SettingsWindowController: NSWindowController {
 
     init(
         engine: any BrowserApplication, store: SidebarStore,
-        openSettings: @escaping (ChromiumSettings, UUID) -> Void, openHelp: @escaping (URL) -> Void
+        openSettings: @escaping (ChromiumSettings, UUID) -> Void, openHelp: @escaping (URL) -> Void,
+        createProfile: @escaping () -> Void
     ) {
         self.engine = engine
         state = PreferencesState(engine: engine)
@@ -24,7 +25,7 @@ final class SettingsWindowController: NSWindowController {
         add("Profiles", symbol: "person") {
             ProfilePreferencePane(
                 engine: engine, store: store, state: state, openSettings: openSettings, openHelp: openHelp,
-                rename: { [weak self] in self?.rename($0) })
+                create: createProfile, rename: { [weak self] in self?.rename($0) })
         }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
@@ -44,6 +45,12 @@ final class SettingsWindowController: NSWindowController {
             state.reload()
         }
         super.showWindow(sender)
+    }
+
+    /// As Arc: the list is read again and shows the new profile.
+    func profileCreated(_ id: UUID) {
+        state.reload()
+        state.currentProfileID = id
     }
 
     /// As Arc: a sheet on Settings, and the engine takes the name with no word back.

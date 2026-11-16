@@ -3,6 +3,26 @@ import SwiftUI
 
 @MainActor
 enum ProfileDialogUtils {
+    /// Arc's create sheet on the window that asked, with `spaceIDs` ticked. The profile is made, with its Favorites,
+    /// before the confirm about its Spaces, so cancelling there leaves it unused.
+    static func createProfile(checking spaceIDs: [UUID] = [], in model: WindowModel) {
+        guard let window = model.window else { return }
+        let spaces = model.state.spaces.map { CreateProfileDialogSpaceInfo(id: $0.id, title: $0.name) }
+        DialogSheet.present(on: window) { dismiss in
+            CreateProfileDialog(
+                existingProfileNames: Set(model.profiles.map(\.name)), spaces: spaces, checked: Set(spaceIDs)
+            ) { [weak model] name, spaceIDs in
+                dismiss()
+                Task {
+                    guard let model, let profileID = await model.createProfile(named: name) else { return }
+                    confirmSwitch(spaceIDs, to: profileID, in: model)
+                }
+            } cancel: {
+                dismiss()
+            }
+        }
+    }
+
     /// Arc's confirm before a Space changes profile, on the window that started it. Every way to change it asks.
     static func confirmSwitch(_ spaceIDs: [UUID], to profileID: UUID, in model: WindowModel) {
         let spaces = spaceIDs.compactMap { model.state.space($0)?.name }

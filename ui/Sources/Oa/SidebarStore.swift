@@ -21,6 +21,7 @@ final class SidebarStore {
     @ObservationIgnored var closing: [UUID: CloseRequest] = [:]
     @ObservationIgnored var deletingSpace: ClosingSpace?
     @ObservationIgnored let commandBarPicks: CommandBarPicks
+    @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
 
     init(directory: URL) {
         persistence = SidebarPersistence(directory: directory)

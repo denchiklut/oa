@@ -119,6 +119,10 @@ struct SidebarView: View {
                                             ProfileDialogUtils.confirmSwitch([space.id], to: profile.id, in: model)
                                         })
                                 }
+                                Divider()
+                                Button("New Profile…") {
+                                    ProfileDialogUtils.createProfile(checking: [space.id], in: model)
+                                }
                             }
                             Button("Delete") { SpaceDeletion.confirm(space, in: model) }
                                 .disabled(model.state.spaces.count == 1)

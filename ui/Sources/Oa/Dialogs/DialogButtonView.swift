@@ -17,14 +17,15 @@ struct DialogButtonView: View {
                     .font(.system(size: 11, weight: .bold))
                     .frame(minHeight: 18)
                     .padding(.horizontal, 6)
-                    .background(kind == .cancel ? DialogColor.hint : .white.opacity(0.2), in: shape(5))
+                    .background(kind == .cancel ? DialogColor.hint : text.opacity(0.2), in: shape(5))
             }
             .padding(.horizontal, 12)
             .frame(height: 39)
-            .foregroundStyle(kind == .cancel ? DialogColor.secondaryText : .white)
-            .background(fill.shadow(.drop(color: .black.opacity(0.18), radius: 0, y: 1.5)), in: shape(8))
+            .foregroundStyle(text)
+            .background(
+                fill.shadow(.drop(color: .black.opacity(isEnabled ? 0.18 : 0.05), radius: 0, y: 1.5)), in: shape(8)
+            )
             .overlay(shape(8).strokeBorder(kind == .cancel ? DialogColor.secondaryBorder : .clear))
-            .opacity(isEnabled ? 1 : 0.25)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -40,11 +41,20 @@ struct DialogButtonView: View {
         }
     }
 
+    /// Arc's disabled buttons keep their hue: a pale fill, and on the primary one text in its own tint.
     private var fill: Color {
         switch kind {
         case .cancel: DialogColor.secondary
-        case .primary: DialogColor.primary
-        case .destructive: DialogColor.destructive
+        case .primary: DialogColor.primary.opacity(isEnabled ? 1 : 0.1)
+        case .destructive: DialogColor.destructive.opacity(isEnabled ? 1 : 0.27)
+        }
+    }
+
+    private var text: Color {
+        switch kind {
+        case .cancel: DialogColor.secondaryText
+        case .primary: isEnabled ? .white : DialogColor.primary.opacity(0.45)
+        case .destructive: .white
         }
     }
 

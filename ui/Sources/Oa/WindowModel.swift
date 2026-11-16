@@ -460,6 +460,14 @@ final class WindowModel {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }
 
+    /// As Arc: the new profile has its Favorites from the start, and Settings selects it.
+    func createProfile(named name: String) async -> UUID? {
+        guard let profileID = await engine.createBrowserContext(userVisibleName: name) else { return nil }
+        store.edit { $0.addProfile(profileID) }
+        store.didCreateProfile(profileID)
+        return profileID
+    }
+
     /// As Arc's `didSetProfileForSpaceIDs`. A page can't change profile, so the Spaces' pages go with nothing kept
     /// and each tab loads again in the new profile once selected, at its saved address. A window showing a moved
     /// Space selects its bottom-most unpinned tab. Arc leaves the pages another window holds alive in the old
