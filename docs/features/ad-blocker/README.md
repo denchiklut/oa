@@ -74,6 +74,9 @@ is excluded.
 This slice does not implement Arc's profile-specific extension chooser,
 additional regional/annoyance lists, custom subscriptions or scriptlets.
 Chromium's parser determines supported filter syntax; `+js` rules are omitted.
+`$document` and `$genericblock` exceptions are matched against the request's
+URL rather than the page that loads it, as Arc does, so an allowlisted page's
+own third-party loads are still filtered.
 A service worker has no top frame, so only its own origin is checked against
 the exclusions. This is not a claim of complete Arc or uBlock Origin parity.
 
