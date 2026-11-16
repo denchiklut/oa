@@ -6,8 +6,11 @@ import Observation
 @MainActor
 public final class StubBrowserApplication: BrowserApplication {
     private var contexts: [UUID: StubBrowserContext] = [:]
+    public let adBlocker: AdBlocker
 
-    public init() {}
+    public init(directory: URL) {
+        adBlocker = AdBlocker(directory: directory, apply: { _ in true }, exclude: { _ in })
+    }
 
     public func run(ready: @escaping @MainActor () -> Void) -> Int32 {
         let application = NSApplication.shared

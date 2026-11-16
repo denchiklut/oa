@@ -4,6 +4,8 @@ import AppKit
 // protocols name the same selectors and instances are cast with `unsafeBitCast`. Keep both sides in step.
 
 @MainActor @objc protocol CoreEngine: NSObjectProtocol {
+    @objc(setBlockLists:completion:) func setBlockLists(_ lists: [String], completion: @escaping (Bool) -> Void)
+    @objc(setAdBlockExcludedHosts:) func setAdBlockExcludedHosts(_ hosts: [String])
     @objc(profileWithIdentifier:) func profile(identifier: String) -> CoreProfile
     @objc(attachWindow:withIdentifier:) func attach(_ window: NSWindow, identifier: String)
     @objc(closeWindowWithIdentifier:) func closeWindow(identifier: String)

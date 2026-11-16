@@ -1,0 +1,8 @@
+module oa.mojom;
+
+import "mojo/public/mojom/base/shared_memory.mojom";
+
+interface AdBlockerAgent {
+  SetRules(mojo_base.mojom.ReadOnlySharedMemoryRegion? rules);
+  SetExcludedHosts(array<string> hosts);
+};

@@ -5,6 +5,7 @@ import Observation
 /// The engine the app programs against. Every call happens on the main thread.
 @MainActor
 public protocol BrowserApplication: AnyObject {
+    var adBlocker: AdBlocker { get }
     /// Runs the app until it quits and returns the exit code. `ready` runs once, after the engine has started and
     /// before the event loop; the app sets its delegate and opens its windows there.
     func run(ready: @escaping @MainActor () -> Void) -> Int32

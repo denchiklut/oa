@@ -10,6 +10,17 @@ public final class ChromiumBrowserApplication: BrowserApplication {
     private let arguments: [String]
     private var engine: CoreEngine?
     private var contexts: [UUID: ChromiumBrowserContext] = [:]
+    private let dataDirectory: URL
+    public lazy var adBlocker = AdBlocker(
+        directory: dataDirectory,
+        apply: { [weak self] texts in
+            guard let engine = self?.engine else { return false }
+            return await withCheckedContinuation { continuation in
+                engine.setBlockLists(texts) { continuation.resume(returning: $0) }
+            }
+        },
+        exclude: { [weak self] hosts in self?.engine?.setAdBlockExcludedHosts(hosts) }
+    )
 
     /// Loads the framework from the app bundle, or nil when the bundle has none. Call it before the process starts a
     /// second thread: PartitionAlloc installs its allocator when the framework loads.
@@ -33,6 +44,7 @@ public final class ChromiumBrowserApplication: BrowserApplication {
 
     private init(main: CoreMain, userDataDirectory: URL) {
         self.main = main
+        dataDirectory = userDataDirectory.deletingLastPathComponent()
         arguments = CommandLine.arguments + ["--user-data-dir=\(userDataDirectory.path)", "--use-mock-keychain"]
     }
 

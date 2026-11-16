@@ -447,6 +447,9 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @end
 
 @interface OAEngine : NSObject
+- (void)setBlockLists:(NSArray<NSString*>*)lists
+           completion:(void (^)(BOOL success))completion;
+- (void)setAdBlockExcludedHosts:(NSArray<NSString*>*)hosts;
 - (instancetype)init NS_UNAVAILABLE;
 - (OAProfile*)profileWithIdentifier:(NSString*)identifier;
 // Binds the window once; a later call for the same identifier is ignored.

@@ -14,6 +14,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         self?.openWindow(on: spaceID)
     }
     private var askingToQuit = false
+    private var isLaunching = true
     private static var current: ApplicationDelegate?
 
     static func start(engine: any BrowserApplication) {
@@ -35,14 +36,24 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Task {
+            await engine.adBlocker.start()
+            finishLaunching()
+        }
+    }
+
+    private func finishLaunching() {
+        isLaunching = false
         let saved = store.savedWindows
-        if saved.isEmpty { openWindow() } else { saved.forEach { openWindow(restoring: $0) } }
+        if windows.isEmpty {
+            if saved.isEmpty { openWindow() } else { saved.forEach { openWindow(restoring: $0) } }
+        }
         store.startAutoArchive()
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if !hasVisibleWindows && windows.isEmpty { openWindow() }
+        if !isLaunching && !hasVisibleWindows && windows.isEmpty { openWindow() }
         return true
     }
 
