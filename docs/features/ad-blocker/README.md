@@ -8,14 +8,15 @@ that were already blocked.
 
 ## Lists and updates
 
-The app bundles unmodified EasyList and EasyPrivacy, and downloads updates
-straight from their authors:
+The app ships no filter lists. A selected list is downloaded straight from its
+authors the first time the blocker needs it, and updated from there:
 
 - https://easylist.to/easylist/easylist.txt
 - https://easylist.to/easylist/easyprivacy.txt
 
-There is no dependency on Arc or Dia servers. Attribution and license links
-ship alongside the lists in DevKit's resource bundle.
+Nothing is downloaded while the blocker is off, and there is no dependency on
+Arc or Dia servers. Until a list's first download succeeds it has no rules;
+General shows the download and any failure, and the hourly loop retries.
 
 DevKit owns the catalogue, saved selections and update loop. Each logical
 list has ordered URL components. `BlockList.json` stores their original text,
@@ -24,8 +25,7 @@ catalogue has one component per list. `AdBlockSettings.json` stores the global
 master switch, selected list IDs and excluded hosts beside the list cache in
 Oa's data directory.
 
-Cached rules, or bundled rules on first use, are applied before restored pages
-open. While enabled, updates run at startup and hourly, with a three-hour
+Cached rules are applied before restored pages open. While enabled, updates run at startup and hourly, with a three-hour
 minimum age per URL. Conditional requests send the saved ETag. A 304 retains
 the old text and timestamp. A failed component retains the previous logical
 list. Successful downloads are written atomically; update errors are shown in
@@ -67,7 +67,8 @@ provider. The other adds the top frame's origin to renderer requests.
 Arc research confirms General as the settings location and global native
 rules/exclusions. Opt-in startup, the two-list catalogue, exact-host matching,
 the explicit Reload button, and Chromium's standard blocked-request error are
-Oa's choices. Excluding `example.com` does not automatically exclude
+Oa's choices. So is downloading the lists on first use: Arc ships EasyList and
+EasyPrivacy in its app. Excluding `example.com` does not automatically exclude
 `www.example.com`. A frame is exempt when its own host or its top-level host
 is excluded.
 

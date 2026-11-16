@@ -83,10 +83,7 @@ else
 </plist>
 PLIST
 fi
-for resource in "$(dirname "$executable")/"*.bundle; do
-  [[ -d "$resource" ]] || continue
-  ditto "$resource" "$bundle/Contents/Resources/$(basename "$resource")"
-done
+ditto "$(dirname "$executable")/Oa_Oa.bundle" "$bundle/Contents/Resources/Oa_Oa.bundle"
 codesign --force --sign - "$bundle"
 
 [[ "${OA_ASSEMBLE_ONLY:-0}" == "1" ]] && exit 0

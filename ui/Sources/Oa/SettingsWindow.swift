@@ -48,7 +48,11 @@ struct GeneralSettingsView: View {
                     )
                 ).disabled(!adBlocker.isEnabled)
                 Text("Applies to all profiles.").font(.caption).foregroundStyle(.secondary)
-                if adBlocker.isApplying { ProgressView().controlSize(.small) }
+                if adBlocker.isDownloading {
+                    Text("Downloading filters…").font(.caption).foregroundStyle(.secondary)
+                } else if adBlocker.isApplying {
+                    ProgressView().controlSize(.small)
+                }
                 if let error = adBlocker.error { Text(error).font(.caption).foregroundStyle(.secondary) }
             }
         }

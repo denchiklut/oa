@@ -8,6 +8,7 @@ public final class AdBlocker {
     public private(set) var selectedLists: Set<String>
     public private(set) var excludedHosts: Set<String>
     public private(set) var isApplying = false
+    public private(set) var isDownloading = false
     public var error: String? { settingsError ?? applyError ?? updateError }
 
     private var settingsError: String?
@@ -93,15 +94,22 @@ public final class AdBlocker {
 
     private func scheduleUpdates() {
         updates?.cancel()
+        isDownloading = false
         guard isEnabled else { return }
         updates = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
                 let current = revision
+                isDownloading = await cache.isMissing(selectedLists)
                 let result = await cache.refresh(selectedLists)
+                let missing = await cache.isMissing(selectedLists)
                 guard !Task.isCancelled, current == revision else { return }
+                isDownloading = false
                 if result.changed { await applyRules() }
-                updateError = result.failed ? "Couldn’t update filters. Saved rules are still in use." : nil
+                updateError =
+                    !result.failed
+                    ? nil
+                    : missing ? "Couldn’t download filters." : "Couldn’t update filters. Saved rules are still in use."
                 do { try await Task.sleep(for: .seconds(3600)) } catch { return }
             }
         }
@@ -159,6 +167,11 @@ private actor BlockListCache {
         }
     }
 
+    func isMissing(_ selected: Set<String>) -> Bool {
+        load()
+        return Self.feeds.contains { selected.contains($0.id) && (archive?.lists[$0.id] ?? []).isEmpty }
+    }
+
     func refresh(_ selected: Set<String>) async -> (changed: Bool, failed: Bool) {
         load()
         var changed = false
@@ -212,12 +225,5 @@ private actor BlockListCache {
         guard archive == nil else { return }
         let saved = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(Archive.self, from: $0) }
         archive = saved?.version == 1 ? saved : Archive()
-        for feed in Self.feeds where archive?.lists[feed.id] == nil {
-            if let resource = Bundle.module.url(forResource: feed.id, withExtension: "txt"),
-                let text = try? String(contentsOf: resource, encoding: .utf8)
-            {
-                archive?.lists[feed.id] = [Content(url: feed.urls[0], text: text)]
-            }
-        }
     }
 }

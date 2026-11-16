@@ -9,7 +9,7 @@ let package = Package(
         .library(name: "DevKitLive", targets: ["DevKitLive"]),
     ],
     targets: [
-        .target(name: "DevKit", resources: [.process("Resources")]),
+        .target(name: "DevKit"),
         .target(name: "DevKitLive", dependencies: ["DevKit"]),
     ]
 )
