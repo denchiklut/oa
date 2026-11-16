@@ -19,6 +19,7 @@ enum ProfileDialogUtils {
                 }
             } cancel: {
                 dismiss()
+                SettingsWindowController.bringForwardIfOpen()
             }
         }
     }
