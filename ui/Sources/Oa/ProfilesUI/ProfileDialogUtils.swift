@@ -15,7 +15,9 @@ enum ProfileDialogUtils {
                 dismiss()
                 Task {
                     guard let model, let profileID = await model.createProfile(named: name) else { return }
-                    confirmSwitch(spaceIDs, to: profileID, in: model)
+                    if !confirmSwitch(spaceIDs, to: profileID, in: model) {
+                        SettingsWindowController.bringForwardIfOpen()
+                    }
                 }
             } cancel: {
                 dismiss()
@@ -24,16 +26,24 @@ enum ProfileDialogUtils {
         }
     }
 
-    /// Arc's confirm before a Space changes profile, on the window that started it. Every way to change it asks.
-    static func confirmSwitch(_ spaceIDs: [UUID], to profileID: UUID, in model: WindowModel) {
+    /// Arc's confirm before Spaces change profile, on the window that started it. As Arc, Spaces already on the
+    /// profile stay as they are, and Spaces without tabs change without asking. False when it didn't ask.
+    @discardableResult
+    static func confirmSwitch(_ spaceIDs: [UUID], to profileID: UUID, in model: WindowModel) -> Bool {
+        let spaceIDs = spaceIDs.filter { model.state.space($0).map { $0.profileID != profileID } ?? false }
+        guard let window = model.window, !spaceIDs.isEmpty else { return false }
+        guard spaceIDs.contains(where: { !model.state.tabs(in: $0).isEmpty }) else {
+            model.setProfile(profileID, forSpaces: spaceIDs)
+            return false
+        }
         let spaces = spaceIDs.compactMap { model.state.space($0)?.name }
-        guard let window = model.window, !spaces.isEmpty else { return }
         DialogSheet.present(on: window) { dismiss in
             SwitchProfileDialog(profile: model.profileName(profileID), spaces: spaces) { [weak model] proceed in
                 dismiss()
                 if proceed { model?.setProfile(profileID, forSpaces: spaceIDs) }
             }
         }
+        return true
     }
 }
 
@@ -58,7 +68,9 @@ private struct SwitchProfileDialog: View {
             HStack(spacing: 8) {
                 Spacer()
                 DialogButtonView(title: "Cancel", kind: .cancel) { done(false) }
-                DialogButtonView(title: "Switch it up", kind: .primary) { done(true) }
+                DialogButtonView(title: spaces.count == 1 ? "Switch it up" : "Switch them up", kind: .primary) {
+                    done(true)
+                }
             }
             .padding(.top, 43)
             .padding(.trailing, -10)
@@ -69,9 +81,8 @@ private struct SwitchProfileDialog: View {
         .frame(width: 455)
     }
 
-    /// The wording for several Spaces is Oa's own: Arc's was seen with one.
     private var message: AttributedString {
-        var names = AttributedString(spaces.formatted(.list(type: .and)))
+        var names = AttributedString(spaces.joined(separator: ", "))
         names.font = .system(size: 14, weight: .bold)
         return "Each Profile has different browser data, so your " + names
             + AttributedString(
