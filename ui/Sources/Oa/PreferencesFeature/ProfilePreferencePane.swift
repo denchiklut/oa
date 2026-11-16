@@ -1,8 +1,8 @@
 import DevKit
 import SwiftUI
 
-/// Arc's Profiles pane at Arc's measures: the profiles on the left, the chosen one's settings on the right. The
-/// list shows with one profile too, Oa's own: Arc's layout for a single profile is unknown.
+/// Arc's Profiles pane at Arc's measures: the profiles on the left, the chosen one's settings on the right, with one
+/// profile too.
 struct ProfilePreferencePane: View {
     let engine: any BrowserApplication
     let store: SidebarStore
@@ -39,28 +39,33 @@ struct ProfilePreferencePane: View {
         .background(Color(nsColor: .textBackgroundColor))
     }
 
-    /// By name, capitals first, as Arc lists them.
-    private var profiles: [SidebarProfile] { store.state.profiles.sorted { $0.name < $1.name } }
+    /// In the engine's order with the engine's names, read on each render as Arc does; it keeps no copy.
+    private var profiles: [ProfileList.Item] {
+        engine.allProfiles().map { ProfileList.Item(id: $0, name: engine.userVisibleName(of: $0) ?? "") }
+    }
 
-    private var profile: SidebarProfile? { store.state.profile(state.currentProfileID) ?? profiles.first }
+    private var profile: UUID? {
+        let profiles = engine.allProfiles()
+        return profiles.contains(state.currentProfileID) ? state.currentProfileID : profiles.first
+    }
 
     private func spaceCount(_ profileID: UUID) -> Int {
         store.state.spaces.count { $0.profileID == profileID }
     }
 
-    private func contents(of profile: SidebarProfile) -> some View {
-        let preferences = engine.browserContext(id: profile.id).preferences
+    private func contents(of profile: UUID) -> some View {
+        let preferences = engine.browserContext(id: profile).preferences
         return VStack(alignment: .leading, spacing: 8) {
-            SearchSettingsSection(preferences: preferences) { openSettings(.searchEngines, profile.id) }
+            SearchSettingsSection(preferences: preferences) { openSettings(.searchEngines, profile) }
             PreferencesPaneSection {
                 AutoArchiveView(
-                    profileID: profile.id, hasSeveralProfiles: store.state.profiles.count > 1, openHelp: openHelp
+                    profileID: profile, hasSeveralProfiles: engine.allProfiles().count > 1, openHelp: openHelp
                 )
-                .id(profile.id)
+                .id(profile)
                 PreferenceRowDivider()
                 DownloadLocationView(preferences: preferences)
             }
-            DataActionButtonsView { openSettings($0, profile.id) }
+            DataActionButtonsView { openSettings($0, profile) }
         }
     }
 }
@@ -111,7 +116,12 @@ private struct DataActionButtonsView: View {
 }
 
 private struct ProfileList: View {
-    let profiles: [SidebarProfile]
+    struct Item: Identifiable, Equatable {
+        let id: UUID
+        let name: String
+    }
+
+    let profiles: [Item]
     let spaceCount: (UUID) -> Int
     @Binding var selection: UUID
 
@@ -135,7 +145,7 @@ private struct ProfileList: View {
         .background(PreferencesPaneSectionBackground(fill: .clear))
     }
 
-    private func row(_ profile: SidebarProfile) -> some View {
+    private func row(_ profile: Item) -> some View {
         Button {
             selection = profile.id
         } label: {

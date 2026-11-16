@@ -1,11 +1,16 @@
+import DevKit
 import Foundation
 
+/// What the sidebar keeps for a profile: its Favorites, as Arc's `topAppsContainerIDs`. The engine owns the list of
+/// profiles and their names.
 struct SidebarProfile: Identifiable, Hashable, Codable {
-    /// The one profile until the app grows a profile list; the same UUID keys the engine context.
-    static let defaultID = UUID(uuidString: "6B0F3E1A-0A5C-4F7B-9C1D-0A0A0A0A0A01")!
+    static let defaultID = BrowserProfile.initialID
     let id: UUID
-    var name: String
     let favoritesRootID: UUID
+    /// A name the engine hasn't taken yet: an older sidebar.json's, or a new install's "Personal".
+    var pendingName: String?
+
+    private enum CodingKeys: String, CodingKey { case id, favoritesRootID, pendingName = "name" }
 }
 
 struct SidebarSpace: Identifiable, Hashable, Codable {
@@ -195,7 +200,7 @@ struct SidebarState {
 
     static func initial() -> SidebarState {
         var state = SidebarState()
-        let profile = state.addProfile(name: "Personal", id: SidebarProfile.defaultID)
+        let profile = state.addProfile(SidebarProfile.defaultID, pendingName: "Personal")
         let space = state.addSpace(name: "Personal", profileID: profile.id)
         state.appendTab(SidebarTab(id: UUID(), url: URL(string: "https://www.wikipedia.org/")), in: space.id)
         return state
@@ -268,8 +273,8 @@ struct SidebarState {
     }
 
     @discardableResult
-    mutating func addProfile(name: String, id: UUID = UUID()) -> SidebarProfile {
-        let profile = SidebarProfile(id: id, name: name, favoritesRootID: UUID())
+    mutating func addProfile(_ id: UUID, pendingName: String? = nil) -> SidebarProfile {
+        let profile = SidebarProfile(id: id, favoritesRootID: UUID(), pendingName: pendingName)
         tree.addRoot(.favorites, id: profile.favoritesRootID)
         profiles.append(profile)
         return profile

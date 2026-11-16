@@ -98,6 +98,7 @@ final class WindowModel {
         selectedTabID.flatMap { state.profile(containing: $0)?.id } ?? space?.profileID
     }
     var browser: (any Browser)? { profileID.flatMap { browsers[$0] } }
+    func profileName(_ id: UUID) -> String { engine.userVisibleName(of: id) ?? "" }
     var extensions: [BrowserExtension] { profileID.map { engine.browserContext(id: $0).extensions.items } ?? [] }
     var extensionActions: [ExtensionAction] { browser?.extensionActions ?? [] }
     var extensionPopup: ExtensionPopup? { browsers.values.lazy.compactMap(\.extensionPopup).first }
