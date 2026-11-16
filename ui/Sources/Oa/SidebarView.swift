@@ -109,8 +109,9 @@ struct SidebarView: View {
                                     model.renameSpace(space.id, to: name)
                                 }
                             }
+                            // As Arc, by name here, where Settings and Change Profile keep the engine's order.
                             Menu("Set Profile") {
-                                ForEach(model.profiles) { profile in
+                                ForEach(model.profiles.sorted { $0.name < $1.name }) { profile in
                                     Toggle(
                                         profile.name,
                                         isOn: Binding {
