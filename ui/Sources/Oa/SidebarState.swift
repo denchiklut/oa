@@ -16,7 +16,7 @@ struct SidebarProfile: Identifiable, Hashable, Codable {
 struct SidebarSpace: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
-    let profileID: UUID
+    var profileID: UUID
     let pinnedRootID: UUID
     let unpinnedRootID: UUID
 }
@@ -288,6 +288,11 @@ struct SidebarState {
         tree.addRoot(.unpinned, id: space.unpinnedRootID)
         spaces.append(space)
         return space
+    }
+
+    mutating func setProfile(_ profileID: UUID, forSpaces spaceIDs: [UUID]) {
+        guard profile(profileID) != nil else { return }
+        for index in spaces.indices where spaceIDs.contains(spaces[index].id) { spaces[index].profileID = profileID }
     }
 
     mutating func renameSpace(_ id: UUID, to name: String) {

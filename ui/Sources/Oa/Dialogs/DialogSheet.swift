@@ -6,20 +6,16 @@ import SwiftUI
 @MainActor
 enum DialogSheet {
     static func present(on parent: NSWindow, @ViewBuilder content: (_ dismiss: @escaping () -> Void) -> some View) {
-        let sheet = Window(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
-        sheet.isOpaque = false
-        sheet.backgroundColor = .clear
+        let sheet = NSWindow(
+            contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+        sheet.titlebarAppearsTransparent = true
+        sheet.backgroundColor = NSColor(DialogColor.sheet)
         let dismiss = { [weak parent, weak sheet] in
             guard let sheet else { return }
             parent?.endSheet(sheet)
         }
-        sheet.contentViewController = NSHostingController(
-            rootView: content(dismiss).background(DialogColor.sheet, in: RoundedRectangle(cornerRadius: 26)))
+        sheet.contentViewController = NSHostingController(rootView: content(dismiss).ignoresSafeArea())
         parent.beginSheet(sheet)
-    }
-
-    private final class Window: NSWindow {
-        override var canBecomeKey: Bool { true }
     }
 }
 

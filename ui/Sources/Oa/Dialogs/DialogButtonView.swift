@@ -22,7 +22,7 @@ struct DialogButtonView: View {
             .padding(.horizontal, 12)
             .frame(height: 39)
             .foregroundStyle(kind == .cancel ? DialogColor.secondaryText : .white)
-            .background(fill, in: shape(8))
+            .background(fill.shadow(.drop(color: .black.opacity(0.18), radius: 0, y: 1.5)), in: shape(8))
             .overlay(shape(8).strokeBorder(kind == .cancel ? DialogColor.secondaryBorder : .clear))
             .opacity(isEnabled ? 1 : 0.25)
             .contentShape(Rectangle())
@@ -81,5 +81,19 @@ struct DialogTextField: View {
             .padding(.vertical, verticalPadding)
             .background(DialogColor.field, in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(DialogColor.fieldBorder))
+    }
+}
+
+/// Where Arc's dialogs show their mascot, 62 pt square. The symbols are Oa's own: the art is Arc's.
+struct DialogIcon: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 44, weight: .light))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(DialogColor.primary)
+            .frame(width: 62, height: 62)
+            .accessibilityHidden(true)
     }
 }
