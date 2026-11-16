@@ -192,21 +192,23 @@ void AdBlockState::SetExcludedHosts(std::vector<std::string> hosts) {
 }
 
 AdBlockThrottle::AdBlockThrottle(scoped_refptr<AdBlockState> state,
-                                 url::Origin top_origin,
                                  bool browser)
-    : state_(std::move(state)),
-      top_origin_(std::move(top_origin)),
-      browser_(browser) {}
+    : state_(std::move(state)), browser_(browser) {}
 AdBlockThrottle::~AdBlockThrottle() = default;
 
 void AdBlockThrottle::WillStartRequest(network::ResourceRequest* request,
                                        bool* defer) {
   auto snapshot = state_->Get();
-  if (!snapshot.rules || snapshot.IsExcluded(top_origin_) ||
-      (request->request_initiator &&
-       snapshot.IsExcluded(*request->request_initiator)) ||
-      snapshot.IsExcluded(
-          url::Origin::Create(request->site_for_cookies.RepresentativeUrl()))) {
+  if (!snapshot.rules) {
+    return;
+  }
+  // As Arc: the page is known only from the request. A renderer's requests
+  // carry their top frame's origin (a Chromium patch); the browser's carry it
+  // in their isolation info.
+  if (snapshot.IsExcluded(request->request_initiator.value_or(
+          url::Origin::Create(request->url))) ||
+      (request->top_frame_origin &&
+       snapshot.IsExcluded(*request->top_frame_origin))) {
     return;
   }
   if (request->trusted_params) {

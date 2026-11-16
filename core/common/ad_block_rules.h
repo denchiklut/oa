@@ -54,16 +54,13 @@ class AdBlockState : public base::RefCountedThreadSafe<AdBlockState> {
 
 class AdBlockThrottle : public blink::URLLoaderThrottle {
  public:
-  explicit AdBlockThrottle(scoped_refptr<AdBlockState> state,
-                           url::Origin top_origin,
-                           bool browser);
+  AdBlockThrottle(scoped_refptr<AdBlockState> state, bool browser);
   ~AdBlockThrottle() override;
   void WillStartRequest(network::ResourceRequest* request,
                         bool* defer) override;
 
  private:
   scoped_refptr<AdBlockState> state_;
-  url::Origin top_origin_;
   bool browser_;
 };
 

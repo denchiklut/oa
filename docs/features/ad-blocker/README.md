@@ -49,13 +49,18 @@ are not rechecked by these throttles.
 At document start, each frame receives a stylesheet built from matching domain
 and generic selectors, with cosmetic exceptions applied. CSS also hides
 matching elements added later. Changing rules, exclusions or the master
-switch replaces or removes the stylesheet in open documents. Frame origins
-are shared with background request threads so dedicated workers inherit an
-excluded top-level page.
+switch replaces or removes the stylesheet in open documents.
 
-The small Chromium patch installs Oa's renderer client in macOS helpers;
-those helpers enter `ChromeMainDelegate` rather than Oa's browser delegate.
-The client preserves Chrome's renderer hooks and throttle provider.
+Site exclusions are decided from the request alone, as Arc's are: its
+initiator, its top frame's origin, and for the browser's own requests the top
+frame in their isolation info. Blink already knows the top frame for frames
+and dedicated workers; a Chromium patch copies it onto the network request,
+where Arc added the same field. It is not sent over Mojo.
+
+Two small Chromium patches support this. One installs Oa's renderer client in
+macOS helpers; those helpers enter `ChromeMainDelegate` rather than Oa's
+browser delegate. The client preserves Chrome's renderer hooks and throttle
+provider. The other adds the top frame's origin to renderer requests.
 
 ## Oa choices and limits
 
@@ -69,9 +74,8 @@ is excluded.
 This slice does not implement Arc's profile-specific extension chooser,
 additional regional/annoyance lists, custom subscriptions or scriptlets.
 Chromium's parser determines supported filter syntax; `+js` rules are omitted.
-Shared/service workers without a frame token use the request's available
-origin/cookie context for exclusions; they do not have an unambiguous owning
-tab. This is not a claim of complete Arc or uBlock Origin parity.
+A service worker has no top frame, so only its own origin is checked against
+the exclusions. This is not a claim of complete Arc or uBlock Origin parity.
 
 ## Verification
 

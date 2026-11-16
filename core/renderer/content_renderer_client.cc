@@ -1,10 +1,11 @@
 #include "oa/renderer/content_renderer_client.h"
+
 #include <map>
 #include <utility>
+
 #include "base/functional/bind.h"
 #include "chrome/renderer/chrome_content_renderer_client.h"
 #include "content/public/renderer/render_frame.h"
-#include "content/public/renderer/render_frame_observer.h"
 #include "content/public/renderer/render_frame_visitor.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/render_thread_observer.h"
@@ -21,52 +22,6 @@
 
 namespace oa {
 namespace {
-class FrameOrigins : public base::RefCountedThreadSafe<FrameOrigins> {
- public:
-  url::Origin Get(const blink::LocalFrameToken& token) const {
-    base::AutoLock guard(lock_);
-    auto found = origins_.find(token);
-    return found == origins_.end() ? url::Origin() : found->second;
-  }
-  void Set(const blink::LocalFrameToken& token, url::Origin origin) {
-    base::AutoLock guard(lock_);
-    origins_[token] = std::move(origin);
-  }
-  void Remove(const blink::LocalFrameToken& token) {
-    base::AutoLock guard(lock_);
-    origins_.erase(token);
-  }
-
- private:
-  friend class base::RefCountedThreadSafe<FrameOrigins>;
-  ~FrameOrigins() = default;
-  mutable base::Lock lock_;
-  std::map<blink::LocalFrameToken, url::Origin> origins_ GUARDED_BY(lock_);
-};
-
-class FrameObserver : public content::RenderFrameObserver {
- public:
-  FrameObserver(content::RenderFrame* frame,
-                scoped_refptr<FrameOrigins> origins)
-      : RenderFrameObserver(frame),
-        origins_(std::move(origins)),
-        token_(frame->GetWebFrame()->GetLocalFrameToken()) {
-    DidCreateNewDocument();
-  }
-  void DidCreateNewDocument() override {
-    origins_->Set(token_,
-                  render_frame()->GetWebFrame()->Top()->GetSecurityOrigin());
-  }
-  void OnDestruct() override {
-    origins_->Remove(token_);
-    delete this;
-  }
-
- private:
-  scoped_refptr<FrameOrigins> origins_;
-  blink::LocalFrameToken token_;
-};
-
 class AdBlockerAgent : public content::RenderThreadObserver,
                        public mojom::AdBlockerAgent,
                        public content::RenderFrameVisitor {
@@ -153,26 +108,16 @@ class AdBlockerAgent : public content::RenderThreadObserver,
 class ThrottleProvider : public blink::URLLoaderThrottleProvider {
  public:
   ThrottleProvider(std::unique_ptr<blink::URLLoaderThrottleProvider> chrome,
-                   scoped_refptr<AdBlockState> state,
-                   scoped_refptr<FrameOrigins> origins)
-      : chrome_(std::move(chrome)),
-        state_(std::move(state)),
-        origins_(std::move(origins)) {}
+                   scoped_refptr<AdBlockState> state)
+      : chrome_(std::move(chrome)), state_(std::move(state)) {}
   std::unique_ptr<blink::URLLoaderThrottleProvider> Clone() override {
-    return std::make_unique<ThrottleProvider>(chrome_->Clone(), state_,
-                                              origins_);
+    return std::make_unique<ThrottleProvider>(chrome_->Clone(), state_);
   }
   std::vector<std::unique_ptr<blink::URLLoaderThrottle>> CreateThrottles(
       base::optional_ref<const blink::LocalFrameToken> token,
       const network::ResourceRequest& request) override {
     auto throttles = chrome_->CreateThrottles(token, request);
-    auto top = token ? origins_->Get(*token) : url::Origin();
-    if (token && content::RenderThread::IsMainThread()) {
-      if (auto* frame = blink::WebLocalFrame::FromFrameToken(*token)) {
-        top = frame->Top()->GetSecurityOrigin();
-      }
-    }
-    throttles.push_back(std::make_unique<AdBlockThrottle>(state_, top, false));
+    throttles.push_back(std::make_unique<AdBlockThrottle>(state_, false));
     return throttles;
   }
   void SetOnline(bool online) override { chrome_->SetOnline(online); }
@@ -180,15 +125,10 @@ class ThrottleProvider : public blink::URLLoaderThrottleProvider {
  private:
   std::unique_ptr<blink::URLLoaderThrottleProvider> chrome_;
   scoped_refptr<AdBlockState> state_;
-  scoped_refptr<FrameOrigins> origins_;
 };
 
 class ContentRendererClient : public ChromeContentRendererClient {
  public:
-  void RenderFrameCreated(content::RenderFrame* frame) override {
-    ChromeContentRendererClient::RenderFrameCreated(frame);
-    new FrameObserver(frame, origins_);
-  }
   void RenderThreadStarted() override {
     ChromeContentRendererClient::RenderThreadStarted();
     agent_ = std::make_unique<AdBlockerAgent>(state_);
@@ -202,12 +142,11 @@ class ContentRendererClient : public ChromeContentRendererClient {
       blink::URLLoaderThrottleProviderType type) override {
     return std::make_unique<ThrottleProvider>(
         ChromeContentRendererClient::CreateURLLoaderThrottleProvider(type),
-        state_, origins_);
+        state_);
   }
 
  private:
   scoped_refptr<AdBlockState> state_ = base::MakeRefCounted<AdBlockState>();
-  scoped_refptr<FrameOrigins> origins_ = base::MakeRefCounted<FrameOrigins>();
   std::unique_ptr<AdBlockerAgent> agent_;
 };
 }  // namespace
