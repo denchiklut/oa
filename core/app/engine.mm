@@ -40,7 +40,6 @@
 #include "components/security_interstitials/core/features.h"
 #include "content/public/app/content_main.h"
 #include "content/public/browser/browser_main_runner.h"
-#include "content/public/browser/web_contents.h"
 #include "content/public/common/main_function_params.h"
 #include "oa/browser/ad_blocker_service.h"
 #include "oa/browser/page_impl.h"
@@ -129,12 +128,8 @@ class ContentBrowserClient : public ChromeContentBrowserClient {
     auto throttles = ChromeContentBrowserClient::CreateURLLoaderThrottles(
         request, context, get_contents, navigation_data, frame_id,
         navigation_id);
-    auto* contents = get_contents.is_null() ? nullptr : get_contents.Run();
-    auto origin = contents
-                      ? url::Origin::Create(contents->GetLastCommittedURL())
-                      : url::Origin();
     throttles.push_back(
-        std::make_unique<AdBlockThrottle>(BrowserAdBlockState(), origin, true));
+        std::make_unique<AdBlockThrottle>(BrowserAdBlockState(), true));
     return throttles;
   }
 

@@ -1,6 +1,8 @@
 #include "oa/browser/ad_blocker_service.h"
+
 #include <map>
 #include <utility>
+
 #include "base/functional/bind.h"
 #include "base/no_destructor.h"
 #include "base/task/thread_pool.h"

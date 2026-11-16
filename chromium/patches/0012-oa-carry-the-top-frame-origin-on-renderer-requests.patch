@@ -1,0 +1,66 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Sun, 15 Nov 2026 22:54:10 -0700
+Subject: [PATCH] oa: carry the top frame origin on renderer requests
+
+---
+ services/network/prefetch_matches.cc                        | 6 +++++-
+ services/network/public/cpp/resource_request.h              | 4 ++++
+ .../platform/loader/fetch/url_loader/request_conversion.cc  | 5 +++++
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/services/network/prefetch_matches.cc b/services/network/prefetch_matches.cc
+index c9db5831e75d8d26458bc35e7da7215d860cfdcc..9762a0424be80e0118a808c4d9218d18deb0553e 100644
+--- a/services/network/prefetch_matches.cc
++++ b/services/network/prefetch_matches.cc
+@@ -116,7 +116,8 @@ namespace {
+   DO_FIELD(keepalive_token) __VA_ARGS__                            \
+   DO_FIELD(allows_device_bound_sessions) __VA_ARGS__   \
+   DO_FIELD(permissions_policy) __VA_ARGS__   \
+-  DO_FIELD(fetch_retry_options)
++  DO_FIELD(fetch_retry_options) __VA_ARGS__   \
++  DO_FIELD(top_frame_origin)
+ 
+ // clang-format on
+ 
+@@ -331,6 +332,9 @@ constexpr std::array kIgnoredFields = {
+ 
+     // It doesn't matter if they match.
+     Fields::ksocket_tag,
++
++    // Oa: never sent over Mojo.
++    Fields::ktop_frame_origin,
+ };
+ 
+ // These headers are completely ignored for the purposes of matching when they
+diff --git a/services/network/public/cpp/resource_request.h b/services/network/public/cpp/resource_request.h
+index 684b6e2f5bcfb3b0926bc897057ae2dc59b69e1f..1347581010b3a7011109b69e4a15eb4b943b8cf5 100644
+--- a/services/network/public/cpp/resource_request.h
++++ b/services/network/public/cpp/resource_request.h
+@@ -300,6 +300,10 @@ struct COMPONENT_EXPORT(NETWORK_CPP_BASE) ResourceRequest {
+ 
+   std::optional<network::FetchRetryOptions> fetch_retry_options;
+   // LINT.ThenChange(//services/network/prefetch_matches.cc)
++
++  // Oa: the top frame's origin, for the renderer's own loader throttles. It is
++  // not part of the Mojo struct, so it never leaves the process that set it.
++  std::optional<url::Origin> top_frame_origin;
+ };
+ 
+ // This does not accept |kDefault| referrer policy.
+diff --git a/third_party/blink/renderer/platform/loader/fetch/url_loader/request_conversion.cc b/third_party/blink/renderer/platform/loader/fetch/url_loader/request_conversion.cc
+index 45ee9a552ea5902f16bdb18020b8b0c556b4d792..4ac032e476bfca51725e0a5a1ea864458162ece1 100644
+--- a/third_party/blink/renderer/platform/loader/fetch/url_loader/request_conversion.cc
++++ b/third_party/blink/renderer/platform/loader/fetch/url_loader/request_conversion.cc
+@@ -288,6 +288,11 @@ void PopulateResourceRequest(const ResourceRequestHead& src,
+   } else {
+     dest->request_initiator = src.RequestorOrigin()->ToUrlOrigin();
+   }
++  if (src.TopFrameOrigin()) {
++    dest->top_frame_origin = src.TopFrameOrigin()->ToUrlOrigin();
++  } else {
++    dest->top_frame_origin = std::nullopt;
++  }
+ 
+   DCHECK(dest->navigation_redirect_chain.empty());
+   dest->navigation_redirect_chain.reserve(src.NavigationRedirectChain().size());
