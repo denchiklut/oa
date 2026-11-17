@@ -13,22 +13,26 @@ struct BrowserWindowView: View {
         let theme = WindowTheme.default
         let background = theme.background[colorScheme]
         let appearance = background.contentOverBackgroundAppearance
-        // As measured in Arc: hidden, the sidebar's column is past the window's edge by its width and 10 pt more,
-        // and the card is 10 pt in from every edge.
-        let hidden = model.sidebarMode == .noChrome && model.library == nil
+        // As measured in Arc: hidden, the sidebar is past the window's edge by its width and 10 pt more, and the card
+        // is 10 pt in from every edge, a floating sidebar over it.
+        let presentation = model.library == nil ? layout.sidebarPresentation : .locked
+        let floats = layout.sidebarIsPanel && model.library == nil
         ZStack(alignment: .topLeading) {
             WindowDragRegion()
-            SidebarView(model: model, layout: layout)
-                .environment(\.colorScheme, appearance.colorScheme)
-                .offset(x: hidden ? -(SidebarView.width + 10) : 0)
+            FloatingSidebarBackgroundView(background: background, windowSize: layout.size, isFloating: floats) {
+                SidebarView(model: model, layout: layout)
+                    .environment(\.colorScheme, appearance.colorScheme)
+            }
+            .offset(x: presentation == .hidden ? -(SidebarView.width + 10) : 0)
+            .zIndex(floats ? 1 : 0)
             card
                 .padding([.top, .trailing, .bottom], 10)
-                .padding(.leading, hidden ? 10 : model.library != nil ? LibraryView.width : SidebarView.width)
+                .padding(.leading, presentation == .locked ? sidebarWidth : 10)
         }
         .background { WindowSurface(background: background) }
         .overlay {
             if let peek = model.peek {
-                PeekView(model: model, page: peek, sidebarWidth: sidebarWidth)
+                PeekView(model: model, page: peek, sidebarWidth: peekInset)
             }
         }
         .overlay {
@@ -95,10 +99,11 @@ struct BrowserWindowView: View {
         }
     }
 
-    private var sidebarWidth: CGFloat {
-        if model.showingArchive { return 0 }
-        if model.library != nil { return LibraryView.width }
-        return model.sidebarMode == .anchored ? SidebarView.width : 0
+    private var sidebarWidth: CGFloat { model.library != nil ? LibraryView.width : SidebarView.width }
+
+    /// What the Peek leaves clear on the left: nothing under the Archive's Peek or a floating sidebar.
+    private var peekInset: CGFloat {
+        model.showingArchive || (model.library == nil && layout.sidebarPresentation != .locked) ? 0 : sidebarWidth
     }
 }
 

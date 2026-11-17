@@ -7,25 +7,43 @@ import simd
 /// while the window is active, so an inactive window is opaque, as Arc's.
 struct WindowSurface: View {
     let background: WindowTheme.Background
+    /// Arc's floating sidebar draws the theme over a blur of what the window shows under it, not of the desktop,
+    /// and the part of the window's colours that lies under it, as measured: `window` is the window in its space.
+    var floats = false
+    var window: CGRect?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.controlActiveState) private var activeState
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         ZStack {
-            WindowMaterial(material: material)
-            ZStack {
-                // Arc's underlay goes by the window's appearance, not the theme's: black under a dark one.
-                let underlay = min(alpha, 0.5)
-                ThemeColors(
-                    style: background.style, alpha: alpha,
-                    underlay: colorScheme == .dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay))
-                texture
+            WindowMaterial(material: floats ? .popover : material, blendingMode: floats ? .withinWindow : .behindWindow)
+            if let window {
+                Color.clear
+                    .overlay(alignment: .topLeading) {
+                        colors
+                            .frame(width: window.width, height: window.height)
+                            .offset(x: window.minX, y: window.minY)
+                    }
+                    .clipped()
+            } else {
+                colors
             }
-            .compositingGroup()
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private var colors: some View {
+        ZStack {
+            // Arc's underlay goes by the window's appearance, not the theme's: black under a dark one.
+            let underlay = min(alpha, 0.5)
+            ThemeColors(
+                style: background.style, alpha: alpha,
+                underlay: colorScheme == .dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay))
+            texture
+        }
+        .compositingGroup()
     }
 
     private var translucencyStyle: WindowTheme.TranslucencyStyle {
@@ -76,10 +94,11 @@ struct WindowSurface: View {
 
 private struct WindowMaterial: NSViewRepresentable {
     let material: NSVisualEffectView.Material
+    let blendingMode: NSVisualEffectView.BlendingMode
 
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.blendingMode = .behindWindow
+        view.blendingMode = blendingMode
         view.state = .followsWindowActiveState
         view.isEmphasized = true
         return view

@@ -20,7 +20,7 @@ struct SidebarHeader: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(ChromeButtonStyle())
-                .accessibilityLabel("Hide sidebar")
+                .accessibilityLabel(layout.sidebarPresentation == .locked ? "Hide sidebar" : "Lock sidebar")
                 if !showsToolbar {
                     NavigationButtons(page: model.page, size: CGSize(width: 32, height: 32), spacing: 2)
                 }
@@ -31,7 +31,7 @@ struct SidebarHeader: View {
             .frame(height: showsToolbar ? 36 : 46, alignment: .top)
             .background(WindowDragRegion())
             if !showsToolbar {
-                SidebarAddressField(model: model)
+                SidebarAddressField(model: model, layout: layout)
                     .padding(.horizontal, 8)
             }
         }
@@ -47,6 +47,7 @@ struct SidebarHeader: View {
 /// Site Controls at its end while the pointer is over it, or while Site Controls or a permission prompt hangs from it.
 private struct SidebarAddressField: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     @State private var hovering = false
     @State private var showingSiteControls = false
     @Environment(\.theme) private var theme
@@ -91,6 +92,9 @@ private struct SidebarAddressField: View {
             }
         }
         .onHover { hovering = $0 }
+        .onChange(of: showingSiteControls || model.permissionPromptBinding(forPeek: false).wrappedValue) {
+            layout.setHold(.popover, $1)
+        }
     }
 }
 
