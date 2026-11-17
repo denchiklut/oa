@@ -118,7 +118,13 @@ struct BrowserWindowView: View {
     /// Arc's page as measured: a card flush with the sidebar and 10 pt in from the window's other edges, with 6 pt
     /// corners, no border and a soft shadow.
     private var card: some View {
-        VStack(spacing: 0) {
+        // As Arc: under a page the card is opaque white or black by the window's appearance, and with none it is
+        // `emptyWindowContentBackgroundColor`, white at 0.666 or 0.1 over the Space's theme.
+        let dark = colorScheme == .dark
+        let fill =
+            model.placeholder == nil && model.page == nil
+            ? Color.white.opacity(dark ? 0.1 : 0.666) : dark ? Color.black : .white
+        return VStack(spacing: 0) {
             if showsToolbar {
                 PageToolbar(model: model)
                     .environment(\.theme, .toolbar)
@@ -129,16 +135,23 @@ struct BrowserWindowView: View {
             } else if let page = model.page {
                 PageContentView(page: page)
             } else {
-                Color(nsColor: .windowBackgroundColor)
+                Color.clear
             }
         }
+        .background(fill)
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        // What casts the shadow sits a point inside the card, so it never tints the card's edge.
+        // What casts the shadow sits a point inside the card, so it never tints the card's edge, and is cut out
+        // under it, as Arc's shadow is as strong under the see-through empty card as under a page.
         .background {
             RoundedRectangle(cornerRadius: 5)
-                .fill(Color(nsColor: .windowBackgroundColor))
                 .padding(1)
                 .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
+                .mask {
+                    Rectangle()
+                        .padding(-20)
+                        .overlay { RoundedRectangle(cornerRadius: 6).blendMode(.destinationOut) }
+                        .compositingGroup()
+                }
         }
         // Oa's own place, in the margin over the card: Arc's with the sidebar showing wasn't measured.
         .overlay(alignment: .top) {
@@ -168,7 +181,7 @@ private struct PlaceholderView: View {
     let image: NSImage
 
     var body: some View {
-        Color(nsColor: .windowBackgroundColor)
+        Color.clear
             .overlay(alignment: .top) {
                 Image(nsImage: image)
                     .resizable()
