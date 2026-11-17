@@ -11,7 +11,7 @@ struct SidebarView: View {
 
     var body: some View {
         if let section = model.library {
-            LibraryView(model: model, section: section)
+            LibraryView(model: model, section: section, width: layout.libraryWidth(for: section))
         } else {
             tabs.frame(width: layout.sidebarWidth)
         }

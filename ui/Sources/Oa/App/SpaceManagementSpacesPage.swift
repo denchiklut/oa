@@ -1,0 +1,120 @@
+import SwiftUI
+
+/// Arc's Spaces page of the Library: a card for each Space in a row that scrolls sideways, 24 pt apart and 24 pt in,
+/// each 240 pt wide and 96 pt shorter than the row, then the item that adds a Space. A row that fits is centred.
+struct SpaceManagementSpacesPage: View {
+    /// What the page asks of the Library's width for a count of Spaces, as Arc's: the cards, the item that adds one,
+    /// and room for the rail.
+    static func contentWidth(for spaces: Int) -> CGFloat { 264 * CGFloat(spaces) + 216 }
+
+    let model: WindowModel
+
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView(.horizontal) {
+                HStack(spacing: 24) {
+                    ForEach(model.state.spaces) { space in
+                        SpaceManagementCollectionViewItem(model: model, space: space)
+                            .frame(width: 240, height: max(geometry.size.height - 96, 0))
+                    }
+                    SpaceManagementAddSpaceView(model: model)
+                }
+                .padding(.horizontal, 24)
+                .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
+            }
+        }
+    }
+}
+
+/// Arc's card: the Space's sidebar under its name, with 12 pt corners and Arc's shadow. Arc's holds the Space's live
+/// sidebar view. Oa's own until rows are shared with it: a row here only goes to its tab.
+private struct SpaceManagementCollectionViewItem: View {
+    let model: WindowModel
+    let space: SidebarSpace
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let unpinned = model.state.tabs(in: space.id, pinned: false)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(space.name)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 13)
+                .frame(height: 36)
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(model.state.tabs(in: space.id, pinned: true)) { row($0) }
+                    if !unpinned.isEmpty {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.1))
+                            .frame(height: 1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 11)
+                    }
+                    ForEach(unpinned) { row($0) }
+                }
+                .padding(.horizontal, 8)
+            }
+        }
+        .background { WindowSurface(background: WindowTheme.default.background[colorScheme]) }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        // What casts the shadow sits a point inside the card, as the page's does.
+        .background {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .padding(1)
+                .shadow(color: .black.opacity(0.15), radius: 12, y: 1)
+        }
+    }
+
+    private func row(_ tab: SidebarTab) -> some View {
+        HStack(spacing: 6) {
+            Group {
+                if let icon = model.favicon(for: tab) {
+                    Image(nsImage: icon).resizable().interpolation(.high)
+                } else {
+                    RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.1))
+                }
+            }
+            .frame(width: 16, height: 16)
+            Text(model.title(for: tab))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(model.selectedTabIDs[space.id] == tab.id ? 0.12 : 0))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { model.show(tab.id) }
+    }
+}
+
+/// Arc's item after the last card: a 30 pt disc in the theme's cutout colour with a plus in its strongest, in a
+/// 48 pt square. It asks for a name until the Create a Space panel is here.
+private struct SpaceManagementAddSpaceView: View {
+    let model: WindowModel
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button {
+            if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(theme.maxContrast)
+                .frame(width: 30, height: 30)
+                .background(theme.cutout, in: Circle())
+                .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
+                .frame(width: 48, height: 48)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("New Space")
+        .accessibilityLabel("New Space")
+    }
+}

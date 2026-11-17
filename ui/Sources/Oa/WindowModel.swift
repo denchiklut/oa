@@ -1248,7 +1248,7 @@ final class WindowModel {
 
     /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown and for another
     /// Space's tab picked in the command bar.
-    private func show(_ tabID: UUID) {
+    func show(_ tabID: UUID) {
         let spaceID = state.space(containing: tabID)?.id ?? selectedSpaceID
         guard state.isSelectable(tabID, in: spaceID) else { return }
         if spaceID != selectedSpaceID {

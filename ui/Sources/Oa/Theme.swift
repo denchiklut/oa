@@ -3,6 +3,8 @@ import SwiftUI
 /// What the window's chrome is drawn in over a Space's theme.
 struct Theme {
     let foreground: Color
+    let maxContrast: Color
+    let cutout: Color
     let icon: Color
     let disabledIcon: Color
     let addressText: Color
@@ -19,6 +21,8 @@ struct Theme {
             appearance == .dark ? .white.opacity(dark) : .black.opacity(light)
         }
         foreground = palette.title.color
+        maxContrast = palette.maxContrastColor.color
+        cutout = palette.cutoutColor.color
         icon = ink(0.57, 0.59)
         disabledIcon = ink(0.22, 0.25)
         addressText = ink(0.62, 0.64)
@@ -37,6 +41,8 @@ struct Theme {
 
     private init() {
         foreground = .primary
+        maxContrast = .primary
+        cutout = Color(nsColor: .textBackgroundColor)
         icon = Color(nsColor: .secondaryLabelColor)
         disabledIcon = Color(nsColor: .tertiaryLabelColor)
         addressText = Color(nsColor: .secondaryLabelColor)

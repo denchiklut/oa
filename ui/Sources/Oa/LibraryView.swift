@@ -3,20 +3,40 @@ import QuickLookThumbnailing
 import SwiftUI
 
 enum LibrarySection: CaseIterable {
-    case downloads, archive
+    case downloads, spaces, archive
 
-    var title: String { self == .downloads ? "Downloads" : "Archived Tabs" }
-    var symbol: String { self == .downloads ? "arrow.down.circle" : "archivebox" }
+    var title: String {
+        switch self {
+        case .downloads: "Downloads"
+        case .spaces: "Spaces"
+        case .archive: "Archived Tabs"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .downloads: "arrow.down.circle"
+        case .spaces: "square.on.square"
+        case .archive: "archivebox"
+        }
+    }
 }
 
 /// Arc's Library in the sidebar's place, with the page still showing: its rail of sections, of which Oa has
-/// Downloads and Archived Tabs, beside the section's list. The widths are Arc's.
+/// Downloads, Spaces and Archived Tabs in Arc's order, beside the section's page. The widths are Arc's.
 struct LibraryView: View {
-    static let width: CGFloat = 416
     private static let railWidth: CGFloat = 112
+
+    /// Arc's rule: 417 pt, or as wide as the section's page asks, up to the window less the 56 pt of the page card
+    /// left showing.
+    static func width(for section: LibrarySection, spaces: Int, in window: CGFloat) -> CGFloat {
+        let content = section == .spaces ? SpaceManagementSpacesPage.contentWidth(for: spaces) : 0
+        return max(417, min(window - 56, content))
+    }
 
     let model: WindowModel
     let section: LibrarySection
+    let width: CGFloat
 
     var body: some View {
         HStack(spacing: 0) {
@@ -25,12 +45,13 @@ struct LibraryView: View {
             Group {
                 switch section {
                 case .downloads: DownloadsPage(model: model)
+                case .spaces: SpaceManagementSpacesPage(model: model)
                 case .archive: ArchivePage(model: model)
                 }
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(width: Self.width)
+        .frame(width: width)
     }
 
     private var rail: some View {
