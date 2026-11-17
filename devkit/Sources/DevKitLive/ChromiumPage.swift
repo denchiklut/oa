@@ -15,6 +15,7 @@ final class ChromiumPage: Page, MediaSession {
     private(set) var canGoForward = false
     private(set) var favicon: NSImage?
     private(set) var securityLevel = SecurityLevel.neutral
+    private(set) var rootBackgroundColor: NSColor?
     private(set) var navigationResult: NavigationResult?
     private(set) var isCameraOn = false
     private(set) var isMicrophoneOn = false
@@ -90,6 +91,8 @@ final class ChromiumPage: Page, MediaSession {
         if favicon !== self.favicon { self.favicon = favicon }
         let level = SecurityLevel(core: page.securityLevel)
         if level != securityLevel { securityLevel = level }
+        let background = page.rootBackgroundColor
+        if background != rootBackgroundColor { rootBackgroundColor = background }
         let result = NavigationResult(core: page.navigationResult)
         if result != navigationResult { navigationResult = result }
         if page.isCameraOn != isCameraOn { isCameraOn = page.isCameraOn }
