@@ -54,11 +54,13 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
     func select(
         _ id: PageID, animated: Bool, velocity: CGFloat? = nil, spring shape: (Double, Double) = settle
     ) {
-        guard let target = origin(of: id) else { return }
+        guard origin(of: id) != nil else { return }
         let changed = selectedPageID != id
         selectedPageID = id
         if changed { pageSelectionHandler(id) }
+        // Stopping tells the owner, which may lay the pages out again: the page's place is read after.
         stop()
+        guard let target = origin(of: id) else { return }
         position = target
         guard animated, presentationPosition != target, let window = windowProvider() else {
             return presentationPosition = target
@@ -80,11 +82,11 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         guard event.timestamp != began else { return true }
         guard scrollingShouldBegin(event), let window = windowProvider() else { return false }
         began = event.timestamp
+        isTracking = true
         stop()
         position = unbanded(presentationPosition)
         beginIndex = nearestIndex
         samples = []
-        isTracking = true
         while isTracking,
             let next = window.nextEvent(matching: .any, until: .distantFuture, inMode: .eventTracking, dequeue: true)
         {
@@ -127,8 +129,9 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         pages.indices.min { abs(origin(at: $0) - position) < abs(origin(at: $1) - position) } ?? 0
     }
 
+    /// Tracking ends once the settle has begun, so the owner never sees the pager at rest in between.
     private func end(at time: TimeInterval) {
-        isTracking = false
+        defer { isTracking = false }
         guard !pages.isEmpty else { return }
         let recent = samples.filter { time - $0.time <= 0.1 }
         var velocity: CGFloat = 0
