@@ -1,28 +1,44 @@
 import SwiftUI
 
 /// Arc's paging container in the sidebar: a page per Space side by side, each the sidebar's width, scrolled by the
-/// window's pager and cut at the sidebar's edges. The header above it and the dock below stay where they are.
+/// window's pager and cut at the sidebar's edges. The header above it and the dock below stay where they are. A
+/// profile's Favorites sit over the pages of its Spaces: they stay put while the swipe is between two of them and
+/// slide with the page when it leaves them, as Arc's app tray does. As in Arc's layout, a profile's Spaces count as
+/// one run only where they are neighbours.
 struct SidebarPagingContainerView: View {
     let model: WindowModel
     let layout: WindowLayoutController
 
     var body: some View {
         let width = layout.sidebarWidth
-        VStack(spacing: 0) {
-            FavoritesGrid(model: model, layout: layout, favorites: model.favorites)
-                .padding(8)
+        let offset = layout.sidebarScrollOffset
+        let spaces = model.state.spaces
+        let groups = spaces.indices.filter { $0 == 0 || spaces[$0].profileID != spaces[$0 - 1].profileID }
+        ZStack(alignment: .topLeading) {
             HStack(alignment: .top, spacing: 0) {
-                ForEach(model.state.spaces) { space in
+                ForEach(spaces) { space in
+                    let favorites = model.state.favorites(for: space.id).count
                     SidebarSpacePage(model: model, layout: layout, space: space)
+                        .padding(.top, FavoritesGrid.height(for: favorites, in: width) + 16)
                         .frame(width: width)
                         .allowsHitTesting(space.id == model.selectedSpaceID)
                         .accessibilityHidden(space.id != model.selectedSpaceID)
                 }
             }
-            .offset(x: -layout.sidebarScrollOffset)
-            .frame(width: width, alignment: .topLeading)
-            .clipped()
+            .offset(x: -offset)
+            ForEach(Array(groups.enumerated()), id: \.element) { position, first in
+                let last = (position + 1 < groups.count ? groups[position + 1] : spaces.count) - 1
+                let shown = spaces[first...last].contains { $0.id == model.selectedSpaceID }
+                FavoritesGrid(model: model, layout: layout, favorites: model.state.favorites(for: spaces[first].id))
+                    .padding(8)
+                    .frame(width: width)
+                    .offset(x: min(max(offset, CGFloat(first) * width), CGFloat(last) * width) - offset)
+                    .allowsHitTesting(shown)
+                    .accessibilityHidden(!shown)
+            }
         }
+        .frame(width: width, alignment: .topLeading)
+        .clipped()
     }
 }
 
