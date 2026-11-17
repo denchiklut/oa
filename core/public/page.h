@@ -167,6 +167,14 @@ struct PictureInPictureEvent {
   double height = 0;
 };
 
+// sRGB and unpremultiplied, as SkColor4f.
+struct Color {
+  float red = 0;
+  float green = 0;
+  float blue = 0;
+  float alpha = 1;
+};
+
 class Page {
  public:
   // The NSImage lives only for the call; null if nothing could be copied.
@@ -238,6 +246,10 @@ class Page {
   // An NSImage, held by the tab while it keeps the icon; null until it has one.
   virtual void* Favicon() const = 0;
   virtual SecurityLevel GetSecurityLevel() const = 0;
+  // The main frame's compositor frames' root background colour, as ArcCore
+  // keeps it: none until the first frame, then the last one, across
+  // navigations and crashes.
+  virtual std::optional<Color> GetRootBackgroundColor() const = 0;
   virtual NavigationResult GetNavigationResult() const = 0;
   // While the page captures from them, as ArcCore's media session reports.
   virtual bool IsCameraOn() const = 0;

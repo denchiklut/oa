@@ -17,10 +17,16 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "oa/browser/forwarding_web_contents_delegate.h"
 #include "oa/public/page.h"
+#include "third_party/skia/include/core/SkColor.h"
+
+namespace cc {
+class RenderFrameMetadata;
+}
 
 namespace content {
+class RenderWidgetHost;
 class WebContents;
-}
+}  // namespace content
 
 namespace oa {
 
@@ -46,6 +52,8 @@ class PageImpl : public Page,
       WindowBrowser* window_browser,
       content::WebContents* contents);
   static void CloseAll();
+  // Before the browser starts.
+  static void InstallFrameMetadataObserver();
 
   PageImpl(const PageImpl&) = delete;
   PageImpl& operator=(const PageImpl&) = delete;
@@ -83,6 +91,7 @@ class PageImpl : public Page,
   bool CanGoForward() const override;
   void* Favicon() const override;
   SecurityLevel GetSecurityLevel() const override;
+  std::optional<Color> GetRootBackgroundColor() const override;
   NavigationResult GetNavigationResult() const override;
   bool IsCameraOn() const override;
   bool IsMicrophoneOn() const override;
@@ -170,6 +179,9 @@ class PageImpl : public Page,
   void Bind(content::WebContents* contents);
   bool KeepsAddressAgainst(const content::OpenURLParams& params) const;
   void Unbind();
+  static void OnFrameMetadata(content::RenderWidgetHost* widget_host,
+                              content::WebContents* web_contents,
+                              const cc::RenderFrameMetadata& metadata);
   void NotifyStateChanged();
   void NotifyClosed(std::optional<SessionID> session_id);
 
@@ -182,6 +194,7 @@ class PageImpl : public Page,
   bool suppress_dialogs_ = false;
   double load_progress_ = 0;
   NavigationResult navigation_result_ = NavigationResult::kNone;
+  std::optional<SkColor4f> root_background_color_;
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>
       favicon_observation_{this};

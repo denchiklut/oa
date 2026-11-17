@@ -228,6 +228,7 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   BrowserWindowImpl::InstallFactory();
   PermissionPromptImpl::InstallFactory();
   SadTabImpl::InstallFactory();
+  PageImpl::InstallFrameMetadataObserver();
   InstallContextMenuEditor();
   InstallExtensionDialogs();
 
