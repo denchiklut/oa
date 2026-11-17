@@ -308,8 +308,12 @@ final class WindowLayoutController: NSViewController {
                 if self?.sidebarPresentation != .locked { self?.sidebarIsPanel = true }
             }
         case (.hidden, .locked):
-            sidebarIsPanel = false
-            withAnimation(Self.lockAnimation) { sidebarPresentation = new }
+            // One transaction: SwiftUI flushed a separate unanimated change while the presentation was being set,
+            // drew the old value and missed the new one, so ⌘S sometimes left the sidebar hidden.
+            withAnimation(Self.lockAnimation) {
+                sidebarIsPanel = false
+                sidebarPresentation = new
+            }
         case (.floating, .locked):
             withAnimation(Self.lockAnimation) {
                 sidebarPresentation = new
