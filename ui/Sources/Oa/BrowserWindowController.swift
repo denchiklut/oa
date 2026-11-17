@@ -12,7 +12,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let downloadPreview = DownloadPreviewWindow()
     private let extensionPopup = ExtensionPopupWindow()
     private var viewTimer: Task<Void, Never>?
-    private var windowButtons: WindowButtons?
+    /// As Arc's `BrowserWindow.windowButtons`: the title bar's own, taken before the sidebar's header makes its set,
+    /// which the window would hand out in their place. They show only in full screen.
+    private let windowButtons: [NSButton]
 
     init(
         id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore,
@@ -35,13 +37,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.contentMinSize = NSSize(width: 640, height: 320)
+        windowButtons = [.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
+        windowButtons.forEach { $0.isHidden = true }
         super.init(window: window)
         let content = NSHostingController(rootView: BrowserWindowView(model: model))
         content.sizingOptions = []
         window.contentViewController = content
         window.setContentSize(NSSize(width: 1100, height: 760))
         window.delegate = self
-        windowButtons = WindowButtons(window: window)
         model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
         model.window = window
     }
@@ -103,6 +106,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         window?.title = model.peek != nil ? model.space?.name ?? "Oa" : title.isEmpty ? "Oa" : title
     }
+
+    func windowDidEnterFullScreen(_ notification: Notification) { windowButtons.forEach { $0.isHidden = false } }
+    func windowWillExitFullScreen(_ notification: Notification) { windowButtons.forEach { $0.isHidden = true } }
 
     func windowDidBecomeKey(_ notification: Notification) {
         model.showSelected()
