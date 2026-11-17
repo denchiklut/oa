@@ -9,12 +9,12 @@ struct BrowserWindowView: View {
 
     var body: some View {
         // As Arc: a theme with a light and a dark side shows the one the window's appearance asks for, and the
-        // chrome over it takes that side's own appearance. During a swipe the next Space's background fades in over
-        // it, and the chrome takes the nearer Space's, Oa's own: what Arc's does between a light and a dark theme
-        // wasn't traced.
+        // chrome over it takes that side's own appearance. While the pages move the next Space's background fades in
+        // over it, and the chrome keeps the resting Space's until they rest again.
         let transition = layout.themeTransition
-        let theme = transition.map { $0.progress < 0.5 ? $0.from : $0.to } ?? model.space?.theme ?? .default
-        let background = transition?.from.background[colorScheme] ?? theme.background[colorScheme]
+        let theme = layout.restingTheme
+        let background =
+            transition?.from.background[colorScheme] ?? (model.space?.theme ?? .default).background[colorScheme]
         let next = transition.map { (background: $0.to.background[colorScheme], progress: Double($0.progress)) }
         let appearance = theme.background[colorScheme].contentOverBackgroundAppearance
         // As measured in Arc: hidden, the sidebar is past the window's edge by its width and 10 pt more, and the card
