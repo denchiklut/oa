@@ -42,3 +42,12 @@ struct PageContentView: View {
         }
     }
 }
+
+extension View {
+    /// As Arc's card: a layer of the page's root background colour under it, none until the page reports one.
+    func pageRootBackground(_ page: any Page) -> some View {
+        background {
+            if let color = page.rootBackgroundColor { Color(nsColor: color) }
+        }
+    }
+}
