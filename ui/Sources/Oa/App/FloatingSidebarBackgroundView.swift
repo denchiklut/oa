@@ -16,27 +16,33 @@ struct FloatingSidebarBackgroundView<Sidebar: View>: View {
         let shape = RoundedRectangle(cornerRadius: isFloating ? Self.cornerRadius : 0)
         let inset = WindowLayoutController.floatingInset
         sidebar
+            // The blur, rim and shadow are gone while docked rather than clear: under a docked sidebar that fades
+            // or shrinks they would show.
             .background {
-                WindowSurface(
-                    background: background, floats: true,
-                    window: CGRect(origin: CGPoint(x: -inset, y: -inset), size: windowSize)
-                )
-                .opacity(isFloating ? 1 : 0)
+                if isFloating {
+                    WindowSurface(
+                        background: background, floats: true,
+                        window: CGRect(origin: CGPoint(x: -inset, y: -inset), size: windowSize))
+                }
             }
             .clipShape(shape)
-            .overlay { shape.strokeBorder(.white.opacity(isFloating ? 0.3 : 0)) }
+            .overlay {
+                if isFloating { shape.strokeBorder(.white.opacity(0.3)) }
+            }
             // Fitted to Arc's `CellDropShadow` as captured over a white page. Cut out under the panel, whose blur
             // would pick it up.
             .background {
-                shape
-                    .fill(.black)
-                    .shadow(color: .black.opacity(isFloating ? 0.16 : 0), radius: 4, y: 1)
-                    .mask {
-                        Rectangle()
-                            .padding(-16)
-                            .overlay { shape.blendMode(.destinationOut) }
-                            .compositingGroup()
-                    }
+                if isFloating {
+                    shape
+                        .fill(.black)
+                        .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
+                        .mask {
+                            Rectangle()
+                                .padding(-16)
+                                .overlay { shape.blendMode(.destinationOut) }
+                                .compositingGroup()
+                        }
+                }
             }
             .padding([.top, .leading, .bottom], isFloating ? inset : 0)
     }

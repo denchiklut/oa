@@ -138,8 +138,18 @@ private struct ThemeColors: NSViewRepresentable, Equatable {
             guard let colors, let layer, bounds.width > 0, bounds.height > 0 else { return }
             if let drawn, drawn.colors == colors, drawn.size == bounds.size { return }
             layer.contentsGravity = .resize
-            layer.contents = colors.image(size: bounds.size)
+            layer.contents = Self.image(of: colors, size: bounds.size)
             drawn = (colors, bounds.size)
+        }
+
+        /// The last few bitmaps, so the Library's cards, all one size and often one theme, compute theirs once.
+        private static var recent: [(colors: ThemeColors, size: CGSize, image: CGImage?)] = []
+
+        private static func image(of colors: ThemeColors, size: CGSize) -> CGImage? {
+            if let cached = recent.first(where: { $0.colors == colors && $0.size == size }) { return cached.image }
+            let image = colors.image(size: size)
+            recent = Array((recent + [(colors, size, image)]).suffix(8))
+            return image
         }
     }
 

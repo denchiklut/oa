@@ -29,10 +29,11 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
     }
     private var position: CGFloat = 0
     private var beginIndex = 0
+    private var began: TimeInterval = 0
     private var samples: [(time: TimeInterval, position: CGFloat)] = []
     private var wheel: (sum: CGFloat, time: TimeInterval, flipped: TimeInterval) = (0, 0, 0)
     private var spring:
-        (from: CGFloat, to: CGFloat, velocity: CGFloat, start: CFTimeInterval?, shape: (Double, Double))?
+        (from: CGFloat, to: CGFloat, velocity: CGFloat, time: Double, last: CFTimeInterval?, shape: (Double, Double))?
     private let ticker = Ticker()
 
     func origin(of id: PageID) -> CGFloat? {
@@ -62,7 +63,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         guard animated, presentationPosition != target, let window = windowProvider() else {
             return presentationPosition = target
         }
-        spring = (presentationPosition, target, velocity ?? 0, nil, shape)
+        spring = (presentationPosition, target, velocity ?? 0, 0, nil, shape)
         isAnimating = true
         ticker.start(in: window) { [weak self] in self?.step() }
     }
@@ -72,9 +73,13 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
     func scrollWheel(with event: NSEvent) -> Bool {
         guard event.momentumPhase.isEmpty else { return true }
         guard !event.phase.isEmpty else { return flip(with: event) }
-        guard event.phase.contains(.began), abs(event.scrollingDeltaY) <= abs(event.scrollingDeltaX),
-            scrollingShouldBegin(event), let window = windowProvider()
-        else { return false }
+        guard event.phase.contains(.began), abs(event.scrollingDeltaY) <= abs(event.scrollingDeltaX) else {
+            return false
+        }
+        // A scroll view at its end hands the same start over a second time once the pager is done with the swipe.
+        guard event.timestamp != began else { return true }
+        guard scrollingShouldBegin(event), let window = windowProvider() else { return false }
+        began = event.timestamp
         stop()
         position = unbanded(presentationPosition)
         beginIndex = nearestIndex
@@ -162,11 +167,13 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
 
     private func step() {
         guard var spring else { return }
-        // The spring's clock starts with its first frame, so what selecting the page costs doesn't eat into it.
+        // The spring's clock starts with its first frame and counts a long frame as two, so what selecting the page
+        // or drawing the Library for the first time costs delays the motion rather than skipping it.
         let now = CACurrentMediaTime()
-        let time = now - (spring.start ?? now)
-        spring.start = spring.start ?? now
+        spring.time += min(now - (spring.last ?? now), 1.0 / 60)
+        spring.last = now
         self.spring = spring
+        let time = spring.time
         let (response, damping) = spring.shape
         let omega = 2 * Double.pi / response
         let decay = exp(-damping * omega * time)

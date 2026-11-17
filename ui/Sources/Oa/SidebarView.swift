@@ -10,14 +10,6 @@ struct SidebarView: View {
     @State private var showingFlyout = false
 
     var body: some View {
-        if let section = model.library {
-            LibraryView(model: model, section: section, width: layout.libraryWidth(for: section))
-        } else {
-            tabs.frame(width: layout.sidebarWidth)
-        }
-    }
-
-    private var tabs: some View {
         VStack(spacing: 0) {
             SidebarHeader(model: model, layout: layout)
             SidebarPagingContainerView(model: model, layout: layout)
@@ -54,11 +46,13 @@ struct SidebarView: View {
                 if !overLibraryButton, !overFlyout { showingFlyout = false }
             }
         }
-        .onDisappear {
+        // The sidebar stays mounted under the Library, where the pointer's leaving isn't reported.
+        .onChange(of: model.library == nil) {
             overLibraryButton = false
             overFlyout = false
             showingFlyout = false
         }
+        .frame(width: layout.sidebarWidth)
     }
 
     private var spaces: some View {
