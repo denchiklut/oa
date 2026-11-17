@@ -153,10 +153,14 @@ private struct SpaceManagementCollectionViewItem: View {
 }
 
 /// Arc's item after the last card: a 30 pt disc in the theme's cutout colour with a plus in its strongest, in a
-/// 48 pt square. It asks for a name until the Create a Space panel is here.
+/// 48 pt square. Under the pointer the two colours swap in 0.05 s and the disc then bounces once to 1.15, as Arc's
+/// `CircularProgressView` does when activated; leaving swaps them back with no bounce. It asks for a name until the
+/// Create a Space panel is here.
 private struct SpaceManagementAddSpaceView: View {
     let model: WindowModel
     @Environment(\.theme) private var theme
+    @State private var isActivated = false
+    @State private var scale = 1.0
 
     var body: some View {
         Button {
@@ -164,15 +168,25 @@ private struct SpaceManagementAddSpaceView: View {
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(theme.maxContrast)
+                .foregroundStyle(isActivated ? theme.cutout : theme.maxContrast)
                 .frame(width: 30, height: 30)
-                .background(theme.cutout, in: Circle())
+                .background(isActivated ? theme.maxContrast : theme.cutout, in: Circle())
                 .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
+                .scaleEffect(scale)
                 .frame(width: 48, height: 48)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("New Space")
         .accessibilityLabel("New Space")
+        .onHover { inside in
+            withAnimation(.linear(duration: 0.05)) { isActivated = inside }
+            guard inside else { return }
+            withAnimation(.easeOut(duration: 0.07).delay(0.05)) {
+                scale = 1.15
+            } completion: {
+                withAnimation(.easeIn(duration: 0.07)) { scale = 1 }
+            }
+        }
     }
 }
