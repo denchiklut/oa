@@ -1,6 +1,8 @@
 import AppKit
 import Quartz
+import QuickLookThumbnailing
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Arc's preview is a borderless window of its own, the size of the browser window and above it, that takes the
 /// keyboard and never becomes main: switching apps and back returns the keyboard to it, not to the page beneath.
@@ -92,18 +94,20 @@ struct DownloadPreviewView: View {
     let entry: DownloadsStore.Entry
 
     var body: some View {
-        ZStack {
-            Backdrop(onClick: model.closeDownloadPreview, color: NSColor.black.withAlphaComponent(0.7))
-            KeyTrap(onReturn: {}, onEscape: model.closeDownloadPreview)
-            VStack(spacing: 0) {
-                header
-                Divider()
-                if let file = entry.download.file { QuickLook(file: file) }
+        GeometryReader { geometry in
+            ZStack {
+                Backdrop(onClick: model.closeDownloadPreview, color: NSColor.black.withAlphaComponent(0.7))
+                KeyTrap(onReturn: {}, onEscape: model.closeDownloadPreview)
+                // As measured in Arc, with no shadow. The strip's material is Oa's own: Arc's is unknown.
+                VStack(spacing: 0) {
+                    header.frame(height: 46).background(.regularMaterial)
+                    if let file = entry.download.file { FileView(file: file).padding(16) }
+                }
+                .background { if let file = entry.download.file { BlurredCopy(file: file) } }
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .frame(
+                    width: max(geometry.size.width * 0.8 - 50, 100), height: max(geometry.size.height * 0.8 - 50, 100))
             }
-            .background(Color(nsColor: .windowBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
-            .padding(40)
         }
     }
 
@@ -155,11 +159,57 @@ struct DownloadPreviewView: View {
     }
 }
 
+/// As Arc's `MediaPreviewView`: an image as itself, anything else in Quick Look's compact view.
+private struct FileView: View {
+    let file: URL
+
+    var body: some View {
+        if let image = imageFile(file) {
+            Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+        } else {
+            QuickLook(file: file)
+        }
+    }
+}
+
+private func imageFile(_ file: URL) -> NSImage? {
+    UTType(filenameExtension: file.pathExtension)?.conforms(to: .image) == true ? NSImage(contentsOf: file) : nil
+}
+
+/// Arc's `BlurredItemContent`, over black as measured.
+private struct BlurredCopy: View {
+    let file: URL
+    @State private var image: NSImage?
+
+    var body: some View {
+        GeometryReader { geometry in
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .frame(width: geometry.size.width * 0.2, height: geometry.size.height * 0.2)
+                    .blur(radius: 30)
+                    .scaleEffect(7)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+        }
+        .background(.black)
+        .task(id: file) {
+            if let own = imageFile(file) { image = own } else { image = await Self.thumbnail(of: file) }
+        }
+    }
+
+    private static func thumbnail(of file: URL) async -> NSImage? {
+        let request = QLThumbnailGenerator.Request(
+            fileAt: file, size: CGSize(width: 512, height: 512), scale: 1, representationTypes: .all)
+        return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
+    }
+}
+
 private struct QuickLook: NSViewRepresentable {
     let file: URL
 
     func makeNSView(context: Context) -> QLPreviewView {
-        let view = QLPreviewView(frame: .zero, style: .normal)!
+        let view = QLPreviewView(frame: .zero, style: .compact)!
         view.autostarts = true
         return view
     }
