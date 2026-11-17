@@ -8,7 +8,6 @@ struct SidebarView: View {
     @State private var overLibraryButton = false
     @State private var overFlyout = false
     @State private var showingFlyout = false
-    @State private var overTabs = false
 
     var body: some View {
         if let section = model.library {
@@ -21,18 +20,7 @@ struct SidebarView: View {
     private var tabs: some View {
         VStack(spacing: 0) {
             SidebarHeader(model: model, layout: layout)
-            FavoritesGrid(model: model, layout: layout)
-                .padding(8)
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(model.pinnedTabs) { TabRow(model: model, layout: layout, tab: $0) }
-                    if !model.unpinnedTabs.isEmpty { clearDivider }
-                    ForEach(model.unpinnedTabs) { TabRow(model: model, layout: layout, tab: $0) }
-                }
-                .padding(8)
-            }
-            .onHover { overTabs = $0 }
-            .onDrop(of: [.plainText], delegate: TabDrop { model.unfavorite($0) })
+            SidebarPagingContainerView(model: model, layout: layout)
             Divider()
             Button {
                 model.openCommandBar(.newTab)
@@ -71,25 +59,6 @@ struct SidebarView: View {
             overFlyout = false
             showingFlyout = false
         }
-    }
-
-    /// Arc's divider above the unpinned tabs, with Clear while the pointer is over the sidebar.
-    private var clearDivider: some View {
-        HStack(spacing: 8) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.1))
-                .frame(height: 1)
-            if overTabs {
-                Button("Clear") { model.clearTabs() }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .help("Clear unselected Today tabs")
-            }
-        }
-        .frame(height: 16)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
     }
 
     private var spaces: some View {
@@ -181,12 +150,12 @@ private struct SpaceChip: View {
 /// row at the default width and two at the narrowest; columns from the count as `rows = ⌈n / most⌉`,
 /// `cols = ⌈n / rows⌉`, the last row left-aligned, a favicon and nothing else. A row dropped on a tile joins the grid
 /// before it, one dropped beside the tiles is appended; tiles move the same way.
-private struct FavoritesGrid: View {
+struct FavoritesGrid: View {
     let model: WindowModel
     let layout: WindowLayoutController
+    let favorites: [SidebarTab]
 
     var body: some View {
-        let favorites = model.favorites
         let most = max(1, Int((layout.sidebarWidth - 8) / 55))
         let rows = max(1, (favorites.count + most - 1) / most)
         let columns = max(1, (favorites.count + rows - 1) / rows)
@@ -261,7 +230,7 @@ private struct FavoriteTile: View {
 }
 
 /// A dragged tab's ID arrives as text; the drop decides where it goes.
-private struct TabDrop: DropDelegate {
+struct TabDrop: DropDelegate {
     let drop: @MainActor @Sendable (UUID) -> Void
 
     func performDrop(info: DropInfo) -> Bool {
@@ -304,14 +273,15 @@ private struct RecordingDot: View {
     }
 }
 
-private struct TabRow: View {
+struct TabRow: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let tab: SidebarTab
+    let spaceID: UUID
     @State private var hovering = false
 
     var body: some View {
-        let selected = model.selectedTabID == tab.id
+        let selected = model.selectedTabIDs[spaceID] == tab.id
         HStack(spacing: 6) {
             if model.isRecording(tab) { RecordingDot() }
             Group {
