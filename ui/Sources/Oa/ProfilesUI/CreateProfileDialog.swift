@@ -3,6 +3,7 @@ import SwiftUI
 struct CreateProfileDialogSpaceInfo: Identifiable {
     let id: UUID
     let title: String
+    let theme: WindowTheme
 }
 
 /// Arc's two-step `CreateProfileDialog`: the name, then the Spaces that move to the new profile, at least one. Its
@@ -89,7 +90,7 @@ struct CreateProfileDialog: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 12) {
                 ForEach(spaces) { space in
-                    Toggle(space.title, isOn: binding(space.id)).toggleStyle(SpaceCardStyle())
+                    Toggle(space.title, isOn: binding(space.id)).toggleStyle(SpaceCardStyle(theme: space.theme))
                 }
             }
             .padding(.horizontal, 38)
@@ -143,9 +144,9 @@ private struct ProfileNameTextBox: View {
     }
 }
 
-/// Arc's Space card, 64 by 155 with its tick and title under the Space's theme. Every Space shows the window's
-/// theme until Oa's Spaces have their own.
+/// Arc's Space card, 64 by 155 with its tick and title under the Space's theme.
 private struct SpaceCardStyle: ToggleStyle {
+    let theme: WindowTheme
     @Environment(\.colorScheme) private var colorScheme
 
     func makeBody(configuration: Configuration) -> some View {
@@ -153,7 +154,7 @@ private struct SpaceCardStyle: ToggleStyle {
             configuration.isOn.toggle()
         } label: {
             VStack(spacing: 11) {
-                WindowSurface(background: WindowTheme.default.background[colorScheme])
+                WindowSurface(background: theme.background[colorScheme])
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.primary.opacity(0.3)))
                     .frame(height: 96)

@@ -7,7 +7,7 @@ enum ProfileDialogUtils {
     /// before the confirm about its Spaces, so cancelling there leaves it unused.
     static func createProfile(checking spaceIDs: [UUID] = [], in model: WindowModel) {
         guard let window = model.window else { return }
-        let spaces = model.state.spaces.map { CreateProfileDialogSpaceInfo(id: $0.id, title: $0.name) }
+        let spaces = model.state.spaces.map { CreateProfileDialogSpaceInfo(id: $0.id, title: $0.name, theme: $0.theme) }
         DialogSheet.present(on: window) { dismiss in
             CreateProfileDialog(
                 existingProfileNames: Set(model.profiles.map(\.name)), spaces: spaces, checked: Set(spaceIDs)

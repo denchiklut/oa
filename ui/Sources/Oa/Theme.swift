@@ -59,4 +59,6 @@ struct Theme {
 
 extension EnvironmentValues {
     @Entry var theme = Theme.toolbar
+    /// The window's own light or dark, where the chrome has taken its theme's.
+    @Entry var windowColorScheme = ColorScheme.light
 }
