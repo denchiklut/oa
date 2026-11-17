@@ -150,7 +150,7 @@ private struct SidebarHomeTransition: ViewModifier {
         content
             .scaleEffect(scale)
             .offset(x: 26 * progress * scale)
-            .opacity(max(0, 1 - progress / 0.08))
+            .opacity(max(0, 1 - 2 * progress))
     }
 }
 
