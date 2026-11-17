@@ -29,24 +29,25 @@ background colour, as under the window's page card, so a page that draws nothing
 shows its own colour. The 31.5 pt toolbar with back, forward, reload or stop and
 the scheme-less URL with the host in bold shows only with View ▸ Show Toolbar,
 as Arc's does, and has no fill of its own: the page's colour shows through it.
-With the toolbar hidden the page starts at the Peek's top, the sidebar's URL
-field shows the Peek's host, and a permission prompt from the Peek hangs from
-that field's Site Controls button. Loading shows as Arc's pill in the margin
-above the Peek. Under it the opener's card fades to 30% and shrinks 9 pt at each
-edge, as Arc's does, and nothing else is dimmed. ✕ and Expand sit 13 pt right of
-its top corner as Arc's modal buttons: the glyph in a capsule of the Space
-theme's `backgroundExtra`, in its `foregroundPrimary`, with a shadow that
-strengthens as the button lifts under the pointer. The sidebar stays live under
-the Peek, the opener's row carries the Peek page's favicon as Arc's badge, a 24
-pt tile of black at 7% (white at 8% in dark) with 6 pt corners, the window title
-reads the Space name while a Peek shows, and keyboard focus goes to the Peek
-page. Selecting another tab or Space hides the Peek and keeps its page alive;
-reselecting the opener shows it again. The page's history is its own. Back,
-Forward, Reload and Stop act on the Peek while it shows; ⌘W closes it and Tabs ▸
-Expand Peek ⌘O expands it, Arc's two shortcuts for it; Esc does nothing, as in
-Arc. ⌘L, New Tab, Pin Tab and tab switching keep acting on the window beneath,
-Oa's own choice: Arc's ⌘L opens its command bar prefilled with the Peek's URL,
-which Oa doesn't have.
+With the toolbar hidden the page starts at the Peek's top and the sidebar stands
+in for the toolbar: its URL field shows the Peek's host, its back, forward and
+reload act on the Peek, and a permission prompt from the Peek hangs from the
+field's Site Controls button, bringing a hidden sidebar out as a page's prompt
+does. Loading shows as Arc's pill in the margin above the Peek. Under it the
+opener's card fades to 30% and shrinks 9 pt at each edge, as Arc's does, and
+nothing else is dimmed. ✕ and Expand sit 13 pt right of its top corner as Arc's
+modal buttons: the glyph in a capsule of the Space theme's `backgroundExtra`, in
+its `foregroundPrimary`, with a shadow that strengthens as the button lifts
+under the pointer. The sidebar stays live under the Peek, the opener's row
+carries the Peek page's favicon as Arc's badge, a 24 pt tile of black at 7%
+(white at 8% in dark) with 6 pt corners, the window title reads the Space name
+while a Peek shows, and keyboard focus goes to the Peek page. Selecting another
+tab or Space hides the Peek and keeps its page alive; reselecting the opener
+shows it again. The page's history is its own. Back, Forward, Reload and Stop
+act on the Peek while it shows; ⌘W closes it and Tabs ▸ Expand Peek ⌘O expands
+it, Arc's two shortcuts for it; Esc does nothing, as in Arc. ⌘L, New Tab, Pin
+Tab and tab switching keep acting on the window beneath, Oa's own choice: Arc's
+⌘L opens its command bar prefilled with the Peek's URL, which Oa doesn't have.
 
 Inside a Peek, plain links navigate the Peek. `target=_blank` and `window.open`
 make a selected tab after the opener's earlier children, which hides the Peek
