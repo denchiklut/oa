@@ -17,17 +17,28 @@ struct BrowserWindowView: View {
         // is 10 pt in from every edge, a floating sidebar over it.
         let presentation = model.library == nil ? layout.sidebarPresentation : .locked
         let floats = layout.sidebarIsPanel && model.library == nil
+        let sidebarOffset = presentation == .hidden ? -(layout.sidebarWidth + 10) : 0
         ZStack(alignment: .topLeading) {
             WindowDragRegion()
             FloatingSidebarBackgroundView(background: background, windowSize: layout.size, isFloating: floats) {
                 SidebarView(model: model, layout: layout)
                     .environment(\.colorScheme, appearance.colorScheme)
             }
-            .offset(x: presentation == .hidden ? -(SidebarView.width + 10) : 0)
+            .offset(x: sidebarOffset)
             .zIndex(floats ? 1 : 0)
             card
                 .padding([.top, .trailing, .bottom], 10)
                 .padding(.leading, presentation == .locked ? sidebarWidth : 10)
+            // Mounted with the sidebar hidden too: a drag that hides the sidebar ends on it.
+            if model.library == nil {
+                SidebarResizeRegion(layout: layout)
+                    .frame(width: 8)
+                    .padding(.vertical, 11)
+                    .offset(
+                        x: sidebarOffset + layout.sidebarWidth + (floats ? WindowLayoutController.floatingInset : 0) - 4
+                    )
+                    .zIndex(2)
+            }
         }
         .background { WindowSurface(background: background) }
         .overlay {
@@ -99,7 +110,7 @@ struct BrowserWindowView: View {
         }
     }
 
-    private var sidebarWidth: CGFloat { model.library != nil ? LibraryView.width : SidebarView.width }
+    private var sidebarWidth: CGFloat { model.library != nil ? LibraryView.width : layout.sidebarWidth }
 
     /// What the Peek leaves clear on the left: nothing under the Archive's Peek or a floating sidebar.
     private var peekInset: CGFloat {

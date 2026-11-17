@@ -10,6 +10,8 @@ final class WindowLayoutController: NSViewController {
     /// What keeps a floating sidebar out with the pointer elsewhere, as Arc's does for its menus, drags and popovers.
     enum Hold { case menu, drag, popover }
 
+    /// As measured in Arc: a floating sidebar is this far in from the window's left, top and bottom.
+    static let floatingInset: CGFloat = 5
     /// Arc's lock and unlock: the sidebar and the page change frames together, over 0.08 s on this curve.
     private static let lockAnimation = Animation.timingCurve(0.25, 0.46, 0.45, 0.94, duration: 0.08)
     /// The floating panel's slide as measured in Arc: its code reads a period of 0.18 s at the same damping.
@@ -21,6 +23,11 @@ final class WindowLayoutController: NSViewController {
     /// Whether the sidebar is drawn as the floating panel. A docked one slides out as it is and becomes the panel
     /// once gone, as Arc moves it into the panel's container after the slide.
     private(set) var sidebarIsPanel: Bool
+    /// The width a drag on the sidebar's edge is at, the layout's own until the drag ends, as in Arc.
+    private var resizingWidth: CGFloat?
+    /// As Arc's: a docked sidebar dragged below its collapse width shows as hidden, and hides if let go there.
+    private var isPreviewingGestureHiddenSidebar = false
+    @ObservationIgnored private var resize: SidebarResizeState?
     @ObservationIgnored private let hover = WindowHoverTracker()
     @ObservationIgnored private var holds: Set<Hold> = []
     @ObservationIgnored private var monitor: Any?
@@ -91,6 +98,32 @@ final class WindowLayoutController: NSViewController {
         setSidebarMode(model.sidebarMode == .anchored ? .noChrome : .anchored)
     }
 
+    var sidebarWidth: CGFloat { resizingWidth ?? model.sidebarWidth }
+
+    func resizeSidebar(by translation: CGFloat, velocity: CGFloat) {
+        var state = resize ?? SidebarResizeState(width: model.sidebarWidth, mode: model.sidebarMode)
+        let width = state.width(for: translation, velocity: velocity)
+        resize = state
+        if let width { resizingWidth = width }
+        isPreviewingGestureHiddenSidebar = width == nil
+        updatePresentation()
+    }
+
+    /// As Arc: a sidebar let go while it previews as hidden hides, keeping the width it had.
+    func endSidebarResize() {
+        if isPreviewingGestureHiddenSidebar {
+            model.setSidebarMode(.noChrome)
+        } else if let resizingWidth {
+            model.setSidebarWidth(resizingWidth)
+        }
+        (resize, resizingWidth, isPreviewingGestureHiddenSidebar) = (nil, nil, false)
+        updatePresentation()
+    }
+
+    func resetSidebarWidth() {
+        model.setSidebarWidth(SidebarResizeState.resetWidth)
+    }
+
     func setHold(_ hold: Hold, _ held: Bool) {
         if held { holds.insert(hold) } else { holds.remove(hold) }
         updatePresentation()
@@ -120,7 +153,7 @@ final class WindowLayoutController: NSViewController {
             in: WindowHoverTracker.Geometry(
                 size: view.bounds.size,
                 sidebarWidth: sidebarPresentation == .locked
-                    ? SidebarView.width : sidebarPresentation == .floating ? SidebarView.width + 80 : 0,
+                    ? sidebarWidth : sidebarPresentation == .floating ? sidebarWidth + 80 : 0,
                 showsToolbar: PageToolbar.isShown, roomAbove: roomAbove > 10 ? roomAbove : 0))
         updatePresentation()
     }
@@ -128,7 +161,7 @@ final class WindowLayoutController: NSViewController {
     /// Arc's order: a docked sidebar is locked; a hidden one stays hidden under the Library, and floats while the
     /// pointer is in a hover region, while nothing is selected, and while the sidebar holds it.
     private var derivedPresentation: SidebarPresentation {
-        if model.sidebarMode == .anchored { return .locked }
+        if model.sidebarMode == .anchored { return isPreviewingGestureHiddenSidebar ? .hidden : .locked }
         if model.library != nil { return .hidden }
         let floating = sidebarPresentation == .floating
         let allowTop = !PageToolbar.isShown || model.selectedTabID != nil

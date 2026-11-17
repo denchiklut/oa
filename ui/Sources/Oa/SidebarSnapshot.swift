@@ -156,29 +156,35 @@ struct WindowRecord: Codable {
     let id: UUID
     var selectedSpaceID: UUID
     var sidebarMode: SidebarMode
+    var sidebarWidth: CGFloat
     var lastActiveDates: [UUID: Date]
     var createdDates: [UUID: Date]
 
-    private enum Key: String, CodingKey { case id, selectedSpaceID, sidebarMode, lastActiveDates, createdDates }
+    private enum Key: String, CodingKey {
+        case id, selectedSpaceID, sidebarMode, sidebarWidth, lastActiveDates, createdDates
+    }
 
     init(
-        id: UUID, selectedSpaceID: UUID, sidebarMode: SidebarMode, lastActiveDates: [UUID: Date],
-        createdDates: [UUID: Date]
+        id: UUID, selectedSpaceID: UUID, sidebarMode: SidebarMode, sidebarWidth: CGFloat,
+        lastActiveDates: [UUID: Date], createdDates: [UUID: Date]
     ) {
         self.id = id
         self.selectedSpaceID = selectedSpaceID
         self.sidebarMode = sidebarMode
+        self.sidebarWidth = sidebarWidth
         self.lastActiveDates = lastActiveDates
         self.createdDates = createdDates
     }
 
     /// The dates are by tab ID string, so each is a JSON object; a file from before them has none, and one from
-    /// before the sidebar's mode has a docked sidebar.
+    /// before the sidebar's mode and width has a docked sidebar of the default width.
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: Key.self)
         id = try values.decode(UUID.self, forKey: .id)
         selectedSpaceID = try values.decode(UUID.self, forKey: .selectedSpaceID)
         sidebarMode = try values.decodeIfPresent(SidebarMode.self, forKey: .sidebarMode) ?? .anchored
+        sidebarWidth =
+            try values.decodeIfPresent(CGFloat.self, forKey: .sidebarWidth) ?? SidebarViewPreferences.defaultWidth
         func dates(_ key: Key) throws -> [UUID: Date] {
             let stored = try values.decodeIfPresent([String: Date].self, forKey: key) ?? [:]
             return Dictionary(stored.compactMap { id, date in UUID(uuidString: id).map { ($0, date) } }) { $1 }
@@ -192,6 +198,7 @@ struct WindowRecord: Codable {
         try values.encode(id, forKey: .id)
         try values.encode(selectedSpaceID, forKey: .selectedSpaceID)
         try values.encode(sidebarMode, forKey: .sidebarMode)
+        try values.encode(sidebarWidth, forKey: .sidebarWidth)
         func stored(_ dates: [UUID: Date]) -> [String: Date] {
             Dictionary(uniqueKeysWithValues: dates.map { ($0.key.uuidString, $0.value) })
         }

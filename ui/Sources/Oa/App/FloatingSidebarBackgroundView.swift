@@ -4,7 +4,6 @@ import SwiftUI
 /// 5 pt in from the window's left, top and bottom, the theme over a blur of the page, a white rim at 30% and a soft
 /// shadow. Docking it morphs the same view back, so the page never shows through in between.
 struct FloatingSidebarBackgroundView<Sidebar: View>: View {
-    static var inset: CGFloat { 5 }
     /// Arc's code: 12 pt from macOS 26, 8 pt before.
     private static var cornerRadius: CGFloat { if #available(macOS 26, *) { 12 } else { 8 } }
 
@@ -15,11 +14,12 @@ struct FloatingSidebarBackgroundView<Sidebar: View>: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: isFloating ? Self.cornerRadius : 0)
+        let inset = WindowLayoutController.floatingInset
         sidebar
             .background {
                 WindowSurface(
                     background: background, floats: true,
-                    window: CGRect(origin: CGPoint(x: -Self.inset, y: -Self.inset), size: windowSize)
+                    window: CGRect(origin: CGPoint(x: -inset, y: -inset), size: windowSize)
                 )
                 .opacity(isFloating ? 1 : 0)
             }
@@ -38,6 +38,6 @@ struct FloatingSidebarBackgroundView<Sidebar: View>: View {
                             .compositingGroup()
                     }
             }
-            .padding([.top, .leading, .bottom], isFloating ? Self.inset : 0)
+            .padding([.top, .leading, .bottom], isFloating ? inset : 0)
     }
 }
