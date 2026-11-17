@@ -86,10 +86,12 @@ private struct SpaceManagementViewport {
 private struct SpaceManagementCollectionViewItem: View {
     let model: WindowModel
     let space: SidebarSpace
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.theme) private var theme
+    @Environment(\.windowColorScheme) private var windowColorScheme
 
     var body: some View {
+        let background = space.theme.background[windowColorScheme]
+        let appearance = background.contentOverBackgroundAppearance
+        let theme = Theme(palette: space.theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         let unpinned = model.state.tabs(in: space.id, pinned: false)
         VStack(alignment: .leading, spacing: 0) {
             Text(space.name)
@@ -113,7 +115,8 @@ private struct SpaceManagementCollectionViewItem: View {
                 .padding(.horizontal, 8)
             }
         }
-        .background { WindowSurface(background: WindowTheme.default.background[colorScheme]) }
+        .environment(\.colorScheme, appearance.colorScheme)
+        .background { WindowSurface(background: background).environment(\.colorScheme, windowColorScheme) }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         // What casts the shadow sits a point inside the card, as the page's does.
         .background {

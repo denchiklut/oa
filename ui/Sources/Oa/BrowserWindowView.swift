@@ -10,7 +10,7 @@ struct BrowserWindowView: View {
     var body: some View {
         // As Arc: a theme with a light and a dark side shows the one the window's appearance asks for, and the
         // chrome over it takes that side's own appearance.
-        let theme = WindowTheme.default
+        let theme = model.space?.theme ?? .default
         let background = theme.background[colorScheme]
         let appearance = background.contentOverBackgroundAppearance
         // As measured in Arc: hidden, the sidebar is past the window's edge by its width and 10 pt more, and the card
@@ -104,6 +104,7 @@ struct BrowserWindowView: View {
         .environment(
             \.theme, Theme(palette: theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         )
+        .environment(\.windowColorScheme, colorScheme)
         .ignoresSafeArea()
     }
 
