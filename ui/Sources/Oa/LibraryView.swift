@@ -35,6 +35,7 @@ struct LibraryView: View {
     }
 
     let model: WindowModel
+    let layout: WindowLayoutController
     let section: LibrarySection
     let width: CGFloat
     let progress: CGFloat
@@ -47,7 +48,9 @@ struct LibraryView: View {
             Group {
                 switch section {
                 case .downloads: DownloadsPage(model: model)
-                case .spaces: SpaceManagementSpacesPage(model: model, progress: progress, pageInset: pageInset)
+                case .spaces:
+                    SpaceManagementSpacesPage(
+                        model: model, layout: layout, progress: progress, pageInset: pageInset)
                 case .archive: ArchivePage(model: model)
                 }
             }

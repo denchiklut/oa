@@ -38,7 +38,8 @@ struct BrowserWindowView: View {
             .zIndex(floats ? 3 : 0)
             if progress > 0 {
                 LibraryView(
-                    model: model, section: section, width: libraryWidth, progress: progress, pageInset: lead
+                    model: model, layout: layout, section: section, width: libraryWidth, progress: progress,
+                    pageInset: lead
                 )
                 .environment(\.colorScheme, appearance.colorScheme)
                 .offset(x: -libraryWidth * (1 - progress))

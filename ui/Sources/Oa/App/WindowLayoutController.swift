@@ -211,6 +211,13 @@ final class WindowLayoutController: NSViewController {
         updatePresentation()
     }
 
+    /// Oa's own, after open-arch: a tab opened from the Library leaves the panel away until the pointer asks for it.
+    func dismissSidebar() {
+        guard sidebarPresentation == .floating else { return }
+        sidebarPresentation = .hidden
+        trackPointer()
+    }
+
     private func observeModel() {
         withObservationTracking {
             _ = (model.sidebarMode, model.library, model.selectedTabID, model.selectedSpaceID, model.sidebarWidth)
@@ -243,12 +250,12 @@ final class WindowLayoutController: NSViewController {
         updatePresentation()
     }
 
-    /// Arc's order: a docked sidebar is locked; a hidden one stays hidden under the Library, and floats while the
-    /// pointer is in a hover region, while nothing is selected, while a permission prompt needs the address field
-    /// it hangs from, and while the sidebar holds it.
+    /// Arc's order: a docked sidebar is locked; a hidden one floats while the pointer is in a hover region, while
+    /// nothing is selected, while a permission prompt needs the address field it hangs from, and while the sidebar
+    /// holds it. Oa's own, by the author's decision, after open-arch: the Library doesn't hide it as Arc's does, so
+    /// a panel the pointer is still over comes back with the swipe out of the Library.
     private var derivedPresentation: SidebarPresentation {
         if model.sidebarMode == .anchored { return isPreviewingGestureHiddenSidebar ? .hidden : .locked }
-        if model.library != nil { return .hidden }
         let floating = sidebarPresentation == .floating
         let allowTop = !PageToolbar.isShown || model.selectedTabID != nil
         let prompts = model.permissionRequest != nil && model.peek == nil && !PageToolbar.isShown
