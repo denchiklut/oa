@@ -257,21 +257,33 @@ struct TabDrop: DropDelegate {
     }
 }
 
+/// Arc's `ModalV2SidebarBadgeView`; with no favicon, the grey square measured in Arc.
 private struct PeekBadge: View {
+    private static let emptyFavicon = Color(
+        nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(displayP3Red: 119 / 255, green: 118 / 255, blue: 130 / 255, alpha: 1)
+                : NSColor(displayP3Red: 195 / 255, green: 194 / 255, blue: 196 / 255, alpha: 1)
+        })
+
     let favicon: NSImage?
 
     var body: some View {
         Group {
             if let favicon {
-                Image(nsImage: favicon).resizable().interpolation(.high)
+                Image(nsImage: favicon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 16, height: 16)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
-                RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(0.1))
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Self.emptyFavicon)
+                    .frame(width: 14, height: 14)
             }
         }
-        .frame(width: 12, height: 12)
-        .padding(2)
-        .background(RoundedRectangle(cornerRadius: 4).fill(Color(nsColor: .windowBackgroundColor)))
-        .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.08)))
+        .frame(width: 24, height: 24)
+        .background(ARCUIColor.grayA4, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
@@ -310,17 +322,20 @@ struct TabRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 0)
-            if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon) }
-            if hovering || selected {
-                Button {
-                    model.close(tab.id)
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .frame(width: 16, height: 16)
+            // As Arc's row: 2 pt after the badge instead of the row's 6.
+            HStack(spacing: 2) {
+                if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon) }
+                if hovering || selected {
+                    Button {
+                        model.close(tab.id)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .frame(width: 16, height: 16)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 10)
