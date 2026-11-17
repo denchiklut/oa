@@ -19,6 +19,15 @@ struct SidebarSpace: Identifiable, Hashable, Codable {
     var profileID: UUID
     let pinnedRootID: UUID
     let unpinnedRootID: UUID
+    var customInfo: CustomInfo?
+
+    /// As Arc's `customInfo`, which also holds the Space's icon.
+    struct CustomInfo: Hashable, Codable {
+        var windowTheme: WindowTheme?
+    }
+
+    /// As Arc: a Space without a theme shows the default.
+    var theme: WindowTheme { customInfo?.windowTheme ?? .default }
 }
 
 struct SidebarTab: Identifiable, Hashable {
