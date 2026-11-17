@@ -52,6 +52,7 @@ final class MainMenu {
         view.addItem(item("Reload Page", #selector(BrowserWindowController.reload(_:)), key: "r"))
         view.addItem(item("Stop Loading", #selector(BrowserWindowController.stopLoading(_:)), key: "."))
         view.addItem(.separator())
+        view.addItem(item("Hide Sidebar", #selector(BrowserWindowController.toggleSidebarMode(_:)), key: "s"))
         view.addItem(
             item(
                 "Show Toolbar", #selector(ApplicationDelegate.toggleToolbar(_:)), key: "d",

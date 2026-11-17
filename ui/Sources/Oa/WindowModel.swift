@@ -37,6 +37,8 @@ final class WindowModel {
         }
     }
     private var lastLibrarySection = LibrarySection.downloads
+    /// As Arc's `WindowState.sidebarMode`: the window's own, saved with it.
+    private(set) var sidebarMode: SidebarMode
     private var previewedDownloadID: Download.ID?
     private(set) var dialogs: [UUID: [PageDialog]] = [:]
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
@@ -118,7 +120,8 @@ final class WindowModel {
 
     var record: WindowRecord {
         WindowRecord(
-            id: id, selectedSpaceID: selectedSpaceID, lastActiveDates: lastActiveDates, createdDates: createdDates)
+            id: id, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode, lastActiveDates: lastActiveDates,
+            createdDates: createdDates)
     }
 
     init(
@@ -131,6 +134,7 @@ final class WindowModel {
         self.downloads = downloads
         self.pictureInPicture = pictureInPicture
         selectedSpaceID = spaceID
+        sidebarMode = store.sidebarViewPreferences.sidebarMode
         loadExtensions()
     }
 
@@ -138,6 +142,7 @@ final class WindowModel {
     /// too, as Oa's own: Arc saves them with the window, and what its restore does with them is unknown.
     func restore(_ record: WindowRecord) {
         if state.space(record.selectedSpaceID) != nil { selectedSpaceID = record.selectedSpaceID }
+        sidebarMode = record.sidebarMode
         lastActiveDates = record.lastActiveDates
         createdDates = record.createdDates
         openCommandBar(.newTab)
@@ -567,6 +572,13 @@ final class WindowModel {
         }
         store.closing[page.id] = .window(id)
         page.close()
+    }
+
+    /// As seen in Arc: the window's mode changes, and with it the one a new window takes.
+    func setSidebarMode(_ mode: SidebarMode) {
+        guard mode != sidebarMode else { return }
+        sidebarMode = mode
+        store.sidebarViewPreferences.sidebarMode = mode
     }
 
     var showingArchive: Bool { library == .archive }

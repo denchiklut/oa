@@ -1,24 +1,36 @@
 import DevKit
 import SwiftUI
 
-/// Arc's header: the window buttons 13 pt in, centred in a 40 pt row 4 pt below the window's top, then back, forward
-/// and reload, 32 pt buttons from x 135 on the same line, over the URL field. With the toolbar shown those are on the
-/// page, and the header ends 36 pt down. Arc's sidebar toggle at x 77 waits for the hidden sidebar.
+/// Arc's header: the window buttons 13 pt in, centred in a 40 pt row 4 pt below the window's top, then the sidebar
+/// toggle at x 77 and back, forward and reload from x 135, 32 pt buttons on the same line, over the URL field. With
+/// the toolbar shown the last three are on the page, and the header ends 36 pt down.
 struct SidebarHeader: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     @AppStorage(PageToolbar.key) private var showsToolbar = false
 
     var body: some View {
         VStack(spacing: 0) {
-            if showsToolbar {
-                WindowDragRegion().frame(height: 36)
-            } else {
-                NavigationButtons(page: model.page, size: CGSize(width: 32, height: 32), spacing: 2)
-                    .padding(.leading, 135)
-                    .padding(.top, 7.5)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .frame(height: 46, alignment: .top)
-                    .background(WindowDragRegion())
+            HStack(spacing: 26) {
+                Button {
+                    layout.toggleSidebar()
+                } label: {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 16))
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(ChromeButtonStyle())
+                .accessibilityLabel("Hide sidebar")
+                if !showsToolbar {
+                    NavigationButtons(page: model.page, size: CGSize(width: 32, height: 32), spacing: 2)
+                }
+            }
+            .padding(.leading, 77)
+            .padding(.top, 7.5)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(height: showsToolbar ? 36 : 46, alignment: .top)
+            .background(WindowDragRegion())
+            if !showsToolbar {
                 SidebarAddressField(model: model)
                     .padding(.horizontal, 8)
             }

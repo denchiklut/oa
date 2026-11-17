@@ -12,6 +12,9 @@ final class SidebarStore {
     private var removedFavicons = 0
     @ObservationIgnored private(set) var windows: [WindowModel] = []
     @ObservationIgnored let savedWindows: [WindowRecord]
+    @ObservationIgnored var sidebarViewPreferences: SidebarViewPreferences {
+        didSet { scheduleSave() }
+    }
     @ObservationIgnored private let persistence: SidebarPersistence
     @ObservationIgnored private let favicons: FaviconCache
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
@@ -28,7 +31,9 @@ final class SidebarStore {
         favicons = FaviconCache(directory: directory)
         commandBarPicks = CommandBarPicks(directory: directory)
         state = persistence.loadSidebar() ?? .initial()
-        savedWindows = persistence.loadWindows()
+        let windows = persistence.loadWindows()
+        savedWindows = windows?.windows ?? []
+        sidebarViewPreferences = windows?.sidebarViewPreferences ?? SidebarViewPreferences()
         commandBarPicks.prune(keeping: state.profiles.map(\.id))
     }
 
@@ -179,7 +184,9 @@ final class SidebarStore {
     }
 
     private func save() {
-        persistence.save(state, windows: windows.map(\.record))
+        persistence.save(
+            state,
+            windows: WindowsSnapshot(sidebarViewPreferences: sidebarViewPreferences, windows: windows.map(\.record)))
         favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
     }
 }
