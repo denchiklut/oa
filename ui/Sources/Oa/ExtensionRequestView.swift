@@ -10,13 +10,14 @@ struct ExtensionRequestView: View {
 
     var body: some View {
         ZStack {
-            Backdrop(onClick: {}, opacity: 0.45)
+            Backdrop(onClick: {}, color: NSColor.black.withAlphaComponent(0.45))
             KeyTrap(onReturn: { answer(true) }, onEscape: { answer(false) })
+            // As Arc's Dialogs sheet, which its install prompt is.
             panel
                 .padding(38)
                 .frame(width: 450, alignment: .leading)
-                .background(Color(nsColor: .windowBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .background(DialogColor.sheet)
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                 .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
         }
     }

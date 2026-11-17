@@ -53,6 +53,7 @@ struct BrowserWindowView: View {
                 .zIndex(1)
             }
             card
+                .opacity(fadesCard ? 0.3 : 1)
                 .padding([.top, .trailing, .bottom], 10)
                 .padding(.leading, lead)
                 .offset(x: (libraryWidth - lead) * progress)
@@ -76,7 +77,7 @@ struct BrowserWindowView: View {
                 let overPage = !model.showingArchive
                 PeekView(
                     model: model, page: peek,
-                    sidebarWidth: overPage && presentation == .locked ? layout.sidebarWidth : 0
+                    sidebarWidth: overPage && presentation == .locked ? layout.sidebarWidth : 0, overPage: overPage
                 )
                 .offset(x: overPage ? (libraryWidth - lead) * progress : 0)
             }
@@ -115,6 +116,9 @@ struct BrowserWindowView: View {
         .ignoresSafeArea()
     }
 
+    /// As measured in Arc: under a Peek over the page, the opener's card shows at 30% over the window's theme.
+    private var fadesCard: Bool { model.peek != nil && !model.showingArchive }
+
     /// Arc's page as measured: a card flush with the sidebar and 10 pt in from the window's other edges, with 6 pt
     /// corners, no border and a soft shadow.
     private var card: some View {
@@ -138,7 +142,8 @@ struct BrowserWindowView: View {
                 Color.clear
             }
         }
-        .background(fill)
+        // Faded, the fill would show through the page that covers it.
+        .background(fadesCard ? .clear : fill)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         // What casts the shadow sits a point inside the card, so it never tints the card's edge, and is cut out
         // under it, as Arc's shadow is as strong under the see-through empty card as under a page.

@@ -93,7 +93,7 @@ struct DownloadPreviewView: View {
 
     var body: some View {
         ZStack {
-            Backdrop(onClick: model.closeDownloadPreview, opacity: 0.45)
+            Backdrop(onClick: model.closeDownloadPreview, color: NSColor.black.withAlphaComponent(0.7))
             KeyTrap(onReturn: {}, onEscape: model.closeDownloadPreview)
             VStack(spacing: 0) {
                 header
