@@ -192,6 +192,11 @@ from the window's Space while the Library is involved, as Arc's does, and from
 the first Space otherwise. So only a swipe from the first Space reaches the
 Library; from the others a swipe right goes to the Space before.
 
+The Library opens on the section it last showed, in any window and after a
+relaunch, as Arc's `lastSelectedHomePage` in `StorableHome.json` does: Oa keeps
+it in `home.json` under Arc's names. Until a section is chosen it opens on
+Downloads, Oa's own: Arc's first value wasn't traced.
+
 With the Library in view a swipe may start anywhere in the window. A tab's Peek
 is over its page, so it goes where the card goes, Oa's own: Arc's wasn't looked
 at there. Moving between sections of different widths animates on the same
