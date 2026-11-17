@@ -37,11 +37,13 @@ struct BrowserWindowView: View {
             .allowsHitTesting(progress == 0)
             .zIndex(floats ? 3 : 0)
             if progress > 0 {
-                LibraryView(model: model, section: section, width: libraryWidth)
-                    .environment(\.colorScheme, appearance.colorScheme)
-                    .offset(x: -libraryWidth * (1 - progress))
-                    .allowsHitTesting(model.library != nil)
-                    .zIndex(1)
+                LibraryView(
+                    model: model, section: section, width: libraryWidth, progress: progress, pageInset: lead
+                )
+                .environment(\.colorScheme, appearance.colorScheme)
+                .offset(x: -libraryWidth * (1 - progress))
+                .allowsHitTesting(model.library != nil)
+                .zIndex(1)
             }
             card
                 .padding([.top, .trailing, .bottom], 10)

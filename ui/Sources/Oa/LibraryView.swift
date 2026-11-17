@@ -37,6 +37,8 @@ struct LibraryView: View {
     let model: WindowModel
     let section: LibrarySection
     let width: CGFloat
+    let progress: CGFloat
+    let pageInset: CGFloat
 
     var body: some View {
         HStack(spacing: 0) {
@@ -45,7 +47,7 @@ struct LibraryView: View {
             Group {
                 switch section {
                 case .downloads: DownloadsPage(model: model)
-                case .spaces: SpaceManagementSpacesPage(model: model)
+                case .spaces: SpaceManagementSpacesPage(model: model, progress: progress, pageInset: pageInset)
                 case .archive: ArchivePage(model: model)
                 }
             }

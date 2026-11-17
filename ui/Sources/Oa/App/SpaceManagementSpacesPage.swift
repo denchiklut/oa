@@ -8,9 +8,17 @@ struct SpaceManagementSpacesPage: View {
     static func contentWidth(for spaces: Int) -> CGFloat { 264 * CGFloat(spaces) + 216 }
 
     let model: WindowModel
+    /// The Library's progress into the window, to 1, and what the page card keeps clear at its start among the
+    /// Spaces: the gap between the Library and the card on the way is that much of what is left.
+    let progress: CGFloat
+    let pageInset: CGFloat
+    @State private var scroll: CGFloat = 0
 
     var body: some View {
         GeometryReader { geometry in
+            let viewport = SpaceManagementViewport(
+                width: geometry.size.width, spaces: model.state.spaces.count, scroll: scroll, pageInset: pageInset,
+                progress: progress)
             ScrollView(.horizontal) {
                 HStack(spacing: 24) {
                     ForEach(model.state.spaces) { space in
@@ -21,8 +29,55 @@ struct SpaceManagementSpacesPage: View {
                 }
                 .padding(.horizontal, 24)
                 .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
+                .background {
+                    GeometryReader { content in
+                        Color.clear.preference(key: Scroll.self, value: -content.frame(in: .named(Scroll.space)).minX)
+                    }
+                }
+            }
+            .coordinateSpace(name: Scroll.space)
+            .onPreferenceChange(Scroll.self) { scroll = $0 }
+            // The scroll view reaches left by what the row is moved, so the row keeps its place in it.
+            .frame(width: viewport.clip + viewport.travel)
+            .offset(x: -viewport.travel)
+            .frame(width: viewport.clip, alignment: .leading)
+            .clipped()
+            .frame(width: geometry.size.width, alignment: .leading)
+        }
+    }
+
+    private enum Scroll: PreferenceKey {
+        static let space = "SpaceManagementSpacesPage"
+        static let defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+    }
+}
+
+/// Where the row of cards is cut while the Library comes in or leaves. Oa's own, by the author's decision, after
+/// open-arch's `SpaceOverviewViewport`: Arc cuts the row at the Library's own edge all the way, mid-card and short of
+/// the page card. Here the cut follows the page card's edge, and the one card the settled edge will cut is moved in
+/// whole and slides under the edge as the Library settles. A settled edge in a gap moves nothing, and the item that
+/// adds a Space, once in view, leaves with the cards. At rest the row is cut at the page card, as Arc's.
+private struct SpaceManagementViewport {
+    /// How far the row is moved toward the Library's start, and where it is cut.
+    let travel: CGFloat
+    let clip: CGFloat
+
+    init(width: CGFloat, spaces: Int, scroll: CGFloat, pageInset: CGFloat, progress: CGFloat) {
+        let progress = min(max(progress, 0), 1)
+        let row = 264 * CGFloat(spaces) + 96
+        var edge = width
+        if row > width {
+            let settled = width + scroll
+            let card = ((settled - 24) / 264).rounded(.down)
+            if settled > row - 72 {
+                edge = max(width, row - scroll)
+            } else if card >= 0, settled > 24 + card * 264, settled < 264 + card * 264 {
+                edge = 264 + card * 264 - scroll
             }
         }
+        travel = (edge - width) * (1 - progress)
+        clip = min(width + pageInset * (1 - progress), edge - travel)
     }
 }
 
