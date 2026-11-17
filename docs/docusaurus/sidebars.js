@@ -22,6 +22,7 @@ const sidebars = {
       items: [
         { type: "doc", id: "features/README", label: "Arc and Oa feature inventory" },
         { type: "doc", id: "features/sidebar/README", label: "Sidebar state" },
+        { type: "doc", id: "features/sidebar-motion/README", label: "Sidebar motion" },
         { type: "doc", id: "features/peek/README", label: "Peek" },
         { type: "doc", id: "features/favorites/README", label: "Favorites" },
         { type: "doc", id: "features/profiles/README", label: "Profiles" },

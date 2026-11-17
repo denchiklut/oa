@@ -42,9 +42,11 @@ without an icon. A finished one whose file is gone is left out, as in Arc. A
 finished row drags out as a file. Arc's flyout also lists its Library's other
 files, which Oa doesn't have.
 
-A click on the button, or Window ▸ View Downloads…, puts the Library in the
-sidebar's place with the page still showing; the menu item then reads Hide
-Downloads. It has Arc's Downloads section only, 300 pt wide, Oa's own width.
+A click on the button, or Window ▸ View Downloads…, opens the Library over the
+sidebar with the page still showing beside it; the menu item then reads Hide
+Downloads. Its Downloads section is 417 pt wide, as Arc's. How the Library
+comes in, and its Spaces section, are in
+[Sidebar motion](../sidebar-motion/README.md).
 The list merges every profile's downloads, newest first, under Today,
 Yesterday, N days ago, 1 week ago and N weeks ago. A row has the thumbnail or
 icon, the name and Arc's line under it: "‹Kind› from ‹host›" with Arc's type

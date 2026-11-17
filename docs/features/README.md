@@ -31,6 +31,7 @@ that every online integration still works.
 ## Oa implementation notes
 
 - [Sidebar state](sidebar/README.md)
+- [Sidebar motion](sidebar-motion/README.md)
 - [Peek](peek/README.md)
 - [Favorites](favorites/README.md)
 - [Profiles](profiles/README.md)
@@ -71,7 +72,7 @@ notes here does not assess or change the checklist status below.
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
 | Vertical sidebar | ✅ | ☐ |
-| Hide/reveal and resize the sidebar | ✅ | ☐ |
+| Hide/reveal and resize the sidebar | ✅ | ✅ |
 | Optional top toolbar | ✅ | ✅ |
 | Favorites | ✅ | ✅ |
 | Pinned tabs | ✅ | ☐ |

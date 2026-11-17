@@ -132,6 +132,9 @@ Implementation details live with their features:
 
 - <a id="sidebar-state"></a>[Sidebar state](../../features/sidebar/README.md): shared data, window selection,
   Archive, opened pages and page recovery.
+- <a id="sidebar-motion"></a>[Sidebar motion](../../features/sidebar-motion/README.md): the window's layout
+  controller and pager, the docked and hidden sidebar with its floating panel, resizing, the swipe between Spaces
+  and the Library as the pager's first page with its Space cards.
 - <a id="peek"></a>[Peek](../../features/peek/README.md): routing, presentation and page lifetime.
 - <a id="favorites"></a>[Favorites](../../features/favorites/README.md): profile-scoped tiles, selection and placement.
 - <a id="files"></a>[Saved state and recovery](../../features/saved-state/README.md): file formats, favicons,
