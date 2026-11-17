@@ -290,7 +290,7 @@ final class WindowLayoutController: NSViewController {
         if model.sidebarMode == .anchored { return isPreviewingGestureHiddenSidebar ? .hidden : .locked }
         let floating = sidebarPresentation == .floating
         let allowTop = !PageToolbar.isShown || model.selectedTabID != nil
-        let prompts = model.permissionRequest != nil && model.peek == nil && !PageToolbar.isShown
+        let prompts = model.permissionRequest != nil && !PageToolbar.isShown
         if hover.reveals(active: floating, allowTop: allowTop) || model.selectedTabID == nil || prompts {
             return .floating
         }
