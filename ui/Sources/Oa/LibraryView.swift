@@ -71,6 +71,12 @@ struct LibraryView: View {
         }
         .padding(8)
         .frame(width: Self.railWidth)
+        // As measured in Arc: the rail has its own window buttons, a little lower and further in than the header's.
+        .overlay(alignment: .topLeading) {
+            WindowStandardButtonsView()
+                .padding(.leading, 16)
+                .padding(.top, 21)
+        }
     }
 }
 
