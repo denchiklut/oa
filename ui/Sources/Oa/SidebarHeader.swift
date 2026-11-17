@@ -2,8 +2,9 @@ import DevKit
 import SwiftUI
 
 /// Arc's header: the window buttons 13 pt in, centred in a 40 pt row 4 pt below the window's top, then the sidebar
-/// toggle at x 77 and back, forward and reload from x 135, 32 pt buttons on the same line, over the URL field. With
-/// the toolbar shown the last three are on the page, and the header ends 36 pt down.
+/// toggle at x 77 and back, forward and reload ending 6 pt from the sidebar's edge, 32 pt buttons on the same line,
+/// over the URL field. With the toolbar shown the last three are on the page, and the header ends 36 pt down. Oa's
+/// own: a sidebar too narrow for all of them drops those three; what Arc's header drops is unknown.
 struct SidebarHeader: View {
     let model: WindowModel
     let layout: WindowLayoutController
@@ -11,7 +12,7 @@ struct SidebarHeader: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 26) {
+            HStack(spacing: 0) {
                 Button {
                     layout.toggleSidebar()
                 } label: {
@@ -21,11 +22,13 @@ struct SidebarHeader: View {
                 }
                 .buttonStyle(ChromeButtonStyle())
                 .accessibilityLabel(layout.sidebarPresentation == .locked ? "Hide sidebar" : "Lock sidebar")
-                if !showsToolbar {
+                Spacer(minLength: 0)
+                if !showsToolbar, layout.sidebarWidth >= 215 {
                     NavigationButtons(page: model.page, size: CGSize(width: 32, height: 32), spacing: 2)
                 }
             }
             .padding(.leading, 77)
+            .padding(.trailing, 6)
             .padding(.top, 7.5)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .frame(height: showsToolbar ? 36 : 46, alignment: .top)
