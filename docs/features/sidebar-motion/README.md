@@ -197,7 +197,8 @@ the edge as the Library settles. A settled edge in a gap moves nothing.
 
 ## Not there yet
 
-Per-Space themes and icons, so nothing blends during a swipe. The pull past the
+Space icons. Arc's blend of two Spaces' themes during a swipe: the window takes
+a Space's theme when the swipe lands on it. The pull past the
 last Space that creates one, and the Create a Space panel. Reordering cards.
 Full screen: the window's own buttons show there as Arc's do, and the rest is
 as outside it. Arc's other shortcuts for Spaces and the sidebar. Reduce Motion.

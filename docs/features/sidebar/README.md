@@ -186,9 +186,11 @@ and is opaque otherwise. Over it lie an underlay, the theme's colours at the
 alpha its intensity gives, and its texture. A theme is a value in the shape Arc
 stores (`WindowTheme`): a gradient or a single colour with its intensity,
 texture and translucency style, the appearance of the chrome over it, and the
-palettes the chrome's colours come from. Until Spaces carry their own, every
-window shows Arc's default theme: a light and a dark gradient, chosen by the
-system's appearance. The four textures are Oa's own, generated to match Arc's.
+palettes the chrome's colours come from. Each Space keeps its own, and a window
+shows its Space's. A Space without one shows Arc's default theme: a light and a
+dark gradient, chosen by the system's appearance. Oa has no theme editor yet,
+so a theme gets into a Space only through the saved sidebar. The four textures
+are Oa's own, generated to match Arc's.
 
 Stand-ins, each waiting for its own slice: the toolbar takes the system's
 colours until Oa reads the page's top band; and the sidebar's field opens the
