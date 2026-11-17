@@ -165,9 +165,11 @@ final class WindowLayoutController: NSViewController {
         observers = []
     }
 
+    /// The pointer is measured again in the new mode's regions, so a sidebar hidden from under it stays hidden, as
+    /// Arc's did with the pointer left on the toggle.
     func setSidebarMode(_ mode: SidebarMode) {
         model.setSidebarMode(mode)
-        updatePresentation()
+        trackPointer()
     }
 
     func toggleSidebar() {
@@ -199,7 +201,7 @@ final class WindowLayoutController: NSViewController {
         }
         (resize, resizingWidth, isPreviewingGestureHiddenSidebar) = (nil, nil, false)
         updatePages()
-        updatePresentation()
+        trackPointer()
     }
 
     func resetSidebarWidth() {
@@ -244,7 +246,7 @@ final class WindowLayoutController: NSViewController {
             to: point,
             in: WindowHoverTracker.Geometry(
                 size: view.bounds.size,
-                sidebarWidth: sidebarPresentation == .locked
+                sidebarWidth: model.sidebarMode == .anchored && !isPreviewingGestureHiddenSidebar
                     ? sidebarWidth : sidebarPresentation == .floating ? sidebarWidth + 80 : 0,
                 showsToolbar: PageToolbar.isShown, roomAbove: roomAbove > 10 ? roomAbove : 0))
         updatePresentation()
