@@ -24,7 +24,7 @@ struct SidebarHeader: View {
                 .accessibilityLabel(layout.sidebarPresentation == .locked ? "Hide sidebar" : "Lock sidebar")
                 Spacer(minLength: 0)
                 if !showsToolbar, layout.sidebarWidth >= 215 {
-                    NavigationButtons(page: model.page, size: CGSize(width: 32, height: 32), spacing: 2)
+                    NavigationButtons(page: model.frontPage, size: CGSize(width: 32, height: 32), spacing: 2)
                 }
             }
             .padding(.leading, 77)
