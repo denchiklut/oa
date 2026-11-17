@@ -14,6 +14,7 @@ final class StubPage: Page, MediaSession {
     var canGoBack: Bool { position > 0 }
     var canGoForward: Bool { position < history.count - 1 }
     private(set) var favicon: NSImage?
+    private(set) var rootBackgroundColor: NSColor?
     private(set) var navigationResult: NavigationResult?
     var securityLevel: SecurityLevel {
         switch url?.scheme {
@@ -468,7 +469,8 @@ final class StubPage: Page, MediaSession {
         }
     }
 
-    /// A host ending in `.invalid` fails to load, as a site that can't be reached does.
+    /// A host ending in `.invalid` fails to load, as a site that can't be reached does; one starting with `orange.`
+    /// paints an orange page.
     private func finishLoading() {
         load?.cancel()
         load = nil
@@ -477,6 +479,7 @@ final class StubPage: Page, MediaSession {
             title = StubPage.title(for: url)
             favicon = failed ? nil : StubPage.icon(for: url)
             navigationResult = failed ? .failed : .loaded
+            rootBackgroundColor = url.host()?.hasPrefix("orange.") == true ? .orange : .white
         }
         isLoading = false
         loadProgress = 1
@@ -536,6 +539,7 @@ private final class StubHostingView: NSHostingView<StubPageView> {
 
 private struct StubPageView: View {
     weak var page: StubPage?
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 12) {
@@ -599,7 +603,8 @@ private struct StubPageView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(Color(nsColor: page?.rootBackgroundColor ?? .textBackgroundColor))
+        .environment(\.colorScheme, page?.rootBackgroundColor == nil ? colorScheme : .light)
     }
 }
 

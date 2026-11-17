@@ -402,6 +402,9 @@ public protocol Page: AnyObject, Observable {
     /// The icon the engine's favicon driver chose for the page, nil until it has one.
     var favicon: NSImage? { get }
     var securityLevel: SecurityLevel { get }
+    /// The page's root background colour from its compositor frames, as ADK's `rootBackgroundColor`: nil until the
+    /// first frame, then kept across navigations and crashes.
+    var rootBackgroundColor: NSColor? { get }
     /// Nil from a navigation's start until its document loads or fails, as Arc's ADK reports it.
     var navigationResult: NavigationResult? { get }
     /// While the page captures from them, as ADK's media session state reports.
