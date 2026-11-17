@@ -105,7 +105,9 @@ Space, each the sidebar's width.
   view keeps those, so they reach the pager through the window's event
   monitor.
 - **Following.** The position moves half the fingers' distance. The first
-  event of a gesture moves nothing, as in Arc.
+  event of a gesture moves nothing, as in Arc. Only the gesture's start has to
+  be more sideways than up or down: once begun, the swipe follows every
+  movement until the fingers lift, as Arc's does.
 - **Release.** With any speed over the last 100 ms (5 pt/s, which two events in
   that window give) the pager goes one page that way; held still, to the
   nearest page. One gesture moves one page at most. The Space is selected at
