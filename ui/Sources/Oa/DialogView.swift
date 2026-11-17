@@ -11,13 +11,17 @@ struct DialogView: View {
     @FocusState private var fieldFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
 
+    /// As measured in Arc behind its dialogs and its Dialogs sheets: a flat grey by the window's appearance, the
+    /// system's dim for a sheet.
+    static func scrim(dark: Bool) -> NSColor {
+        dark ? NSColor(white: 0.094, alpha: 0.61) : NSColor(white: 0.667, alpha: 0.6)
+    }
+
     var body: some View {
-        // As measured in Arc: a flat grey scrim by the window's appearance, and the panel in the system's sheet glass
-        // with no shadow.
-        let scrim = colorScheme == .dark ? NSColor(white: 0.094, alpha: 0.61) : NSColor(white: 0.667, alpha: 0.6)
+        // As measured in Arc: the panel in the system's sheet glass with no shadow.
         let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
         ZStack {
-            Backdrop(onClick: {}, color: scrim)
+            Backdrop(onClick: {}, color: Self.scrim(dark: colorScheme == .dark))
             KeyTrap(onReturn: accept, onEscape: cancellable ? cancel : {})
             if #available(macOS 26, *) {
                 panel.frame(width: wide ? 448 : 260).glassEffect(.regular, in: shape)
