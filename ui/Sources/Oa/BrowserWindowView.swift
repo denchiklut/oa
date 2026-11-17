@@ -14,34 +14,49 @@ struct BrowserWindowView: View {
         let background = theme.background[colorScheme]
         let appearance = background.contentOverBackgroundAppearance
         // As measured in Arc: hidden, the sidebar is past the window's edge by its width and 10 pt more, and the card
-        // is 10 pt in from every edge, a floating sidebar over it.
-        let presentation = model.library == nil ? layout.sidebarPresentation : .locked
-        let floats = layout.sidebarIsPanel && model.library == nil
-        let sidebarOffset = presentation == .hidden ? -(layout.sidebarWidth + 10) : 0
+        // is 10 pt in from every edge, a floating sidebar over it. The Library comes in from the left on the pager's
+        // progress, the card starts where it ends, keeping its width, and what the progress does to the sidebar is
+        // `SidebarHomeTransition`.
+        let presentation = layout.sidebarPresentation
+        let floats = layout.sidebarIsPanel
+        let progress = layout.libraryProgress
+        let section = model.library ?? model.lastLibrarySection
+        let libraryWidth = layout.libraryWidth(for: section)
+        let lead = presentation == .locked ? layout.sidebarWidth : 10
+        let sidebarOffset =
+            presentation == .hidden
+            ? -(layout.sidebarWidth + 10) : floats ? -(layout.sidebarWidth + 10) * min(progress, 1) : 0
         ZStack(alignment: .topLeading) {
             WindowDragRegion()
             FloatingSidebarBackgroundView(background: background, windowSize: layout.size, isFloating: floats) {
                 SidebarView(model: model, layout: layout)
                     .environment(\.colorScheme, appearance.colorScheme)
             }
+            .modifier(SidebarHomeTransition(progress: floats ? 0 : min(progress, 1)))
             .offset(x: sidebarOffset)
-            .zIndex(floats ? 1 : 0)
-            // As Arc: beside the Library the card keeps its width and starts where the Library ends, running off the
-            // window's trailing edge.
-            let lead = layout.sidebarPresentation == .locked ? layout.sidebarWidth : 10
+            .allowsHitTesting(progress == 0)
+            .zIndex(floats ? 3 : 0)
+            if progress > 0 {
+                LibraryView(model: model, section: section, width: libraryWidth)
+                    .environment(\.colorScheme, appearance.colorScheme)
+                    .offset(x: -libraryWidth * (1 - progress))
+                    .allowsHitTesting(model.library != nil)
+                    .zIndex(1)
+            }
             card
                 .padding([.top, .trailing, .bottom], 10)
                 .padding(.leading, lead)
-                .offset(x: model.library.map { layout.libraryWidth(for: $0) - lead } ?? 0)
+                .offset(x: (libraryWidth - lead) * progress)
+                .zIndex(2)
             // Mounted with the sidebar hidden too: a drag that hides the sidebar ends on it.
-            if model.library == nil {
+            if progress == 0 {
                 SidebarResizeRegion(layout: layout)
                     .frame(width: 8)
                     .padding(.vertical, 11)
                     .offset(
                         x: sidebarOffset + layout.sidebarWidth + (floats ? WindowLayoutController.floatingInset : 0) - 4
                     )
-                    .zIndex(2)
+                    .zIndex(4)
             }
         }
         .background { WindowSurface(background: background) }
@@ -118,6 +133,20 @@ struct BrowserWindowView: View {
     private var peekInset: CGFloat {
         if let section = model.library { return section == .archive ? 0 : layout.libraryWidth(for: section) }
         return layout.sidebarPresentation == .locked ? layout.sidebarWidth : 0
+    }
+}
+
+/// Arc's docked sidebar while the Library comes over it: it stays where it is, shrinking by a tenth toward a point
+/// 26 pt to its right, and fades. Gone 8% of the way in, as measured; Arc's code reads halfway.
+private struct SidebarHomeTransition: ViewModifier {
+    let progress: CGFloat
+
+    func body(content: Content) -> some View {
+        let scale = 1 - 0.1 * progress
+        content
+            .scaleEffect(scale)
+            .offset(x: 26 * progress * scale)
+            .opacity(max(0, 1 - progress / 0.08))
     }
 }
 

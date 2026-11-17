@@ -36,7 +36,7 @@ final class WindowModel {
             if library != .archive { closeArchivePeek() }
         }
     }
-    private var lastLibrarySection = LibrarySection.downloads
+    private(set) var lastLibrarySection = LibrarySection.downloads
     /// As Arc's `WindowState.sidebarMode` and width: the window's own, saved with it.
     private(set) var sidebarMode: SidebarMode
     private(set) var sidebarWidth: CGFloat

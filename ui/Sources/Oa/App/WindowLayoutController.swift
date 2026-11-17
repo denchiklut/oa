@@ -3,7 +3,8 @@ import Observation
 import SwiftUI
 
 /// Arc's window layout controller, the window's content: it derives how the sidebar is shown from its mode, the
-/// pointer and what the sidebar is in the middle of, and lays the sidebar and the page out for it.
+/// pointer and what the sidebar is in the middle of, and lays the sidebar, the Library and the page out by where its
+/// pager is. The Library is the pager's first page, 417 pt of travel from the Space beside it.
 @MainActor
 @Observable
 final class WindowLayoutController: NSViewController {
@@ -12,6 +13,9 @@ final class WindowLayoutController: NSViewController {
 
     /// As measured in Arc: a floating sidebar is this far in from the window's left, top and bottom.
     static let floatingInset: CGFloat = 5
+    private static let homeWidth: CGFloat = 417
+    /// The Library opening and closing from a button, as measured in Arc: critically damped.
+    private static let homeSpring = (response: 0.205, damping: 1.0)
     /// Arc's lock and unlock: the sidebar and the page change frames together, over 0.08 s on this curve.
     private static let lockAnimation = Animation.timingCurve(0.25, 0.46, 0.45, 0.94, duration: 0.08)
     /// The floating panel's slide as measured in Arc: its code reads a period of 0.18 s at the same damping.
@@ -28,9 +32,13 @@ final class WindowLayoutController: NSViewController {
     /// As Arc's: a docked sidebar dragged below its collapse width shows as hidden, and hides if let go there.
     private var isPreviewingGestureHiddenSidebar = false
     @ObservationIgnored private var resize: SidebarResizeState?
-    /// Arc's pager over the window's pages, and where it is: the Space pages scroll by it.
+    /// Arc's pager over the window's pages, and where it is.
     @ObservationIgnored private let pager = PageSwipeController<WindowLayoutPage>()
-    private(set) var sidebarScrollOffset: CGFloat = 0
+    private var pagerPosition = homeWidth
+    /// The Space whose page is beside the Library's, as Arc's pager starts its Space pages from one: the window's
+    /// Space on the way into the Library and out of it, so neither passes through the Spaces before it, and the first
+    /// Space otherwise.
+    private var leadingSpace = 0
     @ObservationIgnored private let hover = WindowHoverTracker()
     @ObservationIgnored private var holds: Set<Hold> = []
     @ObservationIgnored private var monitor: Any?
@@ -43,11 +51,19 @@ final class WindowLayoutController: NSViewController {
         super.init(nibName: nil, bundle: nil)
         hover.needsUpdate = { [weak self] in self?.updatePresentation() }
         pager.windowProvider = { [weak self] in self?.viewIfLoaded?.window }
-        pager.positionUpdateHandler = { [weak self] in self?.sidebarScrollOffset = $0 }
+        pager.positionUpdateHandler = { [weak self] in self?.pagerPosition = $0 }
         pager.pageSelectionHandler = { [weak self] page in
-            if case .space(let id) = page { self?.model.selectSpace(id) }
+            guard let model = self?.model else { return }
+            switch page {
+            case .home:
+                model.viewLibrary()
+            case .space(let id):
+                model.exitLibrary()
+                model.selectSpace(id)
+            }
         }
-        pager.scrollingShouldBegin = { [weak self] in self?.sidebarContains($0) ?? false }
+        pager.trackingStateUpdateHandler = { [weak self] in self?.updatePages() }
+        pager.scrollingShouldBegin = { [weak self] in self?.scrollingShouldBegin($0) ?? false }
     }
 
     @available(*, unavailable)
@@ -71,21 +87,41 @@ final class WindowLayoutController: NSViewController {
         if !pager.scrollWheel(with: event) { super.scrollWheel(with: event) }
     }
 
-    /// Arc's gate on a swipe between Spaces: it starts over the sidebar.
-    private func sidebarContains(_ event: NSEvent) -> Bool {
+    /// Arc's gate on a swipe: between Spaces it starts over the sidebar, and with the Library in view anywhere.
+    private func scrollingShouldBegin(_ event: NSEvent) -> Bool {
+        guard libraryProgress == 0 else { return true }
         let point = CGPoint(x: event.locationInWindow.x, y: view.bounds.height - event.locationInWindow.y)
         let inset = sidebarPresentation == .floating ? Self.floatingInset : 0
         let sidebar = CGRect(x: 0, y: 0, width: sidebarWidth, height: view.bounds.height - 2 * inset)
-        return model.library == nil && sidebarPresentation != .hidden
-            && sidebar.offsetBy(dx: inset, dy: inset).contains(point)
+        return sidebarPresentation != .hidden && sidebar.offsetBy(dx: inset, dy: inset).contains(point)
     }
 
+    /// How far the Space pages are scrolled, from the first Space's.
+    var sidebarScrollOffset: CGFloat {
+        CGFloat(leadingSpace) * sidebarWidth + max(pagerPosition - Self.homeWidth, 0)
+    }
+
+    /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
+    var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
+
     private func updatePages() {
-        let selected = WindowLayoutPage.space(model.selectedSpaceID)
+        let spaces = model.state.spaces
+        let index = spaces.firstIndex { $0.id == model.selectedSpaceID } ?? 0
+        let target: WindowLayoutPage = model.library == nil ? .space(model.selectedSpaceID) : .home
+        let throughHome = target == .home || pager.selectedPageID == .home
+        if pager.selectedPageID != target {
+            leadingSpace = throughHome ? index : 0
+        } else if target != .home, !pager.isTracking, !pager.isAnimating {
+            leadingSpace = 0
+        }
+        let home = PageSwipeController<WindowLayoutPage>.Page(id: .home, width: Self.homeWidth)
         pager.setPages(
-            model.state.spaces.map { PageSwipeController.Page(id: .space($0.id), width: sidebarWidth) },
-            selecting: selected)
-        if pager.selectedPageID != selected { pager.select(selected, animated: true) }
+            [home] + spaces[min(leadingSpace, spaces.count)...].map { .init(id: .space($0.id), width: sidebarWidth) },
+            selecting: target)
+        if pager.selectedPageID != target {
+            let settle = PageSwipeController<WindowLayoutPage>.settle
+            pager.select(target, animated: true, spring: throughHome ? Self.homeSpring : settle)
+        }
     }
 
     override func viewDidAppear() {

@@ -59,7 +59,8 @@ struct LibraryView: View {
             Spacer()
             ForEach(LibrarySection.allCases, id: \.self) { item in
                 Button {
-                    model.viewLibrary(item)
+                    // Oa's own: how Arc moves the page between sections of different widths wasn't measured.
+                    withAnimation(.spring(response: 0.205, dampingFraction: 1)) { model.viewLibrary(item) }
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: item.symbol)
