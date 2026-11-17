@@ -37,8 +37,9 @@ final class WindowModel {
         }
     }
     private var lastLibrarySection = LibrarySection.downloads
-    /// As Arc's `WindowState.sidebarMode`: the window's own, saved with it.
+    /// As Arc's `WindowState.sidebarMode` and width: the window's own, saved with it.
     private(set) var sidebarMode: SidebarMode
+    private(set) var sidebarWidth: CGFloat
     private var previewedDownloadID: Download.ID?
     private(set) var dialogs: [UUID: [PageDialog]] = [:]
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
@@ -120,8 +121,8 @@ final class WindowModel {
 
     var record: WindowRecord {
         WindowRecord(
-            id: id, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode, lastActiveDates: lastActiveDates,
-            createdDates: createdDates)
+            id: id, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode, sidebarWidth: sidebarWidth,
+            lastActiveDates: lastActiveDates, createdDates: createdDates)
     }
 
     init(
@@ -135,6 +136,7 @@ final class WindowModel {
         self.pictureInPicture = pictureInPicture
         selectedSpaceID = spaceID
         sidebarMode = store.sidebarViewPreferences.sidebarMode
+        sidebarWidth = store.sidebarViewPreferences.sidebarWidth
         loadExtensions()
     }
 
@@ -143,6 +145,7 @@ final class WindowModel {
     func restore(_ record: WindowRecord) {
         if state.space(record.selectedSpaceID) != nil { selectedSpaceID = record.selectedSpaceID }
         sidebarMode = record.sidebarMode
+        sidebarWidth = record.sidebarWidth
         lastActiveDates = record.lastActiveDates
         createdDates = record.createdDates
         openCommandBar(.newTab)
@@ -579,6 +582,12 @@ final class WindowModel {
         guard mode != sidebarMode else { return }
         sidebarMode = mode
         store.sidebarViewPreferences.sidebarMode = mode
+    }
+
+    func setSidebarWidth(_ width: CGFloat) {
+        guard width != sidebarWidth else { return }
+        sidebarWidth = width
+        store.sidebarViewPreferences.sidebarWidth = width
     }
 
     var showingArchive: Bool { library == .archive }

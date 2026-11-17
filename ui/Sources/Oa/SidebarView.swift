@@ -3,8 +3,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SidebarView: View {
-    static let width: CGFloat = 241
-
     let model: WindowModel
     let layout: WindowLayoutController
     @State private var overLibraryButton = false
@@ -16,7 +14,7 @@ struct SidebarView: View {
         if let section = model.library {
             LibraryView(model: model, section: section)
         } else {
-            tabs.frame(width: Self.width)
+            tabs.frame(width: layout.sidebarWidth)
         }
     }
 
@@ -179,18 +177,20 @@ private struct SpaceChip: View {
     }
 }
 
-/// Arc's grid as measured: 47 pt tiles with 8 pt gaps filling the row, columns from the count as
-/// `rows = ⌈n / 4⌉`, `cols = ⌈n / rows⌉`, the last row left-aligned, a favicon and nothing else. A row dropped on a
-/// tile joins the grid before it, one dropped beside the tiles is appended; tiles move the same way.
+/// Arc's grid as measured: tiles 47 pt tall with 8 pt gaps filling the row, never narrower than 47 pt, so four to a
+/// row at the default width and two at the narrowest; columns from the count as `rows = ⌈n / most⌉`,
+/// `cols = ⌈n / rows⌉`, the last row left-aligned, a favicon and nothing else. A row dropped on a tile joins the grid
+/// before it, one dropped beside the tiles is appended; tiles move the same way.
 private struct FavoritesGrid: View {
     let model: WindowModel
     let layout: WindowLayoutController
 
     var body: some View {
         let favorites = model.favorites
-        let rows = max(1, (favorites.count + 3) / 4)
+        let most = max(1, Int((layout.sidebarWidth - 8) / 55))
+        let rows = max(1, (favorites.count + most - 1) / most)
         let columns = max(1, (favorites.count + rows - 1) / rows)
-        let width = (SidebarView.width - 16 - CGFloat(columns - 1) * 8) / CGFloat(columns)
+        let width = (layout.sidebarWidth - 16 - CGFloat(columns - 1) * 8) / CGFloat(columns)
         VStack(alignment: .leading, spacing: 8) {
             if favorites.isEmpty {
                 RoundedRectangle(cornerRadius: 8)
