@@ -168,7 +168,8 @@ the first Space otherwise. So only a swipe from the first Space reaches the
 Library; from the others a swipe right goes to the Space before.
 
 With the Library in view a swipe may start anywhere in the window. A hidden
-sidebar is hidden under the Library. Moving between sections of different
+sidebar is hidden under the Library. A tab's Peek is over its page, so it goes
+where the card goes, Oa's own: Arc's wasn't looked at there. Moving between sections of different
 widths animates on the same spring, Oa's own: Arc's was not measured.
 
 ## Library ▸ Spaces

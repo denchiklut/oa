@@ -63,8 +63,15 @@ struct BrowserWindowView: View {
         }
         .background { WindowSurface(background: background) }
         .overlay {
+            // The Archive's Peek is over the whole window. A tab's is over its page and leaves the docked sidebar
+            // clear; beside the Library it goes where the card goes, Oa's own: Arc's wasn't looked at there.
             if let peek = model.peek {
-                PeekView(model: model, page: peek, sidebarWidth: peekInset)
+                let overPage = !model.showingArchive
+                PeekView(
+                    model: model, page: peek,
+                    sidebarWidth: overPage && presentation == .locked ? layout.sidebarWidth : 0
+                )
+                .offset(x: overPage ? (libraryWidth - lead) * progress : 0)
             }
         }
         .overlay {
@@ -129,12 +136,6 @@ struct BrowserWindowView: View {
         .overlay(alignment: .top) {
             LoadingIndicator(isLoading: model.page?.isLoading == true).offset(y: -7)
         }
-    }
-
-    /// What the Peek leaves clear on the left: nothing under the Archive's Peek or a floating sidebar.
-    private var peekInset: CGFloat {
-        if let section = model.library { return section == .archive ? 0 : layout.libraryWidth(for: section) }
-        return layout.sidebarPresentation == .locked ? layout.sidebarWidth : 0
     }
 }
 
