@@ -58,6 +58,10 @@ class AdBlockThrottle : public blink::URLLoaderThrottle {
   ~AdBlockThrottle() override;
   void WillStartRequest(network::ResourceRequest* request,
                         bool* defer) override;
+  // Synchronous loads (sync XHR, often sent as a page hides) move every
+  // throttle to another thread, and the default is a fatal NOTREACHED. The
+  // state is thread-safe, so the throttle can go as is.
+  void DetachFromCurrentSequence() override {}
 
  private:
   scoped_refptr<AdBlockState> state_;
