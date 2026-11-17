@@ -24,9 +24,14 @@ links are untested.
 The Peek is a view in the window, not a window of its own, with Arc's measured
 geometry: its page is 80% of the content area's width by the height minus
 56 pt, under a 33 pt toolbar with back, forward, reload or stop and the
-scheme-less URL with the host in bold, centered 11 pt from the top, with
-rounded corners and a shadow, over a dim of about a fifth. ✕ and Expand sit
-outside its top-right corner. The sidebar stays live under the dim, the opener's
+scheme-less URL with the host in bold, centered 11 pt from the top, with 8 pt
+corners and a shadow, on Arc's opaque white or black card. Under it the
+opener's card shows at 30% over the window's theme, as Arc's does, and nothing
+else is dimmed. ✕ and Expand sit outside its top-right corner as Arc's 34 pt
+discs, white in light; the dark ones are Oa's own. Arc leaves its toolbar
+without a fill, showing the page's own background colour, and shows it only
+with View ▸ Show Toolbar; Oa's still always shows it, on the card's white or
+black. The sidebar stays live under the Peek, the opener's
 row carries the Peek page's favicon as a badge, the window title reads the Space
 name while a Peek shows, and keyboard focus goes to the Peek page. Selecting
 another tab or Space hides the Peek and keeps its page alive; reselecting the
