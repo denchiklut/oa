@@ -21,7 +21,8 @@ enum DialogSheet {
 
 /// Arc's dialog colours as measured in light; the dark ones are Oa's own, Arc's dark dialogs weren't captured.
 enum DialogColor {
-    static let sheet = dynamic(0xFBFCFF, .windowBackgroundColor)
+    /// Arc's `PopoverBackground`: dark as its asset catalog has it.
+    static let sheet = dynamic(0xFBFCFF, NSColor(hex: 0x151C30))
     static let title = dynamic(0x212429, .labelColor)
     static let body = dynamic(0x565C72, .secondaryLabelColor)
     static let note = dynamic(0x858999, .tertiaryLabelColor)

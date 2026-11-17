@@ -120,11 +120,10 @@ private struct SpaceManagementCollectionViewItem: View {
         .environment(\.colorScheme, appearance.colorScheme)
         .background { WindowSurface(background: background).environment(\.colorScheme, windowColorScheme) }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        // What casts the shadow sits a point inside the card, as the page's does.
+        // As Arc's: under the card, its `EaselBackground` casts the shadow.
         .background {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor))
-                .padding(1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(appearance.colorScheme == .dark ? Color.black.opacity(0.5) : .white.opacity(0.85))
                 .shadow(color: .black.opacity(0.15), radius: 12, y: 1)
         }
     }

@@ -16,7 +16,10 @@ struct CrashedPageView: View {
                 .keyboardShortcut(.defaultAction)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        // As Arc: white in either appearance. Its words stay light-appearance grey, Oa's own: Arc's turn white in a
+        // dark window and vanish.
+        .background(.white)
+        .environment(\.colorScheme, .light)
     }
 
     private var message: String {

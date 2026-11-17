@@ -9,16 +9,21 @@ struct DialogView: View {
     @State private var text = ""
     @State private var suppress = false
     @FocusState private var fieldFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        // As measured in Arc: a flat grey scrim by the window's appearance, and the panel in the system's sheet glass
+        // with no shadow.
+        let scrim = colorScheme == .dark ? NSColor(white: 0.094, alpha: 0.61) : NSColor(white: 0.667, alpha: 0.6)
+        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
         ZStack {
-            Backdrop(onClick: {}, opacity: 0.45)
+            Backdrop(onClick: {}, color: scrim)
             KeyTrap(onReturn: accept, onEscape: cancellable ? cancel : {})
-            panel
-                .frame(width: wide ? 448 : 260)
-                .background(Color(nsColor: .windowBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
+            if #available(macOS 26, *) {
+                panel.frame(width: wide ? 448 : 260).glassEffect(.regular, in: shape)
+            } else {
+                panel.frame(width: wide ? 448 : 260).background(.regularMaterial, in: shape)
+            }
         }
         .onAppear {
             guard case .prompt(let defaultText) = dialog.kind else { return }
