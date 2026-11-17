@@ -87,7 +87,10 @@ drag within 14 pt of 228 snaps to it with a tap. The band, the 50 pt/s and the
 0.5 s between taps are Arc's constants; how Arc combines them was not decoded,
 so that reading is Oa's own. The width is the window's, saved with it, with the
 same default for new windows, 241 pt to start as Arc's was measured. Favorites
-keep tiles at least 47 pt wide, so the narrowest sidebar has two to a row.
+keep tiles at least 47 pt wide, so the narrowest sidebar has two to a row. Back,
+forward and reload end 6 pt from the sidebar's edge, as measured at 241 pt, and
+a sidebar under 215 pt, too narrow for them beside the toggle, drops them: Oa's
+own, as what Arc's header drops is unknown.
 
 ## Swiping between Spaces
 

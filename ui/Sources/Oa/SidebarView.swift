@@ -52,7 +52,7 @@ struct SidebarView: View {
             overFlyout = false
             showingFlyout = false
         }
-        .frame(width: layout.sidebarWidth)
+        .frame(width: layout.sidebarWidth, alignment: .leading)
     }
 
     private var spaces: some View {
