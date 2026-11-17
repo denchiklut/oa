@@ -39,11 +39,11 @@ struct LibraryView: View {
     let width: CGFloat
     let progress: CGFloat
     let pageInset: CGFloat
+    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 0) {
             rail
-            Divider()
             Group {
                 switch section {
                 case .downloads: DownloadsPage(model: model)
@@ -54,30 +54,47 @@ struct LibraryView: View {
             .frame(maxWidth: .infinity)
         }
         .frame(width: width)
+        // Arc's edge between the rail and the page, in fixed colours whatever the theme: a glow that rises across
+        // the rail, a line, and a shade that runs into the page.
+        .overlay(alignment: .topLeading) {
+            HStack(spacing: 0) {
+                LinearGradient(colors: [.white.opacity(0.05), .clear], startPoint: .trailing, endPoint: .leading)
+                    .frame(width: Self.railWidth)
+                Color.primary.opacity(0.1).frame(width: 1)
+                LinearGradient(colors: [.black.opacity(0.05), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 32)
+            }
+            .allowsHitTesting(false)
+        }
     }
 
     private var rail: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 20) {
             Spacer()
             ForEach(LibrarySection.allCases, id: \.self) { item in
+                let isPageSelected = item == section
                 Button {
                     // Oa's own: how Arc moves the page between sections of different widths wasn't measured.
                     withAnimation(.spring(response: 0.205, dampingFraction: 1)) { model.viewLibrary(item) }
                 } label: {
                     VStack(spacing: 6) {
-                        Image(systemName: item.symbol)
-                            .font(.system(size: 20))
+                        // Arc's icons are its own animations, drawn in two of the theme's colours: the outline in
+                        // the strongest, at 70% until its page is chosen, and then the inside in the cutout colour.
+                        // Oa's symbols take the same colours.
+                        ZStack {
+                            if isPageSelected {
+                                Image(systemName: item.symbol + ".fill").foregroundStyle(theme.cutout)
+                            }
+                            Image(systemName: item.symbol)
+                                .foregroundStyle(theme.maxContrast.opacity(isPageSelected ? 1 : 0.7))
+                        }
+                        .font(.system(size: 20))
                         Text(item.title)
                             .font(.system(size: 11, weight: .semibold))
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 60)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(item == section ? 0.1 : 0))
-                    )
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PageSidebarItemButtonStyle(isPageSelected: isPageSelected))
+                .frame(width: 97, height: 80)
             }
             Spacer()
             HStack {
@@ -93,13 +110,43 @@ struct LibraryView: View {
                 Spacer()
             }
         }
-        .padding(8)
-        .frame(width: Self.railWidth)
+        .padding([.leading, .vertical], 8)
+        .frame(width: Self.railWidth, alignment: .leading)
         // As measured in Arc: the rail has its own window buttons, a little lower and further in than the header's.
         .overlay(alignment: .topLeading) {
             WindowStandardButtonsView()
                 .padding(.leading, 16)
                 .padding(.top, 21)
+        }
+    }
+}
+
+/// Arc's `PageSidebarItemButtonStyle`: the label in the label colour, at 70% until its page is chosen, over a fill of
+/// the same colour at 10% when chosen and 5% under the pointer, which draws in by 2 pt while pressed.
+private struct PageSidebarItemButtonStyle: ButtonStyle {
+    let isPageSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        ButtonView(configuration: configuration, isPageSelected: isPageSelected)
+    }
+
+    private struct ButtonView: View {
+        let configuration: Configuration
+        let isPageSelected: Bool
+        @State private var isHovered = false
+
+        var body: some View {
+            configuration.label
+                .foregroundStyle(Color.primary.opacity(isPageSelected ? 1 : 0.7))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.primary.opacity(isPageSelected ? 0.1 : isHovered ? 0.05 : 0))
+                        .padding(configuration.isPressed ? 2 : 0)
+                        .animation(.spring(response: 0.18, dampingFraction: 0.8), value: configuration.isPressed)
+                }
+                .contentShape(Rectangle())
+                .onHover { isHovered = $0 }
         }
     }
 }
