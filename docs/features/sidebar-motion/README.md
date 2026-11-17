@@ -144,6 +144,18 @@ darker and nothing else, and during a swipe the two Spaces' dots cross-fade
 with it. A dot's tooltip is the Space's name, and its menu has Rename, Set
 Profile and Delete. Arc's icons wait for Spaces to have them.
 
+The window's theme follows the swipe, as Arc's does. The Spaces on either side
+of where the pages are, and how far between them, give one progress, and the
+next Space's background fades in over the other's at that progress: the whole
+surface at once, around the card and in the floating panel, with no moving
+edge. The colours cross-fade in encoded values, which fits Arc's measured
+mid-swipe colours best, and the next theme's material, where it differs, comes
+in over the other's at the same progress. The header's icons and the dock blend
+with it, being drawn over it. The chrome takes the nearer Space's appearance
+and colours, switching at the halfway point, Oa's own: what Arc does between a
+light and a dark theme wasn't traced. The page card keeps the old Space's page
+until the swipe lands, as Arc's does.
+
 Recorded against Arc's captures: the page follows each event at 0.5; held at 48
 and 98 pt it returns, at 148 pt it commits; flicks of 1 and 3 pt commit; one
 event in the last 100 ms does not; the settle back runs a frame ahead of
@@ -230,8 +242,6 @@ the edge as the Library settles. A settled edge in a gap moves nothing.
 
 ## Not there yet
 
-Space icons. Arc's blend of two Spaces' themes during a swipe: the window takes
-a Space's theme when the swipe lands on it. The pull past the
-last Space that creates one, and the Create a Space panel. Reordering cards.
+Space icons. The pull past the last Space that creates one, and the Create a Space panel. Reordering cards.
 Full screen: the window's own buttons show there as Arc's do, and the rest is
 as outside it. Arc's other shortcuts for Spaces and the sidebar. Reduce Motion.
