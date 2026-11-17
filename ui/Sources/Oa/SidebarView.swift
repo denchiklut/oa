@@ -65,40 +65,7 @@ struct SidebarView: View {
         HStack(spacing: 4) {
             LibraryButton(model: model)
                 .onHover { overLibraryButton = $0 }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(model.state.spaces) { space in
-                        SpaceChip(name: space.name, selected: space.id == model.selectedSpaceID) {
-                            model.selectSpace(space.id)
-                        }
-                        .contextMenu {
-                            Button("Rename…") {
-                                if let name = NamePrompt.run("Rename Space", name: space.name) {
-                                    model.renameSpace(space.id, to: name)
-                                }
-                            }
-                            // As Arc, by name here, where Settings and Change Profile keep the engine's order.
-                            Menu("Set Profile") {
-                                ForEach(model.profiles.sorted { $0.name < $1.name }) { profile in
-                                    Toggle(
-                                        profile.name,
-                                        isOn: Binding {
-                                            profile.id == space.profileID
-                                        } set: { _ in
-                                            ProfileDialogUtils.confirmSwitch([space.id], to: profile.id, in: model)
-                                        })
-                                }
-                                Divider()
-                                Button("New Profile…") {
-                                    ProfileDialogUtils.createProfile(checking: [space.id], in: model)
-                                }
-                            }
-                            Button("Delete") { SpaceDeletion.confirm(space, in: model) }
-                                .disabled(model.state.spaces.count == 1)
-                        }
-                    }
-                }
-            }
+            SidebarDock(model: model, layout: layout)
             Button {
                 if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
             } label: {
@@ -127,22 +94,64 @@ enum SpaceDeletion {
     }
 }
 
-private struct SpaceChip: View {
-    let name: String
-    let selected: Bool
-    let select: () -> Void
+/// Arc's Space items in the dock, between the Library button and the plus: an 8 pt dot for a Space without an icon,
+/// which is every Space until Spaces have icons, 26 pt apart and closer once they don't fit. The current Space's is
+/// darker and nothing else, and during a swipe the two Spaces' dots cross-fade with it. Past a pitch of 18 pt the
+/// others shrink to 4 pt: Arc's do between its 8 Spaces and its 10, and where exactly is Oa's own.
+private struct SidebarDock: View {
+    let model: WindowModel
+    let layout: WindowLayoutController
+    @Environment(\.theme) private var theme
 
     var body: some View {
-        Button(action: select) {
-            Text(name)
-                .font(.system(size: 12, weight: selected ? .semibold : .regular))
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(selected ? 0.12 : 0)))
-                .contentShape(Rectangle())
+        let spaces = model.state.spaces
+        let page = layout.sidebarScrollOffset / layout.sidebarWidth
+        GeometryReader { geometry in
+            let pitch = min(26, geometry.size.width / CGFloat(max(spaces.count, 1)))
+            HStack(spacing: 0) {
+                ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
+                    let emphasis = max(0, 1 - abs(page - CGFloat(index)))
+                    let size: CGFloat = pitch < 18 ? 4 + 4 * emphasis : 8
+                    Button {
+                        model.selectSpace(space.id)
+                    } label: {
+                        Circle()
+                            .fill(theme.dockItem(emphasis: emphasis))
+                            .frame(width: size, height: size)
+                            .frame(width: pitch, height: 34)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(space.name)
+                    .accessibilityLabel(space.name)
+                    .contextMenu { menu(for: space) }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .buttonStyle(.plain)
+        .frame(height: 34)
+    }
+
+    @ViewBuilder private func menu(for space: SidebarSpace) -> some View {
+        Button("Rename…") {
+            if let name = NamePrompt.run("Rename Space", name: space.name) { model.renameSpace(space.id, to: name) }
+        }
+        // As Arc, by name here, where Settings and Change Profile keep the engine's order.
+        Menu("Set Profile") {
+            ForEach(model.profiles.sorted { $0.name < $1.name }) { profile in
+                Toggle(
+                    profile.name,
+                    isOn: Binding {
+                        profile.id == space.profileID
+                    } set: { _ in
+                        ProfileDialogUtils.confirmSwitch([space.id], to: profile.id, in: model)
+                    })
+            }
+            Divider()
+            Button("New Profile…") { ProfileDialogUtils.createProfile(checking: [space.id], in: model) }
+        }
+        Button("Delete") { SpaceDeletion.confirm(space, in: model) }
+            .disabled(model.state.spaces.count == 1)
     }
 }
 
@@ -155,9 +164,19 @@ struct FavoritesGrid: View {
     let layout: WindowLayoutController
     let favorites: [SidebarTab]
 
+    static func rows(for count: Int, in width: CGFloat) -> Int {
+        let most = max(1, Int((width - 8) / 55))
+        return max(1, (count + most - 1) / most)
+    }
+
+    /// What the grid takes of the sidebar's height, so a Space's page starts under its profile's grid.
+    static func height(for count: Int, in width: CGFloat) -> CGFloat {
+        let rows = CGFloat(rows(for: count, in: width))
+        return rows * 47 + (rows - 1) * 8
+    }
+
     var body: some View {
-        let most = max(1, Int((layout.sidebarWidth - 8) / 55))
-        let rows = max(1, (favorites.count + most - 1) / most)
+        let rows = Self.rows(for: favorites.count, in: layout.sidebarWidth)
         let columns = max(1, (favorites.count + rows - 1) / rows)
         let width = (layout.sidebarWidth - 16 - CGFloat(columns - 1) * 8) / CGFloat(columns)
         VStack(alignment: .leading, spacing: 8) {
@@ -178,6 +197,7 @@ struct FavoritesGrid: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: Self.height(for: favorites.count, in: layout.sidebarWidth), alignment: .top)
         .contentShape(Rectangle())
         .onDrop(of: [.plainText], delegate: TabDrop { model.favorite($0, at: nil) })
     }

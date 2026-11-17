@@ -10,6 +10,7 @@ struct Theme {
     let fieldFill: Color
     /// Arc's loading track is fainter under a dark foreground.
     let loadingTrackOpacity: Double
+    private let isDark: Bool
 
     /// As measured on Arc over several themes: text takes the palette's title, and the greys and fills are black
     /// over a light theme and white over a dark one.
@@ -24,6 +25,14 @@ struct Theme {
         secondaryText = ink(0.3, 0.45)
         fieldFill = ink(0.04, 0.1)
         loadingTrackOpacity = appearance == .dark ? 0.46 : 0.276
+        isDark = appearance == .dark
+    }
+
+    /// A Space's dot in the dock as measured on Arc: black at 25% over a light theme and white at 17% over a dark
+    /// one, and at 50% for the current Space; `emphasis` is how far between.
+    func dockItem(emphasis: Double) -> Color {
+        let rest = isDark ? 0.175 : 0.25
+        return (isDark ? Color.white : .black).opacity(rest + (0.5 - rest) * emphasis)
     }
 
     private init() {
@@ -34,6 +43,7 @@ struct Theme {
         secondaryText = Color(nsColor: .tertiaryLabelColor)
         fieldFill = .clear
         loadingTrackOpacity = 0
+        isDark = false
     }
 
     /// On the page's toolbar, which Arc colours from the page's top band: the system's colours stand in until Oa
