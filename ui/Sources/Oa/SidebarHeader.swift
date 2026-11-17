@@ -90,12 +90,12 @@ private struct SidebarAddressField: View {
                 }
                 .padding(.trailing, 4)
                 .opacity(
-                    hovering || showingSiteControls || model.permissionPromptBinding(forPeek: false).wrappedValue
+                    hovering || showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue
                         ? 1 : 0)
             }
         }
         .onHover { hovering = $0 }
-        .onChange(of: showingSiteControls || model.permissionPromptBinding(forPeek: false).wrappedValue) {
+        .onChange(of: showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue) {
             layout.setHold(.popover, $1)
         }
     }

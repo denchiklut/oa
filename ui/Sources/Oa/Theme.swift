@@ -10,6 +10,10 @@ struct Theme {
     let addressText: Color
     let secondaryText: Color
     let fieldFill: Color
+    /// Arc's modal buttons (`ModalButtonStyle`): the palette's `backgroundExtra` under its `foregroundPrimary`, which
+    /// is darkened in a light scheme by however far its luminance passes 0.4.
+    let modalButtonFill: Color
+    let modalButtonGlyph: Color
     /// Arc's loading track is fainter under a dark foreground.
     let loadingTrackOpacity: Double
     private let isDark: Bool
@@ -28,6 +32,11 @@ struct Theme {
         addressText = ink(0.62, 0.64)
         secondaryText = ink(0.3, 0.45)
         fieldFill = ink(0.04, 0.1)
+        modalButtonFill = palette.backgroundExtra.color
+        modalButtonGlyph =
+            appearance == .dark
+            ? palette.foregroundPrimary.color
+            : palette.foregroundPrimary.darkened(by: palette.foregroundPrimary.luminance - 0.4).color
         loadingTrackOpacity = appearance == .dark ? 0.46 : 0.276
         isDark = appearance == .dark
     }
@@ -48,6 +57,8 @@ struct Theme {
         addressText = Color(nsColor: .secondaryLabelColor)
         secondaryText = Color(nsColor: .tertiaryLabelColor)
         fieldFill = .clear
+        modalButtonFill = Color(nsColor: .controlBackgroundColor)
+        modalButtonGlyph = .primary
         loadingTrackOpacity = 0
         isDark = false
     }

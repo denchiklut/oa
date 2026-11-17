@@ -111,8 +111,9 @@ final class WindowModel {
     /// What the prompt draws: the answered request stays until its popover has closed.
     var promptedPermissionRequest: PagePermissionRequest? { permissionRequest ?? answeredPermissionRequest?.request }
     private var peekOwnerID: UUID? { showingArchive ? archivePeekID : selectedTabID }
-    /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending.
-    var address: URL? { page?.url ?? selectedTab?.url }
+    /// What the address field shows: the live page's URL, else the tab's saved one while its page is pending. As Arc:
+    /// a Peek's while one is up.
+    var address: URL? { frontPage?.url ?? selectedTab?.url }
     var favorites: [SidebarTab] { state.favorites(for: selectedSpaceID) }
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }

@@ -1,16 +1,13 @@
 import DevKit
 import SwiftUI
 
-/// Arc's Peek as measured: the page is 80% of the content area's width by the height minus 56, under a 33 pt
-/// toolbar, centered 11 pt from the top; the sidebar stays live under it.
+/// Arc's Peek as measured: 80% of the content area's width by the height minus 23, centered 11 pt from the top; the
+/// sidebar stays live under it.
 struct PeekView: View {
     let model: WindowModel
     let page: any Page
     let sidebarWidth: CGFloat
-    /// As Arc: over a page the opener's card fades instead and nothing is dimmed. The Archive's Peek keeps a fifth of
-    /// dim, Oa's own: Arc's wasn't measured.
-    let overPage: Bool
-    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(PageToolbar.key) private var showsToolbar = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -18,38 +15,37 @@ struct PeekView: View {
             let margin = contentWidth * 0.1
             let panelWidth = contentWidth - 2 * margin
             ZStack(alignment: .topLeading) {
-                let dim = overPage ? .clear : NSColor.black.withAlphaComponent(0.2)
+                // As Arc: nothing is dimmed, over a page or over the Library; the opener's card fades instead.
                 HStack(spacing: 0) {
-                    Backdrop(onClick: nil, color: dim).frame(width: sidebarWidth)
-                    Backdrop(onClick: model.closePeek, color: dim)
+                    Backdrop(onClick: nil, color: .clear).frame(width: sidebarWidth)
+                    Backdrop(onClick: model.closePeek, color: .clear)
                 }
                 panel
                     .frame(width: panelWidth, height: max(geometry.size.height - 23, 100))
                     .padding(.leading, sidebarWidth + margin)
                     .padding(.top, 11)
                 controls
-                    .padding(.leading, sidebarWidth + margin + panelWidth + min(30, margin / 2) - 17)
-                    .padding(.top, 19)
+                    .padding(.leading, sidebarWidth + margin + panelWidth + 13)
+                    .padding(.top, 11 + 7.5)
             }
         }
         .onAppear { page.activate() }
         .onChange(of: page.id) { _, _ in page.activate() }
     }
 
+    /// Arc's `ModalV2HostView` card: the page's colour shows through the toolbar, which needs View ▸ Show Toolbar.
     private var panel: some View {
-        // As Arc's: the page's card, opaque white or black, with 8 pt corners and no divider under the toolbar.
         VStack(spacing: 0) {
-            toolbar.frame(height: 33)
+            if showsToolbar { toolbar.frame(height: 31.5) }
             PageContentView(page: page)
         }
-        .background(colorScheme == .dark ? Color.black : .white)
-        .overlay(alignment: .top) {
-            if page.isLoading {
-                ProgressView(value: page.loadProgress).progressViewStyle(.linear).frame(height: 2)
-            }
-        }
+        .pageRootBackground(page)
+        .background(ARCUIColor.gray1)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
+        .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
+        .overlay(alignment: .top) {
+            LoadingIndicator(isLoading: page.isLoading).offset(y: -7)
+        }
     }
 
     private var toolbar: some View {
@@ -73,7 +69,7 @@ struct PeekView: View {
             }
             Spacer()
             address
-                .popover(isPresented: model.permissionPromptBinding(forPeek: true), arrowEdge: .bottom) {
+                .popover(isPresented: model.permissionPromptBinding(inPeekToolbar: true), arrowEdge: .bottom) {
                     if let request = model.promptedPermissionRequest {
                         PermissionRequestView(model: model, request: request)
                     }
@@ -95,38 +91,44 @@ struct PeekView: View {
         return Text(host).fontWeight(.semibold) + Text(rest).foregroundStyle(.secondary)
     }
 
-    /// As measured in Arc: 34 pt discs, 43.5 pt apart, white with a blue glyph in light. The dark ones are Oa's own.
+    /// As measured in Arc: 13 pt right of the panel at a 43.5 pt pitch.
     private var controls: some View {
-        VStack(spacing: 9.5) {
-            Button {
-                model.closePeek()
-            } label: {
-                Image(systemName: "xmark")
-            }
-            .help("Close Peek")
-            Button {
-                model.expandPeek()
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-            }
-            .help("Expand Peek")
+        VStack(spacing: 10) {
+            ModalButton(symbol: "xmark", size: 12, help: "Close Peek", action: model.closePeek)
+            ModalButton(
+                symbol: "arrow.up.left.and.arrow.down.right", size: 14.5, help: "Expand Peek", action: model.expandPeek)
         }
-        .buttonStyle(PeekControlStyle(dark: colorScheme == .dark))
     }
 }
 
-private struct PeekControlStyle: ButtonStyle {
-    let dark: Bool
+/// Arc's `ModalButtonStyle`.
+private struct ModalButton: View {
+    let symbol: String
+    let size: CGFloat
+    let help: String
+    let action: () -> Void
+    @Environment(\.theme) private var theme
+    @State private var hovering = false
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(dark ? Color.white : Color(.displayP3, red: 0.192, green: 0.224, blue: 0.984))
-            .frame(width: 34, height: 34)
-            .background(
-                Circle().fill(dark ? Color(white: 0.17) : .white).shadow(color: .black.opacity(0.15), radius: 4, y: 1)
-            )
-            .contentShape(Circle())
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(theme.modalButtonGlyph)
+                .frame(width: 18.5, height: 17.5)
+                .padding(8)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(theme.modalButtonFill)
+                        .shadow(color: .black.opacity(hovering ? 0.3 : 0.2), radius: hovering ? 6 : 4, y: 1)
+                }
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .offset(y: hovering ? -1 : 0)
+        .animation(.spring(response: 0.15, dampingFraction: 0.95), value: hovering)
+        .onHover { hovering = $0 }
+        .help(help)
     }
 }
 

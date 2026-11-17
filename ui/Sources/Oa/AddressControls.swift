@@ -32,7 +32,7 @@ struct SiteControlsButton: View {
             }
         }
         .background {
-            Color.clear.popover(isPresented: model.permissionPromptBinding(forPeek: false), arrowEdge: .bottom) {
+            Color.clear.popover(isPresented: model.permissionPromptBinding(inPeekToolbar: false), arrowEdge: .bottom) {
                 if let request = model.promptedPermissionRequest {
                     PermissionRequestView(model: model, request: request)
                 }
