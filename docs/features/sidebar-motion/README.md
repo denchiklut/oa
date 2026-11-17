@@ -71,11 +71,12 @@ Recorded: first movement 128–138 ms after the pointer rests at x 4 (Arc
 113–136 ms), the same points reveal and don't as in Arc's table, and the panel
 leaves 28–40 ms after the pointer passes x 320 (Arc 33 ms).
 
-The presentation is derived in Arc's order: a docked sidebar is `locked`; under
-the Library a hidden one is `hidden`; it is `floating` while the pointer is in a
-region, while no tab is selected, and while a permission prompt needs the
-address field it hangs from; and a floating one stays while one of its menus is
-open, a row is dragged, or Site Controls hangs from its field.
+The presentation is derived in Arc's order: a docked sidebar is `locked`; a
+hidden one is `floating` while the pointer is in a region, while no tab is
+selected, and while a permission prompt needs the address field it hangs from;
+and a floating one stays while one of its menus is open, a row is dragged, or
+Site Controls hangs from its field. Arc's also makes a hidden sidebar `hidden`
+under the Library. Oa's doesn't, by the author's decision: see the Library.
 
 ## Resizing
 
@@ -169,10 +170,19 @@ from the window's Space while the Library is involved, as Arc's does, and from
 the first Space otherwise. So only a swipe from the first Space reaches the
 Library; from the others a swipe right goes to the Space before.
 
-With the Library in view a swipe may start anywhere in the window. A hidden
-sidebar is hidden under the Library. A tab's Peek is over its page, so it goes
-where the card goes, Oa's own: Arc's wasn't looked at there. Moving between sections of different
-widths animates on the same spring, Oa's own: Arc's was not measured.
+With the Library in view a swipe may start anywhere in the window. A tab's Peek
+is over its page, so it goes where the card goes, Oa's own: Arc's wasn't looked
+at there. Moving between sections of different widths animates on the same
+spring, Oa's own: Arc's was not measured.
+
+Arc hides a hidden sidebar under the Library, so its panel is gone for the
+whole way out and returns only when the pointer next asks for it. Oa's own, by
+the author's decision, after open-arch: the panel stays `floating` under the
+Library while the pointer is still in its region, moved off the window by the
+progress. So it comes back with the fingers on a swipe out, from the first
+movement, and with the spring from the rail's arrow. With the pointer
+elsewhere it is `hidden` and the way out shows no panel. A tab opened from a
+card leaves the panel away until the pointer brings it out, as open-arch does.
 
 ## Library ▸ Spaces
 
