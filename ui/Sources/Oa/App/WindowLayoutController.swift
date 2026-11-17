@@ -214,6 +214,7 @@ final class WindowLayoutController: NSViewController {
     private func observeModel() {
         withObservationTracking {
             _ = (model.sidebarMode, model.library, model.selectedTabID, model.selectedSpaceID, model.sidebarWidth)
+            _ = model.permissionRequest
             _ = model.state.spaces
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeModel() }
@@ -243,13 +244,17 @@ final class WindowLayoutController: NSViewController {
     }
 
     /// Arc's order: a docked sidebar is locked; a hidden one stays hidden under the Library, and floats while the
-    /// pointer is in a hover region, while nothing is selected, and while the sidebar holds it.
+    /// pointer is in a hover region, while nothing is selected, while a permission prompt needs the address field
+    /// it hangs from, and while the sidebar holds it.
     private var derivedPresentation: SidebarPresentation {
         if model.sidebarMode == .anchored { return isPreviewingGestureHiddenSidebar ? .hidden : .locked }
         if model.library != nil { return .hidden }
         let floating = sidebarPresentation == .floating
         let allowTop = !PageToolbar.isShown || model.selectedTabID != nil
-        if hover.reveals(active: floating, allowTop: allowTop) || model.selectedTabID == nil { return .floating }
+        let prompts = model.permissionRequest != nil && model.peek == nil && !PageToolbar.isShown
+        if hover.reveals(active: floating, allowTop: allowTop) || model.selectedTabID == nil || prompts {
+            return .floating
+        }
         return floating && !holds.isEmpty ? .floating : .hidden
     }
 
