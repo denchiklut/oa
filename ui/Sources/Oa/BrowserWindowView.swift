@@ -26,9 +26,13 @@ struct BrowserWindowView: View {
             }
             .offset(x: sidebarOffset)
             .zIndex(floats ? 1 : 0)
+            // As Arc: beside the Library the card keeps its width and starts where the Library ends, running off the
+            // window's trailing edge.
+            let lead = layout.sidebarPresentation == .locked ? layout.sidebarWidth : 10
             card
                 .padding([.top, .trailing, .bottom], 10)
-                .padding(.leading, presentation == .locked ? sidebarWidth : 10)
+                .padding(.leading, lead)
+                .offset(x: model.library.map { layout.libraryWidth(for: $0) - lead } ?? 0)
             // Mounted with the sidebar hidden too: a drag that hides the sidebar ends on it.
             if model.library == nil {
                 SidebarResizeRegion(layout: layout)
@@ -110,11 +114,10 @@ struct BrowserWindowView: View {
         }
     }
 
-    private var sidebarWidth: CGFloat { model.library != nil ? LibraryView.width : layout.sidebarWidth }
-
     /// What the Peek leaves clear on the left: nothing under the Archive's Peek or a floating sidebar.
     private var peekInset: CGFloat {
-        model.showingArchive || (model.library == nil && layout.sidebarPresentation != .locked) ? 0 : sidebarWidth
+        if let section = model.library { return section == .archive ? 0 : layout.libraryWidth(for: section) }
+        return layout.sidebarPresentation == .locked ? layout.sidebarWidth : 0
     }
 }
 
