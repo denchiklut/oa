@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     let model: WindowModel
+    private let layout: WindowLayoutController
     private let engine: any BrowserApplication
     private let store: SidebarStore
     private let didClose: (BrowserWindowController) -> Void
@@ -26,6 +27,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         model = WindowModel(
             id: id, engine: engine, store: store, downloads: downloads, pictureInPicture: pictureInPicture,
             spaceID: spaceID)
+        layout = WindowLayoutController(model: model)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -40,9 +42,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         windowButtons = [.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
         windowButtons.forEach { $0.isHidden = true }
         super.init(window: window)
-        let content = NSHostingController(rootView: BrowserWindowView(model: model))
-        content.sizingOptions = []
-        window.contentViewController = content
+        window.contentViewController = layout
         window.setContentSize(NSSize(width: 1100, height: 760))
         window.delegate = self
         model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
@@ -179,6 +179,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func toggleDownloads(_ sender: Any?) {
         if model.showingDownloads { model.exitLibrary() } else { model.viewLibrary(.downloads) }
     }
+    /// Not `toggleSidebar:`, which AppKit's own responders answer first, as Arc's `toggleArcSidebar:` isn't.
+    @objc func toggleSidebarMode(_ sender: Any?) { layout.toggleSidebar() }
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
     @objc func clearTabs(_ sender: Any?) { model.clearTabs() }
     @objc func addExtension(_ sender: Any?) { model.addExtension() }
@@ -234,6 +236,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if item.action == #selector(toggleFavorite(_:)) {
             guard let tabID = model.selectedTabID else { return false }
             item.title = model.state.isFavorite(tabID) ? "Unfavorite Tab" : "Favorite Tab"
+            return true
+        }
+        if item.action == #selector(toggleSidebarMode(_:)) {
+            item.title = model.sidebarMode == .anchored ? "Hide Sidebar" : "Show Sidebar"
             return true
         }
         if item.action == #selector(toggleDownloads(_:)) {

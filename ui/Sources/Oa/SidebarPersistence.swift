@@ -35,13 +35,13 @@ final class SidebarPersistence {
         load(SidebarSnapshot.self, from: sidebarURL, version: SidebarSnapshot.version) { try $0.state() }
     }
 
-    func loadWindows() -> [WindowRecord] {
-        load(WindowsSnapshot.self, from: windowsURL, version: WindowsSnapshot.version, \.windows) ?? []
+    func loadWindows() -> WindowsSnapshot? {
+        load(WindowsSnapshot.self, from: windowsURL, version: WindowsSnapshot.version) { $0 }
     }
 
-    func save(_ state: SidebarState, windows: [WindowRecord]) {
+    func save(_ state: SidebarState, windows: WindowsSnapshot) {
         write(SidebarSnapshot(state: state), to: sidebarURL)
-        write(WindowsSnapshot(windows: windows), to: windowsURL)
+        write(windows, to: windowsURL)
     }
 
     /// The dated copies, newest first.

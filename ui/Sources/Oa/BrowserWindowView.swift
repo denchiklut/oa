@@ -3,6 +3,7 @@ import SwiftUI
 
 struct BrowserWindowView: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(PageToolbar.key) private var showsToolbar = false
 
@@ -12,12 +13,17 @@ struct BrowserWindowView: View {
         let theme = WindowTheme.default
         let background = theme.background[colorScheme]
         let appearance = background.contentOverBackgroundAppearance
-        HStack(spacing: 0) {
-            SidebarView(model: model)
+        // As measured in Arc: hidden, the sidebar's column is past the window's edge by its width and 10 pt more,
+        // and the card is 10 pt in from every edge.
+        let hidden = model.sidebarMode == .noChrome && model.library == nil
+        ZStack(alignment: .topLeading) {
+            WindowDragRegion()
+            SidebarView(model: model, layout: layout)
                 .environment(\.colorScheme, appearance.colorScheme)
+                .offset(x: hidden ? -(SidebarView.width + 10) : 0)
             card
                 .padding([.top, .trailing, .bottom], 10)
-                .background(WindowDragRegion())
+                .padding(.leading, hidden ? 10 : model.library != nil ? LibraryView.width : SidebarView.width)
         }
         .background { WindowSurface(background: background) }
         .overlay {
@@ -90,7 +96,9 @@ struct BrowserWindowView: View {
     }
 
     private var sidebarWidth: CGFloat {
-        model.showingArchive ? 0 : model.library != nil ? LibraryView.width : SidebarView.width
+        if model.showingArchive { return 0 }
+        if model.library != nil { return LibraryView.width }
+        return model.sidebarMode == .anchored ? SidebarView.width : 0
     }
 }
 

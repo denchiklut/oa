@@ -6,6 +6,7 @@ struct SidebarView: View {
     static let width: CGFloat = 241
 
     let model: WindowModel
+    let layout: WindowLayoutController
     @State private var overLibraryButton = false
     @State private var overFlyout = false
     @State private var showingFlyout = false
@@ -21,7 +22,7 @@ struct SidebarView: View {
 
     private var tabs: some View {
         VStack(spacing: 0) {
-            SidebarHeader(model: model)
+            SidebarHeader(model: model, layout: layout)
             FavoritesGrid(model: model)
                 .padding(8)
             ScrollView {
