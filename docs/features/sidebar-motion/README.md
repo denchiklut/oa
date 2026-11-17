@@ -147,12 +147,12 @@ value, 0 among the Spaces and 1 with the Library open, places everything:
 | --- | --- |
 | Library | at its full width L, moved left by L·(1 − p) |
 | Page card | its leading edge at s + (L − s)·p, where s is the sidebar's width docked and 10 pt hidden; it keeps its width and runs off the window's trailing edge |
-| Docked sidebar | in place, shrinking by a tenth toward a point 26 pt to its right, gone at p 0.08 |
+| Docked sidebar | in place, shrinking by a tenth toward a point 26 pt to its right, fading as 1 − 2p, so gone at p 0.5 |
 | Floating panel | moved left by its width and 10 pt, times p |
 
 L is `max(417, min(window − 56, what the section asks))`: 417 pt for Downloads
 and Archived Tabs, and 264 pt per Space plus 216 for Spaces. The sidebar's fade
-is the measured one; Arc's code reads gone at p 0.5.
+is the one in Arc's code, and Arc's recorded frames follow it.
 
 A swipe right from the first Space drags the Library in over 417 pt of travel,
 and held at 220 pt the card is where Arc's was (786 against 785). Its release
@@ -175,7 +175,17 @@ widths animates on the same spring, Oa's own: Arc's was not measured.
 ## Library ▸ Spaces
 
 The rail has Downloads, Spaces and Archived Tabs, in Arc's order, and its own
-window buttons at 16, 21. The Spaces page is a row of cards that scrolls
+window buttons at 16, 21. Its items are 97 by 80 pt, 20 pt apart. As in Arc, a
+label and the fill behind an item are the label colour, black or white by the
+theme's content: the label at 70% and full for the chosen page, the fill at
+10% for the chosen page and 5% under the pointer, with 12 pt corners. An icon
+is in the theme's own colours: its outline in the strongest at 70%, and for
+the chosen page at full with its inside in the cutout colour. Arc's icons are
+its own animations; Oa colours its symbols by the same rule and has no hover
+animation. Between the rail and the page lie a faint glow across the rail, a
+1 pt line and a shade 32 pt into the page, in fixed colours.
+
+The Spaces page is a row of cards that scrolls
 sideways: each 240 pt wide and 96 pt shorter than the row, 24 pt apart and
 24 pt in, then a 48 pt item with a 30 pt plus that adds a Space. A row that
 fits is centred, so with four Spaces at 1400 pt the first card is at x 140 and
@@ -185,8 +195,11 @@ into the window's swipe, by the same forwarding as in the sidebar.
 A card shows the Space's name and its tabs, pinned over unpinned, with the
 window's selection in that Space marked. Arc's card holds the Space's live
 sidebar view. Oa's own until rows are shared with it: a click on a row goes to
-that Space and tab, and a row has no other actions there. The plus asks for a
-name with the existing prompt until the Create a Space panel is here.
+that Space and tab, and a row has no other actions there. The plus is a disc in
+the cutout colour of the window's Space with the plus in its strongest. Under
+the pointer the two swap in 0.05 s and the disc bounces once to 1.15, as
+Arc's. It asks for a name with the existing prompt until the Create a Space
+panel is here.
 
 At rest the row is cut at the page card's edge, as Arc's is, which can be
 mid-card. While the Library comes in or leaves, Arc cuts the row at the
