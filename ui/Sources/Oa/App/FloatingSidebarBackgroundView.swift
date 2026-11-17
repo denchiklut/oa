@@ -8,6 +8,7 @@ struct FloatingSidebarBackgroundView<Sidebar: View>: View {
     private static var cornerRadius: CGFloat { if #available(macOS 26, *) { 12 } else { 8 } }
 
     let background: WindowTheme.Background
+    let next: WindowSurface.Next?
     let windowSize: CGSize
     let isFloating: Bool
     @ViewBuilder let sidebar: Sidebar
@@ -21,7 +22,7 @@ struct FloatingSidebarBackgroundView<Sidebar: View>: View {
             .background {
                 if isFloating {
                     WindowSurface(
-                        background: background, floats: true,
+                        background: background, next: next, floats: true,
                         window: CGRect(origin: CGPoint(x: -inset, y: -inset), size: windowSize))
                 }
             }

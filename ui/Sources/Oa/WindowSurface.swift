@@ -6,7 +6,13 @@ import simd
 /// underlay, the colours at the alpha their intensity gives, then the texture. The material shows the desktop only
 /// while the window is active, so an inactive window is opaque, as Arc's.
 struct WindowSurface: View {
+    typealias Next = (background: WindowTheme.Background, progress: Double)
+
     let background: WindowTheme.Background
+    /// Arc's `.transitioning` pair during a swipe between Spaces: the next Space's background and how far toward it.
+    /// Its colours cross-fade with these, as measured on Arc, uniformly and in encoded values, and its material goes
+    /// over this one's at the progress where the two differ, as Arc's foreground frame does.
+    var next: Next?
     /// Arc's floating sidebar draws the theme over a blur of what the window shows under it, not of the desktop,
     /// and the part of the window's colours that lies under it, as measured: `window` is the window in its space.
     var floats = false
@@ -17,7 +23,12 @@ struct WindowSurface: View {
 
     var body: some View {
         ZStack {
-            WindowMaterial(material: floats ? .popover : material, blendingMode: floats ? .withinWindow : .behindWindow)
+            WindowMaterial(
+                material: floats ? .popover : background.material, blendingMode: floats ? .withinWindow : .behindWindow)
+            if !floats, let next, next.background.material != background.material {
+                WindowMaterial(material: next.background.material, blendingMode: .behindWindow)
+                    .opacity(next.progress)
+            }
             if let window {
                 Color.clear
                     .overlay(alignment: .topLeading) {
@@ -36,48 +47,29 @@ struct WindowSurface: View {
 
     private var colors: some View {
         ZStack {
-            // Arc's underlay goes by the window's appearance, not the theme's: black under a dark one.
-            let underlay = min(alpha, 0.5)
-            ThemeColors(
-                style: background.style, alpha: alpha,
-                underlay: colorScheme == .dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay))
-            texture
+            layer(background).opacity(1 - (next?.progress ?? 0))
+            if let next {
+                layer(next.background).opacity(next.progress).blendMode(.plusLighter)
+            }
         }
         .compositingGroup()
     }
 
-    private var translucencyStyle: WindowTheme.TranslucencyStyle {
-        switch background.style {
-        case .color(.blendedGradient(let gradient)): gradient.translucencyStyle
-        case .color(.blendedSingleColor(let single)): single.translucencyStyle
-        case .color(.basicColor(let basic)): basic.translucencyStyle
+    private func layer(_ background: WindowTheme.Background) -> some View {
+        ZStack {
+            // Arc's underlay goes by the window's appearance, not the theme's: black under a dark one.
+            let alpha = background.alpha
+            let underlay = min(alpha, 0.5)
+            ThemeColors(
+                style: background.style, alpha: alpha,
+                underlay: colorScheme == .dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay))
+            texture(background.modifiers)
         }
-    }
-
-    private var modifiers: WindowTheme.BlendedBackgroundModifiers? {
-        switch background.style {
-        case .color(.blendedGradient(let gradient)): gradient.modifiers
-        case .color(.blendedSingleColor(let single)): single.modifiers
-        case .color(.basicColor): nil
-        }
-    }
-
-    /// Arc passes the raw values of the deprecated light and dark materials.
-    private var material: NSVisualEffectView.Material {
-        switch translucencyStyle {
-        case .light: NSVisualEffectView.Material(rawValue: 1)!
-        case .dark: NSVisualEffectView.Material(rawValue: 2)!
-        case .auto: .windowBackground
-        }
-    }
-
-    /// Oa's own for a basic colour, which has no intensity: opaque.
-    private var alpha: Double {
-        modifiers.map { 0.2 + 0.55 * $0.intensityFactor } ?? 1
+        .compositingGroup()
     }
 
     /// Arc's texture gains, a quarter as strong in an inactive window.
-    @ViewBuilder private var texture: some View {
+    @ViewBuilder private func texture(_ modifiers: WindowTheme.BlendedBackgroundModifiers?) -> some View {
         if let modifiers, modifiers.noiseFactor > 0 {
             let gain =
                 switch modifiers.overlay {
@@ -91,6 +83,38 @@ struct WindowSurface: View {
                 .blendMode(.multiply)
                 .opacity(modifiers.noiseFactor * gain * (activeState == .inactive ? 0.25 : 1))
         }
+    }
+}
+
+extension WindowTheme.Background {
+    fileprivate var translucencyStyle: WindowTheme.TranslucencyStyle {
+        switch style {
+        case .color(.blendedGradient(let gradient)): gradient.translucencyStyle
+        case .color(.blendedSingleColor(let single)): single.translucencyStyle
+        case .color(.basicColor(let basic)): basic.translucencyStyle
+        }
+    }
+
+    fileprivate var modifiers: WindowTheme.BlendedBackgroundModifiers? {
+        switch style {
+        case .color(.blendedGradient(let gradient)): gradient.modifiers
+        case .color(.blendedSingleColor(let single)): single.modifiers
+        case .color(.basicColor): nil
+        }
+    }
+
+    /// Arc passes the raw values of the deprecated light and dark materials.
+    fileprivate var material: NSVisualEffectView.Material {
+        switch translucencyStyle {
+        case .light: NSVisualEffectView.Material(rawValue: 1)!
+        case .dark: NSVisualEffectView.Material(rawValue: 2)!
+        case .auto: .windowBackground
+        }
+    }
+
+    /// Oa's own for a basic colour, which has no intensity: opaque.
+    fileprivate var alpha: Double {
+        modifiers.map { 0.2 + 0.55 * $0.intensityFactor } ?? 1
     }
 }
 

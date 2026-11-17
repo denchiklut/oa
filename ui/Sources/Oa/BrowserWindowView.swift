@@ -9,10 +9,14 @@ struct BrowserWindowView: View {
 
     var body: some View {
         // As Arc: a theme with a light and a dark side shows the one the window's appearance asks for, and the
-        // chrome over it takes that side's own appearance.
-        let theme = model.space?.theme ?? .default
-        let background = theme.background[colorScheme]
-        let appearance = background.contentOverBackgroundAppearance
+        // chrome over it takes that side's own appearance. During a swipe the next Space's background fades in over
+        // it, and the chrome takes the nearer Space's, Oa's own: what Arc's does between a light and a dark theme
+        // wasn't traced.
+        let transition = layout.themeTransition
+        let theme = transition.map { $0.progress < 0.5 ? $0.from : $0.to } ?? model.space?.theme ?? .default
+        let background = transition?.from.background[colorScheme] ?? theme.background[colorScheme]
+        let next = transition.map { (background: $0.to.background[colorScheme], progress: Double($0.progress)) }
+        let appearance = theme.background[colorScheme].contentOverBackgroundAppearance
         // As measured in Arc: hidden, the sidebar is past the window's edge by its width and 10 pt more, and the card
         // is 10 pt in from every edge, a floating sidebar over it. The Library comes in from the left on the pager's
         // progress, the card starts where it ends, keeping its width, and what the progress does to the sidebar is
@@ -28,7 +32,9 @@ struct BrowserWindowView: View {
             ? -(layout.sidebarWidth + 10) : floats ? -(layout.sidebarWidth + 10) * min(progress, 1) : 0
         ZStack(alignment: .topLeading) {
             WindowDragRegion()
-            FloatingSidebarBackgroundView(background: background, windowSize: layout.size, isFloating: floats) {
+            FloatingSidebarBackgroundView(
+                background: background, next: next, windowSize: layout.size, isFloating: floats
+            ) {
                 SidebarView(model: model, layout: layout)
                     .environment(\.colorScheme, appearance.colorScheme)
             }
@@ -62,7 +68,7 @@ struct BrowserWindowView: View {
                     .zIndex(4)
             }
         }
-        .background { WindowSurface(background: background) }
+        .background { WindowSurface(background: background, next: next) }
         .overlay {
             // The Archive's Peek is over the whole window. A tab's is over its page and leaves the docked sidebar
             // clear; beside the Library it goes where the card goes, Oa's own: Arc's wasn't looked at there.

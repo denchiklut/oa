@@ -104,6 +104,17 @@ final class WindowLayoutController: NSViewController {
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
     var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
 
+    /// Arc's `.transitioning(from:to:progress:)` for the theme: the Spaces either side of where the pages are and how
+    /// far between, nil while they rest on one.
+    var themeTransition: (from: WindowTheme, to: WindowTheme, progress: CGFloat)? {
+        let page = sidebarScrollOffset / sidebarWidth
+        let index = Int(page.rounded(.down))
+        let progress = page - CGFloat(index)
+        let spaces = model.state.spaces
+        guard progress > 0.001, progress < 0.999, index >= 0, index + 1 < spaces.count else { return nil }
+        return (spaces[index].theme, spaces[index + 1].theme, progress)
+    }
+
     private func updatePages() {
         let spaces = model.state.spaces
         let index = spaces.firstIndex { $0.id == model.selectedSpaceID } ?? 0
