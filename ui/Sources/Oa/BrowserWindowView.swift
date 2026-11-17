@@ -142,7 +142,7 @@ struct BrowserWindowView: View {
 }
 
 /// Arc's docked sidebar while the Library comes over it: it stays where it is, shrinking by a tenth toward a point
-/// 26 pt to its right, and fades. Gone 8% of the way in, as measured; Arc's code reads halfway.
+/// 26 pt to its right, and fades, gone halfway in.
 private struct SidebarHomeTransition: ViewModifier {
     let progress: CGFloat
 
