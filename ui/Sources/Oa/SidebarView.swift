@@ -23,13 +23,13 @@ struct SidebarView: View {
     private var tabs: some View {
         VStack(spacing: 0) {
             SidebarHeader(model: model, layout: layout)
-            FavoritesGrid(model: model)
+            FavoritesGrid(model: model, layout: layout)
                 .padding(8)
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(model.pinnedTabs) { TabRow(model: model, tab: $0) }
+                    ForEach(model.pinnedTabs) { TabRow(model: model, layout: layout, tab: $0) }
                     if !model.unpinnedTabs.isEmpty { clearDivider }
-                    ForEach(model.unpinnedTabs) { TabRow(model: model, tab: $0) }
+                    ForEach(model.unpinnedTabs) { TabRow(model: model, layout: layout, tab: $0) }
                 }
                 .padding(8)
             }
@@ -184,6 +184,7 @@ private struct SpaceChip: View {
 /// tile joins the grid before it, one dropped beside the tiles is appended; tiles move the same way.
 private struct FavoritesGrid: View {
     let model: WindowModel
+    let layout: WindowLayoutController
 
     var body: some View {
         let favorites = model.favorites
@@ -201,7 +202,7 @@ private struct FavoritesGrid: View {
                 HStack(spacing: 8) {
                     let indices = (row * columns)..<min((row + 1) * columns, favorites.count)
                     ForEach(Array(indices), id: \.self) { index in
-                        FavoriteTile(model: model, tab: favorites[index], width: width)
+                        FavoriteTile(model: model, layout: layout, tab: favorites[index], width: width)
                             .onDrop(of: [.plainText], delegate: TabDrop { model.favorite($0, at: index) })
                     }
                 }
@@ -215,6 +216,7 @@ private struct FavoritesGrid: View {
 
 private struct FavoriteTile: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     let tab: SidebarTab
     let width: CGFloat
     @State private var hovering = false
@@ -235,7 +237,10 @@ private struct FavoriteTile: View {
             .contentShape(Rectangle())
             .onTapGesture { model.select(tab.id) }
             .onHover { hovering = $0 }
-            .onDrag { NSItemProvider(object: tab.id.uuidString as NSString) }
+            .onDrag {
+                layout.setHold(.drag, true)
+                return NSItemProvider(object: tab.id.uuidString as NSString)
+            }
             .contextMenu {
                 if selected { Button("Close Tab") { model.close(tab.id) } }
                 Button("Unfavorite") { model.unfavorite(tab.id) }
@@ -301,6 +306,7 @@ private struct RecordingDot: View {
 
 private struct TabRow: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     let tab: SidebarTab
     @State private var hovering = false
 
@@ -342,7 +348,10 @@ private struct TabRow: View {
         .contentShape(Rectangle())
         .onTapGesture { model.select(tab.id) }
         .onHover { hovering = $0 }
-        .onDrag { NSItemProvider(object: tab.id.uuidString as NSString) }
+        .onDrag {
+            layout.setHold(.drag, true)
+            return NSItemProvider(object: tab.id.uuidString as NSString)
+        }
         .contextMenu {
             if !model.state.isPinned(tab.id) {
                 Button("Archive Tab") { model.close(tab.id) }
