@@ -160,7 +160,9 @@ the header's exist, AppKit hands those out in their place. The Library's rail
 has a set too. The sidebar is 241 pt wide to start and drawn straight on the
 window's surface, which also frames the page: a card flush with the sidebar and
 10 pt in from the other edges, with 6 pt corners, no border and a soft shadow.
-Under a page the card is opaque white, or black in a dark window. With no tab
+Under a page the card is opaque white, or black in a dark window, and over
+that is the page's root background colour from Chromium's compositor frames,
+none until the page's first frame, as Arc's engine reports it. With no tab
 selected it is Arc's `emptyWindowContentBackgroundColor`, white at 66.6% over
 the Space's theme, or 10% in a dark window, with the same shadow.
 The header row and that frame drag the window, and a double-click there does

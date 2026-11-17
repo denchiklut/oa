@@ -14,10 +14,11 @@ replaces.
 
 The store's own button starts the install. Chrome then asks before it goes on,
 and the question reaches the app through the page that asked: a panel 450 pt
-wide over the dimmed window, with Oa's icon, the extension's, "Add the
-“‹name›” extension to Oa?" and Chrome's permission warnings under "It can:",
-or "This extension requires no special permissions." Return adds the
-extension and Esc cancels. Nothing is shown once the install ends, as in Arc.
+wide over the window, dimmed with the grey Arc's sheets and dialogs share, with
+Oa's icon, the extension's, "Add the “‹name›” extension to Oa?" and Chrome's
+permission warnings under "It can:", or "This extension requires no special
+permissions." Return adds the extension and Esc cancels. Nothing is shown once
+the install ends, as in Arc.
 A new install is pinned, which is Chromium's own doing in this version.
 
 Removing asks the same way, "Remove “‹name›” extension from Oa?", whichever

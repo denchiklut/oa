@@ -22,25 +22,31 @@ exclusions Arc's renderer has. The port and Arc's exclusions for meeting-join
 links are untested.
 
 The Peek is a view in the window, not a window of its own, with Arc's measured
-geometry: its page is 80% of the content area's width by the height minus
-56 pt, under a 33 pt toolbar with back, forward, reload or stop and the
-scheme-less URL with the host in bold, centered 11 pt from the top, with 8 pt
-corners and a shadow, on Arc's opaque white or black card. Under it the
-opener's card shows at 30% over the window's theme, as Arc's does, and nothing
-else is dimmed. ✕ and Expand sit outside its top-right corner as Arc's 34 pt
-discs, white in light; the dark ones are Oa's own. Arc leaves its toolbar
-without a fill, showing the page's own background colour, and shows it only
-with View ▸ Show Toolbar; Oa's still always shows it, on the card's white or
-black. The sidebar stays live under the Peek, the opener's
-row carries the Peek page's favicon as a badge, the window title reads the Space
-name while a Peek shows, and keyboard focus goes to the Peek page. Selecting
-another tab or Space hides the Peek and keeps its page alive; reselecting the
-opener shows it again. The page's history is its own. Back, Forward, Reload and
-Stop act on the Peek while it shows; ⌘W closes it and Tabs ▸ Expand Peek ⌘O
-expands it, Arc's two shortcuts for it; Esc does nothing, as in Arc. ⌘L,
-New Tab, Pin Tab and tab switching keep acting on the window beneath, Oa's own
-choice: Arc's ⌘L opens its command bar prefilled with the Peek's URL, which Oa
-doesn't have.
+geometry: 80% of the content area's width by the height minus 23 pt, centered 11
+pt from the top, with 8 pt corners, no border and the page card's shadow, on
+Arc's `Gray1` card, near-white or near-black. Over the card is the page's root
+background colour, as under the window's page card, so a page that draws nothing
+shows its own colour. The 31.5 pt toolbar with back, forward, reload or stop and
+the scheme-less URL with the host in bold shows only with View ▸ Show Toolbar,
+as Arc's does, and has no fill of its own: the page's colour shows through it.
+With the toolbar hidden the page starts at the Peek's top, the sidebar's URL
+field shows the Peek's host, and a permission prompt from the Peek hangs from
+that field's Site Controls button. Loading shows as Arc's pill in the margin
+above the Peek. Under it the opener's card fades to 30% and shrinks 9 pt at each
+edge, as Arc's does, and nothing else is dimmed. ✕ and Expand sit 13 pt right of
+its top corner as Arc's modal buttons: the glyph in a capsule of the Space
+theme's `backgroundExtra`, in its `foregroundPrimary`, with a shadow that
+strengthens as the button lifts under the pointer. The sidebar stays live under
+the Peek, the opener's row carries the Peek page's favicon as Arc's badge, a 24
+pt tile of black at 7% (white at 8% in dark) with 6 pt corners, the window title
+reads the Space name while a Peek shows, and keyboard focus goes to the Peek
+page. Selecting another tab or Space hides the Peek and keeps its page alive;
+reselecting the opener shows it again. The page's history is its own. Back,
+Forward, Reload and Stop act on the Peek while it shows; ⌘W closes it and Tabs ▸
+Expand Peek ⌘O expands it, Arc's two shortcuts for it; Esc does nothing, as in
+Arc. ⌘L, New Tab, Pin Tab and tab switching keep acting on the window beneath,
+Oa's own choice: Arc's ⌘L opens its command bar prefilled with the Peek's URL,
+which Oa doesn't have.
 
 Inside a Peek, plain links navigate the Peek. `target=_blank` and `window.open`
 make a selected tab after the opener's earlier children, which hides the Peek
@@ -66,14 +72,15 @@ Nothing about a Peek is saved, so none survives a relaunch, as in Arc.
 
 Clicking an Archive row shows the entry's page in a Peek over the list, made
 from the saved URL with no history, centered over the whole window as Arc does
-over its Library; the entry stays. Its Expand removes the entry and puts the
-tab, selected, at the top of the unpinned section of the Space the window
-shows, as Arc does. When another window has already brought the entry back,
-Expand selects that tab instead of adding a second row, Oa's own choice after
-Arc's ⇧⌘T, which selects a tab that is already open. Closing it, or leaving the Archive view, closes the
-page and keeps the entry; leaving the view is Oa's own choice. A page such a Peek opens
-has no tab to join, so it goes to the top of the shown Space, Oa's own choice.
-Arc's Split View button and copy-link icon don't exist in Oa yet.
+over its Library, with nothing dimmed behind it; the entry stays. Its Expand
+removes the entry and puts the tab, selected, at the top of the unpinned section
+of the Space the window shows, as Arc does. When another window has already
+brought the entry back, Expand selects that tab instead of adding a second row,
+Oa's own choice after Arc's ⇧⌘T, which selects a tab that is already open.
+Closing it, or leaving the Archive view, closes the page and keeps the entry;
+leaving the view is Oa's own choice. A page such a Peek opens has no tab to
+join, so it goes to the top of the shown Space, Oa's own choice. Arc's Split
+View button and copy-link icon don't exist in Oa yet.
 
 Related: [Sidebar state](../sidebar/README.md) · [Favorites](../favorites/README.md) · [Saved state and recovery](../saved-state/README.md).
 
