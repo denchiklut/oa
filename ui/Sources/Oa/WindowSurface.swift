@@ -48,15 +48,17 @@ struct WindowSurface: View {
 
     private var translucencyStyle: WindowTheme.TranslucencyStyle {
         switch background.style {
-        case .blendedGradient(_, _, let style, _, _), .blendedSingleColor(_, let style, _), .basicColor(_, let style):
-            style
+        case .color(.blendedGradient(let gradient)): gradient.translucencyStyle
+        case .color(.blendedSingleColor(let single)): single.translucencyStyle
+        case .color(.basicColor(let basic)): basic.translucencyStyle
         }
     }
 
     private var modifiers: WindowTheme.BlendedBackgroundModifiers? {
         switch background.style {
-        case .blendedGradient(_, _, _, let modifiers, _), .blendedSingleColor(_, _, let modifiers): modifiers
-        case .basicColor: nil
+        case .color(.blendedGradient(let gradient)): gradient.modifiers
+        case .color(.blendedSingleColor(let single)): single.modifiers
+        case .color(.basicColor): nil
         }
     }
 
@@ -157,10 +159,9 @@ private struct ThemeColors: NSViewRepresentable, Equatable {
         let base: [ThemeColor]
         let overlay: [ThemeColor]
         switch style {
-        case .blendedGradient(let baseColors, let overlayColors, _, _, _):
-            (base, overlay) = (baseColors, overlayColors)
-        case .blendedSingleColor(let color, _, _), .basicColor(let color, _):
-            (base, overlay) = ([color], [])
+        case .color(.blendedGradient(let gradient)): (base, overlay) = (gradient.baseColors, gradient.overlayColors)
+        case .color(.blendedSingleColor(let single)): (base, overlay) = ([single.color], [])
+        case .color(.basicColor(let basic)): (base, overlay) = ([basic.color], [])
         }
         guard let first = base.first, let last = base.last else { return nil }
         let side = base.count + overlay.count > 1 ? 256 : 1

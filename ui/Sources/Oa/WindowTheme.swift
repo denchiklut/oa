@@ -1,21 +1,21 @@
 import AppKit
 import SwiftUI
 
-/// A Space's theme, in the shape Arc stores as `windowTheme`. Only Arc's default exists until Oa's Spaces carry one.
-struct WindowTheme {
+/// A Space's theme, in the shape and under the names Arc stores as `customInfo.windowTheme`.
+struct WindowTheme: Hashable, Codable {
     var background: AppearanceBased<Background>
     /// Kept as Arc stores it: nil on its default and on every theme from its editor. What it drives isn't traced.
     var windowAppearance: AppearanceBased<Appearance>?
     var primaryColorPalette: PrimaryColorPalette
     var semanticColorPalette: AppearanceBased<SemanticColorPalette>
 
-    enum Appearance {
+    enum Appearance: String, Hashable, Codable {
         case light, dark
 
         var colorScheme: ColorScheme { self == .dark ? .dark : .light }
     }
 
-    enum AppearanceBased<Value: Sendable>: Sendable {
+    enum AppearanceBased<Value: Hashable & Codable & Sendable>: Hashable, Codable, Sendable {
         case single(Value)
         case appearanceBased(light: Value, dark: Value)
 
@@ -27,49 +27,70 @@ struct WindowTheme {
         }
     }
 
-    struct Background: Equatable {
+    struct Background: Hashable, Codable {
         var style: Style
         var contentOverBackgroundAppearance: Appearance
         /// Kept as Arc stores it: true on themes from its editor, false on its default. What reads it isn't traced.
         var isVibrant: Bool
     }
 
-    enum Style: Equatable {
-        case blendedGradient(
-            baseColors: [ThemeColor], overlayColors: [ThemeColor], translucencyStyle: TranslucencyStyle,
-            modifiers: BlendedBackgroundModifiers, wheel: Wheel)
-        case blendedSingleColor(
-            color: ThemeColor, translucencyStyle: TranslucencyStyle, modifiers: BlendedBackgroundModifiers)
-        /// Arc's built-in themes use it and its editor doesn't. How Arc draws it isn't traced.
-        case basicColor(color: ThemeColor, translucencyStyle: TranslucencyStyle)
+    /// Arc stores this level over the colour styles; no other case of it has been seen.
+    enum Style: Hashable, Codable {
+        case color(ColorStyle)
     }
 
-    struct BlendedBackgroundModifiers: Equatable {
+    enum ColorStyle: Hashable, Codable {
+        case blendedGradient(BlendedGradient)
+        case blendedSingleColor(BlendedSingleColor)
+        /// Arc's built-in themes use it and its editor doesn't. How Arc draws and stores it isn't traced.
+        case basicColor(BasicColor)
+    }
+
+    struct BlendedGradient: Hashable, Codable {
+        var baseColors: [ThemeColor]
+        var overlayColors: [ThemeColor]
+        var translucencyStyle: TranslucencyStyle
+        var modifiers: BlendedBackgroundModifiers
+        var wheel: Wheel
+    }
+
+    struct BlendedSingleColor: Hashable, Codable {
+        var color: ThemeColor
+        var translucencyStyle: TranslucencyStyle
+        var modifiers: BlendedBackgroundModifiers
+    }
+
+    struct BasicColor: Hashable, Codable {
+        var color: ThemeColor
+        var translucencyStyle: TranslucencyStyle
+    }
+
+    struct BlendedBackgroundModifiers: Hashable, Codable {
         var noiseFactor: Double
         var intensityFactor: Double
         var overlay: Overlay
     }
 
-    enum TranslucencyStyle {
+    enum TranslucencyStyle: String, Hashable, Codable {
         case light, dark, auto
     }
 
-    enum Wheel {
+    enum Wheel: Hashable, Codable {
         case complimentary, analogous
     }
 
-    enum Overlay {
+    enum Overlay: String, Hashable, Codable {
         case grain, sand, denim, tweed
     }
 
-    struct PrimaryColorPalette {
+    struct PrimaryColorPalette: Hashable, Codable {
         var tintedLight: ThemeColor
         var midTone: ThemeColor
         var shaded: ThemeColor
         var shadedDark: ThemeColor
     }
 
-    struct SemanticColorPalette {
+    struct SemanticColorPalette: Hashable, Codable {
         var foregroundPrimary: ThemeColor
         var foregroundSecondary: ThemeColor
         var foregroundTertiary: ThemeColor
@@ -86,11 +107,14 @@ struct WindowTheme {
 }
 
 /// Extended sRGB, as Arc stores a theme's colours: a component may leave 0…1.
-struct ThemeColor: Equatable {
+struct ThemeColor: Hashable, Codable {
     var red: Double
     var green: Double
     var blue: Double
     var alpha = 1.0
+    var colorSpace = ColorSpace.extendedSRGB
+
+    enum ColorSpace: String, Codable { case extendedSRGB }
 
     static let white = ThemeColor(red: 1, green: 1, blue: 1)
     static let black = ThemeColor(red: 0, green: 0, blue: 0)
@@ -137,11 +161,14 @@ extension WindowTheme {
             _ appearance: Appearance
         ) -> Background {
             Background(
-                style: .blendedGradient(
-                    baseColors: [ThemeColor(displayP3: first), ThemeColor(displayP3: second)], overlayColors: [],
-                    translucencyStyle: translucency,
-                    modifiers: BlendedBackgroundModifiers(noiseFactor: 0, intensityFactor: intensity, overlay: .grain),
-                    wheel: .complimentary),
+                style: .color(
+                    .blendedGradient(
+                        BlendedGradient(
+                            baseColors: [ThemeColor(displayP3: first), ThemeColor(displayP3: second)],
+                            overlayColors: [], translucencyStyle: translucency,
+                            modifiers: BlendedBackgroundModifiers(
+                                noiseFactor: 0, intensityFactor: intensity, overlay: .grain),
+                            wheel: .complimentary))),
                 contentOverBackgroundAppearance: appearance, isVibrant: false)
         }
         // Arc converts its brand colour before deriving from it, so the palette's steps run in extended sRGB.
