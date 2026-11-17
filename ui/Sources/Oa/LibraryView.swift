@@ -2,8 +2,11 @@ import DevKit
 import QuickLookThumbnailing
 import SwiftUI
 
-enum LibrarySection: CaseIterable {
-    case downloads, spaces, archive
+/// Saved by Arc's `HomePageID` names.
+enum LibrarySection: String, CaseIterable, Codable {
+    case downloads = "DownloadsPage"
+    case spaces = "SpacesPage"
+    case archive = "ArchivePage"
 
     var title: String {
         switch self {
