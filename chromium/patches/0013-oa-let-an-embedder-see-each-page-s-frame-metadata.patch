@@ -1,0 +1,111 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 17 Nov 2026 11:57:34 -0700
+Subject: [PATCH] oa: let an embedder see each page's frame metadata
+
+Adds RenderFrameMetadataProvider::SetObserverForEmbedder(). RenderWidgetHostViewMac's OnRenderFrameMetadataChangedBeforeActivation(), empty upstream, hands every new metadata of a RenderViewHost's widget to that observer with its WebContents, as ArcCore's patched view hands it to its page for the root background colour. content has no public way to a widget's metadata provider.
+---
+ .../render_frame_metadata_provider_impl.cc    | 19 +++++++++++++++++++
+ .../render_widget_host_view_mac.h             |  2 +-
+ .../render_widget_host_view_mac.mm            | 14 ++++++++++++++
+ .../browser/render_frame_metadata_provider.h  | 12 ++++++++++++
+ 4 files changed, 46 insertions(+), 1 deletion(-)
+
+diff --git a/content/browser/renderer_host/render_frame_metadata_provider_impl.cc b/content/browser/renderer_host/render_frame_metadata_provider_impl.cc
+index 438d611d571a9e710972c99cd17af8972bc0a134..b1af731961066c1c574391131b70762afcb92400 100644
+--- a/content/browser/renderer_host/render_frame_metadata_provider_impl.cc
++++ b/content/browser/renderer_host/render_frame_metadata_provider_impl.cc
+@@ -16,6 +16,25 @@
+ 
+ namespace content {
+ 
++namespace {
++
++// Set by RenderFrameMetadataProvider::SetObserverForEmbedder().
++RenderFrameMetadataProvider::EmbedderObserver g_embedder_observer = nullptr;
++
++}  // namespace
++
++// static
++void RenderFrameMetadataProvider::SetObserverForEmbedder(
++    EmbedderObserver observer) {
++  g_embedder_observer = observer;
++}
++
++// static
++RenderFrameMetadataProvider::EmbedderObserver
++RenderFrameMetadataProvider::GetObserverForEmbedder() {
++  return g_embedder_observer;
++}
++
+ RenderFrameMetadataProviderImpl::RenderFrameMetadataProviderImpl(
+     scoped_refptr<base::SingleThreadTaskRunner> task_runner,
+     FrameTokenMessageQueue::Client* client)
+diff --git a/content/browser/renderer_host/render_widget_host_view_mac.h b/content/browser/renderer_host/render_widget_host_view_mac.h
+index 4fcbaac7dc34f51a6f3d8754d5a5f84042649451..51bd74491f4a87dc1fb130885be4c575444183cb 100644
+--- a/content/browser/renderer_host/render_widget_host_view_mac.h
++++ b/content/browser/renderer_host/render_widget_host_view_mac.h
+@@ -284,7 +284,7 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
+ 
+   // RenderFrameMetadataProvider::Observer
+   void OnRenderFrameMetadataChangedBeforeActivation(
+-      const cc::RenderFrameMetadata& metadata) override {}
++      const cc::RenderFrameMetadata& metadata) override;
+   void OnRenderFrameMetadataChangedAfterActivation(
+       base::TimeTicks activation_time) override;
+   void OnRenderFrameSubmission() override {}
+diff --git a/content/browser/renderer_host/render_widget_host_view_mac.mm b/content/browser/renderer_host/render_widget_host_view_mac.mm
+index 10d8a0e16d6bd7e603eddabfd3f053f44d43d7a1..66585d213ca799cd7168669653fdf3327303be55 100644
+--- a/content/browser/renderer_host/render_widget_host_view_mac.mm
++++ b/content/browser/renderer_host/render_widget_host_view_mac.mm
+@@ -910,6 +910,20 @@ void SendVisibleTimeRequestToDelegatedFrameHost(
+   }
+ }
+ 
++void RenderWidgetHostViewMac::OnRenderFrameMetadataChangedBeforeActivation(
++    const cc::RenderFrameMetadata& metadata) {
++  RenderFrameMetadataProvider::EmbedderObserver observer =
++      RenderFrameMetadataProvider::GetObserverForEmbedder();
++  RenderViewHost* render_view_host = RenderViewHost::From(host());
++  if (!observer || !render_view_host) {
++    return;
++  }
++  if (WebContents* web_contents =
++          WebContents::FromRenderViewHost(render_view_host)) {
++    observer(host(), web_contents, metadata);
++  }
++}
++
+ void RenderWidgetHostViewMac::OnRenderFrameMetadataChangedAfterActivation(
+     base::TimeTicks activation_time) {
+   // TODO(crbug.com/40219248): Remove toSkColor and make all SkColor4f.
+diff --git a/content/public/browser/render_frame_metadata_provider.h b/content/public/browser/render_frame_metadata_provider.h
+index 327498ef27bd2b17afcaf6c4c02d5af82097947e..bad3a96dea9b47960aa7c02f15a5ff8fa0af2628 100644
+--- a/content/public/browser/render_frame_metadata_provider.h
++++ b/content/public/browser/render_frame_metadata_provider.h
+@@ -13,6 +13,9 @@
+ 
+ namespace content {
+ 
++class RenderWidgetHost;
++class WebContents;
++
+ // Notifies all Observer of the submission of CompositorFrames which cause a
+ // change in RenderFrameMetadata.
+ //
+@@ -65,6 +68,15 @@ class CONTENT_EXPORT RenderFrameMetadataProvider {
+   virtual void RemoveObserver(Observer* observer) = 0;
+ 
+   virtual const cc::RenderFrameMetadata& LastRenderFrameMetadata() = 0;
++
++  // For an embedder that keeps each page's frame metadata, as Arc's engine
++  // does: on macOS the view of every RenderViewHost's widget calls it with each
++  // new metadata, before the frame activates. Set it before the browser starts.
++  using EmbedderObserver = void (*)(RenderWidgetHost* widget_host,
++                                    WebContents* web_contents,
++                                    const cc::RenderFrameMetadata& metadata);
++  static void SetObserverForEmbedder(EmbedderObserver observer);
++  static EmbedderObserver GetObserverForEmbedder();
+ };
+ 
+ }  // namespace content
