@@ -137,7 +137,7 @@ struct BrowserWindowView: View {
             if let placeholder = model.placeholder {
                 PlaceholderView(image: placeholder)
             } else if let page = model.page {
-                PageContentView(page: page)
+                PageContentView(page: page).pageRootBackground(page)
             } else {
                 Color.clear
             }
