@@ -8,6 +8,7 @@ struct SpaceManagementSpacesPage: View {
     static func contentWidth(for spaces: Int) -> CGFloat { 264 * CGFloat(spaces) + 216 }
 
     let model: WindowModel
+    let layout: WindowLayoutController
     /// The Library's progress into the window, to 1, and what the page card keeps clear at its start among the
     /// Spaces: the gap between the Library and the card on the way is that much of what is left.
     let progress: CGFloat
@@ -22,7 +23,7 @@ struct SpaceManagementSpacesPage: View {
             ScrollView(.horizontal) {
                 HStack(spacing: 24) {
                     ForEach(model.state.spaces) { space in
-                        SpaceManagementCollectionViewItem(model: model, space: space)
+                        SpaceManagementCollectionViewItem(model: model, layout: layout, space: space)
                             .frame(width: 240, height: max(geometry.size.height - 96, 0))
                     }
                     SpaceManagementAddSpaceView(model: model)
@@ -85,6 +86,7 @@ private struct SpaceManagementViewport {
 /// sidebar view. Oa's own until rows are shared with it: a row here only goes to its tab.
 private struct SpaceManagementCollectionViewItem: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     let space: SidebarSpace
     @Environment(\.windowColorScheme) private var windowColorScheme
 
@@ -148,7 +150,10 @@ private struct SpaceManagementCollectionViewItem: View {
                 .fill(Color.primary.opacity(model.selectedTabIDs[space.id] == tab.id ? 0.12 : 0))
         )
         .contentShape(Rectangle())
-        .onTapGesture { model.show(tab.id) }
+        .onTapGesture {
+            layout.dismissSidebar()
+            model.show(tab.id)
+        }
     }
 }
 
