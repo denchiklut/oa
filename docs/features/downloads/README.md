@@ -60,9 +60,14 @@ next time, as in Arc. "Search Downloads…" narrows the list by name, and Filter
 opens "Filter Downloads…" with a chip per profile. An empty list reads
 "Nothing here yet!".
 
-A click on a finished row previews the file over the window with Quick Look:
-close, previous and next, the name and age, a menu with Send via iMessage,
-AirDrop and Show in Finder, and "Open in ‹App›". A click on a running row makes
+A click on a finished row previews the file over the window, behind Arc's
+black scrim at 70%: a panel 0.8 of the window less 50 pt each way, with 16 pt
+continuous corners. An image shows as itself and anything else in Quick Look's
+compact view, 16 pt in, over Arc's body: the file at a fifth of the panel,
+blurred and scaled up seven times over black, so it takes the file's colours
+in light and dark alike. Its 46 pt strip has close, previous and next, the name
+and age, a menu with Send via iMessage, AirDrop and Show in Finder, and
+"Open in ‹App›", on a system material, Oa's own: Arc's is unknown. A click on a running row makes
 it open in its app when it finishes, as in Arc. A row's "…" button and its
 context menu have Arc's items: Open ‹Kind›, Copy ‹Kind›, Show in Finder, Cancel
 Download while it runs, Hide from Oa, and Move to Trash once it is finished;
