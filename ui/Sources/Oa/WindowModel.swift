@@ -436,14 +436,13 @@ final class WindowModel {
         if tabs.indices.contains(index) { select(tabs[index].id) }
     }
 
+    /// As Arc: a Space with nothing to show is shown empty, with no command bar.
     func selectSpace(_ spaceID: UUID) {
         guard state.space(spaceID) != nil, spaceID != selectedSpaceID else { return }
         selectedSpaceID = spaceID
         if let tabID = selectedTabID {
             ensurePage(tabID)
             markViewed(tabID)
-        } else {
-            openCommandBar(.newTab)
         }
         store.windowStateChanged()
     }
@@ -479,8 +478,7 @@ final class WindowModel {
     /// and each tab loads again in the new profile once selected, at its saved address. A window showing a moved
     /// Space selects its bottom-most unpinned tab. Arc leaves the pages another window holds alive in the old
     /// profile and blank; in Oa a tab has one page, which goes wherever it is. Oa's own: an open command bar, which
-    /// searches the old profile, closes, and comes back for a new tab where nothing is left to select, as on
-    /// arriving at such a Space.
+    /// searches the old profile, closes.
     func setProfile(_ profileID: UUID, forSpaces spaceIDs: [UUID]) {
         let spaceIDs = spaceIDs.filter { state.space($0).map { $0.profileID != profileID } ?? false }
         let tabIDs = spaceIDs.flatMap { state.tabs(in: $0).map(\.id) }
@@ -489,11 +487,7 @@ final class WindowModel {
         for window in store.windows.filter({ $0 !== self }) + [self] where spaceIDs.contains(window.selectedSpaceID) {
             window.closeCommandBar()
             window.selectedTabIDs[window.selectedSpaceID] = nil
-            if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last {
-                window.select(bottom.id)
-            } else {
-                window.openCommandBar(.newTab)
-            }
+            if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last { window.select(bottom.id) }
         }
     }
 
