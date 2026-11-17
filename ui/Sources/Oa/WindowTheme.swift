@@ -125,6 +125,21 @@ struct ThemeColor: Hashable, Codable {
         ThemeColor(red: red, green: green, blue: blue, alpha: alpha)
     }
 
+    var luminance: Double {
+        zip([red, green, blue], [0.2126, 0.7152, 0.0722]).reduce(0) { sum, pair in
+            sum + pair.1 * (pair.0 >= 0.03928 ? pow((pair.0 + 0.055) / 1.055, 2.4) : pair.0 / 12.92)
+        }
+    }
+
+    func darkened(by amount: Double) -> ThemeColor {
+        guard amount > 0 else { return self }
+        let color = NSColor(srgbRed: red, green: green, blue: blue, alpha: alpha)
+        return ThemeColor(
+            NSColor(
+                colorSpace: .sRGB, hue: color.hueComponent, saturation: color.saturationComponent,
+                brightness: max(0, color.brightnessComponent - amount), alpha: alpha))
+    }
+
     func over(_ backdrop: ThemeColor) -> ThemeColor {
         let rest = backdrop.alpha * (1 - alpha)
         let total = alpha + rest

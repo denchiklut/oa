@@ -63,10 +63,11 @@ private struct PromptButtonStyle: ButtonStyle {
 }
 
 extension WindowModel {
-    /// For a popover on the page's own bar; a click outside or leaving the app sets it false, which dismisses.
-    func permissionPromptBinding(forPeek: Bool) -> Binding<Bool> {
+    /// For a popover on the page's own bar; a click outside or leaving the app sets it false, which dismisses. As
+    /// Arc: a Peek's hangs from its toolbar, and from the sidebar's URL field while the toolbar is hidden.
+    func permissionPromptBinding(inPeekToolbar: Bool) -> Binding<Bool> {
         Binding(
-            get: { self.permissionRequest != nil && (self.peek != nil) == forPeek },
+            get: { self.permissionRequest != nil && (self.peek != nil && PageToolbar.isShown) == inPeekToolbar },
             set: { shown in
                 if !shown, let request = self.permissionRequest { self.respond(to: request, with: .dismiss) }
             })

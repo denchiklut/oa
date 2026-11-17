@@ -52,7 +52,14 @@ struct BrowserWindowView: View {
                 .allowsHitTesting(model.library != nil)
                 .zIndex(1)
             }
+            // As Arc's `DimState`: under a Peek the card shrinks 9 pt at every edge as it fades.
+            let cardSize = CGSize(width: layout.size.width - lead - 10, height: layout.size.height - 20)
             card
+                .scaleEffect(
+                    x: fadesCard ? 1 - 18 / max(cardSize.width, 18) : 1,
+                    y: fadesCard ? 1 - 18 / max(cardSize.height, 18) : 1
+                )
+                .animation(.easeInOut(duration: 0.12), value: fadesCard)
                 .opacity(fadesCard ? 0.3 : 1)
                 .padding([.top, .trailing, .bottom], 10)
                 .padding(.leading, lead)
@@ -77,7 +84,7 @@ struct BrowserWindowView: View {
                 let overPage = !model.showingArchive
                 PeekView(
                     model: model, page: peek,
-                    sidebarWidth: overPage && presentation == .locked ? layout.sidebarWidth : 0, overPage: overPage
+                    sidebarWidth: overPage && presentation == .locked ? layout.sidebarWidth : 0
                 )
                 .offset(x: overPage ? (libraryWidth - lead) * progress : 0)
             }
