@@ -78,6 +78,10 @@ and a floating one stays while one of its menus is open, a row is dragged, or
 Site Controls hangs from its field. Arc's also makes a hidden sidebar `hidden`
 under the Library. Oa's doesn't, by the author's decision: see the Library.
 
+Hiding the sidebar measures the pointer again in the hidden sidebar's regions,
+so a sidebar hidden from under the pointer, by the toggle or ⌘S, stays hidden
+until the pointer asks for it, as Arc's did with the pointer left on the toggle.
+
 ## Resizing
 
 An 8 pt region across the sidebar's trailing edge, 11 pt short of the window's
@@ -112,7 +116,11 @@ Space, each the sidebar's width.
 - **Release.** With any speed over the last 100 ms (5 pt/s, which two events in
   that window give) the pager goes one page that way; held still, to the
   nearest page. One gesture moves one page at most. The Space is selected at
-  lift, before the settle, so the page card changes then.
+  lift, before the settle, so the page card changes then. It shows the tab the
+  window last showed in it, while that tab is still in the Space or one of its
+  profile's Favorites, else nothing, and never opens the command bar. As Arc's
+  `lastActiveTabsPerSpace`, that is kept in memory only, so after a relaunch
+  each Space shows no tab until one is picked there.
 - **Settle.** A spring of response 0.22 s and damping 0.93, inside what was
   measured (Arc's code reads 0.4 and 1). Its clock starts with its first frame
   and never jumps a long frame, so selecting the Space delays it rather than
