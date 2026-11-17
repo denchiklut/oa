@@ -23,10 +23,14 @@ agree, every item is reachable, each profile and Space points at roots of the
 right kind, and no archived tab is also in the tree.
 
 `windows.json` carries `version` and `windows`, each with `id`,
-`selectedSpaceID`, and `lastActiveDates` and `createdDates` by tab ID, which
-order the window's [empty command bar](../command-bar/README.md#ranking). A
-saved Space that no longer exists falls back to the first, and a file without
-the dates reads as none. Window frames are not saved.
+`selectedSpaceID`, the sidebar's `sidebarMode` (`anchored` or `noChrome`) and
+`sidebarWidth`, and `lastActiveDates` and `createdDates` by tab ID, which
+order the window's [empty command bar](../command-bar/README.md#ranking). At
+its top, as in Arc's file, `sidebarViewPreferences` holds the mode and width a
+new window takes: what the user last set in any window. A saved Space that no
+longer exists falls back to the first, a file without the dates reads as none,
+and one without the sidebar's fields reads as docked at 241 pt. Window frames
+are not saved.
 
 The last favicon each tab's page showed is a PNG at `favicons/<id>.png` beside
 the files, written when the page shows a new one, read when a row, tile or

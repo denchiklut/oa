@@ -150,18 +150,22 @@ can't pull the selection to itself from the background.
 
 ## Window frame
 
-The window has no title bar. As in Arc, the system's close, minimize and zoom
-buttons are kept and moved into the sidebar's header, their centres 24 pt down
-at x 20, 43 and 66. AppKit puts them back whenever it lays its title bar out,
-so `WindowButtons` places them again before the window draws; in full screen
-they are the system's. The sidebar is 241 pt wide and drawn straight on the
+The window has no title bar. As in Arc, the sidebar's header has window buttons
+of its own (`WindowStandardButtons`), made with AppKit's factory and laid out
+there, their centres 24 pt down at x 20, 43 and 66. Away from the pointer a
+disc covers each and the group is at 10% over light content and 33% over dark;
+under the pointer they are the system's. The window's own buttons are hidden
+outside full screen. The window takes them at its creation, as Arc's does: once
+the header's exist, AppKit hands those out in their place. The Library's rail
+has a set too. The sidebar is 241 pt wide to start and drawn straight on the
 window's surface, which also frames the page: a card flush with the sidebar and
 10 pt in from the other edges, with 6 pt corners, no border and a soft shadow.
 The header row and that frame drag the window, and a double-click there does
-what System Settings asks of a title bar.
+what System Settings asks of a title bar. Hiding, floating, resizing and
+swiping the sidebar are in [Sidebar motion](../sidebar-motion/README.md).
 
-Back, forward and reload sit in the header beside the window buttons, over a
-field that shows the page's host without a leading `www.`. A click on the field
+The sidebar's toggle, back, forward and reload sit in the header beside the
+window buttons, over a field that shows the page's host without a leading `www.`. A click on the field
 opens the command bar, and the pointer over it shows copy link and Site
 Controls, which the permission prompt hangs from. As in Arc, both stay drawn
 while the prompt or Site Controls is up. View ▸ Show Toolbar (⇧⌘D) moves all of
@@ -173,8 +177,8 @@ own.
 The prompt always hangs from wherever the address is. With the toolbar hidden
 and the Library open there is no address on screen, so, as in Arc, no prompt is
 drawn and the request waits. Oa shows it when the Library closes; Arc holds it
-until the sidebar is next shown or hidden. With the sidebar hidden Arc slides it
-in for the prompt, which Oa will do once its sidebar can hide.
+until the sidebar is next shown or hidden. With the sidebar hidden, as in Arc,
+it slides in for the prompt and stays while the prompt is up.
 
 The surface is the Space's theme, drawn as Arc draws it. At the bottom is the
 window's material, which shows the blurred desktop while the window is active
