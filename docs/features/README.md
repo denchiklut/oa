@@ -310,7 +310,7 @@ Sources: Arc [account management][arc-account], [account deletion][arc-delete],
 | Recent downloads on Library hover † | ✅ | ✅ |
 | Library lists downloads outside the Downloads folder † | ✅ | ☐ |
 | Include/exclude screenshots in Library † | ✅ | ☐ |
-| Remember the selected Library section † | ✅ | ☐ |
+| Remember the selected Library section † | ✅ | ✅ |
 | Move Library files to macOS Trash † | ✅ | ✅ |
 
 Sources: Arc native Settings → Profiles; [2022][arc22], [2023][arc23],
