@@ -15,6 +15,7 @@
 #include "base/task/bind_post_task.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "cc/trees/render_frame_metadata.h"
 #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/profiles/profile.h"
@@ -35,6 +36,7 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/render_frame_metadata_provider.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
@@ -312,6 +314,14 @@ void* PageImpl::Favicon() const {
     return nullptr;
   }
   return (__bridge void*)driver->GetFavicon().ToNSImage();
+}
+
+std::optional<Color> PageImpl::GetRootBackgroundColor() const {
+  if (!root_background_color_) {
+    return std::nullopt;
+  }
+  const SkColor4f& color = *root_background_color_;
+  return Color{color.fR, color.fG, color.fB, color.fA};
 }
 
 SecurityLevel PageImpl::GetSecurityLevel() const {
@@ -868,6 +878,30 @@ void PageImpl::OnIsCapturingAudioChanged(content::WebContents* contents,
   if (contents == web_contents()) {
     NotifyStateChanged();
   }
+}
+
+// static
+void PageImpl::InstallFrameMetadataObserver() {
+  content::RenderFrameMetadataProvider::SetObserverForEmbedder(
+      &PageImpl::OnFrameMetadata);
+}
+
+// As ArcCore: the colour arrives with each new metadata, before the frame
+// activates, and is kept until another differs. Only the primary main frame's
+// counts, Oa's own guard: Arc takes every RenderViewHost's.
+// static
+void PageImpl::OnFrameMetadata(content::RenderWidgetHost* widget_host,
+                               content::WebContents* web_contents,
+                               const cc::RenderFrameMetadata& metadata) {
+  PageImpl* page = FromWebContents(web_contents);
+  if (!page ||
+      widget_host !=
+          web_contents->GetPrimaryMainFrame()->GetRenderWidgetHost() ||
+      page->root_background_color_ == metadata.root_background_color) {
+    return;
+  }
+  page->root_background_color_ = metadata.root_background_color;
+  page->NotifyStateChanged();
 }
 
 void PageImpl::WebContentsDestroyed() {

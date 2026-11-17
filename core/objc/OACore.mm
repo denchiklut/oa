@@ -488,6 +488,18 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
                : OAPageNavigationResultNone;
 }
 
+- (nullable NSColor*)rootBackgroundColor {
+  std::optional<oa::Color> color =
+      _page ? _page->GetRootBackgroundColor() : std::nullopt;
+  if (!color) {
+    return nil;
+  }
+  return [NSColor colorWithSRGBRed:color->red
+                             green:color->green
+                              blue:color->blue
+                             alpha:color->alpha];
+}
+
 - (BOOL)isCameraOn {
   return _page && _page->IsCameraOn();
 }
