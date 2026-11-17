@@ -7,10 +7,11 @@ import SwiftUI
 struct ExtensionRequestView: View {
     let model: WindowModel
     let request: PageExtensionRequest
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
-            Backdrop(onClick: {}, color: NSColor.black.withAlphaComponent(0.45))
+            Backdrop(onClick: {}, color: DialogView.scrim(dark: colorScheme == .dark))
             KeyTrap(onReturn: { answer(true) }, onEscape: { answer(false) })
             // As Arc's Dialogs sheet, which its install prompt is.
             panel
