@@ -69,8 +69,7 @@ what Arc does; nothing in Arc's code makes the call, so the call is Oa's own.
 
 The sheets use Arc's wording, sizes and colours as measured in light
 appearance. The dark colours are Oa's own, and so are the symbols in place of
-Arc's mascot art. Each Space card shows the window's theme until Spaces have
-themes of their own.
+Arc's mascot art. Each Space card shows its Space's theme.
 
 ## Moving a Space to another profile
 
