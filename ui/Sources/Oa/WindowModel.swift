@@ -32,11 +32,11 @@ final class WindowModel {
     private(set) var peeks: [UUID: any Page] = [:]
     private(set) var library: LibrarySection? {
         didSet {
-            if let library { lastLibrarySection = library }
+            if let library { store.home.lastSelectedHomePage = library }
             if library != .archive { closeArchivePeek() }
         }
     }
-    private(set) var lastLibrarySection = LibrarySection.downloads
+    var lastLibrarySection: LibrarySection { store.home.lastSelectedHomePage }
     /// As Arc's `WindowState.sidebarMode` and width: the window's own, saved with it.
     private(set) var sidebarMode: SidebarMode
     private(set) var sidebarWidth: CGFloat

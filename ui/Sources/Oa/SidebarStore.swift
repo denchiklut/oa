@@ -24,12 +24,14 @@ final class SidebarStore {
     @ObservationIgnored var closing: [UUID: CloseRequest] = [:]
     @ObservationIgnored var deletingSpace: ClosingSpace?
     @ObservationIgnored let commandBarPicks: CommandBarPicks
+    @ObservationIgnored let home: StorableHome
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
 
     init(directory: URL) {
         persistence = SidebarPersistence(directory: directory)
         favicons = FaviconCache(directory: directory)
         commandBarPicks = CommandBarPicks(directory: directory)
+        home = StorableHome(directory: directory)
         state = persistence.loadSidebar() ?? .initial()
         let windows = persistence.loadWindows()
         savedWindows = windows?.windows ?? []
