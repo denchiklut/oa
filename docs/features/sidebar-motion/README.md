@@ -151,9 +151,11 @@ surface at once, around the card and in the floating panel, with no moving
 edge. The colours cross-fade in encoded values, which fits Arc's measured
 mid-swipe colours best, and the next theme's material, where it differs, comes
 in over the other's at the same progress. The header's icons and the dock blend
-with it, being drawn over it. The chrome takes the nearer Space's appearance
-and colours, switching at the halfway point, Oa's own: what Arc does between a
-light and a dark theme wasn't traced. The page card keeps the old Space's page
+with it, being drawn over it. The chrome keeps the appearance and colours of
+the Space the pages left and takes the next one's once they rest on it, as Arc
+and open-arch do. A click on a dot further away than the next Space blends the
+two Spaces' themes straight into each other while the pages pass the ones
+between, whose themes never show. The page card keeps the old Space's page
 until the swipe lands, as Arc's does.
 
 Recorded against Arc's captures: the page follows each event at 0.5; held at 48
