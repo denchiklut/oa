@@ -204,12 +204,20 @@ final class WindowModel {
         context.setSiteSetting(setting.type, to: setting.value.isAllowed ? .block : .allow, for: url)
     }
 
-    /// Arc shows the page in a panel in the window; a new tab is Oa's own.
+    /// As Arc: in a Peek over the tab (arc-site-controls.md §1).
     func openAllSiteSettings() {
-        guard let url = page?.url, var components = URLComponents(string: "chrome://settings/content/siteDetails")
+        guard let tabID = selectedTabID, let url = page?.url, let profile = state.profile(containing: tabID),
+            var components = URLComponents(string: "chrome://settings/content/siteDetails")
         else { return }
         components.queryItems = [URLQueryItem(name: "site", value: url.absoluteString)]
-        if let settings = components.url { newTab(settings) }
+        guard let settings = components.url else { return }
+        let context = engine.browserContext(id: profile.id)
+        Task { [weak self, id] in
+            guard let page = await context.makePage(windowID: id, restoring: nil)?.page, let self else { return }
+            guard pages[tabID] != nil else { return page.drop() }
+            peek(page, from: tabID)
+            page.load(settings)
+        }
     }
 
     func siteSetting(_ type: SiteSettingType, ofPage pageID: UUID) -> SiteSettingValue? {
