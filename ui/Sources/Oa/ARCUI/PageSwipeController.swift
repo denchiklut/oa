@@ -94,12 +94,12 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
                 NSApplication.shared.sendEvent(next)
                 continue
             }
-            let (x, y) = (next.scrollingDeltaX, next.scrollingDeltaY)
-            if next.phase.contains(.changed), abs(y) <= abs(x) {
-                position -= 0.5 * x
+            // As Arc's loop: a swipe that has begun keeps every movement, whichever way it leans, until the lift.
+            if next.phase.contains(.changed) {
+                position -= 0.5 * next.scrollingDeltaX
                 samples = samples.filter { next.timestamp - $0.time <= 0.1 } + [(next.timestamp, position)]
                 presentationPosition = banded(position)
-            } else if !next.phase.isEmpty {
+            } else if next.phase.contains(.ended) || next.phase.contains(.cancelled) {
                 end(at: next.timestamp)
             }
         }
