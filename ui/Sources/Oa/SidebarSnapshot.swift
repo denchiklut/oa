@@ -159,14 +159,16 @@ struct WindowRecord: Codable {
     var sidebarWidth: CGFloat
     var lastActiveDates: [UUID: Date]
     var createdDates: [UUID: Date]
+    var collapsedPinnedSpaces: Set<UUID>
 
     private enum Key: String, CodingKey {
         case id, selectedSpaceID, sidebarMode, sidebarWidth, lastActiveDates, createdDates
+        case collapsedPinnedSpaces = "spacesWithCollapsedPinnedSections"
     }
 
     init(
         id: UUID, selectedSpaceID: UUID, sidebarMode: SidebarMode, sidebarWidth: CGFloat,
-        lastActiveDates: [UUID: Date], createdDates: [UUID: Date]
+        lastActiveDates: [UUID: Date], createdDates: [UUID: Date], collapsedPinnedSpaces: Set<UUID>
     ) {
         self.id = id
         self.selectedSpaceID = selectedSpaceID
@@ -174,6 +176,7 @@ struct WindowRecord: Codable {
         self.sidebarWidth = sidebarWidth
         self.lastActiveDates = lastActiveDates
         self.createdDates = createdDates
+        self.collapsedPinnedSpaces = collapsedPinnedSpaces
     }
 
     /// The dates are by tab ID string, so each is a JSON object; a file from before them has none, and one from
@@ -191,6 +194,7 @@ struct WindowRecord: Codable {
         }
         lastActiveDates = try dates(.lastActiveDates)
         createdDates = try dates(.createdDates)
+        collapsedPinnedSpaces = try values.decodeIfPresent(Set<UUID>.self, forKey: .collapsedPinnedSpaces) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -204,6 +208,8 @@ struct WindowRecord: Codable {
         }
         try values.encode(stored(lastActiveDates), forKey: .lastActiveDates)
         try values.encode(stored(createdDates), forKey: .createdDates)
+        try values.encode(
+            collapsedPinnedSpaces.sorted { $0.uuidString < $1.uuidString }, forKey: .collapsedPinnedSpaces)
     }
 }
 

@@ -239,10 +239,13 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         controller.open(cascadingFrom: previous)
         if let record {
             controller.model.restore(record)
-        } else if let tabID {
-            controller.model.select(tabID)
         } else {
-            controller.model.showFirst(isOnlyWindow: windows.count == 1)
+            if let opener = source ?? key?.model { controller.model.inheritCollapsedPinnedSpaces(from: opener) }
+            if let tabID {
+                controller.model.select(tabID)
+            } else {
+                controller.model.showFirst(isOnlyWindow: windows.count == 1)
+            }
         }
         return controller.model
     }

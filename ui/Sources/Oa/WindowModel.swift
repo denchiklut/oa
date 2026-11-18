@@ -37,6 +37,8 @@ final class WindowModel {
             presentationChanged()
         }
     }
+    /// As Arc's per-window `spacesWithCollapsedPinnedSections`: the Spaces whose pinned tabs this window folds away.
+    private(set) var collapsedPinnedSpaces: Set<UUID> = []
     private(set) var library: LibrarySection? {
         didSet {
             if let library { store.home.lastSelectedHomePage = library }
@@ -134,7 +136,7 @@ final class WindowModel {
     var record: WindowRecord {
         WindowRecord(
             id: id, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode, sidebarWidth: sidebarWidth,
-            lastActiveDates: lastActiveDates, createdDates: createdDates)
+            lastActiveDates: lastActiveDates, createdDates: createdDates, collapsedPinnedSpaces: collapsedPinnedSpaces)
     }
 
     init(
@@ -160,6 +162,7 @@ final class WindowModel {
         sidebarWidth = record.sidebarWidth
         lastActiveDates = record.lastActiveDates
         createdDates = record.createdDates
+        collapsedPinnedSpaces = record.collapsedPinnedSpaces
         openCommandBar(.newTab)
     }
 
@@ -487,6 +490,16 @@ final class WindowModel {
         closeCommandBar()
         library = nil
         spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID)
+    }
+
+    /// As Arc: a new window starts with the collapsed sections of the window it came from.
+    func inheritCollapsedPinnedSpaces(from source: WindowModel) {
+        collapsedPinnedSpaces = source.collapsedPinnedSpaces
+    }
+
+    func togglePinnedSection(of spaceID: UUID) {
+        if collapsedPinnedSpaces.remove(spaceID) == nil { collapsedPinnedSpaces.insert(spaceID) }
+        store.windowStateChanged()
     }
 
     /// Where the panel's page and dock item sit among the Spaces: where the Space will go.

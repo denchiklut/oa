@@ -154,6 +154,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         ProfileDialogUtils.createProfile(checking: [model.selectedSpaceID], in: model)
     }
 
+    @objc func togglePinnedSection(_ sender: Any?) {
+        if let space = model.space { model.togglePinnedSection(of: space.id) }
+    }
+
     @objc func newSpace(_ sender: Any?) {
         model.beginSpaceCreation(after: model.selectedSpaceID)
     }
@@ -240,6 +244,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             guard let tabID = model.selectedTabID else { return false }
             item.title = model.state.isFavorite(tabID) ? "Unfavorite Tab" : "Favorite Tab"
             return true
+        }
+        if item.action == #selector(togglePinnedSection(_:)) {
+            let collapsed = model.space.map { model.collapsedPinnedSpaces.contains($0.id) } ?? false
+            item.title = collapsed ? "Expand Pinned Tabs" : "Collapse Pinned Tabs"
+            return model.space != nil && model.spaceCreation == nil
         }
         if item.action == #selector(toggleSidebarMode(_:)) {
             item.title = model.sidebarMode == .anchored ? "Hide Sidebar" : "Show Sidebar"
