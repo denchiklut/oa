@@ -4,6 +4,8 @@ import SwiftUI
 struct SpaceManagementCardHeader: View {
     let model: WindowModel
     let space: SidebarSpace
+    @Binding var isPickingIcon: Bool
+    @Binding var isEditingName: Bool
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -11,8 +13,6 @@ struct SpaceManagementCardHeader: View {
     @State private var isIconHovered = false
     @State private var isProfileHovered = false
     @State private var isProfileMenuOpen = false
-    @State private var isPickingIcon = false
-    @State private var isEditingName = false
     @FocusState private var isIconFocused: Bool
 
     private var isDark: Bool { colorScheme == .dark }
@@ -235,7 +235,7 @@ struct SpaceIconGlyph: View {
     }
 }
 
-private struct SpaceIconPicker: View {
+struct SpaceIconPicker: View {
     let selection: String?
     let choose: (String?) -> Void
     @State private var category: Category

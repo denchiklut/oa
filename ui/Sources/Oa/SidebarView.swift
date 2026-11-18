@@ -120,28 +120,12 @@ private struct SidebarDock: View {
                     .buttonStyle(.plain)
                     .help(space.name)
                     .accessibilityLabel(space.name)
-                    .contextMenu { SpaceMenuItems(model: model, space: space) }
+                    .spaceContextMenu { SpaceMenu(model: model, layout: layout, space: space) }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(height: 34)
-    }
-}
-
-struct SpaceMenuItems: View {
-    let model: WindowModel
-    let space: SidebarSpace
-
-    var body: some View {
-        Button("Rename…") {
-            if let name = NamePrompt.run("Rename Space", name: space.name) { model.renameSpace(space.id, to: name) }
-        }
-        Menu("Set Profile") {
-            SpaceProfileMenuItems(model: model, space: space)
-        }
-        Button("Delete") { SpaceDeletion.confirm(space, in: model) }
-            .disabled(model.state.spaces.count == 1)
     }
 }
 
@@ -483,6 +467,7 @@ struct TabRow: View {
         .frame(height: 40)
         .onHover { hovering = $0 }
         .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
+        .spaceMenuExclusion()
         .contextMenu {
             if !pinned {
                 Button("Archive Tab") { model.close(tab.id) }

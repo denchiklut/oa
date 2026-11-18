@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Arc's Spaces page of the Library: a card for each Space in a row that scrolls sideways, 24 pt apart and 24 pt in,
@@ -88,6 +89,8 @@ private struct SpaceManagementCollectionViewItem: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let space: SidebarSpace
+    @State private var isPickingIcon = false
+    @State private var isEditingName = false
     @Environment(\.windowColorScheme) private var windowColorScheme
 
     var body: some View {
@@ -96,8 +99,10 @@ private struct SpaceManagementCollectionViewItem: View {
         let theme = Theme(palette: space.theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         let unpinned = model.state.tabs(in: space.id, pinned: false)
         VStack(alignment: .leading, spacing: 0) {
-            SpaceManagementCardHeader(model: model, space: space)
-                .padding([.horizontal, .top], 8)
+            SpaceManagementCardHeader(
+                model: model, space: space, isPickingIcon: $isPickingIcon, isEditingName: $isEditingName
+            )
+            .padding([.horizontal, .top], 8)
             ScrollView {
                 VStack(spacing: 1) {
                     ForEach(model.state.tabs(in: space.id, pinned: true)) { row($0) }
@@ -111,6 +116,7 @@ private struct SpaceManagementCollectionViewItem: View {
                 .animation(
                     .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: model.state.tabs(in: space.id).map(\.id))
             }
+            footer
         }
         .environment(\.colorScheme, appearance.colorScheme)
         .environment(\.theme, theme)
@@ -124,9 +130,73 @@ private struct SpaceManagementCollectionViewItem: View {
         }
     }
 
+    /// Arc's `SpaceControlsView`: the handle and "⋯", 28 pt each with GrayA4 under the pointer.
+    private var footer: some View {
+        HStack(spacing: 0) {
+            SpaceManagementDraggerView()
+            Spacer(minLength: 0)
+            SpaceMenuButton {
+                SpaceMenu(model: model, space: space, inLibrary: true) {
+                    // Oa's own: where Arc's card shows the picker is unknown, so the header's opens.
+                    isPickingIcon = true
+                } rename: {
+                    isEditingName = true
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12, weight: .bold))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(SpaceManagementControlStyle())
+            .help("More options")
+            .accessibilityLabel("More options")
+        }
+        .foregroundStyle(.primary.opacity(0.5))
+        .padding(8)
+    }
+
     private func row(_ tab: SidebarTab) -> some View {
         TabRow(model: model, layout: layout, tab: tab, spaceID: space.id, place: .card)
             .transition(.opacity)
+    }
+}
+
+/// Arc's `SpaceManagementDrggerView`: the open hand over it, as Arc's cursor rect.
+private struct SpaceManagementDraggerView: View {
+    @State private var isHovered = false
+
+    var body: some View {
+        Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+            .font(.system(size: 13, weight: .semibold))
+            .frame(width: 28, height: 28)
+            .background(isHovered ? ARCUIColor.grayA4 : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+            .onHover { inside in
+                isHovered = inside
+                if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
+            }
+            .help("Drag to Reorder Space")
+            .accessibilityLabel("Drag to Reorder Space")
+    }
+}
+
+private struct SpaceManagementControlStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HoverFill(configuration: configuration)
+    }
+
+    private struct HoverFill: View {
+        let configuration: Configuration
+        @State private var isHovered = false
+
+        var body: some View {
+            configuration.label
+                .background(
+                    isHovered ? ARCUIColor.grayA4 : .clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+                .onHover { isHovered = $0 }
+        }
     }
 }
 

@@ -81,7 +81,7 @@ private struct SidebarSpacePage: View {
         ScrollView {
             // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
             VStack(spacing: 1) {
-                SpaceNameRow(model: model, space: space)
+                SpaceNameRow(model: model, layout: layout, space: space)
                     .sidebarDragFrame { drag?.lists[space.id, default: .init()].pinnedTop = $0.maxY + 0.5 }
                 ForEach(items) { item in
                     switch item {
@@ -102,6 +102,10 @@ private struct SidebarSpacePage: View {
             // As measured on Arc: an archived row fades where it is while the rows below close up.
             .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
         }
+        // As Arc's: the list's empty space and its rows without a menu of their own give the Space's.
+        .spaceContextMenu(isEnabled: space.id == model.selectedSpaceID && model.library == nil) {
+            SpaceMenu(model: model, layout: layout, space: space)
+        }
         .sidebarDragFrame { drag?.lists[space.id, default: .init()].area = $0 }
     }
 }
@@ -110,6 +114,7 @@ private struct SidebarSpacePage: View {
 /// menu. The chevron Arc shows on hover is left out until what it does is known.
 private struct SpaceNameRow: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     let space: SidebarSpace
     @State private var over = false
     @State private var hovering = false
@@ -130,15 +135,13 @@ private struct SpaceNameRow: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
             if hovering {
-                Menu {
-                    SpaceMenuItems(model: model, space: space)
+                SpaceMenuButton {
+                    SpaceMenu(model: model, layout: layout, space: space)
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(theme.tertiaryText)
                 }
-                .menuStyle(.button)
-                .menuIndicator(.hidden)
                 .buttonStyle(CellButtonStyle())
                 .help("More")
             }
@@ -150,7 +153,13 @@ private struct SpaceNameRow: View {
             hovering ? theme.itemFill : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
         .contentShape(Rectangle())
-        .contextMenu { SpaceMenuItems(model: model, space: space) }
+        .popover(isPresented: pickingIcon, arrowEdge: .bottom) {
+            SpaceIconPicker(selection: space.icon) { icon in
+                model.setSpaceIcon(icon, for: space.id)
+                layout.iconPickerSpaceID = nil
+            }
+        }
+        .onChange(of: pickingIcon.wrappedValue) { layout.setHold(.popover, $1) }
         .onHover { over = $0 }
         // As measured on Arc: the hover shows ≈ 135 ms after the pointer arrives, and goes at once.
         .task(id: over) {
@@ -159,6 +168,14 @@ private struct SpaceNameRow: View {
             if !Task.isCancelled { hovering = true }
         }
         .frame(height: 38, alignment: .top)
+    }
+
+    private var pickingIcon: Binding<Bool> {
+        Binding {
+            layout.iconPickerSpaceID == space.id
+        } set: {
+            if !$0, layout.iconPickerSpaceID == space.id { layout.iconPickerSpaceID = nil }
+        }
     }
 }
 
