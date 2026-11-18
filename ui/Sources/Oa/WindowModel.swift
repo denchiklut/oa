@@ -489,6 +489,13 @@ final class WindowModel {
         spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID)
     }
 
+    /// Where the panel's page and dock item sit among the Spaces: where the Space will go.
+    var spaceCreationIndex: Int? {
+        guard let creation = spaceCreation else { return nil }
+        let spaces = state.spaces
+        return creation.insertAfter.flatMap { id in spaces.firstIndex { $0.id == id } }.map { $0 + 1 } ?? spaces.count
+    }
+
     func updateSpaceCreation(_ change: (inout SpaceCreationState) -> Void) {
         guard var creation = spaceCreation else { return }
         change(&creation)

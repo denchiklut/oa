@@ -16,6 +16,8 @@ final class WindowLayoutController: NSViewController {
     private static let homeWidth: CGFloat = 417
     /// The Library opening and closing from a button, as measured in Arc: critically damped.
     private static let homeSpring = (response: 0.205, damping: 1.0)
+    /// The Create a Space page sliding in, as measured in Arc.
+    private static let spaceCreationSpring = (response: 0.21, damping: 1.0)
     /// Arc's lock and unlock: the sidebar and the page change frames together, over 0.08 s on this curve.
     private static let lockAnimation = Animation.timingCurve(0.25, 0.46, 0.45, 0.94, duration: 0.08)
     /// The floating panel's slide as measured in Arc: its code reads a period of 0.18 s at the same damping.
@@ -54,12 +56,8 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private var pullArmedAt: CFTimeInterval?
     /// As Arc: only a swipe that starts on the last Space, with no panel open, pulls.
     @ObservationIgnored private var pullAllowed: Bool?
-    /// The cross-fade onto the Create a Space page, as measured on Arc: 0.2 s, the page swapped at once beneath it.
-    private(set) var spaceCreationReveal: CGFloat = 1
-    @ObservationIgnored private var revealStart: CFTimeInterval?
-    @ObservationIgnored private let revealTicker = DisplayLinkTicker()
-    /// The Space a swipe off the Create a Space page landed on: the panel closes once the pager rests there.
-    @ObservationIgnored private var leavingSpaceCreationFor: UUID?
+    /// The pull opens the panel its own way; the others slide it in.
+    @ObservationIgnored private var pulledSpaceCreation = false
     /// The Space whose name shows the icon picker its menu asked for.
     var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
@@ -83,18 +81,15 @@ final class WindowLayoutController: NSViewController {
             switch page {
             case .home:
                 model.viewLibrary()
-            case .space(let id) where model.spaceCreation != nil:
-                self?.leavingSpaceCreationFor = id
             case .space(let id):
                 model.exitLibrary()
                 model.selectSpace(id)
             case .spaceCreation:
-                self?.leavingSpaceCreationFor = nil
+                break
             }
         }
         pager.trackingStateUpdateHandler = { [weak self] in
             self?.trackPull()
-            self?.leaveSpaceCreation()
             self?.updatePages()
         }
         pager.scrollingShouldBegin = { [weak self] in self?.scrollingShouldBegin($0) ?? false }
@@ -123,7 +118,7 @@ final class WindowLayoutController: NSViewController {
 
     /// Arc's gate on a swipe: between Spaces it starts over the sidebar, and with the Library in view anywhere.
     private func scrollingShouldBegin(_ event: NSEvent) -> Bool {
-        guard model.spaceCreation?.phase != .animating, spaceCreationReveal == 1 else { return false }
+        guard model.spaceCreation?.phase != .animating else { return false }
         guard libraryProgress == 0 else { return true }
         let point = CGPoint(x: event.locationInWindow.x, y: view.bounds.height - event.locationInWindow.y)
         let inset = sidebarPresentation == .floating ? Self.floatingInset : 0
@@ -136,12 +131,21 @@ final class WindowLayoutController: NSViewController {
         CGFloat(leadingSpace) * sidebarWidth + max(pagerPosition - Self.homeWidth, 0)
     }
 
-    /// 0 among the Spaces and 1 on the Create a Space page, by the pager or by the cross-fade.
+    /// Arc's sidebar pages in order: one per Space, and while the Create a Space panel is open its page, at the slot
+    /// the Space will take.
+    var sidebarPages: [WindowLayoutPage] {
+        var pages = model.state.spaces.map { WindowLayoutPage.space($0.id) }
+        if let index = model.spaceCreationIndex { pages.insert(.spaceCreation, at: index) }
+        return pages
+    }
+
+    /// Where the sidebar's pages are, in pages from the first.
+    var sidebarPage: CGFloat { sidebarScrollOffset / sidebarWidth }
+
+    /// 0 among the Spaces and 1 on the Create a Space page.
     var spaceCreationProgress: CGFloat {
-        guard model.spaceCreation != nil else { return 0 }
-        guard spaceCreationReveal == 1 else { return spaceCreationReveal }
-        let last = CGFloat(model.state.spaces.count - 1)
-        return min(max(sidebarScrollOffset / sidebarWidth - last, 0), 1)
+        guard let index = model.spaceCreationIndex else { return 0 }
+        return max(0, 1 - abs(sidebarPage - CGFloat(index)))
     }
 
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
@@ -162,23 +166,21 @@ final class WindowLayoutController: NSViewController {
     }
 
     private var spaceThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
-        let spaces = model.state.spaces
-        guard let restingSpaceID, !spaces.isEmpty else { return (model.space?.theme ?? .default, nil) }
-        let last = spaces.count - 1
-        if model.spaceCreation != nil {
-            let creation = spaceCreationProgress
-            let from: WindowTheme = spaceCreationReveal < 1 ? model.space?.theme ?? .default : spaces[last].theme
-            if creation == 1 { return (.default, nil) }
-            return creation == 0 ? (from, nil) : (from, (WindowTheme.default, creation))
+        let pages = sidebarPages
+        guard let restingSpaceID, !pages.isEmpty else { return (model.space?.theme ?? .default, nil) }
+        // As Arc: the Create a Space page is in the default theme until one is chosen.
+        let themes = pages.map { page in
+            if case .space(let id) = page { model.state.space(id)?.theme ?? .default } else { WindowTheme.default }
         }
-        let page = min(max(sidebarScrollOffset / sidebarWidth, 0), CGFloat(last))
+        let last = pages.count - 1
+        let page = min(max(sidebarPage, 0), CGFloat(last))
         let from: Int
         let to: Int
         // As Arc and open-arch: pages moved to a Space further away than the next blend the resting Space's theme
         // straight into the selected one's, never through the themes of the Spaces between.
         if !pager.isTracking, restingSpaceID != model.selectedSpaceID,
-            let source = spaces.firstIndex(where: { $0.id == restingSpaceID }),
-            let destination = spaces.firstIndex(where: { $0.id == model.selectedSpaceID })
+            let source = pages.firstIndex(of: .space(restingSpaceID)),
+            let destination = pages.firstIndex(of: .space(model.selectedSpaceID))
         {
             from = source
             to = destination
@@ -186,24 +188,19 @@ final class WindowLayoutController: NSViewController {
             from = Int(page.rounded(.down))
             to = min(from + 1, last)
         }
-        guard from != to else { return (spaces[from].theme, nil) }
+        guard from != to else { return (themes[from], nil) }
         let progress = (page - CGFloat(from)) / CGFloat(to - from)
-        if progress <= 0 { return (spaces[from].theme, nil) }
-        if progress >= 1 { return (spaces[to].theme, nil) }
-        return (spaces[from].theme, (spaces[to].theme, progress))
+        if progress <= 0 { return (themes[from], nil) }
+        if progress >= 1 { return (themes[to], nil) }
+        return (themes[from], (themes[to], progress))
     }
 
     private func updatePages() {
         let spaces = model.state.spaces
-        let index = spaces.firstIndex { $0.id == model.selectedSpaceID } ?? 0
+        let sidebarPages = sidebarPages
+        let index = sidebarPages.firstIndex(of: .space(model.selectedSpaceID)) ?? 0
         let target: WindowLayoutPage =
-            if model.library != nil {
-                .home
-            } else if let leaving = leavingSpaceCreationFor {
-                .space(leaving)
-            } else {
-                model.spaceCreation != nil ? .spaceCreation : .space(model.selectedSpaceID)
-            }
+            model.library != nil ? .home : model.spaceCreation != nil ? .spaceCreation : .space(model.selectedSpaceID)
         let throughHome = target == .home || pager.selectedPageID == .home
         if pager.selectedPageID != target {
             leadingSpace = throughHome ? index : 0
@@ -218,14 +215,23 @@ final class WindowLayoutController: NSViewController {
         }
         if target != .home { homeOrder = nil }
         let home = PageSwipeController<WindowLayoutPage>.Page(id: .home, width: Self.homeWidth)
-        var pages =
-            [home] + spaces[min(leadingSpace, spaces.count)...].map { .init(id: .space($0.id), width: sidebarWidth) }
-        if model.spaceCreation != nil { pages.append(.init(id: .spaceCreation, width: sidebarWidth)) }
-        pager.setPages(pages, selecting: target)
+        let pages =
+            [home] + sidebarPages[min(leadingSpace, sidebarPages.count)...].map { .init(id: $0, width: sidebarWidth) }
+        // As measured on Arc: the panel goes in one frame and the pager settles back from where it was.
+        pager.setPages(pages, selecting: target, settling: (0.175, 1))
         if target == .spaceCreation, pager.selectedPageID != target {
-            // As Arc: the page is swapped at once and cross-fades in, rather than sliding.
-            pager.select(target, animated: false)
-            revealSpaceCreation()
+            if pulledSpaceCreation {
+                // As measured on Arc: the panel is in place at once, 11 pt short of it, and the theme with it.
+                pulledSpaceCreation = false
+                pager.select(target, animated: true, spring: Self.spaceCreationSpring, offset: 11)
+            } else {
+                // As Arc: the Library goes at once, then the panel's page slides in beside the window's Space, or
+                // at the end past the Spaces between.
+                if pager.selectedPageID == .home {
+                    pager.select(.space(model.selectedSpaceID), animated: false, notifying: false)
+                }
+                pager.select(target, animated: true, spring: Self.spaceCreationSpring)
+            }
         } else if pager.selectedPageID != target {
             let settle = PageSwipeController<WindowLayoutPage>.settle
             pager.select(target, animated: true, spring: throughHome ? Self.homeSpring : settle)
@@ -282,27 +288,15 @@ final class WindowLayoutController: NSViewController {
         pullAllowed = nil
         let armedAt = pullArmedAt
         pullArmedAt = nil
-        if let armedAt, CACurrentMediaTime() - armedAt > 0.1 { model.beginSpaceCreation() }
-    }
-
-    private func leaveSpaceCreation() {
-        guard let id = leavingSpaceCreationFor, !pager.isTracking, !pager.isAnimating else { return }
-        leavingSpaceCreationFor = nil
-        model.selectSpace(id)
-    }
-
-    private func revealSpaceCreation() {
-        guard let window = view.window else { return }
-        revealStart = nil
-        spaceCreationReveal = 0
-        revealTicker.start(in: window) { [weak self] in
+        guard let armedAt, CACurrentMediaTime() - armedAt > 0.1 else { return }
+        // As measured on Arc: the page holds where it was let go for 70 ms, then the panel cuts in.
+        pager.hold()
+        pulledSpaceCreation = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) { [weak self] in
             guard let self else { return }
-            let now = CACurrentMediaTime()
-            let start = revealStart ?? now
-            revealStart = start
-            let t = min((now - start) / 0.2, 1)
-            spaceCreationReveal = t * t * (3 - 2 * t)
-            if t == 1 { revealTicker.stop() }
+            guard pulledSpaceCreation, !pager.isTracking else { return pulledSpaceCreation = false }
+            model.beginSpaceCreation()
+            updatePages()
         }
     }
 

@@ -33,7 +33,8 @@ struct SidebarHeader: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .frame(height: showsToolbar ? 36 : 46, alignment: .top)
             .background(WindowDragRegion())
-            if !showsToolbar {
+            // As Arc: the Create a Space panel takes the URL field's place.
+            if !showsToolbar, model.spaceCreation == nil {
                 SidebarAddressField(model: model, layout: layout)
                     .padding(.horizontal, 8)
             }

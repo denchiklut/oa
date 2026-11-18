@@ -40,35 +40,51 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         pages.firstIndex { $0.id == id }.map(origin(at:))
     }
 
-    /// At rest the pager stays on its page as the pages around it change.
-    func setPages(_ pages: [Page], selecting id: PageID) {
+    /// What is shown stays where it is as pages come and go before it, mid-swipe or mid-spring too. When the page
+    /// shown goes, the pager settles on `id` from there, as Arc's does when the Create a Space page closes.
+    func setPages(_ pages: [Page], selecting id: PageID, settling shape: (Double, Double) = settle) {
         guard pages != self.pages || selectedPageID == nil else { return }
+        let shown = selectedPageID.flatMap(origin(of:))
         self.pages = pages
-        if selectedPageID.flatMap(origin(of:)) == nil { selectedPageID = id }
-        guard !isTracking else { return }
+        if let shown, let kept = selectedPageID.flatMap(origin(of:)) {
+            position += kept - shown
+            presentationPosition += kept - shown
+            spring?.from += kept - shown
+            spring?.to += kept - shown
+            return
+        }
+        if shown != nil, !isTracking { return select(id, animated: true, spring: shape) }
+        selectedPageID = id
+        guard !isTracking, let origin = origin(of: id) else { return }
         stop()
-        guard let origin = selectedPageID.flatMap(origin(of:)) else { return }
         (position, presentationPosition) = (origin, origin)
     }
 
-    /// A nil velocity starts the spring at rest, as a click or a key does.
+    /// A nil velocity starts the spring at rest, as a click or a key does. With an offset the page shows that far
+    /// from its place at once and springs back. Unnotified, the owner already shows the page's state.
     func select(
-        _ id: PageID, animated: Bool, velocity: CGFloat? = nil, spring shape: (Double, Double) = settle
+        _ id: PageID, animated: Bool, velocity: CGFloat? = nil, spring shape: (Double, Double) = settle,
+        offset: CGFloat? = nil, notifying: Bool = true
     ) {
         guard origin(of: id) != nil else { return }
         let changed = selectedPageID != id
         selectedPageID = id
-        if changed { pageSelectionHandler(id) }
+        if changed, notifying { pageSelectionHandler(id) }
         // Stopping tells the owner, which may lay the pages out again: the page's place is read after.
         stop()
         guard let target = origin(of: id) else { return }
         position = target
+        if let offset { presentationPosition = target + offset }
         guard animated, presentationPosition != target, let window = windowProvider() else {
             return presentationPosition = target
         }
         spring = (presentationPosition, target, velocity ?? 0, 0, nil, shape)
         isAnimating = true
         ticker.start(in: window) { [weak self] in self?.step() }
+    }
+
+    func hold() {
+        stop()
     }
 
     /// Whether the pager took the event. A scroll view forwards only the start of a swipe it has no use for, so the

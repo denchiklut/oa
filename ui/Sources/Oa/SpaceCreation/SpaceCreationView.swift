@@ -1,28 +1,65 @@
 import SwiftUI
 
+/// Arc's `SpaceCreationView`, as measured on Arc: 36 pt cards 14 pt in from the sidebar's edges and 8 pt apart, the
+/// name field lighter than the other two, Create Space and Cancel at the bottom. After Create Space it plays Arc's
+/// splash: the form fades, the header artwork drops, doubles and flips into a 🙌 card, a glow pulses, the card fades,
+/// and the Space is made, 2.18 s after the click.
 struct SpaceCreationView: View {
     let model: WindowModel
     let creation: SpaceCreationState
     @State private var pickingIcon = false
+    @State private var lifted = false
+    @State private var glowing = false
+    @State private var cardFaded = false
     @FocusState private var nameFocused: Bool
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let editing = creation.phase == .editing
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // As measured on Arc: the card ends centred across the sidebar, 12 pt below the panel's middle.
+                SpaceCreationArtwork(flip: lifted ? 1 : 0, glowing: glowing, dark: colorScheme == .dark)
+                    .scaleEffect(lifted ? 2 : 1)
+                    .offset(y: lifted ? geometry.size.height / 2 + 12 - 56 : 0)
+                    .opacity(cardFaded ? 0 : 1)
+                    .zIndex(1)
+                    .padding(.top, 36)
+                form
+                    .opacity(editing ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.25).delay(0.05), value: editing)
+            }
+        }
+        .padding(.horizontal, 14)
+        .allowsHitTesting(editing)
+        .onAppear { nameFocused = true }
+        .task(id: editing) {
+            guard !editing else { return }
+            withAnimation(.spring(response: 0.8, dampingFraction: 1).delay(0.3)) { lifted = true }
+            try? await Task.sleep(for: .milliseconds(1330))
+            glowing = true
+            try? await Task.sleep(for: .milliseconds(445))
+            withAnimation(.easeInOut(duration: 0.4)) { cardFaded = true }
+            try? await Task.sleep(for: .milliseconds(405))
+            model.completeSpaceCreation()
+        }
+    }
+
+    private var form: some View {
         VStack(spacing: 0) {
-            SpaceCreationArtwork()
-                .padding(.top, 12)
             Text("Create a Space")
                 .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(theme.foreground)
-                .padding(.top, 10)
+                .padding(.top, 18)
             Text("Separate your tabs for life, work, projects, and more.")
                 .font(.system(size: 13))
+                .lineSpacing(1.5)
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-            VStack(spacing: 6) {
-                card {
+                .padding(.top, 11)
+            VStack(spacing: 8) {
+                card(fill: colorScheme == .dark ? .white.opacity(0.08) : .white.opacity(0.55)) {
                     Button {
                         pickingIcon = true
                     } label: {
@@ -30,12 +67,11 @@ struct SpaceCreationView: View {
                             if let glyph = creation.icon {
                                 SpaceIconGlyph(icon: glyph)
                             } else {
-                                Image(systemName: "plus.square")
+                                Image(systemName: "plus.square.dashed")
                             }
                         }
                     }
                     .buttonStyle(.plain)
-                    .help("Choose an icon")
                     .popover(isPresented: $pickingIcon, arrowEdge: .bottom) {
                         SpaceIconPicker(selection: creation.icon) { icon in
                             model.updateSpaceCreation { $0.icon = icon }
@@ -44,32 +80,32 @@ struct SpaceCreationView: View {
                     }
                     TextField("Space name…", text: title)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(theme.foreground)
                         .focused($nameFocused)
-                        .onSubmit { model.triggerSpaceCreation() }
                 }
                 card {
-                    icon { Image(systemName: "face.smiling.fill") }
+                    icon { Image(systemName: "face.smiling") }
                     Text("Profile")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(theme.foreground)
-                    profilePicker
+                        .fixedSize()
+                    profilePicker.layoutPriority(1)
                     Spacer(minLength: 0)
                     Image(systemName: "info.circle")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(theme.foreground.opacity(0.8))
-                        .help("Spaces in the same Profile share history, logins, and extensions.")
+                        .help("You can use a Profile to give this Space its own logins, history, and browsing data.")
                 }
                 card {
-                    icon { Image(systemName: "paintbrush.pointed") }
+                    icon { Image(systemName: "paintbrush.pointed.fill") }
                     Text("Choose a Theme")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(theme.foreground)
                     Spacer(minLength: 0)
                 }
             }
-            .padding(.top, 20)
+            .padding(.top, 31)
             Spacer(minLength: 16)
             Button {
                 model.triggerSpaceCreation()
@@ -78,10 +114,10 @@ struct SpaceCreationView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(creation.canCreate ? 1 : 0.35))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 30)
+                    .frame(height: 36)
                     .background(
-                        creation.canCreate ? Self.enabledColor : Self.disabledColor,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        Self.createColor.opacity(creation.canCreate ? 1 : 0.4),
+                        in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                     )
                     .contentShape(Rectangle())
             }
@@ -89,24 +125,15 @@ struct SpaceCreationView: View {
             .disabled(!creation.canCreate)
             Button("Cancel") { model.cancelSpaceCreation() }
                 .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.secondaryText)
-                .keyboardShortcut(.cancelAction)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(theme.foreground.opacity(0.6))
+                .padding(.top, 14)
+                .padding(.bottom, 16)
         }
-        // As measured on Arc: the rows are 4 pt from the sidebar's leading edge and 8 pt from its trailing one.
-        .padding(.leading, 4)
-        .padding(.trailing, 8)
-        .opacity(creation.phase == .editing ? 1 : 0)
-        .animation(.easeOut(duration: 0.2), value: creation.phase)
-        .allowsHitTesting(creation.phase == .editing)
-        .onAppear { nameFocused = true }
     }
 
-    /// Arc's Create Space button, as measured: #2E2DB1, and #29235D while disabled.
-    private static let enabledColor = Color(red: 0x2E / 255, green: 0x2D / 255, blue: 0xB1 / 255)
-    private static let disabledColor = Color(red: 0x29 / 255, green: 0x23 / 255, blue: 0x5D / 255)
+    /// Arc's Create Space blue, as measured: #1F2AFF, at 0.4 while disabled.
+    private static let createColor = Color(red: 0x1F / 255, green: 0x2A / 255, blue: 1)
 
     private var title: Binding<String> {
         Binding {
@@ -130,53 +157,91 @@ struct SpaceCreationView: View {
             Divider()
             Button("New Profile…") { ProfileDialogUtils.createProfileForSpaceCreation(in: model) }
         } label: {
-            HStack(spacing: 3) {
+            HStack(spacing: 4) {
                 Text(model.profileName(creation.profileID)).lineLimit(1).truncationMode(.tail)
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
             }
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(theme.foreground)
-            .padding(.horizontal, 7)
-            .frame(height: 18)
+            .padding(.horizontal, 8)
+            .frame(height: 22)
             .background(theme.foreground.opacity(0.09), in: Capsule())
         }
         .menuStyle(.button)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .fixedSize()
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func icon(@ViewBuilder _ image: () -> some View) -> some View {
         image()
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(size: 15, weight: .medium))
             .foregroundStyle(theme.foreground.opacity(0.6))
-            .frame(width: 18)
+            .frame(width: 20)
     }
 
-    private func card(@ViewBuilder content: () -> some View) -> some View {
-        HStack(spacing: 8) { content() }
-            .padding(.horizontal, 8)
-            .frame(height: 30)
-            .background(theme.foreground.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    /// As measured on Arc: the cards are the theme's ink at about 4.5 % in light and white at about 11 % in dark.
+    private func card(fill: Color? = nil, @ViewBuilder content: () -> some View) -> some View {
+        let dark = colorScheme == .dark
+        return HStack(spacing: 8) { content() }
+            .padding(.leading, 8)
+            .padding(.trailing, 10)
+            .frame(height: 36)
+            .background(
+                fill ?? (dark ? .white.opacity(0.11) : .black.opacity(0.045)),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .shadow(color: .black.opacity(dark ? 0 : 0.08), radius: 0.5, y: 0.5)
     }
 }
 
-private struct SpaceCreationArtwork: View {
-    var body: some View {
-        ZStack {
-            card(symbol: "leaf.fill", color: .green).rotationEffect(.degrees(-12)).offset(x: -14, y: 2)
-            card(symbol: "basket.fill", color: .orange).rotationEffect(.degrees(12)).offset(x: 14, y: 2)
-            card(symbol: "laptopcomputer", color: .blue)
-        }
-        .frame(height: 40)
-        .accessibilityHidden(true)
+/// Arc's header artwork: three cards with 🌴, 💻 and 📚. Turned over by `flip` it is one white card with 🙌, with a glow
+/// that pulses once, blue in light and white in dark.
+private struct SpaceCreationArtwork: View, Animatable {
+    nonisolated var flip: CGFloat
+    let glowing: Bool
+    let dark: Bool
+    @State private var glow = 0.0
+
+    nonisolated var animatableData: CGFloat {
+        get { flip }
+        set { flip = newValue }
     }
 
-    private func card(symbol: String, color: Color) -> some View {
-        RoundedRectangle(cornerRadius: 4, style: .continuous)
+    var body: some View {
+        ZStack {
+            if flip < 0.5 {
+                ZStack {
+                    card("🌴").rotationEffect(.degrees(-12)).offset(x: -15, y: 2)
+                    card("📚").rotationEffect(.degrees(12)).offset(x: 15, y: 2)
+                    card("💻")
+                }
+            } else {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(dark ? Color.white : Color(red: 0.35, green: 0.36, blue: 1))
+                    .frame(width: 31, height: 39)
+                    .blur(radius: 6)
+                    .scaleEffect(1 + 0.4 * glow)
+                    .opacity(glowing ? 1 - glow : 0)
+                card("🙌")
+                    .rotation3DEffect(.degrees(180), axis: (x: 1, y: 0, z: 0))
+            }
+        }
+        .rotation3DEffect(.degrees(180 * flip), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
+        .frame(height: 40)
+        .accessibilityHidden(true)
+        .onChange(of: glowing) { _, glowing in
+            guard glowing else { return }
+            withAnimation(.easeOut(duration: 0.45)) { glow = 1 }
+        }
+    }
+
+    private func card(_ emoji: String) -> some View {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
             .fill(.white)
-            .frame(width: 29, height: 36)
-            .overlay(Image(systemName: symbol).font(.system(size: 13)).foregroundStyle(color))
-            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+            .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
+            .frame(width: 31, height: 39)
+            .overlay(Text(emoji).font(.system(size: 15)))
+            .shadow(color: .black.opacity(0.15), radius: 1.5, y: 0.5)
     }
 }
