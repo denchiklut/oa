@@ -48,7 +48,6 @@ struct SpaceManagementSpacesPage: View {
                         Color.clear.preference(
                             key: Scroll.self, value: -content.frame(in: .named(SpaceManagementDrag.space)).minX)
                     }
-                    ScrollKeeping(offset: layout.spacesPageScroll) { layout.spacesPageScroll = $0 }
                 }
             }
             .coordinateSpace(name: SpaceManagementDrag.space)
@@ -89,48 +88,6 @@ struct SpaceManagementSpacesPage: View {
     private enum Scroll: PreferenceKey {
         static let defaultValue: CGFloat = 0
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-    }
-}
-
-/// Puts the row's scroll view back at `offset` once its content is laid out, then reports where it scrolls. SwiftUI
-/// doesn't lay the content out again as it scrolls, and takes a scroll point only from macOS 15.
-private struct ScrollKeeping: NSViewRepresentable {
-    let offset: CGFloat
-    let scrolled: (CGFloat) -> Void
-
-    func makeNSView(context: Context) -> Keeper { Keeper(offset: offset, scrolled: scrolled) }
-
-    func updateNSView(_ view: Keeper, context: Context) { view.scrolled = scrolled }
-
-    final class Keeper: NSView {
-        var scrolled: (CGFloat) -> Void
-        private var offset: CGFloat?
-
-        init(offset: CGFloat, scrolled: @escaping (CGFloat) -> Void) {
-            self.offset = offset
-            self.scrolled = scrolled
-            super.init(frame: .zero)
-        }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) { fatalError() }
-
-        override func layout() {
-            super.layout()
-            guard let target = offset, bounds.width > 0, let scrollView = enclosingScrollView else { return }
-            offset = nil
-            let clip = scrollView.contentView
-            let origin = NSPoint(x: target, y: clip.bounds.minY)
-            clip.scroll(to: clip.constrainBoundsRect(NSRect(origin: origin, size: clip.bounds.size)).origin)
-            scrollView.reflectScrolledClipView(clip)
-            clip.postsBoundsChangedNotifications = true
-            NotificationCenter.default.addObserver(
-                self, selector: #selector(clipScrolled), name: NSView.boundsDidChangeNotification, object: clip)
-        }
-
-        @objc private func clipScrolled(_ notification: Notification) {
-            if let clip = notification.object as? NSClipView { scrolled(clip.bounds.minX) }
-        }
     }
 }
 
