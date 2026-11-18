@@ -1,23 +1,21 @@
 import SwiftUI
 
-/// Arc's `CircularProgressView`: a disc in the theme's cutout colour with a symbol in its strongest, ringed in the
-/// strongest as far as the progress goes. Activated, the two colours swap in 0.05 s and the disc then bounces once to
-/// 1.15; going back swaps them with no bounce.
+/// Arc's `CircularProgressView`: a 30 pt disc in the theme's cutout colour with a symbol in its strongest, ringed in
+/// the strongest as far as the progress goes. Activated, the two colours swap in 0.05 s and the disc then bounces once
+/// to 1.15; going back swaps them with no bounce.
 struct CircularProgressView: View {
     let symbol: String
     var progress: CGFloat = 0
     let isActivated: Bool
-    var diameter: CGFloat = 30
-    var symbolSize: CGFloat = 16
     @Environment(\.theme) private var theme
     @State private var swapped = false
     @State private var scale = 1.0
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: symbolSize, weight: .medium))
+            .font(.system(size: 16, weight: .medium))
             .foregroundStyle(swapped ? theme.cutout : theme.maxContrast)
-            .frame(width: diameter, height: diameter)
+            .frame(width: 30, height: 30)
             .background(swapped ? theme.maxContrast : theme.cutout, in: Circle())
             .overlay {
                 if progress > 0 {

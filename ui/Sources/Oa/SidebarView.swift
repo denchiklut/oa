@@ -112,13 +112,10 @@ private struct SidebarDock: View {
                 ForEach(Array(pages.enumerated()), id: \.element) { index, item in
                     let isCurrent = index == current
                     let full = !compact || hovered == item || (isCurrent && hovered == nil)
-                    dockItem(
-                        item, emphasis: max(0, 1 - abs(page - CGFloat(index))), icon: full,
-                        dot: full ? 8 : 4
-                    )
-                    .frame(width: compact ? (isCurrent ? 24 : others) : pitch, height: 34)
-                    .contentShape(Rectangle())
-                    .onHover { inside in hovered = inside ? item : hovered == item ? nil : hovered }
+                    dockItem(item, emphasis: max(0, 1 - abs(page - CGFloat(index))), full: full)
+                        .frame(width: compact ? (isCurrent ? 24 : others) : pitch, height: 34)
+                        .contentShape(Rectangle())
+                        .onHover { inside in hovered = inside ? item : hovered == item ? nil : hovered }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -126,8 +123,10 @@ private struct SidebarDock: View {
         .frame(height: 34)
     }
 
+    /// Shown full, an item is its Space's icon or an 8 pt dot; otherwise a 4 pt dot.
     @ViewBuilder
-    private func dockItem(_ item: WindowLayoutPage, emphasis: CGFloat, icon: Bool, dot: CGFloat) -> some View {
+    private func dockItem(_ item: WindowLayoutPage, emphasis: CGFloat, full: Bool) -> some View {
+        let dot: CGFloat = full ? 8 : 4
         switch item {
         case .space(let id):
             if let space = model.state.space(id) {
@@ -135,7 +134,7 @@ private struct SidebarDock: View {
                     model.selectSpace(space.id)
                 } label: {
                     Group {
-                        if icon, let glyph = space.icon {
+                        if full, let glyph = space.icon {
                             SpaceIconGlyph(icon: glyph).font(.system(size: 13, weight: .semibold))
                         } else {
                             Circle().frame(width: dot, height: dot)

@@ -492,16 +492,6 @@ final class WindowModel {
         spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID)
     }
 
-    /// As Arc: a new window starts with the collapsed sections of the window it came from.
-    func inheritCollapsedPinnedSpaces(from source: WindowModel) {
-        collapsedPinnedSpaces = source.collapsedPinnedSpaces
-    }
-
-    func togglePinnedSection(of spaceID: UUID) {
-        if collapsedPinnedSpaces.remove(spaceID) == nil { collapsedPinnedSpaces.insert(spaceID) }
-        store.windowStateChanged()
-    }
-
     /// Where the panel's page and dock item sit among the Spaces: where the Space will go.
     var spaceCreationIndex: Int? {
         guard let creation = spaceCreation else { return nil }
@@ -541,6 +531,16 @@ final class WindowModel {
             created = $0.addSpace(name: name, profileID: profileID, icon: creation.icon, after: creation.insertAfter)
         }
         if selecting, let created { selectSpace(created.id) }
+    }
+
+    /// As Arc: a new window starts with the collapsed sections of the window it came from.
+    func inheritCollapsedPinnedSpaces(from source: WindowModel) {
+        collapsedPinnedSpaces = source.collapsedPinnedSpaces
+    }
+
+    func togglePinnedSection(of spaceID: UUID) {
+        if collapsedPinnedSpaces.remove(spaceID) == nil { collapsedPinnedSpaces.insert(spaceID) }
+        store.windowStateChanged()
     }
 
     func moveSpace(_ spaceID: UUID, to index: Int) {

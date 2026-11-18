@@ -16,8 +16,9 @@ final class WindowLayoutController: NSViewController {
     private static let homeWidth: CGFloat = 417
     /// The Library opening and closing from a button, as measured in Arc: critically damped.
     private static let homeSpring = (response: 0.205, damping: 1.0)
-    /// The Create a Space page sliding in, as measured in Arc.
+    /// The Create a Space page sliding in, and the pager settling back once it goes, as measured in Arc.
     private static let spaceCreationSpring = (response: 0.21, damping: 1.0)
+    private static let spaceCreationCloseSpring = (response: 0.175, damping: 1.0)
     /// Arc's lock and unlock: the sidebar and the page change frames together, over 0.08 s on this curve.
     private static let lockAnimation = Animation.timingCurve(0.25, 0.46, 0.45, 0.94, duration: 0.08)
     /// The floating panel's slide as measured in Arc: its code reads a period of 0.18 s at the same damping.
@@ -220,7 +221,7 @@ final class WindowLayoutController: NSViewController {
         let pages =
             [home] + sidebarPages[min(leadingSpace, sidebarPages.count)...].map { .init(id: $0, width: sidebarWidth) }
         // As measured on Arc: the panel goes in one frame and the pager settles back from where it was.
-        pager.setPages(pages, selecting: target, settling: (0.175, 1))
+        pager.setPages(pages, selecting: target, settling: Self.spaceCreationCloseSpring)
         if target == .spaceCreation, pager.selectedPageID != target {
             if pulledSpaceCreation {
                 // As measured on Arc: the panel is in place at once, 11 pt short of it, and the theme with it.
@@ -296,7 +297,7 @@ final class WindowLayoutController: NSViewController {
         pulledSpaceCreation = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) { [weak self] in
             guard let self else { return }
-            guard pulledSpaceCreation, !pager.isTracking else { return pulledSpaceCreation = false }
+            guard !pager.isTracking else { return pulledSpaceCreation = false }
             model.beginSpaceCreation()
             updatePages()
         }

@@ -94,7 +94,6 @@ struct SpaceManagementSpacesPage: View {
             self.drag = nil
         }
     }
-
 }
 
 /// The row's scroll view, read from AppKit: SwiftUI doesn't lay the row out again as it scrolls, so a geometry reader

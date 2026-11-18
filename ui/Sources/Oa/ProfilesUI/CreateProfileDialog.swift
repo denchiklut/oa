@@ -12,7 +12,7 @@ struct CreateProfileDialog: View {
     enum Behavior { case createOnly, createAndSelect }
     private enum Step { case createProfile, selectSpaces }
 
-    var behavior = Behavior.createAndSelect
+    let behavior: Behavior
     let spaces: [CreateProfileDialogSpaceInfo]
     let complete: (String, [UUID]) -> Void
     let cancel: () -> Void
