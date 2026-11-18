@@ -58,15 +58,9 @@ struct SidebarView: View {
                 .opacity(1 - creation)
                 .allowsHitTesting(creation == 0)
             SidebarDock(model: model, layout: layout)
-            Button {
-                model.beginSpaceCreation()
-            } label: {
-                Image(systemName: "plus")
-            }
-            .buttonStyle(.borderless)
-            .help("New Space")
-            .opacity(1 - creation)
-            .allowsHitTesting(creation == 0)
+            SidebarPlusButton(model: model, layout: layout)
+                .opacity(1 - creation)
+                .allowsHitTesting(creation == 0)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
