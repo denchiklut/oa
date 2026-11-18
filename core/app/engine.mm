@@ -27,6 +27,7 @@
 #include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
+#include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
 #include "chrome/common/chrome_constants.h"
@@ -213,6 +214,9 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   }
   DisableFeature(command_line, lens::features::kLensStandalone);
   DisableFeature(command_line, lens::features::kLensOverlay);
+  // Chromium's testing field trials turn this on. Its background mode holds a
+  // keep-alive that only Chrome's own quit path lets go, so Oa never exits.
+  DisableFeature(command_line, omnibox::kOmniboxEverywhere);
   // ArcCore's Chromium has the history quick provider offer 10 matches where
   // upstream has every provider offer 3, which is where the command bar's ten
   // history rows come from. This param does the same without a patch.
