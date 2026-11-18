@@ -241,7 +241,6 @@ private struct FavoriteTile: View {
         ZStack {
             shape.fill(selected ? theme.selectedTile : .clear)
                 .shadow(color: .black.opacity(selected ? 0.1 : 0), radius: 2, y: 1)
-            // Arc's code washes every tile; Arc's dark tiles measured untinted unless selected, so only that one is.
             if let favicon, selected {
                 AppTrayVisualEffect(favicon: favicon, tileWidth: width)
                     .opacity(theme.isDark ? (hovering ? 0.3 : 0.2) : (hovering ? 0.1 : 0))
