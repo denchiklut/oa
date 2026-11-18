@@ -14,8 +14,16 @@ struct SpaceManagementSpacesPage: View {
     /// Spaces: the gap between the Library and the card on the way is that much of what is left.
     let progress: CGFloat
     let pageInset: CGFloat
-    @State private var scroll: CGFloat = 0
+    @State private var scroll: CGFloat
     @State private var drag: SpaceManagementDrag?
+
+    init(model: WindowModel, layout: WindowLayoutController, progress: CGFloat, pageInset: CGFloat) {
+        self.model = model
+        self.layout = layout
+        self.progress = progress
+        self.pageInset = pageInset
+        _scroll = State(initialValue: layout.spacesPageScroll)
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -44,14 +52,16 @@ struct SpaceManagementSpacesPage: View {
                 .padding(.horizontal, 24)
                 .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
                 .background {
-                    GeometryReader { content in
-                        Color.clear.preference(
-                            key: Scroll.self, value: -content.frame(in: .named(SpaceManagementDrag.space)).minX)
+                    // Only the open Library's scrolling counts: resizing the scroll view on the way in or out
+                    // moves it too, and the cut must hold still.
+                    ScrollTracking(offset: scroll) { offset in
+                        guard progress >= 1 else { return }
+                        scroll = offset
+                        layout.spacesPageScroll = offset
                     }
                 }
             }
             .coordinateSpace(name: SpaceManagementDrag.space)
-            .onPreferenceChange(Scroll.self) { scroll = $0 }
             // The scroll view reaches left by what the row is moved, so the row keeps its place in it.
             .frame(width: viewport.clip + viewport.travel)
             .offset(x: -viewport.travel)
@@ -85,9 +95,49 @@ struct SpaceManagementSpacesPage: View {
         }
     }
 
-    private enum Scroll: PreferenceKey {
-        static let defaultValue: CGFloat = 0
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// The row's scroll view, read from AppKit: SwiftUI doesn't lay the row out again as it scrolls, so a geometry reader
+/// in it keeps the offset it was laid out at. It starts the scroll view at `offset`, where the window last left the
+/// row, as Arc's Library keeps it.
+private struct ScrollTracking: NSViewRepresentable {
+    let offset: CGFloat
+    let scrolled: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> Tracker { Tracker(offset: offset, scrolled: scrolled) }
+
+    func updateNSView(_ view: Tracker, context: Context) { view.scrolled = scrolled }
+
+    final class Tracker: NSView {
+        var scrolled: (CGFloat) -> Void
+        private var offset: CGFloat?
+
+        init(offset: CGFloat, scrolled: @escaping (CGFloat) -> Void) {
+            self.offset = offset
+            self.scrolled = scrolled
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func layout() {
+            super.layout()
+            guard let target = offset, bounds.width > 0, let scrollView = enclosingScrollView else { return }
+            offset = nil
+            let clip = scrollView.contentView
+            let origin = NSPoint(x: target, y: clip.bounds.minY)
+            clip.scroll(to: clip.constrainBoundsRect(NSRect(origin: origin, size: clip.bounds.size)).origin)
+            scrollView.reflectScrolledClipView(clip)
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(clipScrolled), name: NSView.boundsDidChangeNotification, object: clip)
+            if clip.bounds.minX != target { scrolled(clip.bounds.minX) }
+        }
+
+        @objc private func clipScrolled(_ notification: Notification) {
+            if let clip = notification.object as? NSClipView { scrolled(clip.bounds.minX) }
+        }
     }
 }
 
