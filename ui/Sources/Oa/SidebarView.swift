@@ -120,7 +120,9 @@ private struct SidebarDock: View {
                     .buttonStyle(.plain)
                     .help(space.name)
                     .accessibilityLabel(space.name)
-                    .spaceContextMenu { SpaceMenu(model: model, layout: layout, space: space) }
+                    .spaceContextMenu(isEnabled: !model.coversWindow) {
+                        SpaceMenu(model: model, layout: layout, space: space)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

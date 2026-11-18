@@ -97,6 +97,10 @@ final class WindowModel {
     var extensionRequest: PageExtensionRequest? {
         [peek, page].lazy.compactMap { $0.flatMap { self.extensionRequests[$0.id]?.first } }.first
     }
+    /// Something over the whole window that takes its clicks.
+    var coversWindow: Bool {
+        dialog != nil || extensionRequest != nil || commandBar != nil || (peek != nil && showingArchive)
+    }
     /// The selected tab's profile, else the Space's: whose extensions the window shows.
     private var profileID: UUID? {
         selectedTabID.flatMap { state.profile(containing: $0)?.id } ?? space?.profileID

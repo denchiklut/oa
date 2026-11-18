@@ -103,7 +103,7 @@ private struct SidebarSpacePage: View {
             .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
         }
         // As Arc's: the list's empty space and its rows without a menu of their own give the Space's.
-        .spaceContextMenu(isEnabled: space.id == model.selectedSpaceID && model.library == nil) {
+        .spaceContextMenu(isEnabled: space.id == model.selectedSpaceID && model.library == nil && !model.coversWindow) {
             SpaceMenu(model: model, layout: layout, space: space)
         }
         .sidebarDragFrame { drag?.lists[space.id, default: .init()].area = $0 }
