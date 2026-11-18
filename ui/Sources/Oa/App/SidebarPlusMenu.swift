@@ -11,11 +11,13 @@ struct SidebarPlusButton: View {
         Button {
             isOpen.toggle()
         } label: {
+            // As measured on Arc: a 14 pt glyph in a 32 pt button, in the header's grey.
             Image(systemName: isOpen ? "xmark" : "plus")
-                .frame(width: 24, height: 24)
+                .font(.system(size: 16, weight: .medium))
+                .frame(width: 32, height: 32)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(ChromeButtonStyle())
         .popover(isPresented: $isOpen, arrowEdge: .top) {
             SidebarPlusMenu(model: model) { isOpen = false }
         }
