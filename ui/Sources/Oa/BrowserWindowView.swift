@@ -221,9 +221,8 @@ struct PageHostView: NSViewRepresentable {
         container.subviews.forEach { $0.removeFromSuperview() }
         view.removeFromSuperview()
         view.translatesAutoresizingMaskIntoConstraints = true
-        view.frame = container.bounds
-        view.autoresizingMask = [.width, .height]
         container.addSubview(view)
+        container.fit()
     }
 
     final class Container: NSView {
@@ -231,8 +230,13 @@ struct PageHostView: NSViewRepresentable {
 
         override var isFlipped: Bool { true }
 
-        override func layout() {
-            super.layout()
+        override func resizeSubviews(withOldSize oldSize: NSSize) { fit() }
+
+        /// SwiftUI sizes a new container after its first update, and Chromium drops the saved frame of a page
+        /// resized while hidden, showing its background until it draws again. So the page keeps its size until
+        /// the container has one.
+        func fit() {
+            guard !bounds.isEmpty else { return }
             subviews.forEach { $0.frame = bounds }
         }
     }
