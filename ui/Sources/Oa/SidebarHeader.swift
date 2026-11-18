@@ -47,13 +47,14 @@ struct SidebarHeader: View {
 }
 
 /// Arc's URL field as measured: 36 pt tall, 8 pt in from the sidebar's edges, showing the page's host; copy link and
-/// Site Controls at its end while the pointer is over it, or while Site Controls or a permission prompt hangs from it.
+/// Site Controls at its end while the pointer is in the sidebar, or while Site Controls or a permission prompt hangs
+/// from it.
 private struct SidebarAddressField: View {
     let model: WindowModel
     let layout: WindowLayoutController
-    @State private var hovering = false
     @State private var showingSiteControls = false
     @Environment(\.theme) private var theme
+    @Environment(\.sidebarRevealsControls) private var revealed
 
     var body: some View {
         // As Arc: the URL opens the command bar to edit it, rather than being edited in place.
@@ -90,11 +91,10 @@ private struct SidebarAddressField: View {
                 }
                 .padding(.trailing, 4)
                 .opacity(
-                    hovering || showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue
+                    revealed || showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue
                         ? 1 : 0)
             }
         }
-        .onHover { hovering = $0 }
         .onChange(of: showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue) {
             layout.setHold(.popover, $1)
         }

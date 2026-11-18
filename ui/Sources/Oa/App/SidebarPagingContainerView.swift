@@ -70,8 +70,8 @@ private struct SidebarSpacePage: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let space: SidebarSpace
-    @State private var overTabs = false
     @Environment(\.sidebarDrag) private var drag
+    @Environment(\.sidebarRevealsControls) private var revealed
 
     var body: some View {
         let unpinned = model.state.tabs(in: space.id, pinned: false)
@@ -89,7 +89,7 @@ private struct SidebarSpacePage: View {
                         TabRow(model: model, layout: layout, tab: tab, spaceID: space.id)
                             .transition(.opacity)
                     case .divider:
-                        ClearDivider(model: model, spaceID: space.id, showsClear: overTabs)
+                        ClearDivider(model: model, spaceID: space.id, showsClear: revealed)
                             .sidebarDragFrame { drag?.lists[space.id, default: .init()].divider = $0 }
                             .onDisappear { drag?.lists[space.id]?.divider = nil }
                     case .newTab:
@@ -103,7 +103,6 @@ private struct SidebarSpacePage: View {
             .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
         }
         .sidebarDragFrame { drag?.lists[space.id, default: .init()].area = $0 }
-        .onHover { overTabs = $0 }
     }
 }
 
@@ -163,24 +162,27 @@ private struct SpaceNameRow: View {
     }
 }
 
+/// Arc's `UnpinnedSectionDividerCellView`: its arrow and tooltip say whether Clear takes the selected tab too.
 struct ClearDivider: View {
     let model: WindowModel
     let spaceID: UUID
     let showsClear: Bool
+    var inCard = false
     @State private var hovering = false
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let clearsAll = inCard || model.clearsAllTabs(in: spaceID)
         HStack(spacing: 8) {
             Rectangle()
                 .fill(theme.separator)
                 .frame(height: 0.5)
             if showsClear {
                 Button {
-                    model.clearTabs(in: spaceID)
+                    model.clearTabs(in: spaceID, all: inCard)
                 } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.down")
+                    HStack(spacing: 4) {
+                        if clearsAll { Image(systemName: "arrow.down") }
                         Text("Clear")
                     }
                     .font(.system(size: 10, weight: .bold))
@@ -189,7 +191,7 @@ struct ClearDivider: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering = $0 }
-                .help("Clear unselected Today tabs")
+                .help(clearsAll ? "Clear Today tabs" : "Clear unselected Today tabs")
             }
         }
         .padding(.leading, 10)
