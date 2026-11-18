@@ -225,6 +225,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // Arc takes Archive Tab out of the menu while a download's preview shows.
         if item.action == #selector(closeTab(_:)) { item.isHidden = model.previewedDownload != nil }
         if model.dialog != nil || model.extensionRequest != nil || item.isHidden { return false }
+        // As Arc: the Create a Space panel holds back creating and editing a Space, not moving between them.
+        let editsSpace = [#selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(changeProfile(_:))]
+        if model.spaceCreation != nil, let action = item.action, editsSpace.contains(action) { return false }
         if item.action == #selector(runExtension(_:)) {
             return model.extensionActions.contains { $0.id == item.representedObject as? String }
         }

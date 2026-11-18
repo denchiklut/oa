@@ -5,8 +5,6 @@ import Foundation
 struct SpaceCreationState: Equatable {
     enum Phase { case editing, animating }
 
-    static let defaultIcon = "circle.grid.2x2.fill"
-
     /// Arc's `insertionIndex`: `.after(SpaceID)`, or nil for `.absolute(-1)`.
     var insertAfter: UUID?
     var title = ""

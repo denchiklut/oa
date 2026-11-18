@@ -12,29 +12,40 @@ struct SidebarPagingContainerView: View {
 
     var body: some View {
         let width = layout.sidebarWidth
-        let spaces = model.state.spaces
-        let reveal = layout.spaceCreationReveal
-        let selected = spaces.firstIndex { $0.id == model.selectedSpaceID } ?? 0
-        // Under the cross-fade the Space the window showed stays where it was as it fades.
-        let offset = reveal < 1 ? CGFloat(selected) * width : layout.sidebarScrollOffset
-        let groups = spaces.indices.filter { $0 == 0 || spaces[$0].profileID != spaces[$0 - 1].profileID }
+        let pages = layout.sidebarPages.map { page -> SidebarSpace? in
+            if case .space(let id) = page { model.state.space(id) } else { nil }
+        }
+        let offset = layout.sidebarScrollOffset
+        let groups = pages.indices.filter { index in
+            guard let space = pages[index] else { return false }
+            return index == 0 || pages[index - 1]?.profileID != space.profileID
+        }
         ZStack(alignment: .topLeading) {
             HStack(alignment: .top, spacing: 0) {
-                ForEach(spaces) { space in
-                    let current = space.id == model.selectedSpaceID
-                    let tiles = FavoritesGrid.slots(model.state.favorites(for: space.id), drag: current ? drag : nil)
-                    SidebarSpacePage(model: model, layout: layout, space: space)
-                        .padding(.top, FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16)
-                        .frame(width: width)
-                        .allowsHitTesting(space.id == model.selectedSpaceID)
-                        .accessibilityHidden(space.id != model.selectedSpaceID)
+                ForEach(Array(pages.enumerated()), id: \.element?.id) { _, space in
+                    if let space {
+                        let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
+                        let tiles = FavoritesGrid.slots(
+                            model.state.favorites(for: space.id), drag: current ? drag : nil)
+                        SidebarSpacePage(model: model, layout: layout, space: space)
+                            .padding(
+                                .top, FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16
+                            )
+                            .frame(width: width)
+                            .allowsHitTesting(current)
+                            .accessibilityHidden(!current)
+                    } else {
+                        Color.clear.frame(width: width)
+                    }
                 }
             }
             .offset(x: -offset)
-            ForEach(Array(groups.enumerated()), id: \.element) { position, first in
-                let last = (position + 1 < groups.count ? groups[position + 1] : spaces.count) - 1
-                let shown = spaces[first...last].contains { $0.id == model.selectedSpaceID }
-                let favorites = model.state.favorites(for: spaces[first].id)
+            ForEach(groups, id: \.self) { first in
+                let last =
+                    (first..<pages.count).prefix { pages[$0]?.profileID == pages[first]?.profileID }.last ?? first
+                let shown =
+                    model.spaceCreation == nil && pages[first...last].contains { $0?.id == model.selectedSpaceID }
+                let favorites = model.state.favorites(for: pages[first]?.id ?? model.selectedSpaceID)
                 FavoritesGrid(
                     model: model, layout: layout, slots: FavoritesGrid.slots(favorites, drag: shown ? drag : nil)
                 )
@@ -46,13 +57,11 @@ struct SidebarPagingContainerView: View {
                 .accessibilityHidden(!shown)
             }
         }
-        .opacity(1 - (reveal < 1 ? reveal : 0))
         .overlay(alignment: .topLeading) {
-            if let creation = model.spaceCreation {
+            if let creation = model.spaceCreation, let index = model.spaceCreationIndex {
                 SpaceCreationView(model: model, creation: creation)
                     .frame(width: width)
-                    .offset(x: reveal < 1 ? 0 : CGFloat(spaces.count) * width - layout.sidebarScrollOffset)
-                    .opacity(reveal)
+                    .offset(x: CGFloat(index) * width - offset)
             }
         }
         .frame(width: width, alignment: .topLeading)
