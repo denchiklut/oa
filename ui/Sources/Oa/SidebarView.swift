@@ -18,6 +18,9 @@ struct SidebarView: View {
             spaces
         }
         .coordinateSpace(.named(Self.space))
+        .overlay(alignment: .trailing) {
+            EdgeFeedbackView(progress: layout.spaceCreationPull.progress, reveal: layout.spaceCreationPull.reveal)
+        }
         .overlay {
             if let creation = model.spaceCreation, creation.phase == .animating {
                 SpaceCreationSplashView(
