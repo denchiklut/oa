@@ -1114,8 +1114,10 @@ final class WindowModel {
                 // The app's one window for it, whichever window holds the page, or none any more.
                 if case .pictureInPicture(let event) = event {
                     pictureInPicture.handle(event, for: pageID)
-                } else {
-                    store.windows.first { $0.holds(pageID) }?.handle(event, for: pageID)
+                } else if let window = store.windows.first(where: { $0.holds(pageID) }) {
+                    window.handle(event, for: pageID)
+                } else if case .dialog(let dialog) = event, case .beforeUnload = dialog.kind {
+                    dialog.accept()
                 }
             }
         }
@@ -1150,6 +1152,10 @@ final class WindowModel {
     private func handle(_ event: PageEvent, for pageID: UUID) {
         switch event {
         case .dialog(let dialog):
+            // As Arc: a page asks to be shown first, and a "Leave site?" its window still can't show leaves unasked.
+            if case .beforeUnload = dialog.kind, page?.id != pageID, peek?.id != pageID {
+                return dialog.accept()
+            }
             dialogs[pageID, default: []].append(dialog)
             if let ownerID = peekOwner(of: pageID), state.tree.tab(ownerID) == nil, archivePeekID != ownerID {
                 library = .archive
@@ -1279,8 +1285,7 @@ final class WindowModel {
     /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown and for another
     /// Space's tab picked in the command bar.
     func show(_ tabID: UUID) {
-        let spaceID = state.space(containing: tabID)?.id ?? selectedSpaceID
-        guard state.isSelectable(tabID, in: spaceID) else { return }
+        guard let spaceID = spaceToShow(tabID), state.isSelectable(tabID, in: spaceID) else { return }
         if spaceID != selectedSpaceID {
             library = nil
             selectedTabIDs[spaceID] = tabID
@@ -1289,6 +1294,15 @@ final class WindowModel {
             select(tabID)
         }
         bringToFront()
+    }
+
+    /// As Arc's `spaceToSwitchTo(whenSelecting:)`: a tab's own Space; a Favorite stays when the Space shares its
+    /// profile, else goes to the first Space of its profile in the sidebar's order.
+    private func spaceToShow(_ tabID: UUID) -> UUID? {
+        if let space = state.space(containing: tabID) { return space.id }
+        guard let profile = state.profile(containing: tabID) else { return nil }
+        if space?.profileID == profile.id { return selectedSpaceID }
+        return state.spaces.first { $0.profileID == profile.id }?.id
     }
 
     private func observe(_ page: any Page, for tabID: UUID) {
