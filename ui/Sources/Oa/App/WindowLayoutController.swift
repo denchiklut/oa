@@ -58,6 +58,8 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private var pullAllowed: Bool?
     /// The pull opens the panel its own way; the others slide it in.
     @ObservationIgnored private var pulledSpaceCreation = false
+    /// Where this window's Library last left its Spaces row scrolled.
+    @ObservationIgnored var spacesPageScroll: CGFloat = 0
     /// The Space whose name shows the icon picker its menu asked for.
     var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
