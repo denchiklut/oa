@@ -18,6 +18,7 @@ can't live in `//oa` (`core/`). Every patch is rebased at each Chromium update, 
 | 0011 | Installs `//oa`'s renderer client in the macOS helpers, which enter `ChromeMainDelegate` and not `//oa`'s delegate |
 | 0012 | Copies the top frame's origin from Blink's request onto `network::ResourceRequest`, where ArcCore appends the same field, so the ad blocker's renderer throttle knows a request's page on any thread |
 | 0013 | Lets `//oa` see each page's compositor frame metadata, for its root background colour: `RenderWidgetHostViewMac` hands the metadata of a RenderViewHost's widget to an embedder hook before the frame activates, as ArcCore's patched view hands it to its page |
+| 0014 | Brings back the spare-compositor pool upstream removed, as ArcCore does: a page's view that is shown takes the compositor the page just hidden gave up, so a tab switch never waits for a new compositor's first frame with nothing on screen |
 
 Don't edit these files by hand. Commit on the `oa-patches` branch in `.local/chromium/src`, then run
 `scripts/patches.sh export`. `scripts/build.sh` applies the series before building.

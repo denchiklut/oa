@@ -1,0 +1,265 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Wed, 18 Nov 2026 09:15:38 -0700
+Subject: [PATCH] oa: recycle a page view's compositor, as ArcCore does
+
+Restores ui::RecyclableCompositorMacFactory, which upstream removed: a BrowserCompositorMac that leaves HasOwnCompositor gives its RecyclableCompositorMac to a pool of at most one spare, and the next one that enters it takes that spare instead of building a new compositor. Only a page's view (WebContentsViewMac::CreateViewForWidget) recycles; popups build their own, as in ArcCore, whose RenderWidgetHostViewMac and BrowserCompositorMac take the same added flag. An embedder that hosts the page's NSView itself, outside views' parent ui::Layer, otherwise shows nothing on every tab switch until the new compositor's first frame. BrowserCompositorMac::DisableRecyclingForShutdown() empties the pool before the context factory goes.
+---
+ .../browser_compositor_view_mac.h             |  6 ++-
+ .../browser_compositor_view_mac.mm            | 15 ++++--
+ .../render_widget_host_view_mac.h             |  4 +-
+ .../render_widget_host_view_mac.mm            |  5 +-
+ .../web_contents/web_contents_view_mac.mm     |  3 +-
+ ui/compositor/recyclable_compositor_mac.cc    | 53 +++++++++++++++++++
+ ui/compositor/recyclable_compositor_mac.h     | 37 +++++++++++++
+ 7 files changed, 115 insertions(+), 8 deletions(-)
+
+diff --git a/content/browser/renderer_host/browser_compositor_view_mac.h b/content/browser/renderer_host/browser_compositor_view_mac.h
+index 625bfb2402ef3cd98219915504c9ee29a195cfe4..875530a7fdd2185911a0b6066123633e9f2a78d9 100644
+--- a/content/browser/renderer_host/browser_compositor_view_mac.h
++++ b/content/browser/renderer_host/browser_compositor_view_mac.h
+@@ -58,7 +58,8 @@ class CONTENT_EXPORT BrowserCompositorMac : public DelegatedFrameHostClient,
+       ui::AcceleratedWidgetMacNSView* accelerated_widget_mac_ns_view,
+       BrowserCompositorMacClient* client,
+       bool render_widget_host_is_hidden,
+-      const viz::FrameSinkId& frame_sink_id);
++      const viz::FrameSinkId& frame_sink_id,
++      bool recycles_compositor = false);
+   ~BrowserCompositorMac() override;
+ 
+   // These will not return nullptr until Destroy is called.
+@@ -186,6 +187,9 @@ class CONTENT_EXPORT BrowserCompositorMac : public DelegatedFrameHostClient,
+   raw_ptr<BrowserCompositorMacClient> client_ = nullptr;
+   raw_ptr<ui::AcceleratedWidgetMacNSView> accelerated_widget_mac_ns_view_ =
+       nullptr;
++  // Takes its compositor from, and gives it back to,
++  // ui::RecyclableCompositorMacFactory, as ArcCore does for a page's view.
++  const bool recycles_compositor_;
+   std::unique_ptr<ui::RecyclableCompositorMac> recyclable_compositor_;
+ 
+   std::unique_ptr<DelegatedFrameHost> delegated_frame_host_;
+diff --git a/content/browser/renderer_host/browser_compositor_view_mac.mm b/content/browser/renderer_host/browser_compositor_view_mac.mm
+index 4ab8a9cf166665a3dee3069e237d36788c15447a..3073270c37829849e9a15a5c2d65ece4783f58b7 100644
+--- a/content/browser/renderer_host/browser_compositor_view_mac.mm
++++ b/content/browser/renderer_host/browser_compositor_view_mac.mm
+@@ -50,9 +50,11 @@
+     ui::AcceleratedWidgetMacNSView* accelerated_widget_mac_ns_view,
+     BrowserCompositorMacClient* client,
+     bool render_widget_host_is_hidden,
+-    const viz::FrameSinkId& frame_sink_id)
++    const viz::FrameSinkId& frame_sink_id,
++    bool recycles_compositor)
+     : client_(client),
+       accelerated_widget_mac_ns_view_(accelerated_widget_mac_ns_view),
++      recycles_compositor_(recycles_compositor),
+       weak_factory_(this) {
+   GetBrowserCompositors().insert(this);
+ 
+@@ -251,6 +253,10 @@
+   if (state_ == HasOwnCompositor) {
+     recyclable_compositor_->widget()->ResetNSView();
+     recyclable_compositor_->compositor()->SetRootLayer(nullptr);
++    if (recycles_compositor_) {
++      ui::RecyclableCompositorMacFactory::Get()->RecycleCompositor(
++          std::move(recyclable_compositor_));
++    }
+     recyclable_compositor_.reset();
+   }
+ 
+@@ -272,8 +278,10 @@
+     state_ = UseParentLayerCompositor;
+   }
+   if (new_state == HasOwnCompositor) {
+-    recyclable_compositor_ = std::make_unique<ui::RecyclableCompositorMac>(
+-        content::GetContextFactory());
++    recyclable_compositor_ =
++        ui::RecyclableCompositorMacFactory::Get()->CreateCompositor(
++            content::GetContextFactory(),
++            /*force_new=*/!recycles_compositor_);
+     display::ScreenInfo current = client_->GetCurrentScreenInfo();
+     recyclable_compositor_->UpdateSurface(
+         dfh_size_pixels_, current.device_scale_factor,
+@@ -301,6 +309,7 @@
+     BrowserCompositorMac* browser_compositor = *GetBrowserCompositors().begin();
+     browser_compositor->client_->DestroyCompositorForShutdown();
+   }
++  ui::RecyclableCompositorMacFactory::Get()->DisableRecyclingForShutdown();
+ }
+ 
+ void BrowserCompositorMac::TakeFallbackContentFrom(
+diff --git a/content/browser/renderer_host/render_widget_host_view_mac.h b/content/browser/renderer_host/render_widget_host_view_mac.h
+index 51bd74491f4a87dc1fb130885be4c575444183cb..8b8c348cf1d421ecce701a0547c0693c0dd5ecc5 100644
+--- a/content/browser/renderer_host/render_widget_host_view_mac.h
++++ b/content/browser/renderer_host/render_widget_host_view_mac.h
+@@ -112,7 +112,9 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
+   // The view will associate itself with the given widget. The native view must
+   // be hooked up immediately to the view hierarchy, or else when it is
+   // deleted it will delete this out from under the caller.
+-  RenderWidgetHostViewMac(RenderWidgetHost* widget);
++  // A page's view recycles its compositor, as ArcCore's does; a popup's not.
++  RenderWidgetHostViewMac(RenderWidgetHost* widget,
++                          bool recycles_compositor = false);
+ 
+   RenderWidgetHostViewMac(const RenderWidgetHostViewMac&) = delete;
+   RenderWidgetHostViewMac& operator=(const RenderWidgetHostViewMac&) = delete;
+diff --git a/content/browser/renderer_host/render_widget_host_view_mac.mm b/content/browser/renderer_host/render_widget_host_view_mac.mm
+index 66585d213ca799cd7168669653fdf3327303be55..5650e7fd711d034e135a8ef6ccade06910a64e7e 100644
+--- a/content/browser/renderer_host/render_widget_host_view_mac.mm
++++ b/content/browser/renderer_host/render_widget_host_view_mac.mm
+@@ -250,7 +250,8 @@ void SendVisibleTimeRequestToDelegatedFrameHost(
+ ///////////////////////////////////////////////////////////////////////////////
+ // RenderWidgetHostViewMac, public:
+ 
+-RenderWidgetHostViewMac::RenderWidgetHostViewMac(RenderWidgetHost* widget)
++RenderWidgetHostViewMac::RenderWidgetHostViewMac(RenderWidgetHost* widget,
++                                                 bool recycles_compositor)
+     : RenderWidgetHostViewBase(widget),
+       mouse_wheel_phase_handler_(this),
+       is_loading_(false),
+@@ -280,7 +281,7 @@ void SendVisibleTimeRequestToDelegatedFrameHost(
+   viz::FrameSinkId frame_sink_id = host()->GetFrameSinkId();
+ 
+   browser_compositor_ = std::make_unique<BrowserCompositorMac>(
+-      this, this, host()->IsHidden(), frame_sink_id);
++      this, this, host()->IsHidden(), frame_sink_id, recycles_compositor);
+   CHECK(![GetInProcessNSView() window], base::NotFatalUntil::M152);
+ 
+   host()->SetView(this);
+diff --git a/content/browser/web_contents/web_contents_view_mac.mm b/content/browser/web_contents/web_contents_view_mac.mm
+index 09380afc8aedd8603591262187b261c3fc0daa0b..a2546d832e2f17e5effec2ba446b57c9b1218db5 100644
+--- a/content/browser/web_contents/web_contents_view_mac.mm
++++ b/content/browser/web_contents/web_contents_view_mac.mm
+@@ -461,7 +461,8 @@ void SetReadWritePermissionsForFile(base::File& file) {
+   RenderWidgetHostViewMac* view =
+       g_create_render_widget_host_view
+           ? g_create_render_widget_host_view(render_widget_host)
+-          : new RenderWidgetHostViewMac(render_widget_host);
++          : new RenderWidgetHostViewMac(render_widget_host,
++                                        /*recycles_compositor=*/true);
+   if (delegate()) {
+     view->SetDelegate(
+         delegate()->GetDelegateForHost(render_widget_host, /*is_popup=*/false));
+diff --git a/ui/compositor/recyclable_compositor_mac.cc b/ui/compositor/recyclable_compositor_mac.cc
+index 179a221421e6e7676df782faab44fc1a409b1e38..dfb93a58f8b51a97c1695fbe834481acf0165048 100644
+--- a/ui/compositor/recyclable_compositor_mac.cc
++++ b/ui/compositor/recyclable_compositor_mac.cc
+@@ -100,4 +100,57 @@ void RecyclableCompositorMac::OnCompositingDidCommit(
+   accelerated_widget_mac_->SetSuspended(false);
+ }
+ 
++////////////////////////////////////////////////////////////////////////////////
++// RecyclableCompositorMacFactory
++
++// static
++RecyclableCompositorMacFactory* RecyclableCompositorMacFactory::Get() {
++  static base::NoDestructor<RecyclableCompositorMacFactory> factory;
++  return factory.get();
++}
++
++RecyclableCompositorMacFactory::RecyclableCompositorMacFactory() = default;
++
++RecyclableCompositorMacFactory::~RecyclableCompositorMacFactory() = default;
++
++std::unique_ptr<RecyclableCompositorMac>
++RecyclableCompositorMacFactory::CreateCompositor(
++    ui::ContextFactory* context_factory,
++    bool force_new) {
++  if (spare_compositors_.empty() || force_new) {
++    return std::make_unique<RecyclableCompositorMac>(context_factory);
++  }
++  std::unique_ptr<RecyclableCompositorMac> compositor =
++      std::move(spare_compositors_.front());
++  spare_compositors_.pop_front();
++  return compositor;
++}
++
++void RecyclableCompositorMacFactory::RecycleCompositor(
++    std::unique_ptr<RecyclableCompositorMac> compositor) {
++  if (recycling_disabled_) {
++    return;
++  }
++  compositor->Suspend();
++  compositor->InvalidateSurface();
++  spare_compositors_.push_front(std::move(compositor));
++  // Trimmed in a task, so that no compositor is freed in a nested loop that
++  // waits for a frame (https://crbug.com/828195).
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE,
++      base::BindOnce(&RecyclableCompositorMacFactory::ReduceSpareCompositors,
++                     weak_factory_.GetWeakPtr()));
++}
++
++void RecyclableCompositorMacFactory::DisableRecyclingForShutdown() {
++  recycling_disabled_ = true;
++  spare_compositors_.clear();
++}
++
++void RecyclableCompositorMacFactory::ReduceSpareCompositors() {
++  while (spare_compositors_.size() > 1) {
++    spare_compositors_.pop_back();
++  }
++}
++
+ }  // namespace ui
+diff --git a/ui/compositor/recyclable_compositor_mac.h b/ui/compositor/recyclable_compositor_mac.h
+index 4ad358d9e76470e3d420d304db623a839e89cad4..5ed90607c32ceaa54c0b292c1a2f696603d89a5c 100644
+--- a/ui/compositor/recyclable_compositor_mac.h
++++ b/ui/compositor/recyclable_compositor_mac.h
+@@ -8,6 +8,7 @@
+ #include <list>
+ #include <memory>
+ 
++#include "base/memory/weak_ptr.h"
+ #include "base/no_destructor.h"
+ #include "components/viz/common/surfaces/local_surface_id.h"
+ #include "components/viz/common/surfaces/parent_local_surface_id_allocator.h"
+@@ -54,6 +55,8 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
+                      float refresh_rate);
+ 
+  private:
++  friend class RecyclableCompositorMacFactory;
++
+   // Invalidate the compositor's surface information.
+   void InvalidateSurface();
+ 
+@@ -71,6 +74,40 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
+   std::unique_ptr<ui::CompositorLock> compositor_suspended_lock_;
+ };
+ 
++// Keeps the compositor of a view just hidden for the next view shown, as
++// ArcCore's restored factory does. Without it every shown page builds a new
++// compositor and shows nothing until its first frame.
++class COMPOSITOR_EXPORT RecyclableCompositorMacFactory {
++ public:
++  static RecyclableCompositorMacFactory* Get();
++
++  RecyclableCompositorMacFactory(const RecyclableCompositorMacFactory&) =
++      delete;
++  RecyclableCompositorMacFactory& operator=(
++      const RecyclableCompositorMacFactory&) = delete;
++
++  // The spare most recently recycled, or a new compositor when there is none
++  // or `force_new` is set.
++  std::unique_ptr<RecyclableCompositorMac> CreateCompositor(
++      ui::ContextFactory* context_factory,
++      bool force_new);
++  // Keeps `compositor` as the spare; at most one survives.
++  void RecycleCompositor(std::unique_ptr<RecyclableCompositorMac> compositor);
++  void DisableRecyclingForShutdown();
++
++ private:
++  friend class base::NoDestructor<RecyclableCompositorMacFactory>;
++
++  RecyclableCompositorMacFactory();
++  ~RecyclableCompositorMacFactory();
++
++  void ReduceSpareCompositors();
++
++  bool recycling_disabled_ = false;
++  std::list<std::unique_ptr<RecyclableCompositorMac>> spare_compositors_;
++  base::WeakPtrFactory<RecyclableCompositorMacFactory> weak_factory_{this};
++};
++
+ }  // namespace ui
+ 
+ #endif  // UI_COMPOSITOR_RECYCLABLE_COMPOSITOR_MAC_H_
