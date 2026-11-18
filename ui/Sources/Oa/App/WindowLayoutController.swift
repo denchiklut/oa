@@ -39,8 +39,6 @@ final class WindowLayoutController: NSViewController {
     /// Space on the way into the Library and out of it, so neither passes through the Spaces before it, and the first
     /// Space otherwise.
     private var leadingSpace = 0
-    /// The Space the pages last came to rest on. As Arc sends the settled theme only after the pages' animation, the
-    /// chrome keeps this Space's appearance until they rest again.
     private var restingSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
     @ObservationIgnored private var holds: Set<Hold> = []
@@ -107,28 +105,30 @@ final class WindowLayoutController: NSViewController {
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
     var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
 
-    /// The theme the chrome takes its appearance from: the resting Space's.
-    var restingTheme: WindowTheme {
-        (model.state.space(restingSpaceID ?? model.selectedSpaceID) ?? model.space)?.theme ?? .default
-    }
-
-    /// Arc's `.transitioning(from:to:progress:)` for the theme: the Spaces either side of where the pages are and how
-    /// far between, nil while they rest on one.
-    var themeTransition: (from: WindowTheme, to: WindowTheme, progress: CGFloat)? {
-        let page = sidebarScrollOffset / sidebarWidth
+    var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         let spaces = model.state.spaces
+        guard let restingSpaceID, !spaces.isEmpty else { return (model.space?.theme ?? .default, nil) }
+        let last = spaces.count - 1
+        let page = min(max(sidebarScrollOffset / sidebarWidth, 0), CGFloat(last))
+        let from: Int
+        let to: Int
         // As Arc and open-arch: pages moved to a Space further away than the next blend the resting Space's theme
         // straight into the selected one's, never through the themes of the Spaces between.
-        if !pager.isTracking, let from = spaces.firstIndex(where: { $0.id == restingSpaceID }),
-            let to = spaces.firstIndex(where: { $0.id == model.selectedSpaceID }), from != to
+        if !pager.isTracking, restingSpaceID != model.selectedSpaceID,
+            let source = spaces.firstIndex(where: { $0.id == restingSpaceID }),
+            let destination = spaces.firstIndex(where: { $0.id == model.selectedSpaceID })
         {
-            let progress = min(max((page - CGFloat(from)) / CGFloat(to - from), 0), 1)
-            return (spaces[from].theme, spaces[to].theme, progress)
+            from = source
+            to = destination
+        } else {
+            from = Int(page.rounded(.down))
+            to = min(from + 1, last)
         }
-        let index = Int(page.rounded(.down))
-        let progress = page - CGFloat(index)
-        guard progress > 0.001, progress < 0.999, index >= 0, index + 1 < spaces.count else { return nil }
-        return (spaces[index].theme, spaces[index + 1].theme, progress)
+        guard from != to else { return (spaces[from].theme, nil) }
+        let progress = (page - CGFloat(from)) / CGFloat(to - from)
+        if progress <= 0 { return (spaces[from].theme, nil) }
+        if progress >= 1 { return (spaces[to].theme, nil) }
+        return (spaces[from].theme, (spaces[to].theme, progress))
     }
 
     private func updatePages() {

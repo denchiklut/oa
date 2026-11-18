@@ -8,14 +8,11 @@ struct BrowserWindowView: View {
     @AppStorage(PageToolbar.key) private var showsToolbar = false
 
     var body: some View {
-        // As Arc: a theme with a light and a dark side shows the one the window's appearance asks for, and the
-        // chrome over it takes that side's own appearance. While the pages move the next Space's background fades in
-        // over it, and the chrome keeps the resting Space's until they rest again.
-        let transition = layout.themeTransition
-        let theme = layout.restingTheme
-        let background =
-            transition?.from.background[colorScheme] ?? (model.space?.theme ?? .default).background[colorScheme]
-        let next = transition.map { (background: $0.to.background[colorScheme], progress: Double($0.progress)) }
+        let backdrop = layout.backgroundThemes
+        // As Arc: chrome follows the committed Space while the background follows the pager.
+        let theme = model.space?.theme ?? .default
+        let background = backdrop.base.background[colorScheme]
+        let next = backdrop.blend.map { (background: $0.theme.background[colorScheme], progress: Double($0.progress)) }
         let appearance = theme.background[colorScheme].contentOverBackgroundAppearance
         // As measured in Arc: hidden, the sidebar is past the window's edge by its width and 10 pt more, and the card
         // is 10 pt in from every edge, a floating sidebar over it. The Library comes in from the left on the pager's
