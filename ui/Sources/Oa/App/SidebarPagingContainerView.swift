@@ -89,7 +89,7 @@ private struct SidebarSpacePage: View {
                         TabRow(model: model, layout: layout, tab: tab, spaceID: space.id)
                             .transition(.opacity)
                     case .divider:
-                        ClearDivider(model: model, showsClear: overTabs)
+                        ClearDivider(model: model, spaceID: space.id, showsClear: overTabs)
                             .sidebarDragFrame { drag?.lists[space.id, default: .init()].divider = $0 }
                             .onDisappear { drag?.lists[space.id]?.divider = nil }
                     case .newTab:
@@ -163,8 +163,9 @@ private struct SpaceNameRow: View {
     }
 }
 
-private struct ClearDivider: View {
+struct ClearDivider: View {
     let model: WindowModel
+    let spaceID: UUID
     let showsClear: Bool
     @State private var hovering = false
     @Environment(\.theme) private var theme
@@ -176,7 +177,7 @@ private struct ClearDivider: View {
                 .frame(height: 0.5)
             if showsClear {
                 Button {
-                    model.clearTabs()
+                    model.clearTabs(in: spaceID)
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.down")

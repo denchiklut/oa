@@ -97,20 +97,17 @@ private struct SpaceManagementCollectionViewItem: View {
         let unpinned = model.state.tabs(in: space.id, pinned: false)
         VStack(alignment: .leading, spacing: 0) {
             SpaceManagementCardHeader(model: model, space: space)
-                .padding(8)
+                .padding([.horizontal, .top], 8)
             ScrollView {
-                LazyVStack(spacing: 2) {
+                VStack(spacing: 1) {
                     ForEach(model.state.tabs(in: space.id, pinned: true)) { row($0) }
-                    if !unpinned.isEmpty {
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.1))
-                            .frame(height: 1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 11)
-                    }
+                    // As Arc's card: Clear shows without the pointer over it.
+                    if !unpinned.isEmpty { ClearDivider(model: model, spaceID: space.id, showsClear: true) }
                     ForEach(unpinned) { row($0) }
                 }
-                .padding(.horizontal, 8)
+                .padding([.horizontal, .bottom], 8)
+                .animation(
+                    .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: model.state.tabs(in: space.id).map(\.id))
             }
         }
         .environment(\.colorScheme, appearance.colorScheme)
@@ -126,30 +123,8 @@ private struct SpaceManagementCollectionViewItem: View {
     }
 
     private func row(_ tab: SidebarTab) -> some View {
-        HStack(spacing: 6) {
-            Group {
-                if let icon = model.favicon(for: tab) {
-                    Image(nsImage: icon).resizable().interpolation(.high)
-                } else {
-                    RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.1))
-                }
-            }
-            .frame(width: 16, height: 16)
-            Text(model.title(for: tab))
-                .lineLimit(1)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 30)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(model.selectedTabIDs[space.id] == tab.id ? 0.12 : 0))
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            layout.dismissSidebar()
-            model.show(tab.id)
-        }
+        TabRow(model: model, layout: layout, tab: tab, spaceID: space.id, place: .card)
+            .transition(.opacity)
     }
 }
 

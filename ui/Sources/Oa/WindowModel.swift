@@ -782,15 +782,17 @@ final class WindowModel {
 
     /// As Arc's Clear: the Space's unpinned tabs but the selected one, which goes too when it is the last.
     /// ⇧⌘T brings the last selected back first, as Arc's did.
-    func clearTabs() {
-        var tabIDs = unpinnedTabs.map(\.id)
-        if tabIDs.count > 1, let selectedTabID { tabIDs.removeAll { $0 == selectedTabID } }
+    func clearTabs(in spaceID: UUID? = nil) {
+        let spaceID = spaceID ?? selectedSpaceID
+        var tabIDs = state.tabs(in: spaceID, pinned: false).map(\.id)
+        if tabIDs.count > 1, let selected = selectedTabIDs[spaceID] { tabIDs.removeAll { $0 == selected } }
         closeTogether(tabIDs.sorted { lastActiveDates[$0] ?? .distantPast < lastActiveDates[$1] ?? .distantPast })
     }
 
     /// As Arc's: the unpinned tabs below this one, the selected one included; ⇧⌘T brings them back from the top.
     func archiveTabs(below tabID: UUID) {
-        let tabIDs = unpinnedTabs.map(\.id)
+        guard let space = state.space(containing: tabID) else { return }
+        let tabIDs = state.tabs(in: space.id, pinned: false).map(\.id)
         guard let index = tabIDs.firstIndex(of: tabID) else { return }
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
