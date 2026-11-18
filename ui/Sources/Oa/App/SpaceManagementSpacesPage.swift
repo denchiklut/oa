@@ -261,41 +261,23 @@ private struct SpaceManagementControlStyle: ButtonStyle {
     }
 }
 
-/// Arc's item after the last card: a 30 pt disc in the theme's cutout colour with a plus in its strongest, in a
-/// 48 pt square. Under the pointer the two colours swap in 0.05 s and the disc then bounces once to 1.15, as Arc's
-/// `CircularProgressView` does when activated; leaving swaps them back with no bounce. It asks for a name until the
-/// Create a Space panel is here.
+/// Arc's item after the last card: a 30 pt `CircularProgressView` with a plus in a 48 pt square, activated under the
+/// pointer. It asks for a name until the Create a Space panel is here.
 private struct SpaceManagementAddSpaceView: View {
     let model: WindowModel
-    @Environment(\.theme) private var theme
     @State private var isActivated = false
-    @State private var scale = 1.0
 
     var body: some View {
         Button {
             if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(isActivated ? theme.cutout : theme.maxContrast)
-                .frame(width: 30, height: 30)
-                .background(isActivated ? theme.maxContrast : theme.cutout, in: Circle())
-                .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
-                .scaleEffect(scale)
+            CircularProgressView(symbol: "plus", isActivated: isActivated)
                 .frame(width: 48, height: 48)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("New Space")
         .accessibilityLabel("New Space")
-        .onHover { inside in
-            withAnimation(.linear(duration: 0.05)) { isActivated = inside }
-            guard inside else { return }
-            withAnimation(.easeOut(duration: 0.07).delay(0.05)) {
-                scale = 1.15
-            } completion: {
-                withAnimation(.easeIn(duration: 0.07)) { scale = 1 }
-            }
-        }
+        .onHover { isActivated = $0 }
     }
 }
