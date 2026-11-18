@@ -9,3 +9,4 @@ proprietary_codecs = false
 ffmpeg_branding = "Chromium"
 dcheck_always_on = false
 enable_dangling_raw_ptr_checks = true
+disable_fieldtrial_testing_config = true
