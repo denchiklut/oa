@@ -34,6 +34,10 @@ fi
 
 output="$repo_root/.build/native"
 bundle="$output/Oa.app"
+# Rebuilding replaces the bundle under the running app, and open would only bring that app forward.
+if pgrep -f "^$bundle/Contents/MacOS/Oa" >/dev/null; then
+  die "Oa is already running from $bundle; quit it first"
+fi
 log "building the app"
 swift build --package-path "$repo_root/ui" --scratch-path "$repo_root/.build/swift"
 executable="$repo_root/.build/swift/debug/Oa"
