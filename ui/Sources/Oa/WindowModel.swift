@@ -423,7 +423,11 @@ final class WindowModel {
     }
 
     func select(_ tabID: UUID, restoring sessionID: PageSessionID? = nil) {
-        guard state.isSelectable(tabID, in: selectedSpaceID), selectedTabID != tabID else { return }
+        guard state.isSelectable(tabID, in: selectedSpaceID) else { return }
+        // Oa's own, as for a Space: a tab chosen with the Create a Space panel open closes it. Arc keeps the panel
+        // under the ⌘T bar; what it does once a tab is chosen wasn't seen.
+        cancelSpaceCreation()
+        guard selectedTabID != tabID else { return }
         library = nil
         if let current = selectedTabID {
             if pages[current] != nil { previousTabID = current }
