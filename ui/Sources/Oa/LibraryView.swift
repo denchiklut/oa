@@ -192,6 +192,7 @@ private struct DownloadsPage: View {
             }
         }
         .onAppear { gone = model.downloads.gone }
+        .onChange(of: model.library == nil) { _, closed in if !closed { gone = model.downloads.gone } }
     }
 
     private var empty: some View {
