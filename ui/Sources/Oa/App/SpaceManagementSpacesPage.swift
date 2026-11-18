@@ -262,14 +262,14 @@ private struct SpaceManagementControlStyle: ButtonStyle {
 }
 
 /// Arc's item after the last card: a 30 pt `CircularProgressView` with a plus in a 48 pt square, activated under the
-/// pointer. It asks for a name until the Create a Space panel is here.
+/// pointer.
 private struct SpaceManagementAddSpaceView: View {
     let model: WindowModel
     @State private var isActivated = false
 
     var body: some View {
         Button {
-            if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
+            model.beginSpaceCreation()
         } label: {
             CircularProgressView(symbol: "plus", isActivated: isActivated)
                 .frame(width: 48, height: 48)

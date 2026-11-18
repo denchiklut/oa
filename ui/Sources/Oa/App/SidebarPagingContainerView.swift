@@ -12,8 +12,11 @@ struct SidebarPagingContainerView: View {
 
     var body: some View {
         let width = layout.sidebarWidth
-        let offset = layout.sidebarScrollOffset
         let spaces = model.state.spaces
+        let reveal = layout.spaceCreationReveal
+        let selected = spaces.firstIndex { $0.id == model.selectedSpaceID } ?? 0
+        // Under the cross-fade the Space the window showed stays where it was as it fades.
+        let offset = reveal < 1 ? CGFloat(selected) * width : layout.sidebarScrollOffset
         let groups = spaces.indices.filter { $0 == 0 || spaces[$0].profileID != spaces[$0 - 1].profileID }
         ZStack(alignment: .topLeading) {
             HStack(alignment: .top, spacing: 0) {
@@ -41,6 +44,15 @@ struct SidebarPagingContainerView: View {
                 .offset(x: min(max(offset, CGFloat(first) * width), CGFloat(last) * width) - offset)
                 .allowsHitTesting(shown)
                 .accessibilityHidden(!shown)
+            }
+        }
+        .opacity(1 - (reveal < 1 ? reveal : 0))
+        .overlay(alignment: .topLeading) {
+            if let creation = model.spaceCreation {
+                SpaceCreationView(model: model, creation: creation)
+                    .frame(width: width)
+                    .offset(x: reveal < 1 ? 0 : CGFloat(spaces.count) * width - layout.sidebarScrollOffset)
+                    .opacity(reveal)
             }
         }
         .frame(width: width, alignment: .topLeading)

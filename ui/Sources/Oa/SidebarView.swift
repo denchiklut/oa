@@ -9,12 +9,21 @@ struct SidebarView: View {
     @State private var overFlyout = false
     @State private var showingFlyout = false
     @State private var pointerInside = false
+    @State private var creationSlot = CGPoint.zero
 
     var body: some View {
         VStack(spacing: 0) {
             SidebarHeader(model: model, layout: layout)
             SidebarPagingContainerView(model: model, layout: layout)
             spaces
+        }
+        .coordinateSpace(.named(Self.space))
+        .overlay {
+            if let creation = model.spaceCreation, creation.phase == .animating {
+                SpaceCreationSplashView(
+                    icon: creation.icon ?? SpaceCreationState.defaultIcon, target: creationSlot,
+                    complete: { model.completeSpaceCreation() })
+            }
         }
         .overlay(alignment: .bottomLeading) {
             if showingFlyout {
@@ -46,22 +55,32 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.19), value: pointerInside)
     }
 
+    /// As Arc: on the Create a Space page the Library button and the plus go.
     private var spaces: some View {
-        HStack(spacing: 4) {
+        let creation = layout.spaceCreationProgress
+        return HStack(spacing: 4) {
             LibraryButton(model: model)
                 .onHover { overLibraryButton = $0 }
-            SidebarDock(model: model, layout: layout)
+                .opacity(1 - creation)
+                .allowsHitTesting(creation == 0)
+            SidebarDock(model: model, layout: layout, creationSlot: $creationSlot)
             Button {
-                if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
+                model.beginSpaceCreation()
             } label: {
                 Image(systemName: "plus")
             }
             .buttonStyle(.borderless)
             .help("New Space")
+            .opacity(1 - creation)
+            .allowsHitTesting(creation == 0)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
     }
+}
+
+extension SidebarView {
+    nonisolated static let space = "sidebar"
 }
 
 extension EnvironmentValues {
@@ -91,16 +110,19 @@ enum SpaceDeletion {
 private struct SidebarDock: View {
     let model: WindowModel
     let layout: WindowLayoutController
+    @Binding var creationSlot: CGPoint
     @Environment(\.theme) private var theme
 
     var body: some View {
         let spaces = model.state.spaces
-        let page = layout.sidebarScrollOffset / layout.sidebarWidth
+        let creation = layout.spaceCreationProgress
+        let page = min(layout.sidebarScrollOffset / layout.sidebarWidth, CGFloat(spaces.count - 1))
+        let count = spaces.count + (model.spaceCreation == nil ? 0 : 1)
         GeometryReader { geometry in
-            let pitch = min(26, geometry.size.width / CGFloat(max(spaces.count, 1)))
+            let pitch = min(26, geometry.size.width / CGFloat(max(count, 1)))
             HStack(spacing: 0) {
                 ForEach(Array(spaces.enumerated()), id: \.element.id) { index, space in
-                    let emphasis = max(0, 1 - abs(page - CGFloat(index)))
+                    let emphasis = max(0, 1 - abs(page - CGFloat(index))) * (1 - creation)
                     let size: CGFloat = pitch < 18 ? 4 + 4 * emphasis : 8
                     Button {
                         model.selectSpace(space.id)
@@ -123,6 +145,19 @@ private struct SidebarDock: View {
                     .spaceContextMenu(isEnabled: !model.coversWindow) {
                         SpaceMenu(model: model, layout: layout, space: space)
                     }
+                }
+                if model.spaceCreation != nil {
+                    Circle()
+                        .frame(width: 8, height: 8)
+                        .foregroundStyle(theme.dockItem(emphasis: creation))
+                        .frame(width: pitch, height: 34)
+                        .onGeometryChange(for: CGPoint.self) {
+                            let frame = $0.frame(in: .named(SidebarView.space))
+                            return CGPoint(x: frame.midX, y: frame.midY)
+                        } action: {
+                            creationSlot = $0
+                        }
+                        .accessibilityLabel("New Space")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

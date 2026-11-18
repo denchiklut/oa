@@ -30,6 +30,13 @@ final class WindowModel {
     /// Pages shown over the window as Arc's Peek: by the tab they were opened from, whose state they are, or by
     /// the Archive entry they show.
     private(set) var peeks: [UUID: any Page] = [:]
+    /// As Arc's `WindowState.spaceCreationState`: while it is open the window shows nothing selected.
+    private(set) var spaceCreation: SpaceCreationState? {
+        didSet {
+            closeCommandBarIfSelectionChanged()
+            presentationChanged()
+        }
+    }
     private(set) var library: LibrarySection? {
         didSet {
             if let library { store.home.lastSelectedHomePage = library }
@@ -79,7 +86,7 @@ final class WindowModel {
     var state: SidebarState { store.state }
     var adBlocker: AdBlocker { engine.adBlocker }
     var space: SidebarSpace? { state.space(selectedSpaceID) }
-    var selectedTabID: UUID? { selectedTabIDs[selectedSpaceID] }
+    var selectedTabID: UUID? { spaceCreation == nil ? selectedTabIDs[selectedSpaceID] : nil }
     var selectedTab: SidebarTab? { selectedTabID.flatMap { state.tree.tab($0) } }
     var page: (any Page)? { selectedTabID.flatMap { pages[$0] } }
     var placeholder: NSImage? { page == nil ? selectedTabID.flatMap { placeholders[$0] } : nil }
@@ -454,7 +461,9 @@ final class WindowModel {
 
     /// As Arc: a Space with nothing to show is shown empty, with no command bar.
     func selectSpace(_ spaceID: UUID) {
-        guard state.space(spaceID) != nil, spaceID != selectedSpaceID else { return }
+        guard state.space(spaceID) != nil else { return }
+        cancelSpaceCreation()
+        guard spaceID != selectedSpaceID else { return }
         selectedSpaceID = spaceID
         if let tabID = selectedTabID {
             ensurePage(tabID)
@@ -471,11 +480,47 @@ final class WindowModel {
         ensurePage(tabID)
     }
 
-    func addSpace(named name: String) {
-        guard let profileID = space?.profileID else { return }
+    /// Arc's Create a Space panel, on the window's Space's profile, after `spaceID` or, as Arc's `.absolute(-1)`, at
+    /// the end. As Arc, it leaves the Library and changes neither the Space nor the selection.
+    func beginSpaceCreation(after spaceID: UUID? = nil) {
+        guard spaceCreation == nil, let space else { return }
+        closeCommandBar()
+        library = nil
+        spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID)
+    }
+
+    func updateSpaceCreation(_ change: (inout SpaceCreationState) -> Void) {
+        guard var creation = spaceCreation else { return }
+        change(&creation)
+        spaceCreation = creation
+    }
+
+    /// As Arc: a cancel during the splash still makes the Space, without showing it.
+    func cancelSpaceCreation() {
+        guard let creation = spaceCreation else { return }
+        if creation.phase == .animating { return completeSpaceCreation(selecting: false) }
+        spaceCreation = nil
+    }
+
+    /// As Arc's `didTriggerCreateSpace`: the panel plays its splash, then `completeSpaceCreation` makes the Space, at
+    /// once with Reduce Motion.
+    func triggerSpaceCreation() {
+        guard spaceCreation?.canCreate == true, spaceCreation?.phase == .editing else { return }
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { return completeSpaceCreation() }
+        updateSpaceCreation { $0.phase = .animating }
+    }
+
+    func completeSpaceCreation(selecting: Bool = true) {
+        guard let creation = spaceCreation, creation.canCreate else { return }
+        spaceCreation = nil
+        let name = creation.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Oa's own: a profile deleted while the panel was open gives way to the window's Space's.
+        guard let profileID = state.profile(creation.profileID)?.id ?? space?.profileID else { return }
         var created: SidebarSpace?
-        store.edit { created = $0.addSpace(name: name, profileID: profileID) }
-        if let created { selectSpace(created.id) }
+        store.edit {
+            created = $0.addSpace(name: name, profileID: profileID, icon: creation.icon, after: creation.insertAfter)
+        }
+        if selecting, let created { selectSpace(created.id) }
     }
 
     func moveSpace(_ spaceID: UUID, to index: Int) {

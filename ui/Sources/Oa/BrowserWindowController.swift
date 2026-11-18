@@ -155,7 +155,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     @objc func newSpace(_ sender: Any?) {
-        if let name = NamePrompt.run("New Space") { model.addSpace(named: name) }
+        model.beginSpaceCreation(after: model.selectedSpaceID)
     }
 
     @objc func renameSpace(_ sender: Any?) {
