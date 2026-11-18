@@ -40,6 +40,8 @@ final class WindowLayoutController: NSViewController {
     /// Space otherwise.
     private var leadingSpace = 0
     private var restingSpaceID: UUID?
+    /// The Spaces' order as the Library opened.
+    private var homeOrder: [UUID]?
     /// The Space whose name shows the icon picker its menu asked for.
     var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
@@ -107,7 +109,21 @@ final class WindowLayoutController: NSViewController {
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
     var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
 
+    /// Oa's own, by the author's decision, after open-arch: the Library is in the first Space's theme, blended in
+    /// with the Library's progress. Arc's is the window's Space's.
+    var libraryTheme: WindowTheme { model.state.spaces.first?.theme ?? .default }
+
     var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
+        let spaces = model.state.spaces
+        guard restingSpaceID != nil, !spaces.isEmpty else { return (model.space?.theme ?? .default, nil) }
+        let progress = min(libraryProgress, 1)
+        guard progress > 0 else { return spaceThemes }
+        let beside = spaces[min(leadingSpace, spaces.count - 1)]
+        if progress == 1 || beside.id == spaces[0].id { return (libraryTheme, nil) }
+        return (beside.theme, (libraryTheme, progress))
+    }
+
+    private var spaceThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         let spaces = model.state.spaces
         guard let restingSpaceID, !spaces.isEmpty else { return (model.space?.theme ?? .default, nil) }
         let last = spaces.count - 1
@@ -140,12 +156,16 @@ final class WindowLayoutController: NSViewController {
         let throughHome = target == .home || pager.selectedPageID == .home
         if pager.selectedPageID != target {
             leadingSpace = throughHome ? index : 0
+            if target == .home { homeOrder = spaces.map(\.id) }
         } else if target == .home, !pager.isTracking {
-            // The window's Space may have moved among the Spaces since.
-            leadingSpace = index
+            // Oa's own, by the author's decision: Spaces reordered in the Library put the first beside it, so a
+            // swipe back lands there.
+            let order = spaces.map(\.id)
+            if homeOrder == nil { homeOrder = order } else if homeOrder != order { leadingSpace = 0 }
         } else if target != .home, !pager.isTracking, !pager.isAnimating {
             leadingSpace = 0
         }
+        if target != .home { homeOrder = nil }
         let home = PageSwipeController<WindowLayoutPage>.Page(id: .home, width: Self.homeWidth)
         pager.setPages(
             [home] + spaces[min(leadingSpace, spaces.count)...].map { .init(id: .space($0.id), width: sidebarWidth) },
