@@ -132,7 +132,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// As Arc: ⌘Q and Quit ask first while the warning is on, before any page is asked; quitting from the Dock or
     /// at logout doesn't.
     @objc func quit(_ sender: Any?) {
-        guard QuitWarning.isOn else { return NSApplication.shared.terminate(nil) }
+        guard QuitWarning.isOn else { return terminateFromRunLoop() }
         guard !askingToQuit else { return }
         askingToQuit = true
         let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa"
@@ -145,9 +145,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             self?.askingToQuit = false
             guard response != .alertSecondButtonReturn else { return }
             if response == .alertThirdButtonReturn { QuitWarning.isOn = false }
-            // After the sheet is gone, and from the run loop rather than the main queue: quitting waits on pages'
-            // prompts, which run on the main queue.
-            NSApplication.shared.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
+            self?.terminateFromRunLoop()
         }
         if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow {
             alert.beginSheetModal(for: window) { response in MainActor.assumeIsolated { answer(response) } }
@@ -155,6 +153,12 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             answer(alert.runModal())
         }
     }
+    /// Quitting waits on pages' prompts, which run on the main queue, so it starts from the run loop: never inside
+    /// the engine's task that delivered ⌘Q from a focused page, nor under a sheet that is still closing.
+    private func terminateFromRunLoop() {
+        NSApplication.shared.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
+    }
+
     @objc func restoreData(_ sender: Any?) { restoreData.show() }
 
     /// As Arc's help links in Settings: a new tab in the frontmost window's Space, which comes forward while
