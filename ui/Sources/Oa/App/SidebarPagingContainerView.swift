@@ -79,7 +79,8 @@ private struct SidebarSpacePage: View {
             model.state.tabs(in: space.id, pinned: true).map(Item.tab) + (unpinned.isEmpty ? [] : [.divider])
             + [.newTab] + unpinned.map(Item.tab)
         ScrollView {
-            LazyVStack(spacing: 1) {
+            // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
+            VStack(spacing: 1) {
                 SpaceNameRow(model: model, space: space)
                     .sidebarDragFrame { drag?.lists[space.id, default: .init()].pinnedTop = $0.maxY + 0.5 }
                 ForEach(items) { item in
