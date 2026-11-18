@@ -96,9 +96,12 @@ private struct SidebarSpacePage: View {
 
     var body: some View {
         let unpinned = model.state.tabs(in: space.id, pinned: false)
+        let collapsed = model.collapsedPinnedSpaces.contains(space.id)
+        // As Arc: a collapsed section still shows its selected tab.
+        let pinned = model.state.tabs(in: space.id, pinned: true).filter { !collapsed || $0.id == model.selectedTabID }
+        let pinnedIDs = Set(pinned.map(\.id))
         let items =
-            model.state.tabs(in: space.id, pinned: true).map(Item.tab) + (unpinned.isEmpty ? [] : [.divider])
-            + [.newTab] + unpinned.map(Item.tab)
+            pinned.map(Item.tab) + (unpinned.isEmpty ? [] : [.divider]) + [.newTab] + unpinned.map(Item.tab)
         ScrollView {
             // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
             VStack(spacing: 1) {
@@ -107,8 +110,14 @@ private struct SidebarSpacePage: View {
                 ForEach(items) { item in
                     switch item {
                     case .tab(let tab):
+                        // As measured on Arc: collapsing takes the pinned rows away at once, and expanding fades
+                        // them in where they go.
                         TabRow(model: model, layout: layout, tab: tab, spaceID: space.id)
-                            .transition(.opacity)
+                            .transition(
+                                pinnedIDs.contains(tab.id)
+                                    ? .asymmetric(
+                                        insertion: .opacity.animation(.easeOut(duration: 0.08)), removal: .identity)
+                                    : .opacity)
                     case .divider:
                         ClearDivider(model: model, spaceID: space.id, showsClear: revealed)
                             .sidebarDragFrame { drag?.lists[space.id, default: .init()].divider = $0 }
@@ -120,6 +129,12 @@ private struct SidebarSpacePage: View {
                 }
             }
             .padding([.horizontal, .bottom], 8)
+            // As measured on Arc: the rows below a collapsing pinned section spring up, and down as it expands.
+            .animation(
+                collapsed
+                    ? .spring(response: 0.125, dampingFraction: 0.94) : .spring(response: 0.135, dampingFraction: 0.9),
+                value: collapsed
+            )
             // As measured on Arc: an archived row fades where it is while the rows below close up.
             .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
         }
@@ -132,30 +147,65 @@ private struct SidebarSpacePage: View {
 }
 
 /// Arc's `SidebarSectionHeaderView`: the Space's name, a hover card after a moment and the "⋯" with the Space's
-/// menu. The chevron Arc shows on hover is left out until what it does is known.
+/// menu. As Arc's, a click folds the Space's pinned tabs away or back, with a chevron in the icon's place on hover and
+/// while folded; a Space with no pinned tabs has no chevron, and a click renames it there.
 private struct SpaceNameRow: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let space: SidebarSpace
     @State private var over = false
     @State private var hovering = false
+    @State private var renaming: String?
+    @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let hasPinned = !model.state.tabs(in: space.id, pinned: true).isEmpty
+        let collapsed = hasPinned && model.collapsedPinnedSpaces.contains(space.id)
+        let showsChevron = hasPinned && (hovering || collapsed)
         HStack(spacing: 0) {
-            if let icon = space.icon {
-                SpaceIconGlyph(icon: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.sectionHeaderText)
-                    .frame(width: 26, height: 26)
-                    .padding(.trailing, 2)
-            }
-            Text(space.name)
+            if showsChevron || space.icon != nil {
+                Group {
+                    if showsChevron {
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(collapsed ? -90 : 0))
+                            .animation(.easeOut(duration: 0.1), value: collapsed)
+                    } else if let icon = space.icon {
+                        SpaceIconGlyph(icon: icon)
+                    }
+                }
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(theme.sectionHeaderText)
-                .lineLimit(1)
+                .frame(width: 26, height: 26)
+                .padding(.trailing, 2)
+            }
+            if let draft = renaming {
+                TextField(
+                    "",
+                    text: Binding {
+                        draft
+                    } set: {
+                        renaming = $0
+                    }
+                )
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .semibold))
+                .focused($renameFocused)
+                .onSubmit(commitRename)
+                .onExitCommand { renaming = nil }
+                .onAppear { renameFocused = true }
+                Button("Done", action: commitRename)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.secondaryText)
+            } else {
+                Text(space.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.sectionHeaderText)
+                    .lineLimit(1)
+            }
             Spacer(minLength: 0)
-            if hovering {
+            if hovering, renaming == nil {
                 SpaceMenuButton {
                     SpaceMenu(model: model, layout: layout, space: space)
                 } label: {
@@ -167,13 +217,17 @@ private struct SpaceNameRow: View {
                 .help("More")
             }
         }
-        .padding(.leading, space.icon == nil ? 8 : 5)
+        .padding(.leading, showsChevron || space.icon != nil ? 5 : 8)
         .padding(.trailing, 6)
         .frame(height: 36)
         .background(
             hovering ? theme.itemFill : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
         .contentShape(Rectangle())
+        .onTapGesture {
+            guard renaming == nil else { return }
+            if hasPinned { model.togglePinnedSection(of: space.id) } else { renaming = space.name }
+        }
         .popover(isPresented: pickingIcon, arrowEdge: .bottom) {
             SpaceIconPicker(selection: space.icon) { icon in
                 model.setSpaceIcon(icon, for: space.id)
@@ -189,6 +243,13 @@ private struct SpaceNameRow: View {
             if !Task.isCancelled { hovering = true }
         }
         .frame(height: 38, alignment: .top)
+    }
+
+    private func commitRename() {
+        if let name = renaming?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            model.renameSpace(space.id, to: name)
+        }
+        renaming = nil
     }
 
     private var pickingIcon: Binding<Bool> {
