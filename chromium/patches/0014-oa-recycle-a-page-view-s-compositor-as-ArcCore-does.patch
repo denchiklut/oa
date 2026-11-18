@@ -4,15 +4,17 @@ Date: Wed, 18 Nov 2026 09:15:38 -0700
 Subject: [PATCH] oa: recycle a page view's compositor, as ArcCore does
 
 Restores ui::RecyclableCompositorMacFactory, which upstream removed: a BrowserCompositorMac that leaves HasOwnCompositor gives its RecyclableCompositorMac to a pool of at most one spare, and the next one that enters it takes that spare instead of building a new compositor. Only a page's view (WebContentsViewMac::CreateViewForWidget) recycles; popups build their own, as in ArcCore, whose RenderWidgetHostViewMac and BrowserCompositorMac take the same added flag. An embedder that hosts the page's NSView itself, outside views' parent ui::Layer, otherwise shows nothing on every tab switch until the new compositor's first frame. BrowserCompositorMac::DisableRecyclingForShutdown() empties the pool before the context factory goes.
+
+Viz sends a root compositor's CALayerParams again only when they change (or every 10 s while it draws), and a recycled compositor's don't, so a view that never showed it (a new tab, or the new widget a reload can bring) would stay blank. The compositor keeps the last params across owners, and the view that takes it from the pool is handed them, as a new compositor's first frame would.
 ---
- .../browser_compositor_view_mac.h             |  6 ++-
- .../browser_compositor_view_mac.mm            | 15 ++++--
+ .../browser_compositor_view_mac.h             |  6 +-
+ .../browser_compositor_view_mac.mm            | 25 +++++++-
  .../render_widget_host_view_mac.h             |  4 +-
  .../render_widget_host_view_mac.mm            |  5 +-
  .../web_contents/web_contents_view_mac.mm     |  3 +-
- ui/compositor/recyclable_compositor_mac.cc    | 53 +++++++++++++++++++
- ui/compositor/recyclable_compositor_mac.h     | 34 ++++++++++++
- 7 files changed, 112 insertions(+), 8 deletions(-)
+ ui/compositor/recyclable_compositor_mac.cc    | 57 +++++++++++++++++++
+ ui/compositor/recyclable_compositor_mac.h     | 46 +++++++++++++++
+ 7 files changed, 138 insertions(+), 8 deletions(-)
 
 diff --git a/content/browser/renderer_host/browser_compositor_view_mac.h b/content/browser/renderer_host/browser_compositor_view_mac.h
 index 625bfb2402ef3cd98219915504c9ee29a195cfe4..875530a7fdd2185911a0b6066123633e9f2a78d9 100644
@@ -39,7 +41,7 @@ index 625bfb2402ef3cd98219915504c9ee29a195cfe4..875530a7fdd2185911a0b6066123633e
  
    std::unique_ptr<DelegatedFrameHost> delegated_frame_host_;
 diff --git a/content/browser/renderer_host/browser_compositor_view_mac.mm b/content/browser/renderer_host/browser_compositor_view_mac.mm
-index 4ab8a9cf166665a3dee3069e237d36788c15447a..3073270c37829849e9a15a5c2d65ece4783f58b7 100644
+index 4ab8a9cf166665a3dee3069e237d36788c15447a..8770150deb6aeb898e63ebc8c907baae5592fe5b 100644
 --- a/content/browser/renderer_host/browser_compositor_view_mac.mm
 +++ b/content/browser/renderer_host/browser_compositor_view_mac.mm
 @@ -50,9 +50,11 @@
@@ -55,18 +57,25 @@ index 4ab8a9cf166665a3dee3069e237d36788c15447a..3073270c37829849e9a15a5c2d65ece4
        weak_factory_(this) {
    GetBrowserCompositors().insert(this);
  
-@@ -251,6 +253,10 @@
+@@ -249,8 +251,17 @@
+     root_layer_->parent()->Remove(root_layer_.get());
+   }
    if (state_ == HasOwnCompositor) {
++    std::optional<gfx::CALayerParams> last_ca_layer_params;
++    if (const gfx::CALayerParams* params =
++            recyclable_compositor_->widget()->GetCALayerParams()) {
++      last_ca_layer_params = params->CloneWithoutFence();
++    }
      recyclable_compositor_->widget()->ResetNSView();
      recyclable_compositor_->compositor()->SetRootLayer(nullptr);
 +    if (recycles_compositor_) {
 +      ui::RecyclableCompositorMacFactory::Get()->RecycleCompositor(
-+          std::move(recyclable_compositor_));
++          std::move(recyclable_compositor_), std::move(last_ca_layer_params));
 +    }
      recyclable_compositor_.reset();
    }
  
-@@ -272,8 +278,10 @@
+@@ -272,8 +283,10 @@
      state_ = UseParentLayerCompositor;
    }
    if (new_state == HasOwnCompositor) {
@@ -79,7 +88,19 @@ index 4ab8a9cf166665a3dee3069e237d36788c15447a..3073270c37829849e9a15a5c2d65ece4
      display::ScreenInfo current = client_->GetCurrentScreenInfo();
      recyclable_compositor_->UpdateSurface(
          dfh_size_pixels_, current.device_scale_factor,
-@@ -301,6 +309,7 @@
+@@ -283,6 +296,11 @@
+     recyclable_compositor_->compositor()->SetBackgroundColor(background_color_);
+     recyclable_compositor_->widget()->SetNSView(
+         accelerated_widget_mac_ns_view_);
++    if (const std::optional<gfx::CALayerParams>& params =
++            recyclable_compositor_->recycled_ca_layer_params()) {
++      accelerated_widget_mac_ns_view_->AcceleratedWidgetCALayerParamsUpdated(
++          params->CloneWithoutFence());
++    }
+     recyclable_compositor_->Unsuspend();
+     state_ = HasOwnCompositor;
+   }
+@@ -301,6 +319,7 @@
      BrowserCompositorMac* browser_compositor = *GetBrowserCompositors().begin();
      browser_compositor->client_->DestroyCompositorForShutdown();
    }
@@ -140,10 +161,10 @@ index 09380afc8aedd8603591262187b261c3fc0daa0b..a2546d832e2f17e5effec2ba446b57c9
      view->SetDelegate(
          delegate()->GetDelegateForHost(render_widget_host, /*is_popup=*/false));
 diff --git a/ui/compositor/recyclable_compositor_mac.cc b/ui/compositor/recyclable_compositor_mac.cc
-index 179a221421e6e7676df782faab44fc1a409b1e38..dfb93a58f8b51a97c1695fbe834481acf0165048 100644
+index 179a221421e6e7676df782faab44fc1a409b1e38..a31c7e130d49d2b84aa4121ae75135ce166ecae4 100644
 --- a/ui/compositor/recyclable_compositor_mac.cc
 +++ b/ui/compositor/recyclable_compositor_mac.cc
-@@ -100,4 +100,57 @@ void RecyclableCompositorMac::OnCompositingDidCommit(
+@@ -100,4 +100,61 @@ void RecyclableCompositorMac::OnCompositingDidCommit(
    accelerated_widget_mac_->SetSuspended(false);
  }
  
@@ -174,12 +195,16 @@ index 179a221421e6e7676df782faab44fc1a409b1e38..dfb93a58f8b51a97c1695fbe834481ac
 +}
 +
 +void RecyclableCompositorMacFactory::RecycleCompositor(
-+    std::unique_ptr<RecyclableCompositorMac> compositor) {
++    std::unique_ptr<RecyclableCompositorMac> compositor,
++    std::optional<gfx::CALayerParams> last_ca_layer_params) {
 +  if (recycling_disabled_) {
 +    return;
 +  }
 +  compositor->Suspend();
 +  compositor->InvalidateSurface();
++  if (last_ca_layer_params) {
++    compositor->recycled_ca_layer_params_ = std::move(last_ca_layer_params);
++  }
 +  spare_compositors_.push_front(std::move(compositor));
 +  // Trimmed in a task, so that no compositor is freed in a nested loop that
 +  // waits for a frame (https://crbug.com/828195).
@@ -202,30 +227,51 @@ index 179a221421e6e7676df782faab44fc1a409b1e38..dfb93a58f8b51a97c1695fbe834481ac
 +
  }  // namespace ui
 diff --git a/ui/compositor/recyclable_compositor_mac.h b/ui/compositor/recyclable_compositor_mac.h
-index 4ad358d9e76470e3d420d304db623a839e89cad4..4ceab2b9250fce407ca1f0b9ce3079d69f15f778 100644
+index 4ad358d9e76470e3d420d304db623a839e89cad4..ffdfe0653141d1fce9fa911b540c324bdbbc76cf 100644
 --- a/ui/compositor/recyclable_compositor_mac.h
 +++ b/ui/compositor/recyclable_compositor_mac.h
-@@ -8,6 +8,7 @@
+@@ -7,7 +7,9 @@
+ 
  #include <list>
  #include <memory>
++#include <optional>
  
 +#include "base/memory/weak_ptr.h"
  #include "base/no_destructor.h"
  #include "components/viz/common/surfaces/local_surface_id.h"
  #include "components/viz/common/surfaces/parent_local_surface_id_allocator.h"
-@@ -54,6 +55,8 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
+@@ -15,6 +17,7 @@
+ #include "ui/compositor/compositor.h"
+ #include "ui/compositor/compositor_export.h"
+ #include "ui/compositor/compositor_observer.h"
++#include "ui/gfx/ca_layer_params.h"
+ 
+ namespace ui {
+ 
+@@ -53,7 +56,16 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
+                      int64_t display_id,
                       float refresh_rate);
  
++  // Viz sends a compositor's CALayerParams again only when they change, so the
++  // view that takes a recycled compositor is handed the ones it last sent,
++  // kept across owners until a new frame replaces them.
++  const std::optional<gfx::CALayerParams>& recycled_ca_layer_params() const {
++    return recycled_ca_layer_params_;
++  }
++
   private:
 +  friend class RecyclableCompositorMacFactory;
 +
    // Invalidate the compositor's surface information.
    void InvalidateSurface();
  
-@@ -71,6 +74,37 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
+@@ -69,6 +81,40 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
+   std::unique_ptr<ui::AcceleratedWidgetMac> accelerated_widget_mac_;
+   ui::Compositor compositor_;
    std::unique_ptr<ui::CompositorLock> compositor_suspended_lock_;
- };
- 
++  std::optional<gfx::CALayerParams> recycled_ca_layer_params_;
++};
++
 +// Keeps the compositor of a view just hidden for the next view shown, as
 +// ArcCore's restored factory does. Without it every shown page builds a new
 +// compositor and shows nothing until its first frame.
@@ -241,7 +287,9 @@ index 4ad358d9e76470e3d420d304db623a839e89cad4..4ceab2b9250fce407ca1f0b9ce3079d6
 +  std::unique_ptr<RecyclableCompositorMac> CreateCompositor(
 +      ui::ContextFactory* context_factory,
 +      bool force_new);
-+  void RecycleCompositor(std::unique_ptr<RecyclableCompositorMac> compositor);
++  void RecycleCompositor(
++      std::unique_ptr<RecyclableCompositorMac> compositor,
++      std::optional<gfx::CALayerParams> last_ca_layer_params);
 +  void DisableRecyclingForShutdown();
 +
 + private:
@@ -255,8 +303,6 @@ index 4ad358d9e76470e3d420d304db623a839e89cad4..4ceab2b9250fce407ca1f0b9ce3079d6
 +  bool recycling_disabled_ = false;
 +  std::list<std::unique_ptr<RecyclableCompositorMac>> spare_compositors_;
 +  base::WeakPtrFactory<RecyclableCompositorMacFactory> weak_factory_{this};
-+};
-+
- }  // namespace ui
+ };
  
- #endif  // UI_COMPOSITOR_RECYCLABLE_COMPOSITOR_MAC_H_
+ }  // namespace ui
