@@ -24,10 +24,12 @@ struct SidebarSpace: Identifiable, Hashable, Codable {
     /// As Arc's `customInfo`, which also holds the Space's icon.
     struct CustomInfo: Hashable, Codable {
         var windowTheme: WindowTheme?
+        var icon: String?
     }
 
     /// As Arc: a Space without a theme shows the default.
     var theme: WindowTheme { customInfo?.windowTheme ?? .default }
+    var icon: String? { customInfo?.icon }
 }
 
 struct SidebarTab: Identifiable, Hashable {
@@ -314,6 +316,13 @@ struct SidebarState {
     mutating func renameSpace(_ id: UUID, to name: String) {
         guard let index = spaces.firstIndex(where: { $0.id == id }) else { return }
         spaces[index].name = name
+    }
+
+    mutating func setSpaceIcon(_ icon: String?, for id: UUID) {
+        guard let index = spaces.firstIndex(where: { $0.id == id }) else { return }
+        var info = spaces[index].customInfo ?? SidebarSpace.CustomInfo()
+        info.icon = icon
+        spaces[index].customInfo = info.icon == nil && info.windowTheme == nil ? nil : info
     }
 
     /// The last Space stays.

@@ -475,6 +475,11 @@ final class WindowModel {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }
 
+    func setSpaceIcon(_ icon: String?, for spaceID: UUID) {
+        guard let space = state.space(spaceID), space.icon != icon else { return }
+        store.edit { $0.setSpaceIcon(icon, for: spaceID) }
+    }
+
     /// As Arc: the new profile has its Favorites from the start, and Settings selects it.
     func createProfile(named name: String) async -> UUID? {
         guard let profileID = await engine.createBrowserContext(userVisibleName: name) else { return nil }
