@@ -11,8 +11,8 @@ Restores ui::RecyclableCompositorMacFactory, which upstream removed: a BrowserCo
  .../render_widget_host_view_mac.mm            |  5 +-
  .../web_contents/web_contents_view_mac.mm     |  3 +-
  ui/compositor/recyclable_compositor_mac.cc    | 53 +++++++++++++++++++
- ui/compositor/recyclable_compositor_mac.h     | 37 +++++++++++++
- 7 files changed, 115 insertions(+), 8 deletions(-)
+ ui/compositor/recyclable_compositor_mac.h     | 34 ++++++++++++
+ 7 files changed, 112 insertions(+), 8 deletions(-)
 
 diff --git a/content/browser/renderer_host/browser_compositor_view_mac.h b/content/browser/renderer_host/browser_compositor_view_mac.h
 index 625bfb2402ef3cd98219915504c9ee29a195cfe4..875530a7fdd2185911a0b6066123633e9f2a78d9 100644
@@ -202,7 +202,7 @@ index 179a221421e6e7676df782faab44fc1a409b1e38..dfb93a58f8b51a97c1695fbe834481ac
 +
  }  // namespace ui
 diff --git a/ui/compositor/recyclable_compositor_mac.h b/ui/compositor/recyclable_compositor_mac.h
-index 4ad358d9e76470e3d420d304db623a839e89cad4..5ed90607c32ceaa54c0b292c1a2f696603d89a5c 100644
+index 4ad358d9e76470e3d420d304db623a839e89cad4..4ceab2b9250fce407ca1f0b9ce3079d69f15f778 100644
 --- a/ui/compositor/recyclable_compositor_mac.h
 +++ b/ui/compositor/recyclable_compositor_mac.h
 @@ -8,6 +8,7 @@
@@ -222,7 +222,7 @@ index 4ad358d9e76470e3d420d304db623a839e89cad4..5ed90607c32ceaa54c0b292c1a2f6966
    // Invalidate the compositor's surface information.
    void InvalidateSurface();
  
-@@ -71,6 +74,40 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
+@@ -71,6 +74,37 @@ class COMPOSITOR_EXPORT RecyclableCompositorMac
    std::unique_ptr<ui::CompositorLock> compositor_suspended_lock_;
  };
  
@@ -238,12 +238,9 @@ index 4ad358d9e76470e3d420d304db623a839e89cad4..5ed90607c32ceaa54c0b292c1a2f6966
 +  RecyclableCompositorMacFactory& operator=(
 +      const RecyclableCompositorMacFactory&) = delete;
 +
-+  // The spare most recently recycled, or a new compositor when there is none
-+  // or `force_new` is set.
 +  std::unique_ptr<RecyclableCompositorMac> CreateCompositor(
 +      ui::ContextFactory* context_factory,
 +      bool force_new);
-+  // Keeps `compositor` as the spare; at most one survives.
 +  void RecycleCompositor(std::unique_ptr<RecyclableCompositorMac> compositor);
 +  void DisableRecyclingForShutdown();
 +
