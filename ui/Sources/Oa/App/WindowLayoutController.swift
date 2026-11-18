@@ -42,6 +42,18 @@ final class WindowLayoutController: NSViewController {
     private var restingSpaceID: UUID?
     /// The Spaces' order as the Library opened.
     private var homeOrder: [UUID]?
+    /// Arc's new-Space pull: the overshoot past the last Space's page over 22.5 pt fills the feedback view's ring and
+    /// arms it, over 15 pt slides it in, through a spring of 0.4 s at 0.8 that the display link drives, as SwiftUI's
+    /// don't run while the pager tracks the swipe. Released more than 0.1 s after arming, it opens the Create a Space
+    /// panel.
+    private(set) var spaceCreationPull: (progress: CGFloat, reveal: CGFloat) = (0, 0)
+    @ObservationIgnored private var pullTarget: CGFloat = 0
+    @ObservationIgnored private var pullVelocity: CGFloat = 0
+    @ObservationIgnored private var pullTick: CFTimeInterval?
+    @ObservationIgnored private let pullTicker = DisplayLinkTicker()
+    @ObservationIgnored private var pullArmedAt: CFTimeInterval?
+    /// As Arc: only a swipe that starts on the last Space, with no panel open, pulls.
+    @ObservationIgnored private var pullAllowed: Bool?
     /// The cross-fade onto the Create a Space page, as measured on Arc: 0.2 s, the page swapped at once beneath it.
     private(set) var spaceCreationReveal: CGFloat = 1
     @ObservationIgnored private var revealStart: CFTimeInterval?
@@ -62,7 +74,10 @@ final class WindowLayoutController: NSViewController {
         super.init(nibName: nil, bundle: nil)
         hover.needsUpdate = { [weak self] in self?.updatePresentation() }
         pager.windowProvider = { [weak self] in self?.viewIfLoaded?.window }
-        pager.positionUpdateHandler = { [weak self] in self?.pagerPosition = $0 }
+        pager.positionUpdateHandler = { [weak self] in
+            self?.pagerPosition = $0
+            self?.updatePull()
+        }
         pager.pageSelectionHandler = { [weak self] page in
             guard let model = self?.model else { return }
             switch page {
@@ -78,6 +93,7 @@ final class WindowLayoutController: NSViewController {
             }
         }
         pager.trackingStateUpdateHandler = { [weak self] in
+            self?.trackPull()
             self?.leaveSpaceCreation()
             self?.updatePages()
         }
@@ -217,6 +233,56 @@ final class WindowLayoutController: NSViewController {
         if !pager.isTracking, !pager.isAnimating, restingSpaceID != model.selectedSpaceID {
             restingSpaceID = model.selectedSpaceID
         }
+    }
+
+    private func updatePull() {
+        var overshoot: CGFloat = 0
+        if pullAllowed == true, let last = pager.pages.last, let origin = pager.origin(of: last.id) {
+            overshoot = max(pagerPosition - origin, 0)
+        }
+        spaceCreationPull.progress = min(overshoot / 22.5, 1)
+        springPull(to: min(overshoot / 15, 1))
+        guard pager.isTracking else { return }
+        let armed = spaceCreationPull.progress >= 1
+        guard armed != (pullArmedAt != nil) else { return }
+        pullArmedAt = armed ? CACurrentMediaTime() : nil
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+    }
+
+    private func springPull(to target: CGFloat) {
+        guard target != pullTarget, let window = view.window else { return }
+        pullTarget = target
+        pullTicker.start(in: window) { [weak self] in
+            guard let self else { return }
+            let now = CACurrentMediaTime()
+            let dt = min(now - (pullTick ?? now), 1.0 / 60)
+            pullTick = now
+            let omega = 2 * Double.pi / 0.4
+            let offset = spaceCreationPull.reveal - pullTarget
+            pullVelocity += (-omega * omega * offset - 2 * 0.8 * omega * pullVelocity) * dt
+            let reveal = spaceCreationPull.reveal + pullVelocity * dt
+            if abs(reveal - pullTarget) < 0.001, abs(pullVelocity) < 0.01 {
+                spaceCreationPull.reveal = pullTarget
+                (pullVelocity, pullTick) = (0, nil)
+                pullTicker.stop()
+            } else {
+                spaceCreationPull.reveal = reveal
+            }
+        }
+    }
+
+    private func trackPull() {
+        guard !pager.isTracking else {
+            if pullAllowed == nil {
+                let last = model.state.spaces.last.map { WindowLayoutPage.space($0.id) }
+                pullAllowed = model.spaceCreation == nil && pager.selectedPageID == last
+            }
+            return
+        }
+        pullAllowed = nil
+        let armedAt = pullArmedAt
+        pullArmedAt = nil
+        if let armedAt, CACurrentMediaTime() - armedAt > 0.1 { model.beginSpaceCreation() }
     }
 
     private func leaveSpaceCreation() {
