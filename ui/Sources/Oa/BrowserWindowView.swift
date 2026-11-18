@@ -40,23 +40,23 @@ struct BrowserWindowView: View {
             .offset(x: sidebarOffset)
             .allowsHitTesting(progress == 0)
             .zIndex(floats ? 3 : 0)
-            // Mounted while closed too, as open-arch's overview: the Spaces row keeps where it was scrolled.
-            let libraryAppearance = layout.libraryTheme.background[colorScheme].contentOverBackgroundAppearance
-            LibraryView(
-                model: model, layout: layout, section: section, width: libraryWidth, progress: progress,
-                pageInset: lead
-            )
-            .environment(\.colorScheme, libraryAppearance.colorScheme)
-            .environment(
-                \.theme,
-                Theme(
-                    palette: layout.libraryTheme.semanticColorPalette[libraryAppearance.colorScheme],
-                    appearance: libraryAppearance)
-            )
-            .offset(x: -libraryWidth * (1 - progress))
-            .allowsHitTesting(model.library != nil)
-            .accessibilityHidden(progress == 0)
-            .zIndex(1)
+            if progress > 0 {
+                let libraryAppearance = layout.libraryTheme.background[colorScheme].contentOverBackgroundAppearance
+                LibraryView(
+                    model: model, layout: layout, section: section, width: libraryWidth, progress: progress,
+                    pageInset: lead
+                )
+                .environment(\.colorScheme, libraryAppearance.colorScheme)
+                .environment(
+                    \.theme,
+                    Theme(
+                        palette: layout.libraryTheme.semanticColorPalette[libraryAppearance.colorScheme],
+                        appearance: libraryAppearance)
+                )
+                .offset(x: -libraryWidth * (1 - progress))
+                .allowsHitTesting(model.library != nil)
+                .zIndex(1)
+            }
             // As Arc's `DimState`: under a Peek the card shrinks 9 pt at every edge as it fades.
             let cardSize = CGSize(width: layout.size.width - lead - 10, height: layout.size.height - 20)
             card
