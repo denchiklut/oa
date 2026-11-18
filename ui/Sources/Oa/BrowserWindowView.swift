@@ -41,11 +41,18 @@ struct BrowserWindowView: View {
             .allowsHitTesting(progress == 0)
             .zIndex(floats ? 3 : 0)
             if progress > 0 {
+                let libraryAppearance = layout.libraryTheme.background[colorScheme].contentOverBackgroundAppearance
                 LibraryView(
                     model: model, layout: layout, section: section, width: libraryWidth, progress: progress,
                     pageInset: lead
                 )
-                .environment(\.colorScheme, appearance.colorScheme)
+                .environment(\.colorScheme, libraryAppearance.colorScheme)
+                .environment(
+                    \.theme,
+                    Theme(
+                        palette: layout.libraryTheme.semanticColorPalette[libraryAppearance.colorScheme],
+                        appearance: libraryAppearance)
+                )
                 .offset(x: -libraryWidth * (1 - progress))
                 .allowsHitTesting(model.library != nil)
                 .zIndex(1)
