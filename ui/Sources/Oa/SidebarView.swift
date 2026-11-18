@@ -358,33 +358,43 @@ struct TabFavicon: View {
 /// Arc's tab cell: a 40 pt row with a 36 pt card, selected on mouse-down, its button only under the pointer.
 /// Reads the model itself, so a change to its tab's page, Peek or selection re-renders the row alone.
 struct TabRow: View {
+    /// As Arc's Spaces cards: the same cell, with no selection drawn, always ✕, the saved title, and a click that
+    /// leaves the Library for the tab on mouse-up.
+    enum Place {
+        case sidebar
+        case card
+    }
+
     let model: WindowModel
     let layout: WindowLayoutController
     let tab: SidebarTab
     let spaceID: UUID
+    var place = Place.sidebar
     @State private var hovering = false
+    @State private var size = CGSize.zero
     @State private var pressed = false
     @State private var bounces = 0
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
+        let inCard = place == .card
         let pinned = model.state.isPinned(tab.id)
-        let current = model.selectedTabIDs[spaceID] == tab.id
+        let current = !inCard && model.selectedTabIDs[spaceID] == tab.id
         // As Arc: the New Tab row takes the selected look while the bar makes a tab.
         let selected = current && (spaceID != model.selectedSpaceID || model.commandBar?.destination != .newTab)
         // As Arc's `closeButtonAction`: a pinned tab that is shown, or has left its address, keeps its pin.
         let glyph: SidebarCellButton.Glyph =
-            pinned && (current || model.leftAddress(tab) != nil) ? .minus : .close
+            pinned && !inCard && (current || model.leftAddress(tab) != nil) ? .minus : .close
         let peek = model.peeks[tab.id]
-        let dragged = drag?.tab?.id == tab.id
+        let dragged = !inCard && drag?.tab?.id == tab.id
         let showsButton = hovering && !dragged
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
         HStack(spacing: 0) {
             if model.isRecording(tab) { RecordingDot().padding(.trailing, 2) }
             TabFavicon(model: model, tab: tab)
                 .frame(width: 24, height: 24)
-            Text(model.title(for: tab))
+            Text(inCard ? tab.displayTitle : model.title(for: tab))
                 .font(.system(size: 14))
                 .foregroundStyle(theme.foreground)
                 .lineLimit(1)
@@ -401,21 +411,33 @@ struct TabRow: View {
         }
         .contentShape(card)
         .gesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .named(SidebarDrag.space))
+            DragGesture(minimumDistance: 0, coordinateSpace: inCard ? .local : .named(SidebarDrag.space))
                 .onChanged { value in
                     if !pressed {
                         pressed = true
-                        model.select(tab.id)
+                        if !inCard { model.select(tab.id) }
                     }
+                    guard !inCard else { return }
                     drag?.update(
                         tab, from: pinned ? .pinned : .today, glyph: glyph, at: value.location,
                         start: value.startLocation, model: model, layout: layout)
                 }
-                .onEnded { _ in
+                .onEnded { value in
                     pressed = false
-                    drag?.finish(model: model, layout: layout)
+                    guard inCard else {
+                        drag?.finish(model: model, layout: layout)
+                        return
+                    }
+                    guard CGRect(origin: .zero, size: size).contains(value.location) else { return }
+                    layout.dismissSidebar()
+                    model.show(tab.id)
                 }
         )
+        .onGeometryChange(for: CGSize.self) {
+            $0.size
+        } action: {
+            size = $0
+        }
         .overlay(alignment: .trailing) {
             Group {
                 if let peek {
@@ -449,12 +471,12 @@ struct TabRow: View {
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
-        .sidebarDragFrame { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) }
+        .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
         .contextMenu {
             if !pinned {
                 Button("Archive Tab") { model.close(tab.id) }
                 Button("Archive Tabs Below") { model.archiveTabs(below: tab.id) }
-                    .disabled(model.unpinnedTabs.last?.id == tab.id)
+                    .disabled(model.state.tabs(in: spaceID, pinned: false).last?.id == tab.id)
             }
         }
     }
