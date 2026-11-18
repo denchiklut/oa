@@ -6,6 +6,7 @@ struct BrowserWindowView: View {
     let layout: WindowLayoutController
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(PageToolbar.key) private var showsToolbar = false
+    @State private var sidebarDrag = SidebarDrag()
 
     var body: some View {
         let backdrop = layout.backgroundThemes
@@ -73,6 +74,11 @@ struct BrowserWindowView: View {
                     .zIndex(4)
             }
         }
+        .coordinateSpace(.named(SidebarDrag.space))
+        .overlay(alignment: .topLeading) {
+            SidebarDragLayer(model: model, drag: sidebarDrag)
+                .environment(\.colorScheme, appearance.colorScheme)
+        }
         .background { WindowSurface(background: background, next: next) }
         .overlay {
             // The Archive's Peek is over the whole window. A tab's is over its page and leaves the docked sidebar
@@ -117,6 +123,7 @@ struct BrowserWindowView: View {
             \.theme, Theme(palette: theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         )
         .environment(\.windowColorScheme, colorScheme)
+        .environment(\.sidebarDrag, sidebarDrag)
         .ignoresSafeArea()
     }
 

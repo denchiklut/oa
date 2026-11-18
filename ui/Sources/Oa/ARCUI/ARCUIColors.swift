@@ -5,6 +5,7 @@ import SwiftUI
 enum ARCUIColor {
     static let gray1 = dynamic(srgb(0.99, 1), srgb(0.085, 1))
     static let grayA4 = dynamic(srgb(0, 0.071), srgb(1, 0.077))
+    static let grayA5 = dynamic(srgb(0, 0.09), srgb(1, 0.103))
 
     private static func srgb(_ white: CGFloat, _ alpha: CGFloat) -> NSColor {
         NSColor(srgbRed: white, green: white, blue: white, alpha: alpha)
