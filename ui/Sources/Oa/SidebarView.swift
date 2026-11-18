@@ -88,10 +88,10 @@ enum SpaceDeletion {
     }
 }
 
-/// Arc's Space items in the dock, between the Library button and the plus: an 8 pt dot for a Space without an icon,
-/// which is every Space until Spaces have icons, 26 pt apart and closer once they don't fit. The current Space's is
-/// darker and nothing else, and during a swipe the two Spaces' dots cross-fade with it. Past a pitch of 18 pt the
-/// others shrink to 4 pt: Arc's do between its 8 Spaces and its 10, and where exactly is Oa's own.
+/// Arc's Space items in the dock, between the Library button and the plus: an icon or an 8 pt dot, 26 pt apart and
+/// closer once they don't fit. The current Space's is darker, and during a swipe the two Spaces cross-fade.
+/// Past a pitch of 18 pt the icons give way to dots and the others shrink to 4 pt. Oa chose that threshold
+/// between Arc's measured pitches at 8 and 10 Spaces.
 private struct SidebarDock: View {
     let model: WindowModel
     let layout: WindowLayoutController
@@ -109,11 +109,17 @@ private struct SidebarDock: View {
                     Button {
                         model.selectSpace(space.id)
                     } label: {
-                        Circle()
-                            .fill(theme.dockItem(emphasis: emphasis))
-                            .frame(width: size, height: size)
-                            .frame(width: pitch, height: 34)
-                            .contentShape(Rectangle())
+                        Group {
+                            if pitch >= 18, let icon = space.icon {
+                                SpaceIconGlyph(icon: icon)
+                                    .font(.system(size: 13, weight: .semibold))
+                            } else {
+                                Circle().frame(width: size, height: size)
+                            }
+                        }
+                        .foregroundStyle(theme.dockItem(emphasis: emphasis))
+                        .frame(width: pitch, height: 34)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(space.name)
@@ -130,19 +136,8 @@ private struct SidebarDock: View {
         Button("Rename…") {
             if let name = NamePrompt.run("Rename Space", name: space.name) { model.renameSpace(space.id, to: name) }
         }
-        // As Arc, by name here, where Settings and Change Profile keep the engine's order.
         Menu("Set Profile") {
-            ForEach(model.profiles.sorted { $0.name < $1.name }) { profile in
-                Toggle(
-                    profile.name,
-                    isOn: Binding {
-                        profile.id == space.profileID
-                    } set: { _ in
-                        ProfileDialogUtils.confirmSwitch([space.id], to: profile.id, in: model)
-                    })
-            }
-            Divider()
-            Button("New Profile…") { ProfileDialogUtils.createProfile(checking: [space.id], in: model) }
+            SpaceProfileMenuItems(model: model, space: space)
         }
         Button("Delete") { SpaceDeletion.confirm(space, in: model) }
             .disabled(model.state.spaces.count == 1)

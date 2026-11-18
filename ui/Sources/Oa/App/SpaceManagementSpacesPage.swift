@@ -96,12 +96,8 @@ private struct SpaceManagementCollectionViewItem: View {
         let theme = Theme(palette: space.theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         let unpinned = model.state.tabs(in: space.id, pinned: false)
         VStack(alignment: .leading, spacing: 0) {
-            Text(space.name)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(theme.secondaryText)
-                .lineLimit(1)
-                .padding(.horizontal, 13)
-                .frame(height: 36)
+            SpaceManagementCardHeader(model: model, space: space)
+                .padding(8)
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(model.state.tabs(in: space.id, pinned: true)) { row($0) }
@@ -118,6 +114,7 @@ private struct SpaceManagementCollectionViewItem: View {
             }
         }
         .environment(\.colorScheme, appearance.colorScheme)
+        .environment(\.theme, theme)
         .background { WindowSurface(background: background).environment(\.colorScheme, windowColorScheme) }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         // As Arc's: under the card, its `EaselBackground` casts the shadow.

@@ -68,6 +68,26 @@ enum ProfileDialogUtils {
     }
 }
 
+struct SpaceProfileMenuItems: View {
+    let model: WindowModel
+    let space: SidebarSpace
+
+    var body: some View {
+        // As Arc, by name here, where Settings and Change Profile keep the engine's order.
+        ForEach(model.profiles.sorted { $0.name < $1.name }) { profile in
+            Toggle(
+                profile.name,
+                isOn: Binding {
+                    profile.id == space.profileID
+                } set: { _ in
+                    ProfileDialogUtils.confirmSwitch([space.id], to: profile.id, in: model)
+                })
+        }
+        Divider()
+        Button("New Profile…") { ProfileDialogUtils.createProfile(checking: [space.id], in: model) }
+    }
+}
+
 private struct SwitchProfileDialog: View {
     let profile: String
     let spaces: [String]
