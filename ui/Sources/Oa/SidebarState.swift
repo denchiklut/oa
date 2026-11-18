@@ -313,6 +313,11 @@ struct SidebarState {
         for index in spaces.indices where spaceIDs.contains(spaces[index].id) { spaces[index].profileID = profileID }
     }
 
+    mutating func moveSpace(_ id: UUID, to index: Int) {
+        guard let from = spaces.firstIndex(where: { $0.id == id }) else { return }
+        spaces.insert(spaces.remove(at: from), at: min(max(index, 0), spaces.count))
+    }
+
     mutating func renameSpace(_ id: UUID, to name: String) {
         guard let index = spaces.firstIndex(where: { $0.id == id }) else { return }
         spaces[index].name = name

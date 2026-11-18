@@ -474,6 +474,11 @@ final class WindowModel {
         if let created { selectSpace(created.id) }
     }
 
+    func moveSpace(_ spaceID: UUID, to index: Int) {
+        guard state.spaces.firstIndex(where: { $0.id == spaceID }) != index else { return }
+        store.edit { $0.moveSpace(spaceID, to: index) }
+    }
+
     func renameSpace(_ spaceID: UUID, to name: String) {
         store.edit { $0.renameSpace(spaceID, to: name) }
     }

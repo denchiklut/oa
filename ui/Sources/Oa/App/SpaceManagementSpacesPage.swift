@@ -15,6 +15,7 @@ struct SpaceManagementSpacesPage: View {
     let progress: CGFloat
     let pageInset: CGFloat
     @State private var scroll: CGFloat = 0
+    @State private var drag: SpaceManagementDrag?
 
     var body: some View {
         GeometryReader { geometry in
@@ -23,9 +24,20 @@ struct SpaceManagementSpacesPage: View {
                 progress: progress)
             ScrollView(.horizontal) {
                 HStack(spacing: 24) {
-                    ForEach(model.state.spaces) { space in
-                        SpaceManagementCollectionViewItem(model: model, layout: layout, space: space)
-                            .frame(width: 240, height: max(geometry.size.height - 96, 0))
+                    ForEach(Array(model.state.spaces.enumerated()), id: \.element.id) { index, space in
+                        let isDragged = drag?.spaceID == space.id
+                        SpaceManagementCollectionViewItem(model: model, layout: layout, space: space) {
+                            move(space.id, from: index, by: $0)
+                        } dropped: {
+                            drop()
+                        }
+                        .frame(width: 240, height: max(geometry.size.height - 96, 0))
+                        .offset(x: shift(forCardAt: index))
+                        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: drag?.target)
+                        .offset(isDragged ? drag?.translation ?? .zero : .zero)
+                        .scaleEffect(isDragged ? 1.03 : 1)
+                        .opacity(isDragged ? 0.9 : 1)
+                        .zIndex(isDragged ? 1 : 0)
                     }
                     SpaceManagementAddSpaceView(model: model)
                 }
@@ -33,11 +45,12 @@ struct SpaceManagementSpacesPage: View {
                 .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
                 .background {
                     GeometryReader { content in
-                        Color.clear.preference(key: Scroll.self, value: -content.frame(in: .named(Scroll.space)).minX)
+                        Color.clear.preference(
+                            key: Scroll.self, value: -content.frame(in: .named(SpaceManagementDrag.space)).minX)
                     }
                 }
             }
-            .coordinateSpace(name: Scroll.space)
+            .coordinateSpace(name: SpaceManagementDrag.space)
             .onPreferenceChange(Scroll.self) { scroll = $0 }
             // The scroll view reaches left by what the row is moved, so the row keeps its place in it.
             .frame(width: viewport.clip + viewport.travel)
@@ -48,10 +61,51 @@ struct SpaceManagementSpacesPage: View {
         }
     }
 
+    /// How far a card stands aside for the slot the dragged one would drop into.
+    private func shift(forCardAt index: Int) -> CGFloat {
+        guard let drag, index != drag.source else { return 0 }
+        if drag.source < drag.target, index > drag.source, index <= drag.target { return -264 }
+        if drag.source > drag.target, index >= drag.target, index < drag.source { return 264 }
+        return 0
+    }
+
+    private func move(_ spaceID: UUID, from index: Int, by translation: CGSize) {
+        if drag == nil { drag = SpaceManagementDrag(spaceID: spaceID, source: index) }
+        guard drag?.spaceID == spaceID else { return }
+        drag?.translation = translation
+        let slots = Int((translation.width / 264).rounded())
+        drag?.target = min(max(index + slots, 0), model.state.spaces.count - 1)
+    }
+
+    private func drop() {
+        guard let drag else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            model.moveSpace(drag.spaceID, to: drag.target)
+            self.drag = nil
+        }
+    }
+
     private enum Scroll: PreferenceKey {
-        static let space = "SpaceManagementSpacesPage"
         static let defaultValue: CGFloat = 0
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+    }
+}
+
+/// Oa's own, by the author's decision, after open-arch: the card itself lifts and follows the pointer, the others
+/// stand aside for the slot it would drop into, and it springs into that slot. Arc's is an AppKit drag session: the
+/// card leaves its slot open and a copy of it follows the pointer (arc-spaces-card-drag-static.md).
+private struct SpaceManagementDrag {
+    static let space = "SpaceManagementSpacesPage"
+
+    let spaceID: UUID
+    let source: Int
+    var target: Int
+    var translation = CGSize.zero
+
+    init(spaceID: UUID, source: Int) {
+        self.spaceID = spaceID
+        self.source = source
+        target = source
     }
 }
 
@@ -89,6 +143,8 @@ private struct SpaceManagementCollectionViewItem: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let space: SidebarSpace
+    var moved: ((CGSize) -> Void)?
+    var dropped: (() -> Void)?
     @State private var isPickingIcon = false
     @State private var isEditingName = false
     @Environment(\.windowColorScheme) private var windowColorScheme
@@ -134,6 +190,11 @@ private struct SpaceManagementCollectionViewItem: View {
     private var footer: some View {
         HStack(spacing: 0) {
             SpaceManagementDraggerView()
+                .gesture(
+                    DragGesture(minimumDistance: 3, coordinateSpace: .named(SpaceManagementDrag.space))
+                        .onChanged { moved?($0.translation) }
+                        .onEnded { _ in dropped?() }
+                )
             Spacer(minLength: 0)
             SpaceMenuButton {
                 SpaceMenu(model: model, space: space, inLibrary: true) {
