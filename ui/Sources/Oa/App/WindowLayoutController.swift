@@ -140,6 +140,9 @@ final class WindowLayoutController: NSViewController {
         let throughHome = target == .home || pager.selectedPageID == .home
         if pager.selectedPageID != target {
             leadingSpace = throughHome ? index : 0
+        } else if target == .home, !pager.isTracking {
+            // The window's Space may have moved among the Spaces since.
+            leadingSpace = index
         } else if target != .home, !pager.isTracking, !pager.isAnimating {
             leadingSpace = 0
         }
