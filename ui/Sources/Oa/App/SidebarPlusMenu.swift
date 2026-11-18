@@ -25,10 +25,12 @@ struct SidebarPlusButton: View {
 
 private struct SidebarPlusMenu: View {
     private struct Row: Identifiable {
-        let id: String
+        let title: String
         let symbol: String
         var shortcut = ""
         var action: (() -> Void)?
+
+        var id: String { title }
     }
 
     let model: WindowModel
@@ -39,18 +41,18 @@ private struct SidebarPlusMenu: View {
     var body: some View {
         let groups: [[Row]] = [
             [
-                Row(id: "New Space", symbol: "plus.rectangle.on.rectangle") {
+                Row(title: "New Space", symbol: "plus.rectangle.on.rectangle") {
                     model.beginSpaceCreation(after: model.selectedSpaceID)
                 },
-                Row(id: "New Folder", symbol: "folder"),
+                Row(title: "New Folder", symbol: "folder"),
             ],
             [
-                Row(id: "New Easel", symbol: "scribble", shortcut: "⌃⇧E"),
-                Row(id: "New Boost", symbol: "wand.and.sparkles"),
+                Row(title: "New Easel", symbol: "scribble", shortcut: "⌃⇧E"),
+                Row(title: "New Boost", symbol: "wand.and.sparkles"),
             ],
             [
-                Row(id: "New Split", symbol: "rectangle.split.2x1", shortcut: "⌃⇧="),
-                Row(id: "New Tab", symbol: "plus.square", shortcut: "⌘T") { model.openCommandBar(.newTab) },
+                Row(title: "New Split", symbol: "rectangle.split.2x1", shortcut: "⌃⇧="),
+                Row(title: "New Tab", symbol: "plus.square", shortcut: "⌘T") { model.openCommandBar(.newTab) },
             ],
         ]
         VStack(spacing: 0) {
@@ -75,7 +77,7 @@ private struct SidebarPlusMenu: View {
                 Image(systemName: row.symbol)
                     .font(.system(size: 15))
                     .frame(width: 22)
-                Text(row.id)
+                Text(row.title)
                     .font(.system(size: 13, weight: .medium))
                 Spacer(minLength: 0)
                 Text(row.shortcut)

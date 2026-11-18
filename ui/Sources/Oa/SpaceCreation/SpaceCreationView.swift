@@ -5,6 +5,10 @@ import SwiftUI
 /// splash: the form fades, the header artwork drops, doubles and flips into a 🙌 card, a glow pulses, the card fades,
 /// and the Space is made, 2.18 s after the click.
 struct SpaceCreationView: View {
+    /// Where the header artwork rests, as measured on Arc, and its height.
+    private static let artworkTop: CGFloat = 36
+    private static let artworkHeight: CGFloat = 40
+
     let model: WindowModel
     let creation: SpaceCreationState
     @State private var pickingIcon = false
@@ -20,12 +24,14 @@ struct SpaceCreationView: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 // As measured on Arc: the card ends centred across the sidebar, 12 pt below the panel's middle.
-                SpaceCreationArtwork(flip: lifted ? 1 : 0, glowing: glowing, dark: colorScheme == .dark)
+                let rest = Self.artworkTop + Self.artworkHeight / 2
+                SpaceCreationArtwork(flip: lifted ? 1 : 0, glowing: glowing)
+                    .frame(height: Self.artworkHeight)
                     .scaleEffect(lifted ? 2 : 1)
-                    .offset(y: lifted ? geometry.size.height / 2 + 12 - 56 : 0)
+                    .offset(y: lifted ? geometry.size.height / 2 + 12 - rest : 0)
                     .opacity(cardFaded ? 0 : 1)
                     .zIndex(1)
-                    .padding(.top, 36)
+                    .padding(.top, Self.artworkTop)
                 form
                     .opacity(editing ? 1 : 0)
                     .animation(.easeInOut(duration: 0.25).delay(0.05), value: editing)
@@ -34,14 +40,17 @@ struct SpaceCreationView: View {
         .padding(.horizontal, 14)
         .allowsHitTesting(editing)
         .onAppear { nameFocused = true }
+        // As measured on Arc, from the click: the artwork moves from 0.3 s, the glow at 1.33 s, the card fades from
+        // 1.775 s, and the Space is made at 2.18 s.
         .task(id: editing) {
             guard !editing else { return }
+            let clicked = ContinuousClock.now
             withAnimation(.spring(response: 0.8, dampingFraction: 1).delay(0.3)) { lifted = true }
-            try? await Task.sleep(for: .milliseconds(1330))
+            try? await Task.sleep(until: clicked + .milliseconds(1330))
             glowing = true
-            try? await Task.sleep(for: .milliseconds(445))
+            try? await Task.sleep(until: clicked + .milliseconds(1775))
             withAnimation(.easeInOut(duration: 0.4)) { cardFaded = true }
-            try? await Task.sleep(for: .milliseconds(405))
+            try? await Task.sleep(until: clicked + .milliseconds(2180))
             model.completeSpaceCreation()
         }
     }
@@ -200,8 +209,8 @@ struct SpaceCreationView: View {
 private struct SpaceCreationArtwork: View, Animatable {
     nonisolated var flip: CGFloat
     let glowing: Bool
-    let dark: Bool
     @State private var glow = 0.0
+    @Environment(\.colorScheme) private var colorScheme
 
     nonisolated var animatableData: CGFloat {
         get { flip }
@@ -218,7 +227,7 @@ private struct SpaceCreationArtwork: View, Animatable {
                 }
             } else {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(dark ? Color.white : Color(red: 0.35, green: 0.36, blue: 1))
+                    .fill(colorScheme == .dark ? Color.white : Color(red: 0.35, green: 0.36, blue: 1))
                     .frame(width: 31, height: 39)
                     .blur(radius: 6)
                     .scaleEffect(1 + 0.4 * glow)
@@ -228,7 +237,6 @@ private struct SpaceCreationArtwork: View, Animatable {
             }
         }
         .rotation3DEffect(.degrees(180 * flip), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
-        .frame(height: 40)
         .accessibilityHidden(true)
         .onChange(of: glowing) { _, glowing in
             guard glowing else { return }

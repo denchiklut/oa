@@ -12,17 +12,21 @@ struct SidebarPagingContainerView: View {
 
     var body: some View {
         let width = layout.sidebarWidth
+        let offset = layout.sidebarScrollOffset
+        // The Create a Space page has no Space, and breaks a profile's run of Spaces as another profile's would.
         let pages = layout.sidebarPages.map { page -> SidebarSpace? in
             if case .space(let id) = page { model.state.space(id) } else { nil }
         }
-        let offset = layout.sidebarScrollOffset
-        let groups = pages.indices.filter { index in
-            guard let space = pages[index] else { return false }
-            return index == 0 || pages[index - 1]?.profileID != space.profileID
+        let runs = pages.indices.compactMap { first -> (space: SidebarSpace, pages: ClosedRange<Int>)? in
+            guard let space = pages[first], first == 0 || pages[first - 1]?.profileID != space.profileID else {
+                return nil
+            }
+            let last = (first..<pages.count).prefix { pages[$0]?.profileID == space.profileID }.last ?? first
+            return (space, first...last)
         }
         ZStack(alignment: .topLeading) {
             HStack(alignment: .top, spacing: 0) {
-                ForEach(Array(pages.enumerated()), id: \.element?.id) { _, space in
+                ForEach(Array(zip(layout.sidebarPages, pages)), id: \.0) { _, space in
                     if let space {
                         let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
                         let tiles = FavoritesGrid.slots(
@@ -40,12 +44,11 @@ struct SidebarPagingContainerView: View {
                 }
             }
             .offset(x: -offset)
-            ForEach(groups, id: \.self) { first in
-                let last =
-                    (first..<pages.count).prefix { pages[$0]?.profileID == pages[first]?.profileID }.last ?? first
+            ForEach(runs, id: \.space.id) { run in
+                let (first, last) = (run.pages.lowerBound, run.pages.upperBound)
                 let shown =
-                    model.spaceCreation == nil && pages[first...last].contains { $0?.id == model.selectedSpaceID }
-                let favorites = model.state.favorites(for: pages[first]?.id ?? model.selectedSpaceID)
+                    model.spaceCreation == nil && pages[run.pages].contains { $0?.id == model.selectedSpaceID }
+                let favorites = model.state.favorites(for: run.space.id)
                 FavoritesGrid(
                     model: model, layout: layout, slots: FavoritesGrid.slots(favorites, drag: shown ? drag : nil)
                 )
@@ -155,7 +158,8 @@ private struct SpaceNameRow: View {
     let space: SidebarSpace
     @State private var over = false
     @State private var hovering = false
-    @State private var renaming: String?
+    @State private var renaming = false
+    @State private var draft = ""
     @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
 
@@ -179,21 +183,14 @@ private struct SpaceNameRow: View {
                 .frame(width: 26, height: 26)
                 .padding(.trailing, 2)
             }
-            if let draft = renaming {
-                TextField(
-                    "",
-                    text: Binding {
-                        draft
-                    } set: {
-                        renaming = $0
-                    }
-                )
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, weight: .semibold))
-                .focused($renameFocused)
-                .onSubmit(commitRename)
-                .onExitCommand { renaming = nil }
-                .onAppear { renameFocused = true }
+            if renaming {
+                TextField("", text: $draft)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .semibold))
+                    .focused($renameFocused)
+                    .onSubmit(commitRename)
+                    .onExitCommand { renaming = false }
+                    .onAppear { renameFocused = true }
                 Button("Done", action: commitRename)
                     .buttonStyle(.plain)
                     .font(.system(size: 12, weight: .semibold))
@@ -205,7 +202,7 @@ private struct SpaceNameRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
-            if hovering, renaming == nil {
+            if hovering, !renaming {
                 SpaceMenuButton {
                     SpaceMenu(model: model, layout: layout, space: space)
                 } label: {
@@ -225,8 +222,13 @@ private struct SpaceNameRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            guard renaming == nil else { return }
-            if hasPinned { model.togglePinnedSection(of: space.id) } else { renaming = space.name }
+            guard !renaming else { return }
+            if hasPinned {
+                model.togglePinnedSection(of: space.id)
+            } else {
+                draft = space.name
+                renaming = true
+            }
         }
         .popover(isPresented: pickingIcon, arrowEdge: .bottom) {
             SpaceIconPicker(selection: space.icon) { icon in
@@ -246,10 +248,9 @@ private struct SpaceNameRow: View {
     }
 
     private func commitRename() {
-        if let name = renaming?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-            model.renameSpace(space.id, to: name)
-        }
-        renaming = nil
+        let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty { model.renameSpace(space.id, to: name) }
+        renaming = false
     }
 
     private var pickingIcon: Binding<Bool> {
