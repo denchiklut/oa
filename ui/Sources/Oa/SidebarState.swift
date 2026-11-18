@@ -299,12 +299,14 @@ struct SidebarState {
     }
 
     @discardableResult
-    mutating func addSpace(name: String, profileID: UUID) -> SidebarSpace {
+    mutating func addSpace(name: String, profileID: UUID, icon: String? = nil, after: UUID? = nil) -> SidebarSpace {
         let space = SidebarSpace(
-            id: UUID(), name: name, profileID: profileID, pinnedRootID: UUID(), unpinnedRootID: UUID())
+            id: UUID(), name: name, profileID: profileID, pinnedRootID: UUID(), unpinnedRootID: UUID(),
+            customInfo: icon.map { SidebarSpace.CustomInfo(icon: $0) })
         tree.addRoot(.pinned, id: space.pinnedRootID)
         tree.addRoot(.unpinned, id: space.unpinnedRootID)
-        spaces.append(space)
+        let index = after.flatMap { id in spaces.firstIndex { $0.id == id } }.map { $0 + 1 } ?? spaces.count
+        spaces.insert(space, at: index)
         return space
     }
 

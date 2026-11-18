@@ -6,11 +6,13 @@ struct CreateProfileDialogSpaceInfo: Identifiable {
     let theme: WindowTheme
 }
 
-/// Arc's two-step `CreateProfileDialog`: the name, then the Spaces that move to the new profile, at least one. Its
-/// one-step form belongs to Arc's Create a Space panel, which Oa doesn't have yet.
+/// Arc's `CreateProfileDialog`: `createAndSelect` asks for the name, then the Spaces that move to the new profile, at
+/// least one; `createOnly`, for the Create a Space panel, only for the name.
 struct CreateProfileDialog: View {
+    enum Behavior { case createOnly, createAndSelect }
     private enum Step { case createProfile, selectSpaces }
 
+    var behavior = Behavior.createAndSelect
     let spaces: [CreateProfileDialogSpaceInfo]
     let complete: (String, [UUID]) -> Void
     let cancel: () -> Void
@@ -20,9 +22,11 @@ struct CreateProfileDialog: View {
     @FocusState private var focused: Bool
 
     init(
-        existingProfileNames: Set<String>, spaces: [CreateProfileDialogSpaceInfo], checked: Set<UUID>,
-        complete: @escaping (String, [UUID]) -> Void, cancel: @escaping () -> Void
+        behavior: Behavior = .createAndSelect, existingProfileNames: Set<String>,
+        spaces: [CreateProfileDialogSpaceInfo], checked: Set<UUID>, complete: @escaping (String, [UUID]) -> Void,
+        cancel: @escaping () -> Void
     ) {
+        self.behavior = behavior
         self.spaces = spaces
         self.complete = complete
         self.cancel = cancel
@@ -69,7 +73,13 @@ struct CreateProfileDialog: View {
             HStack(spacing: 8) {
                 Spacer()
                 DialogButtonView(title: "Cancel", kind: .cancel, action: cancel)
-                DialogButtonView(title: "Next", kind: .primary, isEnabled: name.isValid) { step = .selectSpaces }
+                if behavior == .createOnly {
+                    DialogButtonView(title: "Create Profile", kind: .primary, isEnabled: name.isValid) {
+                        complete(name.trimmed, [])
+                    }
+                } else {
+                    DialogButtonView(title: "Next", kind: .primary, isEnabled: name.isValid) { step = .selectSpaces }
+                }
             }
             .padding(.top, 26)
         }

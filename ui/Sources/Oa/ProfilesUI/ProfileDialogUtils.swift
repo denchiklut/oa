@@ -26,6 +26,24 @@ enum ProfileDialogUtils {
         }
     }
 
+    /// Arc's one-step sheet from the Create a Space panel, which then takes the new profile.
+    static func createProfileForSpaceCreation(in model: WindowModel) {
+        guard let window = model.window else { return }
+        DialogSheet.present(on: window) { dismiss in
+            CreateProfileDialog(
+                behavior: .createOnly, existingProfileNames: Set(model.profiles.map(\.name)), spaces: [], checked: []
+            ) { [weak model] name, _ in
+                dismiss()
+                Task {
+                    guard let model, let profileID = await model.createProfile(named: name) else { return }
+                    model.updateSpaceCreation { $0.profileID = profileID }
+                }
+            } cancel: {
+                dismiss()
+            }
+        }
+    }
+
     /// Arc's Spaces ▸ Change Profile: the Space's own profile closes it with nothing done, another one asks as
     /// every move does, and "New Profile" gives way to the create sheet with the Space ticked.
     static func changeProfile(of space: SidebarSpace, in model: WindowModel) {

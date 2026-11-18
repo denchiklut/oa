@@ -34,7 +34,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
     private var wheel: (sum: CGFloat, time: TimeInterval, flipped: TimeInterval) = (0, 0, 0)
     private var spring:
         (from: CGFloat, to: CGFloat, velocity: CGFloat, time: Double, last: CFTimeInterval?, shape: (Double, Double))?
-    private let ticker = Ticker()
+    private let ticker = DisplayLinkTicker()
 
     func origin(of id: PageID) -> CGFloat? {
         pages.firstIndex { $0.id == id }.map(origin(at:))
@@ -45,8 +45,9 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         guard pages != self.pages || selectedPageID == nil else { return }
         self.pages = pages
         if selectedPageID.flatMap(origin(of:)) == nil { selectedPageID = id }
-        guard !isTracking, let origin = selectedPageID.flatMap(origin(of:)) else { return }
+        guard !isTracking else { return }
         stop()
+        guard let origin = selectedPageID.flatMap(origin(of:)) else { return }
         (position, presentationPosition) = (origin, origin)
     }
 
@@ -194,26 +195,5 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         if abs(offset) < 0.05, time > response / 2 { offset = 0 }
         presentationPosition = spring.to + offset
         if offset == 0 { stop() }
-    }
-
-    /// The window's display link, which wants an Objective-C target.
-    @MainActor
-    private final class Ticker: NSObject {
-        private var link: CADisplayLink?
-        private var tick: () -> Void = {}
-
-        func start(in window: NSWindow, tick: @escaping () -> Void) {
-            self.tick = tick
-            guard link == nil else { return }
-            link = window.displayLink(target: self, selector: #selector(fire))
-            link?.add(to: .main, forMode: .common)
-        }
-
-        func stop() {
-            link?.invalidate()
-            link = nil
-        }
-
-        @objc private func fire() { tick() }
     }
 }

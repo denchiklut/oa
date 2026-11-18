@@ -11,7 +11,7 @@ struct BrowserWindowView: View {
     var body: some View {
         let backdrop = layout.backgroundThemes
         // As Arc: chrome follows the committed Space while the background follows the pager.
-        let theme = model.space?.theme ?? .default
+        let theme = model.spaceCreation == nil ? model.space?.theme ?? .default : .default
         let background = backdrop.base.background[colorScheme]
         let next = backdrop.blend.map { (background: $0.theme.background[colorScheme], progress: Double($0.progress)) }
         let appearance = theme.background[colorScheme].contentOverBackgroundAppearance
