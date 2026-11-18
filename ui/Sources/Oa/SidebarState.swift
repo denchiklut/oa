@@ -446,6 +446,12 @@ struct SidebarState {
         tree.move(tabID, into: isPinned(tabID) ? space.unpinnedRootID : space.pinnedRootID)
     }
 
+    /// A row dropped in the list, as Arc's: the section it lands in pins, unpins or unfavorites it.
+    mutating func moveTab(_ tabID: UUID, in spaceID: UUID, pinned: Bool, at index: Int) {
+        guard let space = space(spaceID) else { return }
+        tree.move(tabID, into: pinned ? space.pinnedRootID : space.unpinnedRootID, at: index)
+    }
+
     /// Into the profile's grid at `index`, where a drop lands in Arc; appended when nil, as Arc's Favorite Tab does.
     mutating func favoriteTab(_ tabID: UUID, at index: Int? = nil) {
         guard let profile = profile(containing: tabID) else { return }

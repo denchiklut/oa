@@ -155,11 +155,14 @@ final class WindowModel {
     /// A pinned tab whose page has left its address reads "/ live title", as in Arc; a Favorite, whose tile has no
     /// text, gives the window the live title as Arc's does.
     func title(for tab: SidebarTab) -> String {
-        guard state.keepsAddress(tab.id), let page = pages[tab.id], let url = page.url, !tab.isAt(url) else {
-            return tab.displayTitle
-        }
+        guard let url = leftAddress(tab), let page = pages[tab.id] else { return tab.displayTitle }
         let live = page.title.isEmpty ? url.host() ?? url.absoluteString : page.title
         return state.isFavorite(tab.id) ? live : "/ " + live
+    }
+
+    func leftAddress(_ tab: SidebarTab) -> URL? {
+        guard state.keepsAddress(tab.id), let url = pages[tab.id]?.url, !tab.isAt(url) else { return nil }
+        return url
     }
 
     /// The live page's favicon, wherever the page lives, else the saved one, as Arc shows it.
@@ -568,6 +571,10 @@ final class WindowModel {
         store.edit { $0.unfavoriteTab(tabID, in: selectedSpaceID) }
     }
 
+    func move(_ tabID: UUID, pinned: Bool, at index: Int) {
+        store.edit { $0.moveTab(tabID, in: selectedSpaceID, pinned: pinned, at: index) }
+    }
+
     /// A drop on the grid: a row joins it at the index, a tile moves there.
     func favorite(_ tabID: UUID, at index: Int?) {
         store.edit { $0.favoriteTab(tabID, at: index) }
@@ -760,6 +767,17 @@ final class WindowModel {
         page.close()
     }
 
+    /// A pinned row's ✕, which archives it as a Today row's does, as Arc's close button does.
+    func archivePinned(_ tabID: UUID) {
+        guard state.isPinned(tabID) else { return close(tabID) }
+        store.archivingPins.insert(tabID)
+        guard let page = store.windows.lazy.compactMap({ $0.pages[tabID] }).first else {
+            return end(tabID, reason: .manual, closedBy: .window(id)) { page, _ in page.drop() }
+        }
+        store.closing[page.id] = .window(id)
+        page.close()
+    }
+
     var canClearTabs: Bool { !unpinnedTabs.isEmpty }
 
     /// As Arc's Clear: the Space's unpinned tabs but the selected one, which goes too when it is the last.
@@ -920,7 +938,9 @@ final class WindowModel {
             // As Arc's close: a pinned tab keeps when a window last showed it, not when one made it.
             window.createdDates[tabID] = nil
         }
-        if !pinned { archive(tabID, reason: reason, closedBy: request, sessionID: sessionID) }
+        if !pinned || store.archivingPins.remove(tabID) != nil {
+            archive(tabID, reason: reason, closedBy: request, sessionID: sessionID)
+        }
         if let page { finish(page, pinned) }
         if wasSelected {
             selectedTabIDs[spaceID] = next
@@ -1180,8 +1200,10 @@ final class WindowModel {
 
     /// A refused auto-archive counts as a view, so the next sweep doesn't ask again.
     private func closeCancelled(_ pageID: UUID) {
-        if store.closing.removeValue(forKey: pageID) == .auto, let tabID = tabID(of: pageID) {
-            store.markViewed(tabID)
+        let request = store.closing.removeValue(forKey: pageID)
+        if let tabID = tabID(of: pageID) {
+            store.archivingPins.remove(tabID)
+            if request == .auto { store.markViewed(tabID) }
         }
         spaceDeletionEnded(pageID, kept: true)
     }

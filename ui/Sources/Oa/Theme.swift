@@ -10,13 +10,22 @@ struct Theme {
     let addressText: Color
     let secondaryText: Color
     let fieldFill: Color
+    let itemFill: Color
+    let itemHoveredFill: Color
+    let separator: Color
+    let tertiaryText: Color
+    let secondaryGlyph: Color
+    let sectionHeaderText: Color
+    let selectedCard: Color
+    let selectedShadow: Color
+    let selectedTile: Color
     /// Arc's modal buttons (`ModalButtonStyle`): the palette's `backgroundExtra` under its `foregroundPrimary`, which
     /// is darkened in a light scheme by however far its luminance passes 0.4.
     let modalButtonFill: Color
     let modalButtonGlyph: Color
     /// Arc's loading track is fainter under a dark foreground.
     let loadingTrackOpacity: Double
-    private let isDark: Bool
+    let isDark: Bool
 
     /// As measured on Arc over several themes: text takes the palette's title, and the greys and fills are black
     /// over a light theme and white over a dark one.
@@ -32,6 +41,15 @@ struct Theme {
         addressText = ink(0.62, 0.64)
         secondaryText = ink(0.3, 0.45)
         fieldFill = ink(0.04, 0.1)
+        itemFill = ink(0.05, 0.1)
+        itemHoveredFill = ink(0.1, 0.15)
+        separator = ink(0.15, 0.15)
+        tertiaryText = ink(0.3, 0.3)
+        secondaryGlyph = ink(0.5, 0.5)
+        sectionHeaderText = ink(0.45, 0.45)
+        selectedCard = .white.opacity(appearance == .dark ? 0.2 : 0.85)
+        selectedShadow = .black.opacity(appearance == .dark ? 0 : 0.2)
+        selectedTile = .white.opacity(appearance == .dark ? 0.45 : 0.8)
         modalButtonFill = palette.backgroundExtra.color
         modalButtonGlyph =
             appearance == .dark
@@ -57,6 +75,15 @@ struct Theme {
         addressText = Color(nsColor: .secondaryLabelColor)
         secondaryText = Color(nsColor: .tertiaryLabelColor)
         fieldFill = .clear
+        itemFill = .primary.opacity(0.05)
+        itemHoveredFill = .primary.opacity(0.1)
+        separator = Color(nsColor: .separatorColor)
+        tertiaryText = Color(nsColor: .tertiaryLabelColor)
+        secondaryGlyph = Color(nsColor: .secondaryLabelColor)
+        sectionHeaderText = Color(nsColor: .secondaryLabelColor)
+        selectedCard = Color(nsColor: .controlBackgroundColor)
+        selectedShadow = .black.opacity(0.2)
+        selectedTile = Color(nsColor: .controlBackgroundColor)
         modalButtonFill = Color(nsColor: .controlBackgroundColor)
         modalButtonGlyph = .primary
         loadingTrackOpacity = 0

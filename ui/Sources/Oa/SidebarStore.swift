@@ -22,6 +22,7 @@ final class SidebarStore {
     @ObservationIgnored private var frozen = false
     /// Pages asked to close, by page ID, until the page reports closed or kept.
     @ObservationIgnored var closing: [UUID: CloseRequest] = [:]
+    @ObservationIgnored var archivingPins: Set<UUID> = []
     @ObservationIgnored var deletingSpace: ClosingSpace?
     @ObservationIgnored let commandBarPicks: CommandBarPicks
     @ObservationIgnored let home: StorableHome

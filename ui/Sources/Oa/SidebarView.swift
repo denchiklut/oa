@@ -13,21 +13,6 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             SidebarHeader(model: model, layout: layout)
             SidebarPagingContainerView(model: model, layout: layout)
-            Divider()
-            Button {
-                model.openCommandBar(.newTab)
-            } label: {
-                Label("New Tab", systemImage: "plus")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    // As Arc: highlighted while the bar makes a new tab.
-                    .background(model.commandBar?.destination == .newTab ? Color.primary.opacity(0.08) : .clear)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            Divider()
             spaces
         }
         .overlay(alignment: .bottomLeading) {
@@ -124,15 +109,20 @@ private struct SidebarDock: View {
                     .buttonStyle(.plain)
                     .help(space.name)
                     .accessibilityLabel(space.name)
-                    .contextMenu { menu(for: space) }
+                    .contextMenu { SpaceMenuItems(model: model, space: space) }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(height: 34)
     }
+}
 
-    @ViewBuilder private func menu(for space: SidebarSpace) -> some View {
+struct SpaceMenuItems: View {
+    let model: WindowModel
+    let space: SidebarSpace
+
+    var body: some View {
         Button("Rename…") {
             if let name = NamePrompt.run("Rename Space", name: space.name) { model.renameSpace(space.id, to: name) }
         }
@@ -144,111 +134,162 @@ private struct SidebarDock: View {
     }
 }
 
-/// Arc's grid as measured: tiles 47 pt tall with 8 pt gaps filling the row, never narrower than 47 pt, so four to a
-/// row at the default width and two at the narrowest; columns from the count as `rows = ⌈n / most⌉`,
-/// `cols = ⌈n / rows⌉`, the last row left-aligned, a favicon and nothing else. A row dropped on a tile joins the grid
-/// before it, one dropped beside the tiles is appended; tiles move the same way.
+/// Arc's grid (`AppTrayCollectionViewLayout`): tiles 47 pt tall with 8 pt gaps filling the row, at most four and
+/// never narrower than 47 pt; columns from the count as `rows = ⌈n / most⌉`, `cols = ⌈n / rows⌉`, the last row
+/// left-aligned. While a drag is over it, the grid makes the slot it would land in and the tiles slide to their new
+/// places as Arc's do.
 struct FavoritesGrid: View {
+    struct Layout {
+        let rows: Int
+        let columns: Int
+        let tileWidth: CGFloat
+
+        init(count: Int, width: CGFloat) {
+            let most = min(4, max(1, Int((width - 8) / 55)))
+            rows = max(1, (count + most - 1) / most)
+            columns = max(1, (count + rows - 1) / rows)
+            tileWidth = (width - 16 - CGFloat(columns - 1) * 8) / CGFloat(columns)
+        }
+
+        var height: CGFloat { CGFloat(rows) * 47 + CGFloat(rows - 1) * 8 }
+
+        func origin(of index: Int) -> CGPoint {
+            CGPoint(x: CGFloat(index % columns) * (tileWidth + 8), y: CGFloat(index / columns) * 55)
+        }
+    }
+
+    struct Slot: Identifiable {
+        static let gapID = UUID()
+        let id: UUID
+        let tab: SidebarTab?
+        /// The dragged tile: out of the layout but mounted, so its drag goes on.
+        var isLifted = false
+    }
+
     let model: WindowModel
     let layout: WindowLayoutController
-    let favorites: [SidebarTab]
+    let slots: [Slot]
 
-    static func rows(for count: Int, in width: CGFloat) -> Int {
-        let most = max(1, Int((width - 8) / 55))
-        return max(1, (count + most - 1) / most)
+    /// The tiles as the drag leaves them: a dragged tile has left its place, and the slot opens where it would land.
+    static func slots(_ favorites: [SidebarTab], drag: SidebarDrag?) -> [Slot] {
+        guard let drag, let dragged = drag.tab else { return favorites.map { Slot(id: $0.id, tab: $0) } }
+        var slots = favorites.filter { $0.id != dragged.id }.map { Slot(id: $0.id, tab: $0) }
+        if let target = drag.target, target.section == .favorites {
+            slots.insert(Slot(id: Slot.gapID, tab: nil), at: min(target.index, slots.count))
+        }
+        if favorites.contains(where: { $0.id == dragged.id }) {
+            slots.append(Slot(id: dragged.id, tab: dragged, isLifted: true))
+        }
+        return slots
     }
 
-    /// What the grid takes of the sidebar's height, so a Space's page starts under its profile's grid.
+    /// What the grid takes of the sidebar's height, so a Space's page starts under its profile's grid. It changes at
+    /// once, so the list jumps as Arc's does.
     static func height(for count: Int, in width: CGFloat) -> CGFloat {
-        let rows = CGFloat(rows(for: count, in: width))
-        return rows * 47 + (rows - 1) * 8
+        Layout(count: count, width: width).height
     }
+
+    @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
-        let rows = Self.rows(for: favorites.count, in: layout.sidebarWidth)
-        let columns = max(1, (favorites.count + rows - 1) / rows)
-        let width = (layout.sidebarWidth - 16 - CGFloat(columns - 1) * 8) / CGFloat(columns)
-        VStack(alignment: .leading, spacing: 8) {
-            if favorites.isEmpty {
-                RoundedRectangle(cornerRadius: 8)
+        let shown = slots.filter { !$0.isLifted }
+        let grid = Layout(count: shown.count, width: layout.sidebarWidth)
+        ZStack(alignment: .topLeading) {
+            if shown.isEmpty {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
                     .foregroundStyle(.quaternary)
                     .frame(width: 47, height: 47)
             }
-            ForEach(0..<rows, id: \.self) { row in
-                HStack(spacing: 8) {
-                    let indices = (row * columns)..<min((row + 1) * columns, favorites.count)
-                    ForEach(Array(indices), id: \.self) { index in
-                        FavoriteTile(model: model, layout: layout, tab: favorites[index], width: width)
-                            .onDrop(of: [.plainText], delegate: TabDrop { model.favorite($0, at: index) })
+            ForEach(Array(slots.enumerated()), id: \.element.id) { index, slot in
+                let origin = grid.origin(of: slot.isLifted ? 0 : index)
+                Group {
+                    if let tab = slot.tab {
+                        FavoriteTile(model: model, layout: layout, tab: tab, width: grid.tileWidth)
+                    } else {
+                        Color.clear.sidebarDragFrame { drag?.gap = $0 }
                     }
                 }
+                .frame(width: grid.tileWidth, height: 47)
+                .padding(.leading, origin.x)
+                .padding(.top, origin.y)
+                .opacity(slot.isLifted ? 0 : 1)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: Self.height(for: favorites.count, in: layout.sidebarWidth), alignment: .top)
-        .contentShape(Rectangle())
-        .onDrop(of: [.plainText], delegate: TabDrop { model.favorite($0, at: nil) })
+        .animation(.spring(response: 0.23, dampingFraction: 1), value: shown.map(\.id))
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: grid.height, alignment: .top)
     }
 }
 
+/// Arc's `AppTrayItemViewAppKit`, back to front: the selected white card and its shadow, the favicon's tint, the
+/// body's fill (none when selected), the selection ring and the favicon. A tile has no button and no tooltip.
 private struct FavoriteTile: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let tab: SidebarTab
     let width: CGFloat
     @State private var hovering = false
+    @State private var pressed = false
+    @Environment(\.theme) private var theme
+    @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
         let selected = model.selectedTabID == tab.id
-        RoundedRectangle(cornerRadius: 8)
-            .fill(Color.primary.opacity(selected ? 0.14 : hovering ? 0.08 : 0.05))
-            .frame(width: width, height: 47)
-            .overlay { icon.frame(width: 16, height: 16) }
-            .overlay(alignment: .topTrailing) {
-                if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon).offset(x: 5, y: -5) }
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let favicon = model.favicon(for: tab)
+        ZStack {
+            shape.fill(selected ? theme.selectedTile : .clear)
+                .shadow(color: .black.opacity(selected ? 0.1 : 0), radius: 2, y: 1)
+            // Arc's code washes every tile; Arc's dark tiles measured untinted unless selected, so only that one is.
+            if let favicon, selected {
+                AppTrayVisualEffect(favicon: favicon, tileWidth: width)
+                    .opacity(theme.isDark ? (hovering ? 0.3 : 0.2) : (hovering ? 0.1 : 0))
+                    .animation(.easeOut(duration: 0.12), value: hovering)
+                AppTrayRing(favicon: favicon, tileWidth: width)
             }
-            // Arc's tiles carry the recording dot too (AppTray's `recordingIndicatorView`); the corner is Oa's own.
-            .overlay(alignment: .topLeading) {
-                if model.isRecording(tab) { RecordingDot().padding(6) }
+            shape.fill(selected ? .clear : hovering ? theme.itemHoveredFill : theme.itemFill)
+                .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
+            if let favicon {
+                Image(nsImage: favicon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 16, height: 16)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             }
-            .contentShape(Rectangle())
-            .onTapGesture { model.select(tab.id) }
-            .onHover { hovering = $0 }
-            .onDrag {
-                layout.setHold(.drag, true)
-                return NSItemProvider(object: tab.id.uuidString as NSString)
-            }
-            .contextMenu {
-                if selected { Button("Close Tab") { model.close(tab.id) } }
-                Button("Unfavorite") { model.unfavorite(tab.id) }
-                Button("Remove Favorite") { model.removeFavorite(tab.id) }
-            }
-    }
-
-    /// The host's first letter stands in for a tab whose page never showed a favicon.
-    @ViewBuilder private var icon: some View {
-        if let icon = model.favicon(for: tab) {
-            Image(nsImage: icon).resizable().interpolation(.high)
-        } else {
-            Text(String(tab.url?.host()?.replacingOccurrences(of: "www.", with: "").prefix(1) ?? "").uppercased())
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
         }
-    }
-}
-
-/// A dragged tab's ID arrives as text; the drop decides where it goes.
-struct TabDrop: DropDelegate {
-    let drop: @MainActor @Sendable (UUID) -> Void
-
-    func performDrop(info: DropInfo) -> Bool {
-        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
-        _ = provider.loadObject(ofClass: NSString.self) { text, _ in
-            guard let id = (text as? NSString).flatMap({ UUID(uuidString: String($0)) }) else { return }
-            Task { @MainActor in drop(id) }
+        .frame(width: width, height: 47)
+        .overlay(alignment: .topTrailing) {
+            if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon).offset(x: 5, y: -5) }
         }
-        return true
+        // Arc's tiles carry the recording dot too (AppTray's `recordingIndicatorView`); the corner is Oa's own.
+        .overlay(alignment: .topLeading) {
+            if model.isRecording(tab) { RecordingDot().padding(6) }
+        }
+        .contentShape(shape)
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .named(SidebarDrag.space))
+                .onChanged { value in
+                    if !pressed {
+                        pressed = true
+                        model.select(tab.id)
+                    }
+                    drag?.update(
+                        tab, from: .favorites, glyph: .close, at: value.location, start: value.startLocation,
+                        model: model, layout: layout)
+                }
+                .onEnded { _ in
+                    pressed = false
+                    drag?.finish(model: model, layout: layout)
+                }
+        )
+        .onHover { hovering = $0 }
+        .sidebarDragFrame { drag?.tiles[tab.id] = $0 }
+        .contextMenu {
+            if selected { Button("Close Tab") { model.close(tab.id) } }
+            Button("Unfavorite") { model.unfavorite(tab.id) }
+            Button("Remove Favorite") { model.removeFavorite(tab.id) }
+        }
     }
 }
 
@@ -282,7 +323,6 @@ private struct PeekBadge: View {
     }
 }
 
-/// Reads the model itself, so a change to its tab's page, Peek or selection re-renders the row alone.
 /// Arc's recording dot, before the favicon while the tab's page uses the camera or microphone.
 private struct RecordingDot: View {
     var body: some View {
@@ -294,60 +334,125 @@ private struct RecordingDot: View {
     }
 }
 
+/// A row's favicon as Arc's: 16 pt with 4 pt corners, or its `EmptyFavicon`, a 14 pt square in the palette's
+/// `maxContrastColor` at the image's 0.28.
+struct TabFavicon: View {
+    let model: WindowModel
+    let tab: SidebarTab
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        if let icon = model.favicon(for: tab) {
+            Image(nsImage: icon)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 16, height: 16)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        } else {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(theme.maxContrast.opacity(0.28))
+                .frame(width: 14, height: 14)
+        }
+    }
+}
+
+/// Arc's tab cell: a 40 pt row with a 36 pt card, selected on mouse-down, its button only under the pointer.
+/// Reads the model itself, so a change to its tab's page, Peek or selection re-renders the row alone.
 struct TabRow: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let tab: SidebarTab
     let spaceID: UUID
     @State private var hovering = false
+    @State private var pressed = false
+    @State private var bounces = 0
+    @Environment(\.theme) private var theme
+    @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
-        let selected = model.selectedTabIDs[spaceID] == tab.id
-        HStack(spacing: 6) {
-            if model.isRecording(tab) { RecordingDot() }
-            Group {
-                if let icon = model.favicon(for: tab) {
-                    Image(nsImage: icon).resizable().interpolation(.high)
-                } else {
-                    RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.1))
-                }
-            }
-            .frame(width: 16, height: 16)
+        let pinned = model.state.isPinned(tab.id)
+        let current = model.selectedTabIDs[spaceID] == tab.id
+        // As Arc: the New Tab row takes the selected look while the bar makes a tab.
+        let selected = current && (spaceID != model.selectedSpaceID || model.commandBar?.destination != .newTab)
+        // As Arc's `closeButtonAction`: a pinned tab that is shown, or has left its address, keeps its pin.
+        let glyph: SidebarCellButton.Glyph =
+            pinned && (current || model.leftAddress(tab) != nil) ? .minus : .close
+        let peek = model.peeks[tab.id]
+        let dragged = drag?.tab?.id == tab.id
+        let showsButton = hovering && !dragged
+        let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        HStack(spacing: 0) {
+            if model.isRecording(tab) { RecordingDot().padding(.trailing, 2) }
+            TabFavicon(model: model, tab: tab)
+                .frame(width: 24, height: 24)
             Text(model.title(for: tab))
+                .font(.system(size: 14))
+                .foregroundStyle(theme.foreground)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .padding(.leading, 6)
             Spacer(minLength: 0)
-            // As Arc's row: 2 pt after the badge instead of the row's 6.
-            HStack(spacing: 2) {
-                if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon) }
-                if hovering || selected {
-                    Button {
-                        model.close(tab.id)
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .bold))
-                            .frame(width: 16, height: 16)
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, showsButton || peek != nil ? 31 : 10)
+        .frame(height: 36)
+        .background {
+            card.fill(selected ? theme.selectedCard : hovering ? theme.itemFill : .clear)
+                .shadow(color: selected ? theme.selectedShadow : .clear, radius: 1, y: 1)
+        }
+        .contentShape(card)
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .named(SidebarDrag.space))
+                .onChanged { value in
+                    if !pressed {
+                        pressed = true
+                        model.select(tab.id)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    drag?.update(
+                        tab, from: pinned ? .pinned : .today, glyph: glyph, at: value.location,
+                        start: value.startLocation, model: model, layout: layout)
+                }
+                .onEnded { _ in
+                    pressed = false
+                    drag?.finish(model: model, layout: layout)
+                }
+        )
+        .overlay(alignment: .trailing) {
+            Group {
+                if let peek {
+                    PeekBadge(favicon: peek.favicon)
+                } else if showsButton {
+                    SidebarCellButton(glyph: glyph) {
+                        if glyph == .minus {
+                            bounces += 1
+                            model.close(tab.id)
+                        } else if pinned {
+                            model.archivePinned(tab.id)
+                        } else {
+                            model.close(tab.id)
+                        }
+                    }
+                    .help((glyph == .minus ? "Close and Keep Pinned" : "Archive this tab") + (current ? "  ⌘W" : ""))
                 }
             }
+            .padding(.trailing, 6)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 30)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(selected ? 0.12 : hovering ? 0.06 : 0))
-        )
-        .contentShape(Rectangle())
-        .onTapGesture { model.select(tab.id) }
+        .scaleEffect(pressed ? 0.99 : 1)
+        .animation(.easeOut(duration: 0.1), value: pressed)
+        // As Arc's drop: the row is in its new place at once, under the copy settling onto it.
+        .opacity(dragged && drag?.settling == true ? 0 : 1)
+        // As measured on Arc's −: the row drops to 0.89 and springs back.
+        .keyframeAnimator(initialValue: 1.0, trigger: bounces) { content, scale in
+            content.scaleEffect(scale)
+        } keyframes: { _ in
+            MoveKeyframe(0.89)
+            SpringKeyframe(1, duration: 0.24, spring: Spring(response: 0.24, dampingRatio: 1))
+        }
+        .frame(height: 40)
         .onHover { hovering = $0 }
-        .onDrag {
-            layout.setHold(.drag, true)
-            return NSItemProvider(object: tab.id.uuidString as NSString)
-        }
+        .sidebarDragFrame { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) }
         .contextMenu {
-            if !model.state.isPinned(tab.id) {
+            if !pinned {
                 Button("Archive Tab") { model.close(tab.id) }
                 Button("Archive Tabs Below") { model.archiveTabs(below: tab.id) }
                     .disabled(model.unpinnedTabs.last?.id == tab.id)
