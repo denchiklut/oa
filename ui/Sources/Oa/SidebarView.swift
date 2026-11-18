@@ -90,9 +90,9 @@ enum SpaceDeletion {
 /// Arc's dock items between the Library button and the plus, one per sidebar page, so the Create a Space panel's too
 /// at its slot. As measured on Arc: while (sidebar width − 66.5) / items ≥ 24 a Space shows its icon or an 8 pt dot,
 /// 26 pt apart and closer once they don't fit. Below that the dock is compact: the current item is 24 pt wide with its
-/// icon or an 8 pt dot, the others share the rest as 4 pt dots, and a hovered one shows its icon or an 8 pt dot while
-/// the current becomes a 4 pt dot. The switch takes one frame. The current item is darker, and during a swipe two
-/// cross-fade.
+/// icon or an 8 pt dot, the others share the rest as 4 pt dots, and a hovered one shows its icon or an 8 pt dot too.
+/// Oa's own, by the author's choice: the current item keeps its icon while another is hovered, where Arc's becomes a
+/// dot. The switch takes one frame. The current item is darker, and during a swipe two cross-fade.
 private struct SidebarDock: View {
     let model: WindowModel
     let layout: WindowLayoutController
@@ -111,7 +111,7 @@ private struct SidebarDock: View {
             HStack(spacing: 0) {
                 ForEach(Array(pages.enumerated()), id: \.element) { index, item in
                     let isCurrent = index == current
-                    let full = !compact || hovered == item || (isCurrent && hovered == nil)
+                    let full = !compact || isCurrent || hovered == item
                     dockItem(item, emphasis: max(0, 1 - abs(page - CGFloat(index))), full: full)
                         .frame(width: compact ? (isCurrent ? 24 : others) : pitch, height: 34)
                         .contentShape(Rectangle())
