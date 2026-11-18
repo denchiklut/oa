@@ -102,7 +102,9 @@ private struct SpaceManagementCollectionViewItem: View {
                 VStack(spacing: 1) {
                     ForEach(model.state.tabs(in: space.id, pinned: true)) { row($0) }
                     // As Arc's card: Clear shows without the pointer over it.
-                    if !unpinned.isEmpty { ClearDivider(model: model, spaceID: space.id, showsClear: true) }
+                    if !unpinned.isEmpty {
+                        ClearDivider(model: model, spaceID: space.id, showsClear: true, inCard: true)
+                    }
                     ForEach(unpinned) { row($0) }
                 }
                 .padding([.horizontal, .bottom], 8)

@@ -782,11 +782,18 @@ final class WindowModel {
 
     /// As Arc's Clear: the Space's unpinned tabs but the selected one, which goes too when it is the last.
     /// ⇧⌘T brings the last selected back first, as Arc's did.
-    func clearTabs(in spaceID: UUID? = nil) {
+    /// A Library card's takes them all, as Arc's builds the card with no selection.
+    func clearTabs(in spaceID: UUID? = nil, all: Bool = false) {
         let spaceID = spaceID ?? selectedSpaceID
         var tabIDs = state.tabs(in: spaceID, pinned: false).map(\.id)
-        if tabIDs.count > 1, let selected = selectedTabIDs[spaceID] { tabIDs.removeAll { $0 == selected } }
+        if !all, !clearsAllTabs(in: spaceID), let selectedTabID { tabIDs.removeAll { $0 == selectedTabID } }
         closeTogether(tabIDs.sorted { lastActiveDates[$0] ?? .distantPast < lastActiveDates[$1] ?? .distantPast })
+    }
+
+    /// Arc's `clearTabAction`: Clear keeps the window's selected tab only when it is one of several Today tabs.
+    func clearsAllTabs(in spaceID: UUID) -> Bool {
+        let tabIDs = state.tabs(in: spaceID, pinned: false).map(\.id)
+        return tabIDs.count == 1 || !(selectedTabID.map(tabIDs.contains) ?? false)
     }
 
     /// As Arc's: the unpinned tabs below this one, the selected one included; ⇧⌘T brings them back from the top.

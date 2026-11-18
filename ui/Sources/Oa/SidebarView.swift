@@ -8,6 +8,7 @@ struct SidebarView: View {
     @State private var overLibraryButton = false
     @State private var overFlyout = false
     @State private var showingFlyout = false
+    @State private var pointerInside = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,8 +37,13 @@ struct SidebarView: View {
             overLibraryButton = false
             overFlyout = false
             showingFlyout = false
+            pointerInside = false
         }
         .frame(width: layout.sidebarWidth, alignment: .leading)
+        .onHover { pointerInside = $0 }
+        // As Arc: the floating panel brings them in with it.
+        .environment(\.sidebarRevealsControls, pointerInside || layout.sidebarPresentation == .floating)
+        .animation(.easeInOut(duration: 0.19), value: pointerInside)
     }
 
     private var spaces: some View {
@@ -56,6 +62,11 @@ struct SidebarView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
     }
+}
+
+extension EnvironmentValues {
+    /// Arc's one "pointer is in the sidebar" state, which shows the URL field's buttons and Clear together.
+    @Entry var sidebarRevealsControls = false
 }
 
 @MainActor
