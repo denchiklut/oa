@@ -40,6 +40,8 @@ final class WindowLayoutController: NSViewController {
     /// Space otherwise.
     private var leadingSpace = 0
     private var restingSpaceID: UUID?
+    /// The Space whose name shows the icon picker its menu asked for.
+    var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
     @ObservationIgnored private var holds: Set<Hold> = []
     @ObservationIgnored private var monitor: Any?
