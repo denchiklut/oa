@@ -88,25 +88,36 @@ enum SpaceDeletion {
 }
 
 /// Arc's dock items between the Library button and the plus, one per sidebar page, so the Create a Space panel's too
-/// at its slot: an icon or an 8 pt dot, 26 pt apart and closer once they don't fit. The current item is darker, and
-/// during a swipe two cross-fade. Past a pitch of 18 pt the icons give way to dots and the others shrink to 4 pt. Oa
-/// chose that threshold between Arc's measured pitches at 8 and 10 Spaces.
+/// at its slot. As measured on Arc: while (sidebar width − 66.5) / items ≥ 24 a Space shows its icon or an 8 pt dot,
+/// 26 pt apart and closer once they don't fit. Below that the dock is compact: the current item is 24 pt wide with its
+/// icon or an 8 pt dot, the others share the rest as 4 pt dots, and a hovered one grows to 8 pt while the current
+/// becomes a 4 pt dot. The switch takes one frame. The current item is darker, and during a swipe two cross-fade.
 private struct SidebarDock: View {
     let model: WindowModel
     let layout: WindowLayoutController
+    @State private var hovered: WindowLayoutPage?
     @Environment(\.theme) private var theme
 
     var body: some View {
         let pages = layout.sidebarPages
         let page = layout.sidebarPage
+        let count = CGFloat(max(pages.count, 1))
+        let compact = (layout.sidebarWidth - 66.5) / count < 24
+        let current = Int(min(max(page.rounded(), 0), count - 1))
         GeometryReader { geometry in
-            let pitch = min(26, geometry.size.width / CGFloat(max(pages.count, 1)))
+            let pitch = min(26, geometry.size.width / count)
+            let others = pages.count > 1 ? (geometry.size.width - 24) / (count - 1) : 24
             HStack(spacing: 0) {
                 ForEach(Array(pages.enumerated()), id: \.element) { index, item in
-                    let emphasis = max(0, 1 - abs(page - CGFloat(index)))
-                    dockItem(item, emphasis: emphasis, icon: pitch >= 18, dot: pitch < 18 ? 4 + 4 * emphasis : 8)
-                        .frame(width: pitch, height: 34)
-                        .contentShape(Rectangle())
+                    let isCurrent = index == current
+                    let full = !compact || hovered == item || (isCurrent && hovered == nil)
+                    dockItem(
+                        item, emphasis: max(0, 1 - abs(page - CGFloat(index))), icon: full && hovered != item,
+                        dot: full ? 8 : 4
+                    )
+                    .frame(width: compact ? (isCurrent ? 24 : others) : pitch, height: 34)
+                    .contentShape(Rectangle())
+                    .onHover { inside in hovered = inside ? item : hovered == item ? nil : hovered }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
