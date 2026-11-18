@@ -488,11 +488,13 @@ struct LibraryButton: View {
         Button {
             model.viewLibrary()
         } label: {
-            Image(systemName: "square.stack")
-                .frame(width: 22, height: 22)
+            // As measured on Arc: a filled archive box about 14 by 16.5 pt in a 32 pt button, in the header's grey.
+            Image(systemName: "archivebox.fill")
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 32, height: 32)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(ChromeButtonStyle())
         .help("View Library")
         .overlay(alignment: .topTrailing) {
             if let progress = model.downloads.progress {

@@ -49,10 +49,11 @@ struct SidebarView: View {
         .animation(.easeInOut(duration: 0.19), value: pointerInside)
     }
 
-    /// As Arc: on the Create a Space page the Library button and the plus go.
+    /// Arc's dock as measured: 8 pt in from the sidebar's edges, a 32 pt Library button and plus with the Space items
+    /// 2 pt from them, centred 25 pt above the bottom. On the Create a Space page the Library button and the plus go.
     private var spaces: some View {
         let creation = layout.spaceCreationProgress
-        return HStack(spacing: 4) {
+        return HStack(spacing: 2) {
             LibraryButton(model: model)
                 .onHover { overLibraryButton = $0 }
                 .opacity(1 - creation)
@@ -62,7 +63,7 @@ struct SidebarView: View {
                 .opacity(1 - creation)
                 .allowsHitTesting(creation == 0)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
     }
 }
@@ -88,8 +89,8 @@ enum SpaceDeletion {
 }
 
 /// Arc's dock items between the Library button and the plus, one per sidebar page, so the Create a Space panel's too
-/// at its slot. As measured on Arc: while (sidebar width − 66.5) / items ≥ 24 a Space shows its icon or an 8 pt dot,
-/// 26 pt apart and closer once they don't fit. Below that the dock is compact: the current item is 24 pt wide with its
+/// at its slot. As measured on Arc: the items share the dock's width evenly, and while (sidebar width − 66.5) / items
+/// ≥ 24 a Space shows its icon or an 8 pt dot. Below that the dock is compact: the current item is 24 pt wide with its
 /// icon or an 8 pt dot, the others share the rest as 4 pt dots, and a hovered one shows its icon or an 8 pt dot too.
 /// Oa's own, by the author's choice: the current item keeps its icon while another is hovered, where Arc's becomes a
 /// dot. The switch takes one frame. The current item is darker, and during a swipe two cross-fade.
@@ -106,7 +107,7 @@ private struct SidebarDock: View {
         let compact = (layout.sidebarWidth - 66.5) / count < 24
         let current = Int(min(max(page.rounded(), 0), count - 1))
         GeometryReader { geometry in
-            let pitch = min(26, geometry.size.width / count)
+            let pitch = geometry.size.width / count
             let others = pages.count > 1 ? (geometry.size.width - 24) / (count - 1) : 24
             HStack(spacing: 0) {
                 ForEach(Array(pages.enumerated()), id: \.element) { index, item in
