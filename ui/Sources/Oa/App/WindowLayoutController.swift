@@ -58,8 +58,6 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private var pullAllowed: Bool?
     /// The pull opens the panel its own way; the others slide it in.
     @ObservationIgnored private var pulledSpaceCreation = false
-    /// As Arc's: the Library's Spaces row opens again where it was left, in this window.
-    @ObservationIgnored var spacesPageScroll: CGFloat = 0
     /// The Space whose name shows the icon picker its menu asked for.
     var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
