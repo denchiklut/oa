@@ -89,9 +89,43 @@ struct Theme {
         isDark = false
     }
 
-    /// On the page's toolbar, which Arc colours from the page's top band: the system's colours stand in until Oa
-    /// reads that band.
+    /// The system's colours, where no theme reaches: the Peek's toolbar.
     static let toolbar = Theme()
+
+    /// Over the page's colour on its toolbar, as Arc's `brightnessProfile`: text and icons are white at 0.75 or
+    /// black at 0.6, whichever has the higher WCAG contrast over it, white on a tie, whatever the app's appearance.
+    /// The dimmer inks and the fills are Oa's own.
+    init(toolbarOver background: NSColor) {
+        let backdrop = ThemeColor(background)
+        func contrast(_ text: ThemeColor) -> Double {
+            let luminances = [text.over(backdrop).luminance, backdrop.luminance]
+            return (luminances.max()! + 0.05) / (luminances.min()! + 0.05)
+        }
+        let dark = contrast(.white.opacity(0.75)) >= contrast(.black.opacity(0.6))
+        let ink = dark ? Color.white.opacity(0.75) : .black.opacity(0.6)
+        let fill = dark ? Color.white : .black
+        foreground = ink
+        maxContrast = ink
+        cutout = backdrop.color
+        icon = ink
+        disabledIcon = ink.opacity(0.4)
+        addressText = ink
+        secondaryText = ink.opacity(0.6)
+        fieldFill = .clear
+        itemFill = fill.opacity(0.05)
+        itemHoveredFill = fill.opacity(0.09)
+        separator = fill.opacity(0.15)
+        tertiaryText = ink.opacity(0.4)
+        secondaryGlyph = ink.opacity(0.6)
+        sectionHeaderText = ink.opacity(0.6)
+        selectedCard = fill.opacity(0.09)
+        selectedShadow = .clear
+        selectedTile = fill.opacity(0.09)
+        modalButtonFill = fill.opacity(0.09)
+        modalButtonGlyph = ink
+        loadingTrackOpacity = dark ? 0.46 : 0.276
+        isDark = dark
+    }
 }
 
 extension EnvironmentValues {

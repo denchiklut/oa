@@ -25,6 +25,8 @@ final class SidebarStore {
     @ObservationIgnored var archivingPins: Set<UUID> = []
     @ObservationIgnored var deletingSpace: ClosingSpace?
     @ObservationIgnored let commandBarPicks: CommandBarPicks
+    /// One for the app, as Arc's.
+    @ObservationIgnored let topBarColors = TopBarColorClient()
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
 

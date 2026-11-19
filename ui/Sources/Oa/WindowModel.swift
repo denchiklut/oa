@@ -358,6 +358,13 @@ final class WindowModel {
         commandBarSelection = (selectedSpaceID, selectedTabID)
     }
 
+    var topBarColors: TopBarColorClient { store.topBarColors }
+
+    /// As Arc tracks the pages its toolbars show: only this window's page, and only while its toolbar is shown.
+    func trackToolbarPage(_ shown: Bool) {
+        store.topBarColors.setTrackedPage(shown ? page : nil, for: id)
+    }
+
     func closeCommandBar() {
         guard let bar = commandBar else { return }
         bar.autocomplete.stop()
@@ -1267,6 +1274,9 @@ final class WindowModel {
             return
         case .extensionRequestClosed(let request):
             return forget(request)
+        case .thumbnail(let thumbnail):
+            // As Arc's WebContent feature: every thumbnail goes to the toolbar's colours, which sample a shown page's.
+            return store.topBarColors.process(thumbnail: thumbnail, ofPage: pageID, at: page(id: pageID)?.url)
         case .closeCancelled:
             return closeCancelled(pageID)
         case .wantsActivation:
