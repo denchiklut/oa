@@ -238,12 +238,7 @@ private struct SidebarDockItem: View {
                 }
             }
         case .spaceCreation:
-            // As open-arch's: a 7 pt dot in the new Space's tint, its unthemed one (HSL 248°, 0.6, 0.96) until a theme is
-            // chosen.
-            Circle()
-                .fill(Color(red: 0.942, green: 0.936, blue: 0.984))
-                .frame(width: 7, height: 7)
-                .accessibilityLabel("New Space")
+            content(icon: nil, tint: theme.dockInk).accessibilityLabel("New Space")
         case .home:
             EmptyView()
         }

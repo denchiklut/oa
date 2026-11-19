@@ -252,6 +252,13 @@ final class WindowLayoutController: NSViewController {
         }
     }
 
+    /// How much of the window's background is the Create a Space panel's theme.
+    var spaceCreationThemeWeight: CGFloat {
+        let (base, blend) = backgroundThemes
+        let progress = blend?.progress ?? 0
+        return (base == .spaceCreation ? 1 - progress : 0) + (blend?.theme == .spaceCreation ? progress : 0)
+    }
+
     var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         if let fade = spaceCreationFade { return (fade.themes.from, (fade.themes.to, fade.theme)) }
         let spaces = model.state.spaces
