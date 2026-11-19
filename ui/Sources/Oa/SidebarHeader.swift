@@ -63,15 +63,21 @@ private struct SidebarAddressField: View {
             model.openCommandBar(.currentTab)
         } label: {
             HStack(spacing: 3) {
+                // Oa's own, by the author's decision, as open-arch: the host and the search prompt cross-fade, the
+                // one coming in sliding from where the other's text was.
                 if let label = model.addressLabel {
                     Text(label)
                         .foregroundStyle(theme.addressText)
                         .padding(.leading, 12)
+                        .transition(Self.swap(from: Self.promptShift))
                 } else {
-                    Image(systemName: "magnifyingglass")
-                        .frame(width: 24, height: 24)
-                        .padding(.leading, 6)
-                    Text("Search or Enter URL…")
+                    HStack(spacing: 3) {
+                        Image(systemName: "magnifyingglass")
+                            .frame(width: 24, height: 24)
+                            .padding(.leading, 6)
+                        Text("Search or Enter URL…")
+                    }
+                    .transition(Self.swap(from: -Self.promptShift))
                 }
                 Spacer(minLength: 0)
             }
@@ -80,6 +86,7 @@ private struct SidebarAddressField: View {
             .foregroundStyle(theme.secondaryText)
             .frame(height: 36)
             .background(theme.fieldFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -96,9 +103,17 @@ private struct SidebarAddressField: View {
                         ? 1 : 0)
             }
         }
+        .animation(.easeOut(duration: 0.1), value: model.addressLabel == nil)
         .onChange(of: showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue) {
             layout.setHold(.popover, $1)
         }
+    }
+
+    /// How far the prompt's text sits right of the host's: the magnifier's 6 pt inset, 24 pt and 3 pt gap, less 12.
+    private static let promptShift: CGFloat = 21
+
+    private static func swap(from offset: CGFloat) -> AnyTransition {
+        .asymmetric(insertion: .opacity.combined(with: .offset(x: offset)), removal: .opacity)
     }
 }
 
