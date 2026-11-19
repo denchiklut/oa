@@ -122,7 +122,20 @@ private struct SidebarDock: View {
             if slots.total <= geometry.size.width {
                 row.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) { row }
+                // As Arc's: a Space change centres the current item over 0.16 s. Oa's own, by the author's choice:
+                // it is centred at once as the dock appears or resizes too, where Arc's stays at the start.
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) { row }
+                        .onAppear { proxy.scrollTo(WindowLayoutPage.space(model.selectedSpaceID), anchor: .center) }
+                        .onChange(of: geometry.size.width) {
+                            proxy.scrollTo(WindowLayoutPage.space(model.selectedSpaceID), anchor: .center)
+                        }
+                        .onChange(of: model.selectedSpaceID) { _, id in
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                proxy.scrollTo(WindowLayoutPage.space(id), anchor: .center)
+                            }
+                        }
+                }
             }
         }
         .frame(height: 32)
