@@ -51,7 +51,7 @@ struct SidebarView: View {
 
     /// Arc's dock as measured: 8 pt in from the sidebar's edges, a 32 pt Library button and plus with the Space items
     /// 2 pt from them, centred 25 pt above the bottom. On the Create a Space page the Library button and the plus go.
-    /// Oa's own, by the author's decision: they fade in place as the Create a Space slot comes in, on open-arch's spring.
+    /// Oa's own, by the author's decision: they fade in place as the Create a Space slot comes in, as open-arch's.
     private var spaces: some View {
         let creation = layout.dockSpaceCreationProgress
         return HStack(spacing: 2) {
@@ -66,7 +66,6 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .animation(.spring(response: 0.3, dampingFraction: 0.9), value: model.spaceCreation == nil)
     }
 }
 
