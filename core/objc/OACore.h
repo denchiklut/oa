@@ -253,6 +253,12 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (instancetype)init NS_UNAVAILABLE;
 @end
 
+@interface OAHistoryEntry : NSObject
+@property(nonatomic, readonly) NSString* url;
+@property(nonatomic, readonly) NSString* title;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
 // One of Chromium's search engines, as ArcCore's ArcSearchEngine.
 @interface OASearchEngine : NSObject
 @property(nonatomic, readonly) NSString* name;
@@ -447,6 +453,15 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url;
+// Chromium's history text search, newest first, as ArcCore's history query
+// options ask it. Loads the profile if needed.
+- (void)queryHistoryWithSearchText:(NSString*)searchText
+                        maxResults:(NSInteger)maxResults
+                        completion:(void (^)(NSArray<OAHistoryEntry*>* entries))
+                                       completion;
+// The 16 pt icon the favicon service keeps for a page, nil when it has none.
+- (void)faviconForPageURL:(NSString*)url
+               completion:(void (^)(NSImage* _Nullable image))completion;
 // Loads the profile if needed. ArcCore keeps one per window.
 - (OAAutocomplete*)makeAutocomplete;
 // Loads the profile if needed and reports to `delegate`, held weakly, until
