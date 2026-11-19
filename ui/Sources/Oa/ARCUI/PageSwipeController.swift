@@ -36,9 +36,6 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         (from: CGFloat, to: CGFloat, velocity: CGFloat, time: Double, last: CFTimeInterval?, shape: (Double, Double))?
     private let ticker = DisplayLinkTicker()
 
-    /// How far the fingers have gone past the last page in this swipe.
-    var fingerTravelPastEnd: CGFloat { isTracking ? max(position - range.upperBound, 0) / 0.5 : 0 }
-
     func origin(of id: PageID) -> CGFloat? {
         pages.firstIndex { $0.id == id }.map(origin(at:))
     }
