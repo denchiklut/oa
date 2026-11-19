@@ -21,6 +21,7 @@ struct BrowserWindowView: View {
         // `SidebarHomeTransition`.
         let presentation = layout.sidebarPresentation
         let floats = layout.sidebarIsPanel
+        let floatingShape = floats && presentation != .locked
         let progress = layout.libraryProgress
         let section = model.library ?? model.lastLibrarySection
         let libraryWidth = layout.libraryWidth(for: section)
@@ -31,7 +32,8 @@ struct BrowserWindowView: View {
         ZStack(alignment: .topLeading) {
             WindowDragRegion()
             FloatingSidebarBackgroundView(
-                background: background, next: next, windowSize: layout.size, isFloating: floats
+                background: background, next: next, windowSize: layout.size, isFloating: floatingShape,
+                isPanel: floats
             ) {
                 SidebarView(model: model, layout: layout)
                     .environment(\.colorScheme, appearance.colorScheme)
@@ -76,7 +78,8 @@ struct BrowserWindowView: View {
                     .frame(width: 8)
                     .padding(.vertical, 11)
                     .offset(
-                        x: sidebarOffset + layout.sidebarWidth + (floats ? WindowLayoutController.floatingInset : 0) - 4
+                        x: sidebarOffset + layout.sidebarWidth
+                            + (floatingShape ? WindowLayoutController.floatingInset : 0) - 4
                     )
                     .zIndex(4)
             }

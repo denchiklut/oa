@@ -19,16 +19,17 @@ final class WindowLayoutController: NSViewController {
     /// The Create a Space page sliding in, and the pager settling back once it goes, as measured in Arc.
     private static let spaceCreationSpring = (response: 0.21, damping: 1.0)
     private static let spaceCreationCloseSpring = (response: 0.175, damping: 1.0)
-    /// Arc's lock and unlock: the sidebar and the page change frames together, over 0.08 s on this curve.
-    private static let lockAnimation = Animation.timingCurve(0.25, 0.46, 0.45, 0.94, duration: 0.08)
+    /// Lock and unlock, the sidebar and the page changing frames together. Oa's own, by the author's decision:
+    /// open-arch's 0.18 s ease in and out, not Arc's measured 0.08 s on (0.25, 0.46, 0.45, 0.94).
+    private static let lockAnimation = Animation.easeInOut(duration: 0.18)
     /// The floating panel's slide as measured in Arc: its code reads a period of 0.18 s at the same damping.
     private static let hoverAnimation = Animation.spring(response: 0.17, dampingFraction: 0.8)
 
     @ObservationIgnored let model: WindowModel
     private(set) var size = CGSize.zero
     private(set) var sidebarPresentation: SidebarPresentation
-    /// Whether the sidebar is drawn as the floating panel. A docked one slides out as it is and becomes the panel
-    /// once gone, as Arc moves it into the panel's container after the slide.
+    /// Whether the sidebar is drawn as the floating panel, over the page: from the start of undocking to the end of
+    /// docking, as open-arch's `isPanel`.
     private(set) var sidebarIsPanel: Bool
     /// The width a drag on the sidebar's edge is at, the layout's own until the drag ends, as in Arc.
     private var resizingWidth: CGFloat?
@@ -453,28 +454,24 @@ final class WindowLayoutController: NSViewController {
         let (old, new) = (sidebarPresentation, derivedPresentation)
         guard new != old else { return }
         if new == .hidden { iconPickerSpaceID = nil }
+        // One transaction each: SwiftUI flushed a separate unanimated change while the presentation was being set,
+        // drew the old value and missed the new one, so ⌘S sometimes left the sidebar hidden.
         switch (old, new) {
-        case (.locked, .hidden):
+        case (.locked, _):
+            // As open-arch: undocking makes it the panel at once, over the page, and the shape follows.
+            withAnimation(Self.lockAnimation) {
+                sidebarIsPanel = true
+                sidebarPresentation = new
+            }
+        case (_, .locked):
+            // As open-arch: the panel stays over the page, which is see-through when empty, until the page has
+            // slid out from under it. Its blur then fades into the window's material rather than stepping to it.
             withAnimation(Self.lockAnimation) {
                 sidebarPresentation = new
             } completion: { [weak self] in
-                if self?.sidebarPresentation != .locked { self?.sidebarIsPanel = true }
+                guard self?.sidebarPresentation == .locked else { return }
+                withAnimation(Self.lockAnimation) { self?.sidebarIsPanel = false }
             }
-        case (.hidden, .locked):
-            // One transaction: SwiftUI flushed a separate unanimated change while the presentation was being set,
-            // drew the old value and missed the new one, so ⌘S sometimes left the sidebar hidden.
-            withAnimation(Self.lockAnimation) {
-                sidebarIsPanel = false
-                sidebarPresentation = new
-            }
-        case (.floating, .locked):
-            withAnimation(Self.lockAnimation) {
-                sidebarPresentation = new
-                sidebarIsPanel = false
-            }
-        case (.locked, .floating):
-            sidebarPresentation = new
-            sidebarIsPanel = true
         default:
             withAnimation(Self.hoverAnimation) { sidebarPresentation = new }
         }
