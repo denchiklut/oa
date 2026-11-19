@@ -173,7 +173,7 @@ final class CommandBar {
     private func completion(of row: Row?) -> String? {
         switch row?.source {
         case .match(let match):
-            guard autocomplete.input?.text == text, match.allowedToBeDefault, !match.inlineAutocompletion.isEmpty
+            guard answersText, match.allowedToBeDefault, !match.inlineAutocompletion.isEmpty
             else { return nil }
             return match.inlineAutocompletion
         case .tab(let tab):
@@ -271,7 +271,7 @@ final class CommandBar {
     /// tested, it does the same as Oa's own. ⌥ is Arc's Split View, which Oa doesn't have yet, so it is plain Return
     /// too, as Oa's own.
     func submit(_ modifiers: NSEvent.ModifierFlags) {
-        guard text.isEmpty || autocomplete.input?.text == text else {
+        guard text.isEmpty || answersText else {
             pendingReturn = modifiers
             return
         }
@@ -280,9 +280,13 @@ final class CommandBar {
 
     func answered() {
         rank()
-        guard let modifiers = pendingReturn, autocomplete.input?.text == text else { return }
+        guard let modifiers = pendingReturn, answersText else { return }
         pendingReturn = nil
         act(modifiers)
+    }
+
+    private var answersText: Bool {
+        autocomplete.input?.text == text && autocomplete.input?.keyword == scope?.keyword
     }
 
     private func act(_ modifiers: NSEvent.ModifierFlags) {
