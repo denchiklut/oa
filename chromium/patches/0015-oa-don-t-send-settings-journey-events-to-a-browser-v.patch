@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Thu, 19 Nov 2026 16:07:40 -0700
+Subject: [PATCH] oa: don't send settings journey events to a browser view
+
+settings_utils::MaybeNotifySettingsCustomEvent() returns after its feature check, as ArcCore's does. Upstream it CHECKs that the tab's window has a BrowserView element to send the event to, which an embedder without one never registers, so chrome://settings crashed on activating a search engine, making one the default, changing the theme or a site setting. MaybeNotifySettingsElementActivated() is untouched, as in ArcCore: it tolerates the missing element.
+---
+ .../ui/webui/settings/settings_utils.cc        | 18 ------------------
+ 1 file changed, 18 deletions(-)
+
+diff --git a/chrome/browser/ui/webui/settings/settings_utils.cc b/chrome/browser/ui/webui/settings/settings_utils.cc
+index 352e5946c8e7a93307e2b6618adee2bb9f57ac78..213530b508e9a0ba8b5e1cee5e55250ed3c0f5f3 100644
+--- a/chrome/browser/ui/webui/settings/settings_utils.cc
++++ b/chrome/browser/ui/webui/settings/settings_utils.cc
+@@ -35,24 +35,6 @@ void MaybeNotifySettingsCustomEvent(content::WebUI* web_ui,
+   if (!base::FeatureList::IsEnabled(metrics::kSettingsGlowupJourneys)) {
+     return;
+   }
+-  // May be null in unit tests using TestWebUI without a WebContents or tab.
+-  if (!web_ui->GetWebContents()) {
+-    return;
+-  }
+-  tabs::TabInterface* const tab =
+-      tabs::TabInterface::MaybeGetFromContents(web_ui->GetWebContents());
+-  if (!tab) {
+-    return;
+-  }
+-  CHECK(tab->GetBrowserWindowInterface());
+-  ui::ElementContext context =
+-      BrowserElements::From(tab->GetBrowserWindowInterface())->GetContext();
+-  ui::TrackedElement* const browser_element =
+-      ui::ElementTracker::GetElementTracker()->GetUniqueElement(
+-          kBrowserViewElementId, context);
+-  CHECK(browser_element);
+-  ui::ElementTracker::GetFrameworkDelegate()->NotifyCustomEvent(browser_element,
+-                                                                event_type);
+ }
+ 
+ void MaybeNotifySettingsElementActivated(content::WebUI* web_ui,
