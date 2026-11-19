@@ -148,7 +148,7 @@ Sources: Arc [2022][arc22], [2023][arc23].
 | Search and switch to open tabs | ✅ | ✅ |
 | Run browser actions from the command bar | ✅ | ☐ |
 | Search suggestions and history matches | ✅ | ✅ |
-| Site Search shortcuts | ✅ | ☐ |
+| Site Search shortcuts | ✅ | ✅ |
 | Choose and manage search engines per profile | ✅ | ✅ |
 | Enable/disable search suggestions per profile | ✅ | ✅ |
 | Delete individual command-bar suggestions † | ✅ | ✅ |
