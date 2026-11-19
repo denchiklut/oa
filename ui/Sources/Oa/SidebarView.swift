@@ -56,16 +56,35 @@ struct SidebarView: View {
         let creation = layout.dockSpaceCreationProgress
         return HStack(spacing: 2) {
             LibraryButton(model: model)
+                .modifier(DockHoverFill())
                 .onHover { overLibraryButton = $0 }
                 .opacity(1 - creation)
                 .allowsHitTesting(creation == 0)
             SidebarDock(model: model, layout: layout)
             SidebarPlusButton(model: model, layout: layout)
+                .modifier(DockHoverFill())
                 .opacity(1 - creation)
                 .allowsHitTesting(creation == 0)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
+    }
+}
+
+/// As Arc's: the Library button and the plus take the Space items' hover fill.
+private struct DockHoverFill: ViewModifier {
+    @State private var hovered = false
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(theme.dockHoverFill)
+                    .opacity(hovered ? 1 : 0)
+            }
+            .onHover { hovered = $0 }
+            .animation(.easeInOut(duration: 0.25), value: hovered)
     }
 }
 
