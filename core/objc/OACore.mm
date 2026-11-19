@@ -13,6 +13,7 @@
 #include "oa/public/downloads.h"
 #include "oa/public/engine.h"
 #include "oa/public/extensions.h"
+#include "oa/public/history.h"
 #include "oa/public/page.h"
 #include "oa/public/preferences.h"
 #include "oa/public/profiles.h"
@@ -50,6 +51,10 @@
 
 @interface OASiteSetting ()
 - (instancetype)initWithSetting:(const oa::SiteSetting&)setting;
+@end
+
+@interface OAHistoryEntry ()
+- (instancetype)initWithEntry:(const oa::HistoryEntry&)entry;
 @end
 
 @interface OADownload ()
@@ -764,6 +769,21 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   if ((self = [super init])) {
     _type = static_cast<NSInteger>(setting.type);
     _value = static_cast<NSInteger>(setting.value);
+  }
+  return self;
+}
+
+@end
+
+@implementation OAHistoryEntry
+
+@synthesize url = _url;
+@synthesize title = _title;
+
+- (instancetype)initWithEntry:(const oa::HistoryEntry&)entry {
+  if ((self = [super init])) {
+    _url = @(entry.url.c_str()) ?: @"";
+    _title = @(entry.title.c_str()) ?: @"";
   }
   return self;
 }
@@ -1529,6 +1549,31 @@ class BrowserObserverBridge : public oa::Browser::Observer {
                      url.absoluteString.UTF8String ?: "",
                      static_cast<oa::SiteSettingType>(type),
                      static_cast<oa::SiteSettingValue>(value));
+}
+
+- (void)queryHistoryWithSearchText:(NSString*)searchText
+                        maxResults:(NSInteger)maxResults
+                        completion:
+                            (void (^)(NSArray<OAHistoryEntry*>*))completion {
+  void (^handler)(NSArray<OAHistoryEntry*>*) = [completion copy];
+  oa::QueryHistory(
+      _identifier.UTF8String ?: "", searchText.UTF8String ?: "",
+      static_cast<int>(maxResults),
+      [handler](std::vector<oa::HistoryEntry> entries) {
+        NSMutableArray<OAHistoryEntry*>* result = [NSMutableArray array];
+        for (const oa::HistoryEntry& entry : entries) {
+          [result addObject:[[OAHistoryEntry alloc] initWithEntry:entry]];
+        }
+        handler(result);
+      });
+}
+
+- (void)faviconForPageURL:(NSString*)url
+               completion:(void (^)(NSImage* _Nullable))completion {
+  void (^handler)(NSImage* _Nullable) = [completion copy];
+  oa::GetFaviconForPage(
+      _identifier.UTF8String ?: "", url.UTF8String ?: "",
+      [handler](void* image) { handler((__bridge NSImage*)image); });
 }
 
 - (void)setUserVisibleName:(NSString*)name {
