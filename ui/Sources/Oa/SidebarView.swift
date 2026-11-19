@@ -54,16 +54,18 @@ struct SidebarView: View {
     /// Oa's own, by the author's decision: they fade in place as the Create a Space slot comes in, as open-arch's.
     private var spaces: some View {
         let creation = layout.dockSpaceCreationProgress
+        // As measured in open-arch's recording: its disabled buttons sit at 0.86 of their fade while the panel is in.
+        let fade = (1 - creation) * (model.spaceCreation == nil ? 1 : 0.86)
         return HStack(spacing: 2) {
             LibraryButton(model: model)
                 .modifier(DockHoverFill())
                 .onHover { overLibraryButton = $0 }
-                .opacity(1 - creation)
+                .opacity(fade)
                 .allowsHitTesting(creation == 0)
             SidebarDock(model: model, layout: layout)
             SidebarPlusButton(model: model, layout: layout)
                 .modifier(DockHoverFill())
-                .opacity(1 - creation)
+                .opacity(fade)
                 .allowsHitTesting(creation == 0)
         }
         .padding(.horizontal, 8)
@@ -236,7 +238,12 @@ private struct SidebarDockItem: View {
                 }
             }
         case .spaceCreation:
-            content(icon: nil, tint: theme.dockInk).accessibilityLabel("New Space")
+            // As open-arch's: a 7 pt dot in the new Space's tint, its unthemed one (HSL 248°, 0.6, 0.96) until a theme is
+            // chosen.
+            Circle()
+                .fill(Color(red: 0.942, green: 0.936, blue: 0.984))
+                .frame(width: 7, height: 7)
+                .accessibilityLabel("New Space")
         case .home:
             EmptyView()
         }

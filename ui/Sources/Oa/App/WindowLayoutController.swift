@@ -178,7 +178,8 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private let dockTicker = DisplayLinkTicker()
     @ObservationIgnored private var dockEase: (from: CGFloat, to: CGFloat, start: CFTimeInterval)?
 
-    /// As measured in open-arch: the dock settles in about 0.2 s, easing in and out.
+    /// As open-arch's `SpaceSwitcher`: a spring of 0.3 s at 0.9, quick to start, so the Library button and the plus
+    /// are fading while the theme is still on its way.
     private func updateDock() {
         if spaceCreationSwiped, model.spaceCreation != nil {
             (dockEase, dockSpaceCreationProgress) = (nil, spaceCreationProgress)
@@ -190,11 +191,15 @@ final class WindowLayoutController: NSViewController {
         dockEase = (dockSpaceCreationProgress, target, CACurrentMediaTime())
         dockTicker.start(in: window) { [weak self] in
             guard let self, let ease = dockEase else { return }
-            let t = min((CACurrentMediaTime() - ease.start) / 0.2, 1)
-            dockSpaceCreationProgress = ease.from + (ease.to - ease.from) * Self.ease(t)
-            guard t == 1 else { return }
-            dockEase = nil
-            dockTicker.stop()
+            let time = CACurrentMediaTime() - ease.start
+            let omega = 2 * Double.pi / 0.3
+            let damped = omega * (1 - 0.9 * 0.9).squareRoot()
+            let left = exp(-0.9 * omega * time) * (cos(damped * time) + 0.9 * omega / damped * sin(damped * time))
+            guard abs(left * (ease.to - ease.from)) > 0.001 || time < 0.15 else {
+                (dockEase, dockSpaceCreationProgress) = (nil, ease.to)
+                return dockTicker.stop()
+            }
+            dockSpaceCreationProgress = ease.to - (ease.to - ease.from) * left
         }
     }
 
@@ -209,12 +214,12 @@ final class WindowLayoutController: NSViewController {
         if let runningFade { return runningFade }
         // A frame can be drawn before the pager has caught up with the panel opening or closing: the fade's first.
         if model.spaceCreation != nil, laidOutSpaceCreation == nil, !spaceCreationSwiped {
-            return SpaceCreationFade(panel: nil, themes: (theme(of: .space(model.selectedSpaceID)), .default))
+            return SpaceCreationFade(panel: nil, themes: (theme(of: .space(model.selectedSpaceID)), .spaceCreation))
         }
         if model.spaceCreation == nil, let panel = laidOutSpaceCreation, panel.phase == .editing,
             pager.selectedPageID == .spaceCreation
         {
-            return SpaceCreationFade(panel: panel, themes: (.default, theme(of: .space(model.selectedSpaceID))))
+            return SpaceCreationFade(panel: panel, themes: (.spaceCreation, theme(of: .space(model.selectedSpaceID))))
         }
         return nil
     }
@@ -235,12 +240,16 @@ final class WindowLayoutController: NSViewController {
         if let fade = spaceCreationFade { return fade.theme < 0.5 ? fade.themes.from : fade.themes.to }
         guard model.spaceCreation != nil else { return model.space?.theme ?? .default }
         let pages = sidebarPages
-        guard spaceCreationSwiped, !pages.isEmpty else { return .default }
+        guard spaceCreationSwiped, !pages.isEmpty else { return .spaceCreation }
         return theme(of: pages[min(max(Int(sidebarPage.rounded()), 0), pages.count - 1)])
     }
 
     private func theme(of page: WindowLayoutPage) -> WindowTheme {
-        if case .space(let id) = page { model.state.space(id)?.theme ?? .default } else { .default }
+        switch page {
+        case .space(let id): model.state.space(id)?.theme ?? .default
+        case .spaceCreation: .spaceCreation
+        case .home: .default
+        }
     }
 
     var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
@@ -257,7 +266,7 @@ final class WindowLayoutController: NSViewController {
     private var spaceThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         let pages = sidebarPages
         guard let restingSpaceID, !pages.isEmpty else { return (model.space?.theme ?? .default, nil) }
-        // As Arc: the Create a Space page is in the default theme until one is chosen.
+        // The Create a Space page is in its own theme until one is chosen.
         let themes = pages.map(theme(of:))
         let last = pages.count - 1
         let page = min(max(sidebarPage, 0), CGFloat(last))
@@ -319,14 +328,14 @@ final class WindowLayoutController: NSViewController {
         // it was.
         pager.setPages(pages, selecting: target, settling: Self.spaceCreationCloseSpring)
         if let closing, closing.phase == .editing, shownPanel, pager.selectedPageID == target {
-            fadeSpaceCreation(SpaceCreationFade(panel: closing, themes: (.default, theme(of: target))))
+            fadeSpaceCreation(SpaceCreationFade(panel: closing, themes: (.spaceCreation, theme(of: target))))
             pager.select(target, animated: false, notifying: false)
         } else if target == .spaceCreation, pager.selectedPageID != target {
             if let runningFade, runningFade.panel == nil { return updateDock() }
             // As Arc: the Library goes at once. The Space's page stays and settles back from a pull as the panel
             // fades in over it. The fade starts first, as selecting lays the pages out again from here.
             let space = WindowLayoutPage.space(model.selectedSpaceID)
-            fadeSpaceCreation(SpaceCreationFade(panel: nil, themes: (theme(of: space), .default)))
+            fadeSpaceCreation(SpaceCreationFade(panel: nil, themes: (theme(of: space), .spaceCreation)))
             pager.select(space, animated: pager.selectedPageID != .home, notifying: false)
         } else if pager.selectedPageID != target {
             let settle = PageSwipeController<WindowLayoutPage>.settle
