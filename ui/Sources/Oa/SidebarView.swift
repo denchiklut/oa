@@ -51,8 +51,9 @@ struct SidebarView: View {
 
     /// Arc's dock as measured: 8 pt in from the sidebar's edges, a 32 pt Library button and plus with the Space items
     /// 2 pt from them, centred 25 pt above the bottom. On the Create a Space page the Library button and the plus go.
+    /// Oa's own, by the author's decision: they fade in place as the Create a Space slot comes in, on open-arch's spring.
     private var spaces: some View {
-        let creation = layout.spaceCreationProgress
+        let creation = layout.dockSpaceCreationProgress
         return HStack(spacing: 2) {
             LibraryButton(model: model)
                 .onHover { overLibraryButton = $0 }
@@ -65,6 +66,7 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
+        .animation(.spring(response: 0.3, dampingFraction: 0.9), value: model.spaceCreation == nil)
     }
 }
 
@@ -98,28 +100,48 @@ private struct SidebarDock: View {
     let layout: WindowLayoutController
     @State private var hovered: WindowLayoutPage?
 
+    /// Where the Create a Space slot last was, so it collapses there.
+    @State private var creationIndex = 0
+
     var body: some View {
         let pages = layout.sidebarPages
         let page = layout.sidebarPage
-        let current = Int(min(max(page.rounded(), 0), CGFloat(max(pages.count, 1) - 1)))
-        let hoveredIndex = hovered.flatMap { pages.firstIndex(of: $0) }
-        let wide = hoveredIndex == nil || hoveredIndex == current ? 1 : 2
+        let creation = layout.dockSpaceCreationProgress
+        // Oa's own, by the author's decision, as open-arch: the Create a Space slot stays, at no width while the panel
+        // is closed, and grows with the dock's progress, the Spaces re-centring around it, where Arc's comes and goes
+        // with the page.
+        let items = self.items
+        let current = pages.isEmpty ? nil : pages[Int(min(max(page.rounded(), 0), CGFloat(pages.count - 1)))]
+        let wide = hovered == nil || hovered == current ? 1 : 2
         GeometryReader { geometry in
-            let slots = Slots(width: geometry.size.width, count: pages.count, wide: wide)
+            let normal = Slots(width: geometry.size.width, count: items.count - 1, wide: wide)
+            let open = Slots(width: geometry.size.width, count: items.count, wide: wide)
+            let compact = (creation < 0.5 ? normal : open).compact
             let row = HStack(spacing: 0) {
-                ForEach(Array(pages.enumerated()), id: \.element) { index, item in
+                ForEach(items, id: \.self) { item in
                     let isHovered = hovered == item
-                    // As Arc: in the compact dock the hovered item is drawn as the current one.
-                    let selection = slots.compact && isHovered ? 1 : max(0, 1 - abs(page - CGFloat(index)))
+                    let isCreation = item == .spaceCreation
+                    let isWide = item == current || isHovered
+                    // As Arc: in the compact dock the hovered item is drawn as the current one. As open-arch, the
+                    // window's Space dims as the Create a Space slot comes in.
+                    let paged = pages.firstIndex(of: item).map { max(0, 1 - abs(page - CGFloat($0))) } ?? 0
+                    let opening = model.spaceCreation != nil && item == .space(model.selectedSpaceID) ? 1 - creation : 0
+                    let selection = compact && isHovered ? 1 : max(paged, opening)
+                    let width =
+                        isCreation
+                        ? open.width(isWide) * creation
+                        : normal.width(isWide) + (open.width(isWide) - normal.width(isWide)) * creation
                     SidebarDockItem(
                         model: model, layout: layout, item: item, selection: selection, isHovered: isHovered,
-                        compact: slots.compact
+                        compact: compact
                     )
-                    .frame(width: slots.width(index == current || index == hoveredIndex), height: 32)
+                    .scaleEffect(isCreation ? 0.5 + 0.5 * creation : 1)
+                    .opacity(isCreation ? creation : 1)
+                    .frame(width: width, height: 32)
                     .onHover { inside in hovered = inside ? item : hovered == item ? nil : hovered }
                 }
             }
-            if slots.total <= geometry.size.width {
+            if normal.total + (open.total - normal.total) * creation <= geometry.size.width {
                 row.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // As Arc's: a Space change centres the current item over 0.16 s. Oa's own, by the author's choice:
@@ -139,6 +161,15 @@ private struct SidebarDock: View {
             }
         }
         .frame(height: 32)
+        .onChange(of: model.spaceCreationIndex) { _, index in
+            if let index { creationIndex = index }
+        }
+    }
+
+    private var items: [WindowLayoutPage] {
+        var items = model.state.spaces.map { WindowLayoutPage.space($0.id) }
+        items.insert(.spaceCreation, at: min(model.spaceCreationIndex ?? creationIndex, items.count))
+        return items
     }
 
     private struct Slots {
