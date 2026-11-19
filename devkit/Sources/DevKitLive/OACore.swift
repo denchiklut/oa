@@ -28,6 +28,11 @@ import AppKit
     var value: Int { get }
 }
 
+@MainActor @objc protocol CoreHistoryEntry: NSObjectProtocol {
+    var url: String { get }
+    var title: String { get }
+}
+
 @MainActor @objc protocol CoreDownload: NSObjectProtocol {
     var identifier: String { get }
     var state: Int { get }
@@ -176,6 +181,11 @@ import AppKit
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
+    /// `OAHistoryEntry`s, which Swift can't check against `CoreHistoryEntry`.
+    @objc(queryHistoryWithSearchText:maxResults:completion:)
+    func queryHistory(searchText: String, maxResults: Int, completion: @escaping ([NSObject]) -> Void)
+    @objc(faviconForPageURL:completion:)
+    func favicon(forPageURL url: String, completion: @escaping (NSImage?) -> Void)
     func makeAutocomplete() -> CoreAutocomplete
     @objc(createPageInWindow:restoringSessionID:delegate:completion:)
     func createPage(

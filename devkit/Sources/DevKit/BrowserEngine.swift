@@ -52,6 +52,11 @@ public protocol BrowserContext: AnyObject {
     func changedSiteSettings(for url: URL) -> [SiteSetting]?
     /// For the site's whole origin, without reloading its pages, as Chrome's site settings page sets it.
     func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL)
+    /// The engine's history text search, newest first, as ADK's history query with a search text and a result limit.
+    /// It matches words of a page's URL and title, so a host can find another site's page.
+    func history(matching text: String, maxResults: Int) async -> [HistoryEntry]
+    /// The icon the profile's favicon service keeps for a page, nil when it has none.
+    func favicon(forPageAt url: URL) async -> NSImage?
     /// As ADK's download manager for the context: one per profile, alive as long as it.
     var downloads: any Downloads { get }
     /// As ArcCore's `ArcBrowserContextPreferences`: one per profile, kept current by the engine.
@@ -63,6 +68,27 @@ public protocol BrowserContext: AnyObject {
     /// The app window's side in this profile, as ADK's `Browser`: one per window and profile, alive while the app
     /// holds it.
     func browser(windowID: UUID) -> any Browser
+}
+
+extension BrowserContext {
+    /// As Arc's `siteSearchDominantColor`: the dominant colour of the favicon of the newest page the history search
+    /// finds for `host`, darkened. Nil without such a page, icon or colour. Asked each time, as Arc keeps no cache.
+    public func siteSearchDominantColor(host: String) async -> NSColor? {
+        guard let entry = await history(matching: host, maxResults: 1).first,
+            let icon = await favicon(forPageAt: entry.url)
+        else { return nil }
+        return DominantColor.color(of: icon)?.darkened(byLightness: 0.15)
+    }
+}
+
+public struct HistoryEntry: Sendable, Equatable {
+    public let url: URL
+    public let title: String
+
+    public init(url: URL, title: String) {
+        self.url = url
+        self.title = title
+    }
 }
 
 /// A profile's extensions as the engine installs and runs them. Observable: the engine's events change `items`.
@@ -276,6 +302,29 @@ extension SearchEngine {
             "Spotify", "spotify.com", "https://open.spotify.com/search/", 0x1DB954,
             favicon: "https://www.scdn.co/i/_global/favicon.ico"),
     ]
+
+    /// As ADK's `resolvedSearchURL(for: "")`: the search URL without terms. Chromium's other `{…}` parameters go
+    /// too, and `{google:baseURL}` reads as its default.
+    public var emptySearchURL: URL? {
+        URL(
+            string: url.replacingOccurrences(of: "{google:baseURL}", with: "https://www.google.com/")
+                .replacing(#/\{[^}]*\}/#, with: ""))
+    }
+
+    /// Arc's colour for the engine from `enginesToAutoActivate`, as its command bar looks it up: none for a
+    /// prepopulated engine, then the entry with the engine's URL, then the first whose host the engine's host is or
+    /// is under. So `www.youtube.com` finds YouTube's and `youtube.com` doesn't.
+    public var autoActivatedColor: UInt32? {
+        guard !isPrepopulated else { return nil }
+        let table = SearchEngine.enginesToAutoActivate
+        if let exact = table.first(where: { $0.engine.url == url }) { return exact.color }
+        guard let host = emptySearchURL?.host() else { return nil }
+        return table.first { entry in
+            guard let domain = entry.engine.emptySearchURL?.host() else { return false }
+            return host == domain || host.hasSuffix("." + domain)
+                || host.split(separator: ".").contains(Substring(domain))
+        }?.color
+    }
 
     private static func site(
         _ name: String, _ keyword: String, _ url: String, _ color: UInt32, favicon: String
