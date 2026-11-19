@@ -204,6 +204,8 @@ final class WindowLayoutController: NSViewController {
         let index = sidebarPages.firstIndex(of: .space(model.selectedSpaceID)) ?? 0
         let target: WindowLayoutPage =
             model.library != nil ? .home : model.spaceCreation != nil ? .spaceCreation : .space(model.selectedSpaceID)
+        // Oa's own: the icon picker goes with its Space's page, from the moment a swipe starts.
+        if let id = iconPickerSpaceID, pager.isTracking || target != .space(id) { iconPickerSpaceID = nil }
         let throughHome = target == .home || pager.selectedPageID == .home
         if pager.selectedPageID != target {
             leadingSpace = throughHome ? index : 0
@@ -450,6 +452,7 @@ final class WindowLayoutController: NSViewController {
     private func updatePresentation() {
         let (old, new) = (sidebarPresentation, derivedPresentation)
         guard new != old else { return }
+        if new == .hidden { iconPickerSpaceID = nil }
         switch (old, new) {
         case (.locked, .hidden):
             withAnimation(Self.lockAnimation) {
