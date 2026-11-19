@@ -93,6 +93,7 @@ final class WindowLayoutController: NSViewController {
             }
         }
         pager.trackingStateUpdateHandler = { [weak self] in
+            if self?.pager.isTracking == true, self?.model.spaceCreation != nil { self?.spaceCreationSwiped = true }
             self?.trackPull()
             self?.updatePages()
         }
@@ -151,6 +152,14 @@ final class WindowLayoutController: NSViewController {
         guard let index = model.spaceCreationIndex else { return 0 }
         return max(0, 1 - abs(sidebarPage - CGFloat(index)))
     }
+
+    /// The dock's share of the Create a Space slot. Oa's own, by the author's decision, as open-arch's
+    /// `draftProgress`: 1 while the panel is open, so the dock springs in on its own rather than with the pull's
+    /// one-frame cut, and the pager's progress once a swipe has moved the panel.
+    var dockSpaceCreationProgress: CGFloat {
+        model.spaceCreation == nil ? 0 : spaceCreationSwiped ? spaceCreationProgress : 1
+    }
+    private var spaceCreationSwiped = false
 
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
     var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
@@ -220,6 +229,7 @@ final class WindowLayoutController: NSViewController {
             leadingSpace = 0
         }
         if target != .home { homeOrder = nil }
+        if model.spaceCreation == nil, spaceCreationSwiped { spaceCreationSwiped = false }
         let home = PageSwipeController<WindowLayoutPage>.Page(id: .home, width: Self.homeWidth)
         let pages =
             [home] + sidebarPages[min(leadingSpace, sidebarPages.count)...].map { .init(id: $0, width: sidebarWidth) }
