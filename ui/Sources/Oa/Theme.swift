@@ -59,12 +59,11 @@ struct Theme {
         isDark = appearance == .dark
     }
 
-    /// A Space's dot in the dock as measured on Arc: black at 25% over a light theme and white at 17% over a dark
-    /// one, and at 50% for the current Space; `emphasis` is how far between.
-    func dockItem(emphasis: Double) -> Color {
-        let rest = isDark ? 0.175 : 0.25
-        return (isDark ? Color.white : .black).opacity(rest + (0.5 - rest) * emphasis)
-    }
+    /// Arc's `ForegroundSecondary`, which the dock's dots and resting icons are drawn in at `dockRestAlpha`.
+    var dockInk: Color { (isDark ? Color.white : .black).opacity(0.5) }
+    var dockRestAlpha: Double { isDark ? 0.35 : 0.5 }
+    /// ARCUI `GrayA4`.
+    var dockHoverFill: Color { (isDark ? Color.white : .black).opacity(isDark ? 0.077 : 0.071) }
 
     private init() {
         foreground = .primary
