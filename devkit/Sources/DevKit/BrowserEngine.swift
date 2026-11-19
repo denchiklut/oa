@@ -175,13 +175,23 @@ public protocol BrowserContextPreferences: AnyObject, Observable {
     var downloadDirectory: URL? { get set }
     /// The engine asks where to save each download in its Save panel, as ArcCore's `promptForDownloadPath`.
     var asksWhereToSaveDownloads: Bool { get set }
-    /// The engines Chrome's settings offer as the default, as ArcCore's `getSearchEngines`; empty until loaded.
+    /// Every engine but Chromium's starter packs, as ArcCore's `getSearchEngines`; empty until loaded.
     var searchEngines: [SearchEngine] { get }
     var defaultSearchEngine: SearchEngine? { get }
     /// As the user's choice, as ArcCore's `setDefaultSearchEngine:`.
     func setDefaultSearchEngine(_ engine: SearchEngine)
+    /// Active, as ArcCore's `addSearchEngine:error:`; an engine with the same keyword stays as it is.
+    func addSearchEngine(_ engine: SearchEngine)
     /// Chromium's suggestions from the default engine, as ArcCore's `searchSuggestEnabled`.
     var includesSearchSuggestions: Bool { get set }
+}
+
+extension BrowserContextPreferences {
+    /// As ADK's `activeSearchEngines`: the active and prepopulated engines, site searches first.
+    public var activeSearchEngines: [SearchEngine] {
+        let active = searchEngines.filter { $0.isActive || $0.isPrepopulated }
+        return active.filter { !$0.isPrepopulated } + active.filter(\.isPrepopulated)
+    }
 }
 
 /// As ArcCore's `ArcSearchEngine`.
@@ -193,13 +203,87 @@ public struct SearchEngine: Identifiable, Sendable, Equatable {
     public let url: String
     public let faviconURL: URL?
     public let isPrepopulated: Bool
+    public let isActive: Bool
 
-    public init(name: String, keyword: String, url: String, faviconURL: URL? = nil, isPrepopulated: Bool = true) {
+    public init(
+        name: String, keyword: String, url: String, faviconURL: URL? = nil, isPrepopulated: Bool = true,
+        isActive: Bool = true
+    ) {
         self.name = name
         self.keyword = keyword
         self.url = url
         self.faviconURL = faviconURL
         self.isPrepopulated = isPrepopulated
+        self.isActive = isActive
+    }
+}
+
+extension SearchEngine {
+    /// ADK's `enginesToAutoActivate`: Arc's popular site searches with their colours, in Arc's order. Arc writes the
+    /// URLs with `%s`, which ArcCore stores as `{searchTerms}`.
+    public static let enginesToAutoActivate: [(engine: SearchEngine, color: UInt32)] = [
+        site(
+            "Google Drive", "drive.google.com", "https://drive.google.com/drive/search?q=", 0x0F9D58,
+            favicon: "https://drive.google.com/favicon.ico"),
+        site(
+            "Gmail", "mail.google.com", "https://mail.google.com/mail/ca/u/0/#apps/", 0xD44638,
+            favicon: "https://mail.google.com/favicon.ico"),
+        site(
+            "Google Maps", "maps.google.com", "https://www.google.com/maps/search/", 0xFBBC05,
+            favicon: "https://www.google.com/images/branding/product/ico/maps15_bnuw3a_32dp.ico"),
+        site(
+            "Google Calendar", "calendar.google.com", "https://calendar.google.com/calendar/u/0/r/search?q=", 0x9C27B0,
+            favicon: "https://calendar.google.com/googlecalendar/images/favicons_2020q4/calendar_14.ico"),
+        site(
+            "Google Docs", "docs.google.com", "https://docs.google.com/document/u/0/?q=", 0x4285F4,
+            favicon: "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"),
+        site(
+            "Dropbox", "dropbox.com", "https://www.dropbox.com/search/personal?&query=", 0x007EE5,
+            favicon: "https://cfl.dropboxstatic.com/static/metaserver/static/images/favicon-vfl8lUR9B.ico"),
+        site(
+            "Amazon", "amazon.com", "https://www.amazon.com/s?k=", 0xFF9900,
+            favicon: "https://www.amazon.com/favicon.ico"),
+        site(
+            "GitHub", "github.com", "https://github.com/search?q=", 0x743FC7,
+            favicon: "https://github.com/favicon.ico"),
+        site(
+            "Figma", "figma.com", "https://www.figma.com/files/search?q=", 0xF24E1E,
+            favicon: "https://static.figma.com/app/icon/1/favicon.png"),
+        site("X", "x.com", "https://x.com/search?q=", 0x000000, favicon: "https://x.com/favicon.ico"),
+        site("X", "twitter.com", "https://twitter.com/search?q=", 0x000000, favicon: "https://x.com/favicon.ico"),
+        site(
+            "YouTube", "youtube.com", "https://www.youtube.com/results?search_query=", 0xFF0000,
+            favicon: "https://www.youtube.com/s/desktop/9318de79/img/favicon_32x32.png"),
+        site(
+            "Wikipedia", "wikipedia.org", "https://wikipedia.org/w/index.php?search=", 0xFFA500,
+            favicon: "https://en.wikipedia.org/favicon.ico"),
+        site(
+            "Reddit", "reddit.com", "https://www.reddit.com/search/?q=", 0xFF4500,
+            favicon: "https://reddit.com/favicon.ico"),
+        site(
+            "SoundCloud", "soundcloud.com", "https://soundcloud.com/search?q=", 0xF85216,
+            favicon: "https://soundcloud.com/favicon.ico"),
+        site(
+            "Asana", "asana.com", "https://app.asana.com/0/search?q=", 0xF06A6A,
+            favicon: "https://asana.com/favicon.ico"),
+        site(
+            "LinkedIn", "linkedin.com", "https://linkedin.com/search/results/all/?keywords=", 0x0B66C2,
+            favicon: "https://www.linkedin.com/favicon.ico"),
+        site(
+            "Apple Music", "music.apple.com", "https://music.apple.com/us/search?term=", 0xFA2A44,
+            favicon: "https://music.apple.com/favicon.ico"),
+        site(
+            "Spotify", "spotify.com", "https://open.spotify.com/search/", 0x1DB954,
+            favicon: "https://www.scdn.co/i/_global/favicon.ico"),
+    ]
+
+    private static func site(
+        _ name: String, _ keyword: String, _ url: String, _ color: UInt32, favicon: String
+    ) -> (engine: SearchEngine, color: UInt32) {
+        let engine = SearchEngine(
+            name: name, keyword: keyword, url: url + "{searchTerms}", faviconURL: URL(string: favicon),
+            isPrepopulated: false)
+        return (engine, color)
     }
 }
 

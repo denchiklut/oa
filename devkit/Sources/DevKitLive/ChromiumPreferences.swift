@@ -39,6 +39,11 @@ final class ChromiumPreferences: BrowserContextPreferences {
         core?.setDefaultSearchEngine(keyword: engine.keyword)
     }
 
+    func addSearchEngine(_ engine: SearchEngine) {
+        core?.addSearchEngine(
+            name: engine.name, keyword: engine.keyword, url: engine.url, faviconURL: engine.faviconURL)
+    }
+
     fileprivate func changed(_ core: CorePreferences) {
         if core.downloadDirectory != directory { directory = core.downloadDirectory }
         if core.asksWhereToSaveDownloads != asks { asks = core.asksWhereToSaveDownloads }
@@ -62,6 +67,6 @@ extension SearchEngine {
     fileprivate init(_ core: CoreSearchEngine) {
         self.init(
             name: core.name, keyword: core.keyword, url: core.url, faviconURL: core.faviconURL,
-            isPrepopulated: core.isPrepopulated)
+            isPrepopulated: core.isPrepopulated, isActive: core.isActive)
     }
 }

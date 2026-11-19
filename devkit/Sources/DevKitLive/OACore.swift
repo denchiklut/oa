@@ -68,6 +68,7 @@ import AppKit
     var url: String { get }
     var faviconURL: URL? { get }
     var isPrepopulated: Bool { get }
+    var isActive: Bool { get }
 }
 
 @MainActor @objc protocol CorePreferences: NSObjectProtocol {
@@ -79,6 +80,8 @@ import AppKit
     var defaultSearchEngine: CoreSearchEngine? { get }
     var searchSuggestEnabled: Bool { get set }
     @objc(setDefaultSearchEngineWithKeyword:) func setDefaultSearchEngine(keyword: String)
+    @objc(addSearchEngineWithName:keyword:url:faviconURL:)
+    func addSearchEngine(name: String, keyword: String, url: String, faviconURL: URL?)
 }
 
 @MainActor @objc protocol CoreAutocompleteMatch: NSObjectProtocol {
