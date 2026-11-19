@@ -141,17 +141,24 @@ private struct WeakBrowser {
 final class StubPreferences: BrowserContextPreferences {
     var downloadDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
     var asksWhereToSaveDownloads = false
-    let searchEngines = [
-        SearchEngine(name: "Google", keyword: "google.com", url: "https://www.google.com/search?q={searchTerms}"),
-        SearchEngine(name: "DuckDuckGo", keyword: "duckduckgo.com", url: "https://duckduckgo.com/?q={searchTerms}"),
-        SearchEngine(name: "Microsoft Bing", keyword: "bing.com", url: "https://www.bing.com/search?q={searchTerms}"),
-    ]
+    /// As a profile Arc makes: its popular site searches from the start.
+    private(set) var searchEngines =
+        [
+            SearchEngine(name: "Google", keyword: "google.com", url: "https://www.google.com/search?q={searchTerms}"),
+            SearchEngine(name: "DuckDuckGo", keyword: "duckduckgo.com", url: "https://duckduckgo.com/?q={searchTerms}"),
+            SearchEngine(
+                name: "Microsoft Bing", keyword: "bing.com", url: "https://www.bing.com/search?q={searchTerms}"),
+        ] + SearchEngine.enginesToAutoActivate.map(\.engine)
     private(set) var defaultSearchEngine: SearchEngine?
     var includesSearchSuggestions = true
 
     init() { defaultSearchEngine = searchEngines.first }
 
     func setDefaultSearchEngine(_ engine: SearchEngine) { defaultSearchEngine = engine }
+
+    func addSearchEngine(_ engine: SearchEngine) {
+        if !searchEngines.contains(where: { $0.keyword == engine.keyword }) { searchEngines.append(engine) }
+    }
 }
 
 /// What you typed, some remembered pages and one suggestion, in Chromium's order: the first 8 as its combined result,
@@ -194,6 +201,11 @@ final class StubAutocomplete: Autocomplete {
                     lastVisited: visits.map { Date(timeIntervalSinceNow: -86_400 / Double($0)) }))
         }
         guard !text.isEmpty else { return update([]) }
+        if let keyword = input.keyword {
+            let engine = preferences.searchEngines.first { $0.keyword == keyword }
+            add(.searchOtherEngine, text, url: engine.flatMap { search(text, in: $0.url) }, relevance: 1300)
+            return update(result)
+        }
         let lowered = text.lowercased()
         let remembered = Self.history.filter {
             !deleted.contains($0.url)
@@ -243,8 +255,9 @@ final class StubAutocomplete: Autocomplete {
         if additional != additionalMatches { additionalMatches = additional }
     }
 
-    private func search(_ text: String) -> URL? {
-        let template = preferences.defaultSearchEngine?.url ?? "https://www.google.com/search?q={searchTerms}"
+    private func search(_ text: String, in template: String? = nil) -> URL? {
+        let template =
+            template ?? preferences.defaultSearchEngine?.url ?? "https://www.google.com/search?q={searchTerms}"
         let terms = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? text
         return URL(string: template.replacingOccurrences(of: "{searchTerms}", with: terms))
     }
