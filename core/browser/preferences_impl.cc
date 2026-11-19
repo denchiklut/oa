@@ -1,6 +1,10 @@
 // Copyright 2026 The Oa Authors
 // Use of this source code is governed by the license in the LICENSE file.
 
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
@@ -16,18 +20,24 @@
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "components/search_engines/template_url.h"
+#include "components/search_engines/template_url_data.h"
 #include "components/search_engines/template_url_service.h"
 #include "components/search_engines/template_url_service_observer.h"
 #include "oa/browser/profile_services.h"
 #include "oa/public/preferences.h"
+#include "url/gurl.h"
 
 namespace oa {
 namespace {
 
 SearchEngine ToSearchEngine(const TemplateURL& engine) {
-  return SearchEngine{base::UTF16ToUTF8(engine.short_name()),
-                      base::UTF16ToUTF8(engine.keyword()), engine.url(),
-                      engine.favicon_url().spec(), engine.prepopulate_id() > 0};
+  return SearchEngine{
+      base::UTF16ToUTF8(engine.short_name()),
+      base::UTF16ToUTF8(engine.keyword()),
+      engine.url(),
+      engine.favicon_url().spec(),
+      engine.prepopulate_id() > 0,
+      engine.is_active() == TemplateURLData::ActiveStatus::kTrue};
 }
 
 // As ArcCore's preferences_impl.cc: a registrar on the profile's prefs whose
@@ -82,7 +92,7 @@ class PreferencesImpl : public Preferences,
     }
     std::vector<SearchEngine> engines;
     for (const TemplateURL* engine : service->GetTemplateURLs()) {
-      if (service->ShowInDefaultList(engine)) {
+      if (engine->data().starter_pack_id == 0) {
         engines.push_back(ToSearchEngine(*engine));
       }
     }
@@ -106,6 +116,10 @@ class PreferencesImpl : public Preferences,
       service->SetUserSelectedDefaultSearchProvider(engine);
     }
   }
+  void AddSearchEngine(const SearchEngine& engine) override {
+    pending_engines_.push_back(engine);
+    PostAddPendingEngines();
+  }
   std::optional<bool> GetSearchSuggestEnabled() const override {
     if (!profile_) {
       return std::nullopt;
@@ -127,6 +141,9 @@ class PreferencesImpl : public Preferences,
   // TemplateURLServiceObserver:
   void OnTemplateURLServiceChanged() override {
     Post(&Observer::OnSearchEnginesChanged);
+    if (!pending_engines_.empty()) {
+      PostAddPendingEngines();
+    }
   }
   void OnTemplateURLServiceShuttingDown() override {
     search_engines_observation_.Reset();
@@ -163,6 +180,7 @@ class PreferencesImpl : public Preferences,
       search_engines_observation_.Observe(service);
       if (service->loaded()) {
         Post(&Observer::OnSearchEnginesChanged);
+        PostAddPendingEngines();
       } else {
         service->Load();
       }
@@ -173,6 +191,34 @@ class PreferencesImpl : public Preferences,
     TemplateURLService* service =
         profile_ ? TemplateURLServiceFactory::GetForProfile(profile_) : nullptr;
     return service && service->loaded() ? service : nullptr;
+  }
+
+  // Posted, so the service never changes while it notifies.
+  void PostAddPendingEngines() {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&PreferencesImpl::AddPendingEngines,
+                                  weak_factory_.GetWeakPtr()));
+  }
+
+  void AddPendingEngines() {
+    TemplateURLService* service = LoadedSearchEngines();
+    if (!service) {
+      return;
+    }
+    for (const SearchEngine& engine : std::exchange(pending_engines_, {})) {
+      const std::u16string keyword = base::UTF8ToUTF16(engine.keyword);
+      if (service->GetTemplateURLForKeyword(keyword)) {
+        continue;
+      }
+      TemplateURLData data;
+      data.SetShortName(base::UTF8ToUTF16(engine.name));
+      data.SetKeyword(keyword);
+      data.SetURL(engine.url);
+      data.favicon_url = GURL(engine.favicon_url);
+      data.safe_for_autoreplace = false;
+      data.is_active = TemplateURLData::ActiveStatus::kTrue;
+      service->Add(std::make_unique<TemplateURL>(data));
+    }
   }
 
   void Post(void (Observer::*event)()) {
@@ -203,6 +249,8 @@ class PreferencesImpl : public Preferences,
   const std::string profile_id_;
   raw_ptr<Observer> observer_;
   raw_ptr<Profile> profile_ = nullptr;
+  // Until the profile's search engines have loaded.
+  std::vector<SearchEngine> pending_engines_;
   PrefChangeRegistrar registrar_;
   base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
   base::ScopedObservation<TemplateURLService, TemplateURLServiceObserver>

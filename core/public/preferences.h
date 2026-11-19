@@ -29,6 +29,7 @@ struct SearchEngine {
   std::string url;
   std::string favicon_url;
   bool is_prepopulated = false;
+  bool is_active = false;
 };
 
 class Preferences {
@@ -57,12 +58,15 @@ class Preferences {
   // Chrome's download.prompt_for_download.
   virtual void SetAsksWhereToSaveDownloads(bool asks) = 0;
 
-  // The engines Chrome's settings offer as the default; nullopt until the
-  // profile's search engines have loaded.
+  // Every engine but Chromium's starter packs, as ArcCore's getSearchEngines;
+  // nullopt until the profile's search engines have loaded.
   virtual std::optional<std::vector<SearchEngine>> GetSearchEngines() const = 0;
   virtual std::optional<SearchEngine> GetDefaultSearchEngine() const = 0;
   // By keyword, as the user's choice, as Chrome's settings page sets it.
   virtual void SetDefaultSearchEngine(const std::string& keyword) = 0;
+  // Active and never replaced by Chromium, as ArcCore's addSearchEngine:. Oa's
+  // own: an engine with the same keyword stays as it is.
+  virtual void AddSearchEngine(const SearchEngine& engine) = 0;
   // Chrome's search.suggest_enabled; nullopt until the profile has loaded.
   virtual std::optional<bool> GetSearchSuggestEnabled() const = 0;
   virtual void SetSearchSuggestEnabled(bool enabled) = 0;
