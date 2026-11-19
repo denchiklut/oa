@@ -152,8 +152,11 @@ struct BrowserWindowView: View {
             ? Color.white.opacity(dark ? 0.1 : 0.666) : dark ? Color.black : .white
         return VStack(spacing: 0) {
             if showsToolbar {
+                // A toolbar for each page, so a tab switch shows the page's colour at once, as Arc's toolbar sets its
+                // colour without animation when its page changes.
                 PageToolbar(model: model)
-                    .environment(\.theme, .toolbar)
+                    .id(model.page?.id)
+                    .transition(.identity)
                     .opacity(model.placeholder == nil ? 1 : 0)
             }
             if let placeholder = model.placeholder {
@@ -164,6 +167,10 @@ struct BrowserWindowView: View {
                 Color.clear
             }
         }
+        .onChange(of: showsToolbar ? model.page?.id : nil, initial: true) { _, _ in
+            model.trackToolbarPage(showsToolbar)
+        }
+        .onDisappear { model.trackToolbarPage(false) }
         // Faded, the fill would show through the page that covers it.
         .background(fadesCard ? .clear : fill)
         .clipShape(RoundedRectangle(cornerRadius: 6))

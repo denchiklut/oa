@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Arc's toolbar along the top of the page, shown by View ▸ Show Toolbar: back, forward and reload at its start,
 /// the host in the middle behind copy link, Site Controls 41 pt from its end, where Arc's Split View button follows.
+/// It takes the colour of its page's top right corner, as Arc's does, and one view is one page's toolbar.
 struct PageToolbar: View {
     /// Arc's key. LIKELY kept across launches as Arc's default is; one setting for every window, as seen in Arc.
     static let key = "topBarURLEnabled"
@@ -12,9 +13,23 @@ struct PageToolbar: View {
 
     let model: WindowModel
     @State private var showingSiteControls = false
-    @Environment(\.theme) private var theme
+    /// As Arc's toolbar when its page changes: the page's last colour, else its host's cached one, else white, until
+    /// the page's next sample.
+    @State private var initialColor: NSColor?
+    @Environment(\.theme) private var windowTheme
+
+    init(model: WindowModel) {
+        self.model = model
+        let colors = model.topBarColors
+        _initialColor = State(
+            initialValue: model.page.map { colors.appliedColor(for: $0) ?? colors.cachedColor(for: $0) ?? .white })
+    }
 
     var body: some View {
+        // Oa's own with no page, where Arc's colours aren't known: the empty card shows through, under the window
+        // theme's inks.
+        let color = model.page.flatMap { model.topBarColors.appliedColor(for: $0) } ?? initialColor
+        let theme = color.map(Theme.init(toolbarOver:)) ?? windowTheme
         VStack(spacing: 0) {
             ZStack {
                 HStack(spacing: 0) {
@@ -46,9 +61,12 @@ struct PageToolbar: View {
                 .padding(.horizontal, 130)
             }
             .frame(height: 32)
-            Color.primary.opacity(0.05).frame(height: 1)
+            (theme.isDark ? Color.white : .black).opacity(0.05).frame(height: 1)
         }
-        .background(Color(nsColor: .textBackgroundColor))
+        .environment(\.theme, theme)
+        .background(color.map { Color(nsColor: $0) } ?? .clear)
+        // As Arc: a sample fades in; the colour a page's toolbar starts with doesn't.
+        .animation(.easeInOut(duration: 0.18), value: color)
         .background(WindowDragRegion())
     }
 }
