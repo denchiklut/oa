@@ -154,8 +154,31 @@ page.
 tab at the top of the Space, for the Space's profile. Deleting a page there
 removes it from the bar too.
 
-Not done yet, as later slices: Arc's commands in the bar, Site Search with Tab,
-the sidebar's URL pill, Little Arc's bar and the onboarding rows.
+## Site Search
+
+As Arc, Oa adds Arc's 19 popular site searches (YouTube, Wikipedia, GitHub,
+Google Drive and the rest) to Chromium's search engines with their colours:
+once for every profile the first time Oa runs, and to each profile made after.
+A removed one stays gone. They are edited on Chromium's search engines page.
+
+When what is typed starts an engine's keyword ("you", "YouTube",
+"youtube.com"), the field offers "Search YouTube" with a Tab key cap; the
+shortest keyword wins, and the highlighted row doesn't change it. Tab or a
+click on it enters Site Search: the engine's name in a pill of its colour, an
+empty field, and Chromium in keyword mode for that engine, so the rows are the
+search for the text and past searches on that engine. Return, ⌘Return and ⌘L
+open the engine's results as any row does.
+
+- **Backspace** at the field's start leaves, putting back what was typed before
+  Tab, with the caret after it.
+- **Esc** leaves and clears the field; a second Esc closes the bar.
+- **Tab** with an empty query leaves; with a query it does nothing.
+
+Not done yet, as later slices: the pill's menu (remove, change, manage),
+Space as a trigger, and an empty scope's recent searches.
+
+Not done yet, as later slices: Arc's commands in the bar, the sidebar's URL
+pill, Little Arc's bar and the onboarding rows.
 
 Related: [Sidebar state](../sidebar/README.md) · [Peek](../peek/README.md).
 
