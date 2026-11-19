@@ -304,7 +304,12 @@ struct CommandBarView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             if !rows.isEmpty {
-                Divider()
+                // As measured in Arc: a 1 pt line 12 pt in from the card's sides, 6 pt above the first row.
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 1)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
                 list(rows)
             }
         }
