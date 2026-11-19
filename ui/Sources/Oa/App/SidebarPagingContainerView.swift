@@ -13,6 +13,9 @@ struct SidebarPagingContainerView: View {
     var body: some View {
         let width = layout.sidebarWidth
         let offset = layout.sidebarScrollOffset
+        let fade = layout.spaceCreationFade
+        // The URL field takes no room while the panel comes or goes, so the Space's page keeps its place below it.
+        let below: CGFloat = layout.addressFieldShift != nil && !PageToolbar.isShown ? SidebarAddressField.height : 0
         // The Create a Space page has no Space, and breaks a profile's run of Spaces as another profile's would.
         let pages = layout.sidebarPages.map { page -> SidebarSpace? in
             if case .space(let id) = page { model.state.space(id) } else { nil }
@@ -60,11 +63,22 @@ struct SidebarPagingContainerView: View {
                 .accessibilityHidden(!shown)
             }
         }
+        .offset(y: below)
+        .opacity(fade.map { $0.panel == nil ? 1 - $0.pages : $0.pages } ?? 1)
         .overlay(alignment: .topLeading) {
+            // While it fades in, the panel is over the window's Space's page rather than at its own.
             if let creation = model.spaceCreation, let index = model.spaceCreationIndex {
                 SpaceCreationView(model: model, creation: creation)
                     .frame(width: width)
-                    .offset(x: CGFloat(index) * width - offset)
+                    .offset(x: fade == nil ? CGFloat(index) * width - offset : 0)
+                    .opacity(fade.map { Double($0.pages) } ?? 1)
+            }
+            if let fade, let panel = fade.panel {
+                SpaceCreationView(model: model, creation: panel, focusesName: false)
+                    .frame(width: width)
+                    .opacity(1 - fade.pages)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
         .frame(width: width, alignment: .topLeading)

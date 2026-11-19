@@ -33,10 +33,19 @@ struct SidebarHeader: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .frame(height: showsToolbar ? 36 : 46, alignment: .top)
             .background(WindowDragRegion())
-            // As Arc: the Create a Space panel takes the URL field's place.
-            if !showsToolbar, model.spaceCreation == nil {
+            // As Arc: the Create a Space panel takes the URL field's place. While the panel comes or goes the field
+            // goes with the Space's page, taking no room, so neither the page nor the panel moves.
+            let shift = layout.addressFieldShift
+            if !showsToolbar, model.spaceCreation == nil || shift != nil {
+                let fade = layout.spaceCreationFade
                 SidebarAddressField(model: model, layout: layout)
                     .padding(.horizontal, 8)
+                    .offset(x: shift ?? 0)
+                    .opacity(fade.map { $0.panel == nil ? 1 - $0.pages : $0.pages } ?? 1)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .frame(height: shift == nil ? nil : 0, alignment: .top)
+                    .allowsHitTesting(shift == nil)
             }
         }
         .overlay(alignment: .topLeading) {
@@ -50,7 +59,9 @@ struct SidebarHeader: View {
 /// Arc's URL field as measured: 36 pt tall, 8 pt in from the sidebar's edges, showing the page's host; copy link and
 /// Site Controls at its end while the pointer is in the sidebar, or while Site Controls or a permission prompt hangs
 /// from it.
-private struct SidebarAddressField: View {
+struct SidebarAddressField: View {
+    static let height: CGFloat = 36
+
     let model: WindowModel
     let layout: WindowLayoutController
     @State private var showingSiteControls = false
@@ -84,7 +95,7 @@ private struct SidebarAddressField: View {
             .font(.system(size: 13, weight: .medium))
             .lineLimit(1)
             .foregroundStyle(theme.secondaryText)
-            .frame(height: 36)
+            .frame(height: Self.height)
             .background(theme.fieldFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .contentShape(Rectangle())

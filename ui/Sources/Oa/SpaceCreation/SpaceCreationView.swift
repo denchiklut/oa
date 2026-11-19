@@ -11,6 +11,8 @@ struct SpaceCreationView: View {
 
     let model: WindowModel
     let creation: SpaceCreationState
+    /// Off for the copy that fades out once the panel has gone.
+    var focusesName = true
     @State private var pickingIcon = false
     @State private var lifted = false
     @State private var glowing = false
@@ -39,7 +41,7 @@ struct SpaceCreationView: View {
         }
         .padding(.horizontal, 14)
         .allowsHitTesting(editing)
-        .onAppear { nameFocused = true }
+        .onAppear { if focusesName { nameFocused = true } }
         // As measured on Arc, from the click: the artwork moves from 0.3 s, the glow at 1.33 s, the card fades from
         // 1.775 s, and the Space is made at 2.18 s.
         .task(id: editing) {

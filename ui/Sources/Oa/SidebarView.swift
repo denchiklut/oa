@@ -122,10 +122,9 @@ private struct SidebarDock: View {
                     let isCreation = item == .spaceCreation
                     let isWide = item == current || isHovered
                     // As Arc: in the compact dock the hovered item is drawn as the current one. As open-arch, the
-                    // window's Space dims as the Create a Space slot comes in.
+                    // Spaces dim as the Create a Space slot comes in, and its dot is the current one.
                     let paged = pages.firstIndex(of: item).map { max(0, 1 - abs(page - CGFloat($0))) } ?? 0
-                    let opening = model.spaceCreation != nil && item == .space(model.selectedSpaceID) ? 1 - creation : 0
-                    let selection = compact && isHovered ? 1 : max(paged, opening)
+                    let selection = compact && isHovered || isCreation ? 1 : min(paged, 1 - creation)
                     let width =
                         isCreation
                         ? open.width(isWide) * creation
