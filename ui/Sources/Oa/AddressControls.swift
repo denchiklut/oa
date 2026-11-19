@@ -64,10 +64,17 @@ struct CopyLinkButton: View {
 extension WindowModel {
     /// As Arc's field: the host without a leading `www.`, and nothing else. Oa's own: the whole address of a page
     /// without a host.
-    var addressLabel: String? {
-        address.map { url in
-            guard let host = url.host(), !host.isEmpty else { return url.absoluteString }
-            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-        }
+    var addressLabel: String? { address.map(Self.addressLabel) }
+
+    /// What the field shows on a Space's page: its selected tab's, the window's Space's with its Peek.
+    func addressLabel(in spaceID: UUID) -> String? {
+        if spaceID == selectedSpaceID, spaceCreation == nil { return addressLabel }
+        guard let tabID = selectedTabIDs[spaceID] else { return nil }
+        return (pages[tabID]?.url ?? state.tree.tab(tabID)?.url).map(Self.addressLabel)
+    }
+
+    private static func addressLabel(_ url: URL) -> String {
+        guard let host = url.host(), !host.isEmpty else { return url.absoluteString }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 }

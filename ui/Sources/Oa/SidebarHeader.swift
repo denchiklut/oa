@@ -73,25 +73,21 @@ struct SidebarAddressField: View {
         Button {
             model.openCommandBar(.currentTab)
         } label: {
-            HStack(spacing: 3) {
-                // Oa's own, by the author's decision, as open-arch: the host and the search prompt cross-fade, the
-                // one coming in sliding from where the other's text was.
-                if let label = model.addressLabel {
-                    Text(label)
-                        .foregroundStyle(theme.addressText)
-                        .padding(.leading, 12)
-                        .transition(Self.swap(from: Self.promptShift))
-                } else {
-                    HStack(spacing: 3) {
-                        Image(systemName: "magnifyingglass")
-                            .frame(width: 24, height: 24)
-                            .padding(.leading, 6)
-                        Text("Search or Enter URL…")
+            // Oa's own, by the author's decision: the field's text goes with its Space's page, so a swipe or a dot
+            // carries it across with the pages rather than swapping it at the Space change.
+            // While the Create a Space panel is in, the field is already carried with its Space's page.
+            let pages = model.spaceCreation == nil ? layout.sidebarPages : [.space(model.selectedSpaceID)]
+            let position = model.spaceCreation == nil ? layout.sidebarPage : 0
+            ZStack(alignment: .leading) {
+                ForEach(Self.pagesInView(pages.count, at: position), id: \.self) { index in
+                    if case .space(let id) = pages[index] {
+                        AddressFieldLabel(label: model.addressLabel(in: id))
+                            .offset(x: (CGFloat(index) - position) * layout.sidebarWidth)
+                            .id(id)
                     }
-                    .transition(Self.swap(from: -Self.promptShift))
                 }
-                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .font(.system(size: 13, weight: .medium))
             .lineLimit(1)
             .foregroundStyle(theme.secondaryText)
@@ -103,6 +99,7 @@ struct SidebarAddressField: View {
         .buttonStyle(.plain)
         .overlay(alignment: .trailing) {
             if model.address != nil {
+                let current = layout.sidebarPages.firstIndex(of: .space(model.selectedSpaceID)).map(CGFloat.init)
                 HStack(spacing: -2) {
                     CopyLinkButton(model: model, size: 30)
                     SiteControlsButton(
@@ -111,20 +108,60 @@ struct SidebarAddressField: View {
                 .padding(.trailing, 4)
                 .opacity(
                     revealed || showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue
-                        ? 1 : 0)
+                        ? max(0, 1 - 2 * abs(layout.sidebarPage - (current ?? layout.sidebarPage))) : 0
+                )
+                .transition(.opacity.animation(.easeOut(duration: 0.15)))
             }
         }
-        .animation(.easeOut(duration: 0.1), value: model.addressLabel == nil)
         .onChange(of: showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue) {
             layout.setHold(.popover, $1)
         }
     }
 
+    /// The page the pager is on, and the one beside it while it is between two.
+    private static func pagesInView(_ count: Int, at position: CGFloat) -> [Int] {
+        guard count > 0 else { return [] }
+        let lower = min(max(Int(position.rounded(.down)), 0), count - 1)
+        return lower < count - 1 && position > CGFloat(lower) ? [lower, lower + 1] : [lower]
+    }
+}
+
+/// A Space's host or the search prompt. Oa's own, by the author's decision, after open-arch: a change within the
+/// Space fades the old text out where it is and brings the new one in, sliding from where the old text started.
+private struct AddressFieldLabel: View {
     /// How far the prompt's text sits right of the host's: the magnifier's 6 pt inset, 24 pt and 3 pt gap, less 12.
     private static let promptShift: CGFloat = 21
 
+    let label: String?
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            if let label {
+                Text(label)
+                    .foregroundStyle(theme.addressText)
+                    .padding(.leading, 12)
+                    .id(label)
+                    .transition(Self.swap(from: Self.promptShift))
+            } else {
+                HStack(spacing: 3) {
+                    Image(systemName: "magnifyingglass")
+                        .frame(width: 24, height: 24)
+                        .padding(.leading, 6)
+                    Text("Search or Enter URL…")
+                }
+                .transition(Self.swap(from: -Self.promptShift))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.default, value: label)
+    }
+
+    /// The old text is mostly gone before the new one shows, so the two are never read over each other.
     private static func swap(from offset: CGFloat) -> AnyTransition {
-        .asymmetric(insertion: .opacity.combined(with: .offset(x: offset)), removal: .opacity)
+        .asymmetric(
+            insertion: .opacity.combined(with: .offset(x: offset)).animation(.easeOut(duration: 0.2).delay(0.06)),
+            removal: .opacity.animation(.easeIn(duration: 0.1)))
     }
 }
 
