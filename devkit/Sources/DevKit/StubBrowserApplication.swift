@@ -119,6 +119,19 @@ final class StubBrowserContext: BrowserContext {
 
     func makeAutocomplete() -> any Autocomplete { StubAutocomplete(preferences: preferences) }
 
+    /// The stub's remembered pages whose URL or title holds every word of `text`, in their order.
+    func history(matching text: String, maxResults: Int) async -> [HistoryEntry] {
+        let words = text.lowercased().split { !$0.isLetter && !$0.isNumber }
+        let found = StubAutocomplete.history.filter { page in
+            words.allSatisfy { (page.url + " " + page.title).lowercased().contains($0) }
+        }
+        return found.prefix(maxResults).compactMap { page in
+            URL(string: page.url).map { HistoryEntry(url: $0, title: page.title) }
+        }
+    }
+
+    func favicon(forPageAt url: URL) async -> NSImage? { StubPage.icon(for: url) }
+
     func changedSiteSettings(for url: URL) -> [SiteSetting]? {
         guard let host = url.host() else { return [] }
         return SiteSettingType.allCases.compactMap { type in
@@ -173,9 +186,10 @@ final class StubAutocomplete: Autocomplete {
     @ObservationIgnored private let preferences: any BrowserContextPreferences
     @ObservationIgnored private var deleted: Set<String> = []
 
-    private static let history: [(title: String, url: String, visits: Int)] =
+    static let history: [(title: String, url: String, visits: Int)] =
         [
             ("Apple", "https://www.apple.com/", 12),
+            ("Google", "https://www.google.com/", 9),
             ("Wikipedia, the free encyclopedia", "https://en.wikipedia.org/wiki/Main_Page", 7),
             ("GitHub", "https://github.com/", 30),
             ("Hacker News", "https://news.ycombinator.com/", 4),

@@ -202,10 +202,42 @@ final class ChromiumBrowserContext: BrowserContext {
     func setSiteSetting(_ type: SiteSettingType, to value: SiteSettingValue, for url: URL) {
         profile()?.setSiteSetting(type.rawValue, to: value.rawValue, for: url)
     }
+
+    func history(matching text: String, maxResults: Int) async -> [HistoryEntry] {
+        guard let profile = profile() else { return [] }
+        return await withCheckedContinuation { continuation in
+            profile.queryHistory(searchText: text, maxResults: maxResults) { entries in
+                let entries = MainActor.assumeIsolated {
+                    entries.compactMap { object -> HistoryEntry? in
+                        let entry = unsafeBitCast(object, to: CoreHistoryEntry.self)
+                        return URL(string: entry.url).map { HistoryEntry(url: $0, title: entry.title) }
+                    }
+                }
+                continuation.resume(returning: entries)
+            }
+        }
+    }
+
+    func favicon(forPageAt url: URL) async -> NSImage? {
+        guard let profile = profile() else { return nil }
+        let icon = FoundIcon()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            profile.favicon(forPageURL: url.absoluteString) { image in
+                MainActor.assumeIsolated { icon.image = image }
+                continuation.resume()
+            }
+        }
+        return icon.image
+    }
 }
 
 private struct WeakBrowser {
     weak var browser: ChromiumBrowser?
+}
+
+@MainActor
+private final class FoundIcon {
+    var image: NSImage?
 }
 
 @MainActor
