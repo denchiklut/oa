@@ -200,21 +200,6 @@ extension WindowTheme {
     }()
 }
 
-extension WindowTheme {
-    /// The Create a Space panel's theme until one is chosen: Arc's default. Oa's own, by the author's decision: its
-    /// light side whatever the system's appearance, drawn as in a light window, as the author's Arc shows it with its
-    /// own appearance set to light under a dark macOS. Arc picks the side by that app-wide setting, which Oa doesn't
-    /// have.
-    static let spaceCreation: WindowTheme = {
-        var theme = WindowTheme.default
-        theme.background = .single(spaceCreationBackground)
-        theme.semanticColorPalette = .single(theme.semanticColorPalette[.light])
-        return theme
-    }()
-
-    static let spaceCreationBackground = WindowTheme.default.background[.light]
-}
-
 extension WindowTheme.PrimaryColorPalette {
     /// Arc's rule: each entry is the key colour, moved in 1 % steps of HSL lightness until its luminance is in the
     /// entry's range. Both are worked on the colour's own components, so a Display P3 key steps in P3.
