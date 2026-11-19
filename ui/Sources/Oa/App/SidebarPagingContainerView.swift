@@ -230,7 +230,11 @@ private struct SpaceNameRow: View {
                 renaming = true
             }
         }
-        .popover(isPresented: pickingIcon, arrowEdge: .bottom) {
+        // As Arc's, which hangs it from the header's icon view.
+        .popover(
+            isPresented: pickingIcon, attachmentAnchor: .rect(.rect(CGRect(x: 5, y: 5, width: 26, height: 26))),
+            arrowEdge: .bottom
+        ) {
             SpaceIconPicker(selection: space.icon) { icon in
                 model.setSpaceIcon(icon, for: space.id)
                 layout.iconPickerSpaceID = nil
