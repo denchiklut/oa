@@ -88,64 +88,86 @@ enum SpaceDeletion {
     }
 }
 
-/// Arc's dock items between the Library button and the plus, one per sidebar page, so the Create a Space panel's too
-/// at its slot. As measured on Arc: the items share the dock's width evenly, and while (sidebar width − 66.5) / items
-/// ≥ 24 a Space shows its icon or an 8 pt dot. Below that the dock is compact: the current item is 24 pt wide with its
-/// icon or an 8 pt dot, the others share the rest as 4 pt dots, and a hovered one shows its icon or an 8 pt dot too.
-/// Oa's own, by the author's choice: the current item keeps its icon while another is hovered, where Arc's becomes a
-/// dot. The switch takes one frame. The current item is darker, and during a swipe two cross-fade.
+/// Arc's `SidebarDockView`: one item per sidebar page, so the Create a Space panel's too at its slot. Each slot is
+/// clamp(width / items, 8, 34) wide and 32 tall, and the row is centred. Below 22 the dock is compact: the current and
+/// the hovered item take 22 and the others share the rest, at least 8 each, scrolling once they don't fit.
+/// Oa's own, by the author's choice: the current item keeps its icon and slot while another is hovered, where Arc's
+/// becomes a 4 pt dot and gives the hovered one its slot.
 private struct SidebarDock: View {
     let model: WindowModel
     let layout: WindowLayoutController
     @State private var hovered: WindowLayoutPage?
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let pages = layout.sidebarPages
         let page = layout.sidebarPage
-        let count = CGFloat(max(pages.count, 1))
-        let compact = (layout.sidebarWidth - 66.5) / count < 24
-        let current = Int(min(max(page.rounded(), 0), count - 1))
+        let current = Int(min(max(page.rounded(), 0), CGFloat(max(pages.count, 1) - 1)))
+        let hoveredIndex = hovered.flatMap { pages.firstIndex(of: $0) }
+        let wide = hoveredIndex == nil || hoveredIndex == current ? 1 : 2
         GeometryReader { geometry in
-            let pitch = geometry.size.width / count
-            let others = pages.count > 1 ? (geometry.size.width - 24) / (count - 1) : 24
-            HStack(spacing: 0) {
+            let slots = Slots(width: geometry.size.width, count: pages.count, wide: wide)
+            let row = HStack(spacing: 0) {
                 ForEach(Array(pages.enumerated()), id: \.element) { index, item in
-                    let isCurrent = index == current
-                    let full = !compact || isCurrent || hovered == item
-                    dockItem(item, emphasis: max(0, 1 - abs(page - CGFloat(index))), full: full)
-                        .frame(width: compact ? (isCurrent ? 24 : others) : pitch, height: 34)
-                        .contentShape(Rectangle())
-                        .onHover { inside in hovered = inside ? item : hovered == item ? nil : hovered }
+                    let isHovered = hovered == item
+                    // As Arc: in the compact dock the hovered item is drawn as the current one.
+                    let selection = slots.compact && isHovered ? 1 : max(0, 1 - abs(page - CGFloat(index)))
+                    SidebarDockItem(
+                        model: model, layout: layout, item: item, selection: selection, isHovered: isHovered,
+                        compact: slots.compact
+                    )
+                    .frame(width: slots.width(index == current || index == hoveredIndex), height: 32)
+                    .onHover { inside in hovered = inside ? item : hovered == item ? nil : hovered }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if slots.total <= geometry.size.width {
+                row.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) { row }
+            }
         }
-        .frame(height: 34)
+        .frame(height: 32)
     }
 
-    /// Shown full, an item is its Space's icon or an 8 pt dot; otherwise a 4 pt dot.
-    @ViewBuilder
-    private func dockItem(_ item: WindowLayoutPage, emphasis: CGFloat, full: Bool) -> some View {
-        let dot: CGFloat = full ? 8 : 4
+    private struct Slots {
+        let unit: CGFloat
+        let other: CGFloat
+        let compact: Bool
+        let total: CGFloat
+
+        init(width: CGFloat, count: Int, wide: Int) {
+            let n = CGFloat(max(count, 1))
+            let wide = CGFloat(min(wide, count))
+            unit = min(max(width / n, 8), 34)
+            compact = unit < 22
+            other = n > wide ? max((width - 22 * wide) / (n - wide), 8) : 22
+            total = compact ? 22 * wide + other * (n - wide) : unit * n
+        }
+
+        func width(_ wide: Bool) -> CGFloat { compact ? (wide ? 22 : other) : unit }
+    }
+}
+
+/// Arc's `SidebarDockItemView`. A Space's icon cross-fades between a grey resting copy and an active one in the
+/// Space's own theme colour; a Space without an icon is a dot. `selection` is how far the item is the current one.
+private struct SidebarDockItem: View {
+    let model: WindowModel
+    let layout: WindowLayoutController
+    let item: WindowLayoutPage
+    let selection: CGFloat
+    let isHovered: Bool
+    let compact: Bool
+    @Environment(\.theme) private var theme
+
+    var body: some View {
         switch item {
         case .space(let id):
             if let space = model.state.space(id) {
                 Button {
                     model.selectSpace(space.id)
                 } label: {
-                    Group {
-                        if full, let glyph = space.icon {
-                            SpaceIconGlyph(icon: glyph).font(.system(size: 13, weight: .semibold))
-                        } else {
-                            Circle().frame(width: dot, height: dot)
-                        }
-                    }
-                    .foregroundStyle(theme.dockItem(emphasis: emphasis))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
+                    content(icon: space.icon, tint: tint(space))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressStyle())
                 .help(space.name)
                 .accessibilityLabel(space.name)
                 .spaceContextMenu(isEnabled: !model.coversWindow) {
@@ -153,12 +175,66 @@ private struct SidebarDock: View {
                 }
             }
         case .spaceCreation:
-            Circle()
-                .frame(width: dot, height: dot)
-                .foregroundStyle(theme.dockItem(emphasis: emphasis))
-                .accessibilityLabel("New Space")
+            content(icon: nil, tint: theme.dockInk).accessibilityLabel("New Space")
         case .home:
             EmptyView()
+        }
+    }
+
+    /// As Arc's `LayoutTraits`.
+    private func content(icon: String?, tint: Color) -> some View {
+        let rest = theme.dockRestAlpha
+        let highlight = isHovered ? 0.7 : rest
+        return ZStack {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(theme.dockHoverFill)
+                .opacity(isHovered && !compact ? 1 : 0)
+            if compact && selection <= 0 && !isHovered {
+                Circle().fill(theme.dockInk).frame(width: 4, height: 4).opacity(rest)
+            } else if let icon {
+                let active = (isHovered ? 0.7 : 0) + selection * (1 - (isHovered ? 0.7 : 0))
+                ZStack {
+                    SpaceIconGlyph(icon: icon)
+                        .foregroundStyle(theme.dockInk)
+                        .modifier(RestingEmoji(isEmoji: !icon.allSatisfy(\.isASCII), isDark: theme.isDark))
+                        .opacity((isHovered ? 0 : rest) * (1 - selection))
+                    SpaceIconGlyph(icon: icon).foregroundStyle(tint).opacity(active)
+                }
+                .font(.system(size: 13, weight: .semibold))
+            } else {
+                Circle().fill(theme.dockInk).frame(width: 8, height: 8).opacity(highlight + selection * (1 - highlight))
+            }
+        }
+        .contentShape(Rectangle())
+        .animation(.easeInOut(duration: 0.25), value: isHovered)
+    }
+
+    /// As measured on Arc, the hovered or current icon takes its own Space's `maxContrastColor`, not the window's.
+    /// Oa's own: a Space without a theme stays grey, as Arc's icon colour is optional and its source isn't traced.
+    private func tint(_ space: SidebarSpace) -> Color {
+        guard let windowTheme = space.customInfo?.windowTheme else { return theme.dockInk }
+        return windowTheme.semanticColorPalette[theme.isDark ? .dark : .light].maxContrastColor.color
+    }
+
+    private struct PressStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.95 : 1)
+                .animation(.timingCurve(0.215, 0.61, 0.355, 1, duration: 0.13), value: configuration.isPressed)
+        }
+    }
+
+    /// Arc draws a resting emoji through `CIColorMonochrome` in grey 0.5 (light) or 0.8 (dark).
+    private struct RestingEmoji: ViewModifier {
+        let isEmoji: Bool
+        let isDark: Bool
+
+        func body(content: Content) -> some View {
+            if isEmoji {
+                content.grayscale(1).colorMultiply(Color(white: isDark ? 0.8 : 0.5))
+            } else {
+                content
+            }
         }
     }
 }
