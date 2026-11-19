@@ -55,6 +55,12 @@ final class CommandBar {
         }
     }
 
+    struct ScopeColor: Equatable {
+        var color: NSColor
+        /// Arc's `isFromAutoActivatedList`.
+        var isFromTable: Bool
+    }
+
     let destination: Destination
     let autocomplete: any Autocomplete
     /// The page ⌘L edits, prefilled and selected as Arc does.
@@ -63,6 +69,9 @@ final class CommandBar {
     private(set) var text: String
     /// As Arc's `scopedSearchType`: Site Search, where Chromium searches only this engine.
     private(set) var scope: SearchEngine?
+    /// As Arc's `scopedSearchColor`: nil until the Site Search has one, and for good when it has none.
+    private(set) var scopeColor: ScopeColor?
+    @ObservationIgnored private var scopeColorTask: Task<Void, Never>?
     /// The text typed before Site Search, which Backspace puts back.
     @ObservationIgnored private var textBeforeScope = ""
     /// Ranked once for each change of the text, of Chromium's answer and of the Space's tabs.
@@ -82,6 +91,7 @@ final class CommandBar {
     @ObservationIgnored private let picks: CommandBarPicks
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
     @ObservationIgnored private let searchEngines: () -> [SearchEngine]
+    @ObservationIgnored private let dominantColor: (_ host: String) async -> NSColor?
     @ObservationIgnored private var startedFresh = false
     /// As Arc's `pendingSelection`: Return pressed before Chromium answered the text, with its modifiers.
     @ObservationIgnored private var pendingReturn: NSEvent.ModifierFlags?
@@ -90,6 +100,7 @@ final class CommandBar {
     init(
         destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, profileID: UUID,
         picks: CommandBarPicks, searchEngines: @escaping () -> [SearchEngine],
+        dominantColor: @escaping (_ host: String) async -> NSColor?,
         tabs: @escaping () -> [CommandBarRanking.Tab]
     ) {
         self.destination = destination
@@ -99,6 +110,7 @@ final class CommandBar {
         self.picks = picks
         self.tabs = tabs
         self.searchEngines = searchEngines
+        self.dominantColor = dominantColor
         let text = currentURL?.absoluteString ?? ""
         self.text = text
         selection = NSRange(location: text.utf16.count, length: 0)
@@ -227,7 +239,19 @@ final class CommandBar {
     func enterScope(_ engine: SearchEngine) {
         textBeforeScope = text
         scope = engine
+        loadScopeColor(for: engine)
         replaceText("", caret: 0)
+    }
+
+    /// As Arc's reducer on entering a Site Search: its table's colour at once, else the favicon's when it comes.
+    private func loadScopeColor(for engine: SearchEngine) {
+        scopeColorTask?.cancel()
+        scopeColor = engine.autoActivatedColor.map { ScopeColor(color: displayP3($0), isFromTable: true) }
+        guard scopeColor == nil, let host = engine.emptySearchURL?.host() else { return }
+        scopeColorTask = Task { [weak self, dominantColor] in
+            guard let color = await dominantColor(host), !Task.isCancelled else { return }
+            self?.scopeColor = ScopeColor(color: color, isFromTable: false)
+        }
     }
 
     /// As Arc's Backspace at the field's start: out of Site Search, the text from before it joined to the query and
@@ -246,6 +270,8 @@ final class CommandBar {
 
     private func leaveScope(text: String, caret: Int) {
         scope = nil
+        scopeColorTask?.cancel()
+        scopeColor = nil
         replaceText(text, caret: caret)
     }
 
@@ -344,6 +370,11 @@ struct CommandBarView: View {
 
     let model: WindowModel
     let bar: CommandBar
+    /// The window theme's `focus`, which Arc's bar draws a Site Search without a colour in.
+    let themeFocus: Color
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var bounces = 0.0
+    @State private var glow: (id: UUID, color: Color)?
 
     var body: some View {
         let rows = bar.rows
@@ -354,9 +385,23 @@ struct CommandBarView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { model.closeCommandBar() }
                 card(rows)
+                    .background { if let glow { SiteSearchGlow(color: glow.color).id(glow.id) } }
+                    .modifier(CommandBarBounce(count: bounces))
                     .frame(width: min(Self.width, geometry.size.width - 32))
                     .padding(.top, geometry.size.height * Self.topFraction)
             }
+        }
+        // As Arc: the bar bounces whenever it enters or leaves a Site Search.
+        .onChange(of: bar.scope != nil) { _, _ in
+            withAnimation(.linear(duration: CommandBarBounce.duration)) { bounces += 1 }
+        }
+        // As Arc: the glow plays on entry once the colour is known, so a favicon's starts when it arrives.
+        .onChange(of: bar.scopeColor) { _, color in
+            if let color { glow = (UUID(), Color(nsColor: color.color)) }
+        }
+        .task(id: glow?.id) {
+            try? await Task.sleep(for: .seconds(SiteSearchGlow.duration))
+            if !Task.isCancelled { glow = nil }
         }
         .onChange(of: bar.autocomplete.input) { _, _ in bar.answered() }
         .onChange(of: bar.autocomplete.matches) { _, _ in bar.answered() }
@@ -364,13 +409,13 @@ struct CommandBarView: View {
         .onChange(of: tabs) { _, _ in bar.answered() }
     }
 
-    /// As Arc's `autoActivatedEngineURLToPrimaryColor`, by the engine's URL; any other engine takes the row
-    /// highlight's colour.
-    private var scopeColor: Color {
-        guard let scope = bar.scope,
-            let site = SearchEngine.enginesToAutoActivate.first(where: { $0.engine.url == scope.url })
-        else { return .accentColor }
-        return Color(nsColor: srgb(site.color))
+    /// What Arc draws the pill and the scoped row in: its table's colour as it is, a favicon's colour as the
+    /// `focus` of the theme that colour generates, and the window theme's `focus` without either.
+    private var scopeFocus: Color {
+        guard let scope = bar.scopeColor else { return themeFocus }
+        if scope.isFromTable { return Color(nsColor: scope.color) }
+        let palette = WindowTheme.PrimaryColorPalette(key: scope.color)
+        return WindowTheme.SemanticColorPalette(palette, colorScheme == .dark ? .dark : .light).focus.color
     }
 
     private func card(_ rows: [CommandBar.Row]) -> some View {
@@ -380,7 +425,7 @@ struct CommandBarView: View {
                     Image(systemName: "magnifyingglass")
                         .frame(width: 18)
                     // As measured in Arc: 13 pt from the icon, the field 11.5 pt after it.
-                    SiteSearchPill(name: scope.name, color: scopeColor)
+                    SiteSearchPill(name: scope.name, color: scopeFocus)
                         .padding(.leading, 3)
                         .padding(.trailing, 1.5)
                 } else {
@@ -420,7 +465,7 @@ struct CommandBarView: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         CommandBarRow(
                             row: row, icon: icon(for: row), favicon: favicon(for: row),
-                            selected: index == bar.selectedIndex, tint: bar.scope == nil ? nil : scopeColor
+                            selected: index == bar.selectedIndex, tint: bar.scope == nil ? nil : scopeFocus
                         )
                         .id(index)
                         .onTapGesture {
@@ -501,7 +546,8 @@ private struct CommandBarRow: View {
     }
 }
 
-/// As measured in Arc: a 24 pt capsule in the engine's colour, glowing about 5 pt around, with its name in white.
+/// Arc's pill: 24 pt high with continuous 12 pt corners, its name in white, and an `NSShadow` of blur 8 one point
+/// down in its colour at 0.3, which is a SwiftUI radius of 4.
 private struct SiteSearchPill: View {
     let name: String
     let color: Color
@@ -512,8 +558,50 @@ private struct SiteSearchPill: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 9)
             .frame(height: 24)
-            .background(color, in: Capsule())
-            .shadow(color: color.opacity(0.35), radius: 5)
+            .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .shadow(color: color.opacity(0.3), radius: 4, y: 1)
+    }
+}
+
+/// Arc's `arc_commandBarBounce`: a spring of damping ratio 0.9 and response 0.7 toward a scale of 0.95, cut off
+/// after 0.1 s and played back, so the bar dips to about 0.988. `count` runs linearly from one bounce to the next.
+private struct CommandBarBounce: GeometryEffect {
+    static let duration = 0.2
+
+    var count: Double
+
+    var animatableData: Double {
+        get { count }
+        set { count = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let progress = count - count.rounded(.down)
+        let time = Self.duration / 2 * (1 - abs(2 * progress - 1))
+        let frequency = 2 * Double.pi / 0.7
+        let decay = 0.9 * frequency
+        let damped = frequency * (1 - 0.9 * 0.9).squareRoot()
+        let travelled = 1 - exp(-decay * time) * (cos(damped * time) + decay / damped * sin(damped * time))
+        let scale = 1 - 0.05 * travelled
+        return ProjectionTransform(
+            CGAffineTransform(translationX: size.width / 2, y: size.height / 2).scaledBy(x: scale, y: scale)
+                .translatedBy(x: -size.width / 2, y: -size.height / 2))
+    }
+}
+
+/// Arc's glow on entering a Site Search: the colour as it is, behind the card and of its size, blurring out.
+private struct SiteSearchGlow: View {
+    static let duration = 1.2
+
+    let color: Color
+    @State private var faded = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(color)
+            .blur(radius: faded ? 150 : 0)
+            .opacity(faded ? 0 : 1)
+            .onAppear { withAnimation(.easeOut(duration: Self.duration)) { faded = true } }
     }
 }
 
@@ -548,6 +636,13 @@ private struct SiteSearchHint: View {
 private func srgb(_ hex: UInt32) -> NSColor {
     NSColor(
         srgbRed: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255,
+        blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+}
+
+/// Arc reads its table's hex colours as Display P3: its YouTube red measures #FF0000 in the display's own space.
+private func displayP3(_ hex: UInt32) -> NSColor {
+    NSColor(
+        displayP3Red: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255,
         blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
 }
 
