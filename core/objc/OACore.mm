@@ -958,6 +958,7 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
 @synthesize url = _url;
 @synthesize faviconURL = _faviconURL;
 @synthesize prepopulated = _prepopulated;
+@synthesize active = _active;
 
 - (instancetype)initWithEngine:(const oa::SearchEngine&)engine {
   if ((self = [super init])) {
@@ -968,6 +969,7 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
                       ? nil
                       : [NSURL URLWithString:ToNSString(engine.favicon_url)];
     _prepopulated = engine.is_prepopulated;
+    _active = engine.is_active;
   }
   return self;
 }
@@ -1050,6 +1052,19 @@ class PreferencesObserverBridge : public oa::Preferences::Observer {
 - (void)setDefaultSearchEngineWithKeyword:(NSString*)keyword {
   [self start];
   _preferences->SetDefaultSearchEngine(keyword.UTF8String ?: "");
+}
+
+- (void)addSearchEngineWithName:(NSString*)name
+                        keyword:(NSString*)keyword
+                            url:(NSString*)url
+                     faviconURL:(nullable NSURL*)faviconURL {
+  [self start];
+  oa::SearchEngine engine;
+  engine.name = name.UTF8String ?: "";
+  engine.keyword = keyword.UTF8String ?: "";
+  engine.url = url.UTF8String ?: "";
+  engine.favicon_url = faviconURL.absoluteString.UTF8String ?: "";
+  _preferences->AddSearchEngine(engine);
 }
 
 - (BOOL)searchSuggestEnabled {
