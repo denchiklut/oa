@@ -146,11 +146,9 @@ struct BrowserWindowView: View {
         // As Arc: under a page the card is opaque white or black by the window's appearance, and with none it is
         // `emptyWindowContentBackgroundColor`, white at 0.666 or 0.1 over the Space's theme.
         let dark = colorScheme == .dark
-        // The Create a Space panel's empty card is a light window's, blended in with its theme.
-        let light = layout.spaceCreationThemeWeight
         let fill =
             model.placeholder == nil && model.page == nil
-            ? Color.white.opacity(dark ? 0.1 + (0.666 - 0.1) * light : 0.666) : dark ? Color.black : .white
+            ? Color.white.opacity(dark ? 0.1 : 0.666) : dark ? Color.black : .white
         return VStack(spacing: 0) {
             if showsToolbar {
                 PageToolbar(model: model)

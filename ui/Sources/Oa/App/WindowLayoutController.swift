@@ -215,12 +215,12 @@ final class WindowLayoutController: NSViewController {
         if let runningFade { return runningFade }
         // A frame can be drawn before the pager has caught up with the panel opening or closing: the fade's first.
         if model.spaceCreation != nil, laidOutSpaceCreation == nil, !spaceCreationSwiped {
-            return SpaceCreationFade(panel: nil, themes: (theme(of: .space(model.selectedSpaceID)), .spaceCreation))
+            return SpaceCreationFade(panel: nil, themes: (theme(of: .space(model.selectedSpaceID)), .default))
         }
         if model.spaceCreation == nil, let panel = laidOutSpaceCreation, panel.phase == .editing,
             pager.selectedPageID == .spaceCreation
         {
-            return SpaceCreationFade(panel: panel, themes: (.spaceCreation, theme(of: .space(model.selectedSpaceID))))
+            return SpaceCreationFade(panel: panel, themes: (.default, theme(of: .space(model.selectedSpaceID))))
         }
         return nil
     }
@@ -241,23 +241,16 @@ final class WindowLayoutController: NSViewController {
         if let fade = spaceCreationFade { return fade.theme < 0.5 ? fade.themes.from : fade.themes.to }
         guard model.spaceCreation != nil else { return model.space?.theme ?? .default }
         let pages = sidebarPages
-        guard spaceCreationSwiped, !pages.isEmpty else { return .spaceCreation }
+        guard spaceCreationSwiped, !pages.isEmpty else { return .default }
         return theme(of: pages[min(max(Int(sidebarPage.rounded()), 0), pages.count - 1)])
     }
 
     private func theme(of page: WindowLayoutPage) -> WindowTheme {
         switch page {
         case .space(let id): model.state.space(id)?.theme ?? .default
-        case .spaceCreation: .spaceCreation
+        case .spaceCreation: .default
         case .home: .default
         }
-    }
-
-    /// How much of the window's background is the Create a Space panel's theme.
-    var spaceCreationThemeWeight: CGFloat {
-        let (base, blend) = backgroundThemes
-        let progress = blend?.progress ?? 0
-        return (base == .spaceCreation ? 1 - progress : 0) + (blend?.theme == .spaceCreation ? progress : 0)
     }
 
     var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
@@ -336,14 +329,14 @@ final class WindowLayoutController: NSViewController {
         // it was.
         pager.setPages(pages, selecting: target, settling: Self.spaceCreationCloseSpring)
         if let closing, closing.phase == .editing, shownPanel, pager.selectedPageID == target {
-            fadeSpaceCreation(SpaceCreationFade(panel: closing, themes: (.spaceCreation, theme(of: target))))
+            fadeSpaceCreation(SpaceCreationFade(panel: closing, themes: (.default, theme(of: target))))
             pager.select(target, animated: false, notifying: false)
         } else if target == .spaceCreation, pager.selectedPageID != target {
             if let runningFade, runningFade.panel == nil { return updateDock() }
             // As Arc: the Library goes at once. The Space's page stays and settles back from a pull as the panel
             // fades in over it. The fade starts first, as selecting lays the pages out again from here.
             let space = WindowLayoutPage.space(model.selectedSpaceID)
-            fadeSpaceCreation(SpaceCreationFade(panel: nil, themes: (theme(of: space), .spaceCreation)))
+            fadeSpaceCreation(SpaceCreationFade(panel: nil, themes: (theme(of: space), .default)))
             pager.select(space, animated: pager.selectedPageID != .home, notifying: false)
         } else if pager.selectedPageID != target {
             let settle = PageSwipeController<WindowLayoutPage>.settle
