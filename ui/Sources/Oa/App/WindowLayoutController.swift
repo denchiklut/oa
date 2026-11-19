@@ -45,16 +45,17 @@ final class WindowLayoutController: NSViewController {
     private var restingSpaceID: UUID?
     /// The Spaces' order as the Library opened.
     private var homeOrder: [UUID]?
-    /// Arc's new-Space pull: the overshoot past the last Space's page over 22.5 pt fills the feedback view's ring and
-    /// arms it, over 15 pt slides it in, through a spring of 0.4 s at 0.8 that the display link drives, as SwiftUI's
-    /// don't run while the pager tracks the swipe. Released more than 0.1 s after arming, it opens the Create a Space
-    /// panel.
+    /// The new-Space pull: the feedback view slides in through a spring of 0.4 s at 0.8 that the display link drives,
+    /// as SwiftUI's don't run while the pager tracks the swipe, and its ring fills until it arms. Oa's own, by the
+    /// author's decision, as open-arch: it arms after 90 pt of the fingers past the last Space's page, slid in by 60,
+    /// and opens the Create a Space panel if still armed as they lift. Arc's arms at 22.5 pt of the rubber-banded page,
+    /// about 300 pt of the fingers, and opens only if let go more than 0.1 s after arming.
     private(set) var spaceCreationPull: (progress: CGFloat, reveal: CGFloat) = (0, 0)
     @ObservationIgnored private var pullTarget: CGFloat = 0
     @ObservationIgnored private var pullVelocity: CGFloat = 0
     @ObservationIgnored private var pullTick: CFTimeInterval?
     @ObservationIgnored private let pullTicker = DisplayLinkTicker()
-    @ObservationIgnored private var pullArmedAt: CFTimeInterval?
+    @ObservationIgnored private var pullArmed = false
     /// As Arc: only a swipe that starts on the last Space, with no panel open, pulls.
     @ObservationIgnored private var pullAllowed: Bool?
     /// Oa's own, by the author's decision, as open-arch: the Create a Space panel opens and closes in place, the page
@@ -338,17 +339,15 @@ final class WindowLayoutController: NSViewController {
     }
 
     private func updatePull() {
-        var overshoot: CGFloat = 0
-        if pullAllowed == true, let last = pager.pages.last, let origin = pager.origin(of: last.id) {
-            overshoot = max(pagerPosition - origin, 0)
-        }
-        spaceCreationPull.progress = min(overshoot / 22.5, 1)
-        springPull(to: min(overshoot / 15, 1))
+        let travel = pullAllowed == true ? pager.fingerTravelPastEnd : 0
+        spaceCreationPull.progress = min(travel / 90, 1)
+        springPull(to: min(travel / 60, 1))
         guard pager.isTracking else { return }
         let armed = spaceCreationPull.progress >= 1
-        guard armed != (pullArmedAt != nil) else { return }
-        pullArmedAt = armed ? CACurrentMediaTime() : nil
-        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+        guard armed != pullArmed else { return }
+        pullArmed = armed
+        // As open-arch: a tap as it arms, none as it lets go.
+        if armed { NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now) }
     }
 
     private func springPull(to target: CGFloat) {
@@ -382,9 +381,8 @@ final class WindowLayoutController: NSViewController {
             return
         }
         pullAllowed = nil
-        let armedAt = pullArmedAt
-        pullArmedAt = nil
-        guard let armedAt, CACurrentMediaTime() - armedAt > 0.1 else { return }
+        guard pullArmed else { return }
+        pullArmed = false
         // As open-arch: the panel fades in as the fingers lift, where Arc's page holds for 70 ms before it cuts in.
         model.beginSpaceCreation()
     }
