@@ -70,6 +70,8 @@ final class ChromiumPage: Page, MediaSession {
         page.snapshot { image in MainActor.assumeIsolated { completion(image) } }
     }
 
+    func requestThumbnail() { page?.requestThumbnail() }
+
     func close() { page?.close() }
 
     func drop() {
@@ -177,6 +179,10 @@ final class ChromiumPage: Page, MediaSession {
         continuation.yield(.pictureInPicture(event))
     }
 
+    fileprivate func thumbnailReady(_ thumbnail: NSImage) {
+        if page != nil { continuation.yield(.thumbnail(thumbnail)) }
+    }
+
     fileprivate func closeCancelled() {
         if page != nil { continuation.yield(.closeCancelled) }
     }
@@ -262,6 +268,8 @@ final class PageDelegate: NSObject, CorePageDelegate {
     func page(_ page: CorePage, pictureInPicture event: Int, view: NSView?, rect: NSRect) {
         content?.pictureInPicture(event, view: view, rect: rect)
     }
+
+    func page(_ page: CorePage, thumbnailReady thumbnail: NSImage) { content?.thumbnailReady(thumbnail) }
 
     func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }
 

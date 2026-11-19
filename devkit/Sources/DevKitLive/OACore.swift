@@ -221,6 +221,7 @@ import AppKit
     func activate()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
     @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
+    func requestThumbnail()
     func requestPictureInPicture() -> Bool
     @objc(exitPictureInPictureAndPause:) func exitPictureInPicture(pausing: Bool) -> Bool
     func close()
@@ -273,6 +274,7 @@ import AppKit
     func page(_ page: CorePage, didCloseExtensionRequest request: CorePageExtensionRequest)
     @objc(page:pictureInPicture:view:rect:)
     func page(_ page: CorePage, pictureInPicture event: Int, view: NSView?, rect: NSRect)
+    @objc(page:thumbnailReady:) func page(_ page: CorePage, thumbnailReady thumbnail: NSImage)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
     @objc(page:didCloseWithSessionID:) func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32)
 }

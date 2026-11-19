@@ -148,6 +148,20 @@ final class StubPage: Page, MediaSession {
         completion(image)
     }
 
+    /// The page's view as it is drawn, in its display's colours at a pixel a point, as the engine's is; nothing while
+    /// it loads.
+    func requestThumbnail() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, navigationResult != nil else { return }
+            snapshot { image in
+                guard let image, let bitmap = image.representations.first as? NSBitmapImageRep else { return }
+                let thumbnail = NSImage(size: NSSize(width: bitmap.pixelsWide, height: bitmap.pixelsHigh))
+                thumbnail.addRepresentation(bitmap)
+                self.continuation?.yield(.thumbnail(thumbnail))
+            }
+        }
+    }
+
     private func askToLeave() async -> Bool {
         guard asksBeforeClosing else { return true }
         return await withCheckedContinuation { continuation in
