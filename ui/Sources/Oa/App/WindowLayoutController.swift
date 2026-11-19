@@ -77,6 +77,7 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private var holds: Set<Hold> = []
     @ObservationIgnored private var monitor: Any?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private var appAppearance: NSKeyValueObservation?
 
     init(model: WindowModel) {
         self.model = model
@@ -465,12 +466,17 @@ final class WindowLayoutController: NSViewController {
         observe(NSMenu.didBeginTrackingNotification, nil) { $0.setHold(.menu, $0.view.window?.isKeyWindow == true) }
         observe(NSMenu.didEndTrackingNotification, nil) { $0.setHold(.menu, false) }
         observeModel()
+        observeWindowAppearance()
+        appAppearance = NSApplication.shared.observe(\.effectiveAppearance) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.updateWindowAppearance() }
+        }
     }
 
     override func viewDidDisappear() {
         super.viewDidDisappear()
         monitor.map(NSEvent.removeMonitor)
         monitor = nil
+        appAppearance = nil
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
     }
@@ -528,6 +534,28 @@ final class WindowLayoutController: NSViewController {
         guard sidebarPresentation == .floating else { return }
         sidebarPresentation = .hidden
         trackPointer()
+    }
+
+    private func observeWindowAppearance() {
+        withObservationTracking {
+            updateWindowAppearance()
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeWindowAppearance() }
+        }
+    }
+
+    /// As Arc's `BrowserWindow` and `MainWindowsManager`: the theme's `windowAppearance` resolved against the app's,
+    /// else the app's. Arc's themes all leave it nil, so the window follows the app.
+    private func updateWindowAppearance() {
+        guard let window = view.window else { return }
+        let app = NSApplication.shared
+        let isDark = app.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let appearance =
+            chromeTheme.windowAppearance.map {
+                NSAppearance(named: $0[isDark ? .dark : .light] == .dark ? .darkAqua : .aqua)
+            }
+            ?? app.appearance
+        if window.appearance?.name != appearance?.name { window.appearance = appearance }
     }
 
     private func observeModel() {
