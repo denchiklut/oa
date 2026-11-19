@@ -49,6 +49,14 @@ final class MainMenu {
         edit.addItem(item("Select All", #selector(NSText.selectAll(_:)), key: "a"))
 
         let view = submenu("View", in: menu)
+        let appearance = submenu("Appearance", in: view)
+        let header = NSMenuItem(title: "Websites will use:", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        appearance.addItem(header)
+        appearance.addItem(item("Automatic", #selector(ApplicationDelegate.setAutomaticAppearance(_:))))
+        appearance.addItem(item("Light", #selector(ApplicationDelegate.setLightAppearance(_:))))
+        appearance.addItem(item("Dark", #selector(ApplicationDelegate.setDarkAppearance(_:))))
+        view.addItem(.separator())
         view.addItem(item("Reload Page", #selector(BrowserWindowController.reload(_:)), key: "r"))
         view.addItem(item("Stop Loading", #selector(BrowserWindowController.stopLoading(_:)), key: "."))
         view.addItem(.separator())

@@ -41,6 +41,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         store.didCreateProfile = { [weak self] in self?.settings.profileCreated($0) }
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) { AppAppearance.restore() }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
             await engine.adBlocker.start()
@@ -121,8 +123,20 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc func newWindow(_ sender: Any?) { openWindow() }
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
     @objc func toggleToolbar(_ sender: Any?) { PageToolbar.isShown.toggle() }
+    @objc func setAutomaticAppearance(_ sender: Any?) { AppAppearance.set(nil) }
+    @objc func setLightAppearance(_ sender: Any?) { AppAppearance.set(.aqua) }
+    @objc func setDarkAppearance(_ sender: Any?) { AppAppearance.set(.darkAqua) }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        let appearances: [Selector: NSAppearance.Name?] = [
+            #selector(setAutomaticAppearance(_:)): nil, #selector(setLightAppearance(_:)): .aqua,
+            #selector(setDarkAppearance(_:)): .darkAqua,
+        ]
+        if let action = item.action, let name = appearances[action] {
+            item.state = AppAppearance.current == name ? .on : .off
+            // As Arc: not while Settings is key.
+            return !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController)
+        }
         if item.action == #selector(toggleToolbar(_:)) {
             item.title = PageToolbar.isShown ? "Hide Toolbar" : "Show Toolbar"
         }
