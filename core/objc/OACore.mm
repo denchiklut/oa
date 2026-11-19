@@ -32,6 +32,7 @@
 - (void)pageExtensionRequestClosed:(const oa::ExtensionRequest&)request;
 - (void)pagePictureInPicture:(const oa::PictureInPictureEvent&)event
                         view:(nullable NSView*)view;
+- (void)pageThumbnail:(NSImage*)thumbnail;
 - (void)pageCloseCancelled;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
@@ -237,6 +238,9 @@ class PageObserverBridge : public oa::Page::Observer {
   void OnPagePictureInPicture(const oa::PictureInPictureEvent& event,
                               void* ns_view) override {
     [page_ pagePictureInPicture:event view:(__bridge NSView*)ns_view];
+  }
+  void OnPageThumbnail(void* ns_image) override {
+    [page_ pageThumbnail:(__bridge NSImage*)ns_image];
   }
   void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
   void OnPageClosed(std::optional<int32_t> session_id) override {
@@ -617,6 +621,12 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
       [handler](void* image) { handler((__bridge NSImage*)image); });
 }
 
+- (void)requestThumbnail {
+  if (_page) {
+    _page->RequestThumbnail();
+  }
+}
+
 - (void)close {
   if (_page) {
     _page->Close();
@@ -748,6 +758,10 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
       pictureInPicture:kind
                   view:view
                   rect:NSMakeRect(event.x, event.y, event.width, event.height)];
+}
+
+- (void)pageThumbnail:(NSImage*)thumbnail {
+  [self.delegate page:self thumbnailReady:thumbnail];
 }
 
 - (void)pageCloseCancelled {
