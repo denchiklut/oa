@@ -62,6 +62,7 @@ final class WindowLayoutController: NSViewController {
     /// pager slides the panel's page in and cuts it away. Only a swipe moves it.
     private var runningFade: SpaceCreationFade?
     @ObservationIgnored private let fadeTicker = DisplayLinkTicker()
+    @ObservationIgnored private var fadeStart: CFTimeInterval = 0
     /// The panel as last laid out, to fade it out once it has gone.
     @ObservationIgnored private var laidOutSpaceCreation: SpaceCreationState?
     /// As open-arch: a swipe away from the panel selects its Space once the slide is done, so the panel goes with
@@ -320,7 +321,7 @@ final class WindowLayoutController: NSViewController {
             fadeSpaceCreation(SpaceCreationFade(panel: closing, themes: (.default, theme(of: target))))
             pager.select(target, animated: false, notifying: false)
         } else if target == .spaceCreation, pager.selectedPageID != target {
-            guard runningFade == nil else { return updateDock() }
+            if let runningFade, runningFade.panel == nil { return updateDock() }
             // As Arc: the Library goes at once. The Space's page stays and settles back from a pull as the panel
             // fades in over it. The fade starts first, as selecting lays the pages out again from here.
             let space = WindowLayoutPage.space(model.selectedSpaceID)
@@ -388,10 +389,12 @@ final class WindowLayoutController: NSViewController {
         model.beginSpaceCreation()
     }
 
+    /// A fade that turns one still running back starts from as far as that one had got.
     private func fadeSpaceCreation(_ fade: SpaceCreationFade) {
         guard let window = view.window else { return finishSpaceCreationFade() }
-        runningFade = fade
-        let start = CACurrentMediaTime()
+        let now = CACurrentMediaTime()
+        let start = runningFade == nil ? now : now - max(0, 0.25 - (now - fadeStart))
+        (runningFade, fadeStart) = (fade, start)
         fadeTicker.start(in: window) { [weak self] in
             guard let self, runningFade != nil else { return }
             let time = CACurrentMediaTime() - start
@@ -403,9 +406,8 @@ final class WindowLayoutController: NSViewController {
 
     private func finishSpaceCreationFade() {
         fadeTicker.stop()
-        let opened = runningFade?.panel == nil
         runningFade = nil
-        if opened, model.spaceCreation != nil, pendingSpaceSelection == nil {
+        if model.spaceCreation != nil, pendingSpaceSelection == nil, pager.selectedPageID != .spaceCreation {
             pager.select(.spaceCreation, animated: false, notifying: false)
         }
     }
