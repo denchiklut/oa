@@ -13,9 +13,8 @@ struct WindowSurface: View {
     /// Its colours cross-fade with these, as measured on Arc, uniformly and in encoded values, and its material goes
     /// over this one's at the progress where the two differ, as Arc's foreground frame does.
     var next: Next?
-    /// Arc's floating sidebar draws the theme over a blur of what the window shows under it, not of the desktop,
-    /// and the part of the window's colours that lies under it, as measured: `window` is the window in its space.
-    var floats = false
+    /// The window in this surface's space, for a part of the window's background drawn elsewhere: the floating
+    /// sidebar's.
     var window: CGRect?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.controlActiveState) private var activeState
@@ -23,9 +22,8 @@ struct WindowSurface: View {
 
     var body: some View {
         ZStack {
-            WindowMaterial(
-                material: floats ? .popover : background.material, blendingMode: floats ? .withinWindow : .behindWindow)
-            if !floats, let next, next.background.material != background.material {
+            WindowMaterial(material: background.material, blendingMode: .behindWindow)
+            if let next, next.background.material != background.material {
                 WindowMaterial(material: next.background.material, blendingMode: .behindWindow)
                     .opacity(next.progress)
             }

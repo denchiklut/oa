@@ -475,12 +475,11 @@ final class WindowLayoutController: NSViewController {
             }
         case (_, .locked):
             // As open-arch: the panel stays over the page, which is see-through when empty, until the page has
-            // slid out from under it. Its blur then fades into the window's material rather than stepping to it.
+            // slid out from under it.
             withAnimation(Self.lockAnimation) {
                 sidebarPresentation = new
             } completion: { [weak self] in
-                guard self?.sidebarPresentation == .locked else { return }
-                withAnimation(Self.lockAnimation) { self?.sidebarIsPanel = false }
+                if self?.sidebarPresentation == .locked { self?.sidebarIsPanel = false }
             }
         default:
             withAnimation(Self.hoverAnimation) { sidebarPresentation = new }
