@@ -27,6 +27,7 @@
 #include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
+#include "chrome/browser/metrics/critical_user_journeys/features.h"
 #include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
@@ -205,6 +206,7 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   // Chrome UI that CHECKs without a BrowserView.
   DisableFeature(command_line,
                  security_interstitials::features::kHttpsFirstDialogUi);
+  DisableFeature(command_line, metrics::kSettingsGlowupJourneys);
   for (const base::Feature* toast :
        {&toast_features::kLinkCopiedToast, &toast_features::kImageCopiedToast,
         &toast_features::kVideoFrameCopiedToast,
