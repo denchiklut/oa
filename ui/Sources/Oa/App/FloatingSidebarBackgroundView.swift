@@ -11,19 +11,25 @@ struct FloatingSidebarBackgroundView<Sidebar: View>: View {
     let next: WindowSurface.Next?
     let windowSize: CGSize
     let isFloating: Bool
+    /// Still a panel while docking, as open-arch: the blur stays under the sidebar until the page has slid out from
+    /// under it, while the shape goes with `isFloating`.
+    let isPanel: Bool
     @ViewBuilder let sidebar: Sidebar
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: isFloating ? Self.cornerRadius : 0)
-        let inset = WindowLayoutController.floatingInset
+        let inset = isFloating ? WindowLayoutController.floatingInset : 0
         sidebar
             // The blur, rim and shadow are gone while docked rather than clear: under a docked sidebar that fades
             // or shrinks they would show.
             .background {
-                if isFloating {
+                if isPanel {
                     WindowSurface(
                         background: background, next: next, floats: true,
-                        window: CGRect(origin: CGPoint(x: -inset, y: -inset), size: windowSize))
+                        window: CGRect(origin: CGPoint(x: -inset, y: -inset), size: windowSize)
+                    )
+                    // At once when undocking, as open-arch: half faded, the page sliding under it would show.
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 }
             }
             .clipShape(shape)
@@ -45,6 +51,6 @@ struct FloatingSidebarBackgroundView<Sidebar: View>: View {
                         }
                 }
             }
-            .padding([.top, .leading, .bottom], isFloating ? inset : 0)
+            .padding([.top, .leading, .bottom], inset)
     }
 }
