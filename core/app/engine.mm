@@ -30,6 +30,7 @@
 #include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/profiler/main_thread_stack_sampling_profiler.h"
@@ -226,6 +227,10 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
                               base::NumberToString(static_cast<int>(
                                   AutocompleteProvider::Type::kHistoryQuick)),
                               "%3A10"}));
+
+  // Chrome gives a tab its thumbnail helper only with this, which is off on
+  // macOS. A page's thumbnails come from that helper, as ArcCore's do.
+  EnableFeature(command_line, features::kTabHoverCardImages.name);
 
   ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder();
   StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder();

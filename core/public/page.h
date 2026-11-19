@@ -225,6 +225,10 @@ class Page {
     // sizes it.
     virtual void OnPagePictureInPicture(const PictureInPictureEvent& event,
                                         void* ns_view) = 0;
+    // Every thumbnail Chrome's tab thumbnail helper makes of the page, whoever
+    // asked, as ArcCore's thumbnailReady: an NSImage of one pixel a point that
+    // lives only for the call.
+    virtual void OnPageThumbnail(void* ns_image) = 0;
     // A beforeunload handler kept the page after Close().
     virtual void OnPageCloseCancelled() = 0;
     virtual void OnPageClosed(std::optional<int32_t> session_id) = 0;
@@ -272,6 +276,13 @@ class Page {
   // Fails while the page has nothing drawn, for example when no window shows
   // it.
   virtual void Snapshot(SnapshotCallback callback) = 0;
+  // As ArcCore's request, into Chrome's tab thumbnail: a visible page's whole
+  // view is copied, scaled down to Chrome's tab preview size and sent through
+  // JPEG, in the display's colours; a hidden one gives its stored thumbnail
+  // again. Nothing comes between a navigation's start and its commit. The
+  // observer gets the result, and from the first request on every other
+  // thumbnail too.
+  virtual void RequestThumbnail() = 0;
   // Through the page's media session, as ArcCore's request: false when the
   // page has a picture-in-picture video already, has no media session, or the
   // session can't enter picture-in-picture. Playing or not is the app's check.

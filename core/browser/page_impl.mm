@@ -25,6 +25,8 @@
 #include "chrome/browser/ui/browser_live_tab_context.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
+#include "chrome/browser/ui/tabs/tab_style.h"
+#include "chrome/browser/ui/thumbnails/thumbnail_tab_helper.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/security_state/core/security_state.h"
 #include "components/sessions/content/content_live_tab.h"
@@ -39,6 +41,7 @@
 #include "content/public/browser/render_frame_metadata_provider.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/site_instance.h"
+#include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/referrer.h"
 #include "content/public/common/url_constants.h"
@@ -51,7 +54,9 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/image/image.h"
+#include "ui/gfx/image/image_skia.h"
 #include "url/gurl.h"
 
 namespace oa {
@@ -245,6 +250,7 @@ void PageImpl::Bind(content::WebContents* contents) {
 
 void PageImpl::Unbind() {
   favicon_observation_.Reset();
+  thumbnail_subscription_.reset();
   if (content::WebContents* contents = web_contents()) {
     contents->RemoveUserData(kPageMarkerKey);
     if (contents->GetDelegate() == this) {
@@ -526,6 +532,75 @@ void PageImpl::Snapshot(SnapshotCallback callback) {
             callback((__bridge void*)image);
           },
           std::move(callback))));
+}
+
+ThumbnailImage* PageImpl::Thumbnail() const {
+  content::WebContents* contents = web_contents();
+  tabs::TabInterface* tab =
+      contents ? tabs::TabInterface::MaybeGetFromContents(contents) : nullptr;
+  ThumbnailTabHelper* helper = tab ? ThumbnailTabHelper::From(tab) : nullptr;
+  return helper ? helper->thumbnail().get() : nullptr;
+}
+
+void PageImpl::RequestThumbnail() {
+  ThumbnailImage* thumbnail = Thumbnail();
+  if (!thumbnail) {
+    return;
+  }
+  if (!thumbnail_subscription_) {
+    thumbnail_subscription_ = thumbnail->Subscribe();
+    thumbnail_subscription_->SetUncompressedImageCallback(base::BindRepeating(
+        &PageImpl::OnThumbnail, weak_factory_.GetWeakPtr()));
+  }
+  if (web_contents()->GetVisibility() != content::Visibility::VISIBLE) {
+    thumbnail->RequestThumbnailImage();
+    return;
+  }
+  // Chrome's helper copies a visible page only without the strips a scrollbar
+  // would take at its right and bottom. ArcCore's copies the whole view, so
+  // the copy is made here by the helper's other rules
+  // (ThumbnailTabHelper::GetInitialCaptureInfo): none before the navigation
+  // commits, and at the smallest size of the view's shape that covers Chrome's
+  // tab preview.
+  content::RenderWidgetHostView* view =
+      web_contents()->GetRenderWidgetHostView();
+  if (thumbnail->GetCaptureReadiness() ==
+          ThumbnailImage::CaptureReadiness::kNotReady ||
+      !view || !view->IsSurfaceAvailableForCopy()) {
+    return;
+  }
+  const gfx::Size size = view->GetViewBounds().size();
+  if (size.IsEmpty()) {
+    return;
+  }
+  gfx::Size preview = TabStyle::Get()->GetPreviewImageSize();
+  preview.SetToMax({175, 175});
+  const gfx::Size least = gfx::ScaleToFlooredSize(
+      preview, std::max(view->GetDeviceScaleFactor(), 1.5f));
+  const float ratio =
+      std::min(static_cast<float>(size.width()) / least.width(),
+               static_cast<float>(size.height()) / least.height());
+  // The result can arrive on another sequence.
+  view->CopyFromSurface(
+      gfx::Rect(size),
+      ratio <= 1 ? size : gfx::ScaleToCeiledSize(size, 1 / ratio),
+      base::TimeDelta(),
+      base::BindPostTaskToCurrentDefault(base::BindOnce(
+          &PageImpl::StoreThumbnail, weak_factory_.GetWeakPtr())));
+}
+
+void PageImpl::StoreThumbnail(const content::CopyFromSurfaceResult& result) {
+  ThumbnailImage* thumbnail = Thumbnail();
+  if (thumbnail && result.has_value() && !result->bitmap.drawsNothing()) {
+    thumbnail->AssignSkBitmap(result->bitmap);
+  }
+}
+
+void PageImpl::OnThumbnail(gfx::ImageSkia image) {
+  if (image.isNull() || !observer_) {
+    return;
+  }
+  observer_->OnPageThumbnail((__bridge void*)gfx::Image(image).ToNSImage());
 }
 
 bool PageImpl::RequestPictureInPicture() {

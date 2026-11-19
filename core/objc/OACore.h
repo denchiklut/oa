@@ -147,6 +147,9 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
     pictureInPicture:(OAPagePictureInPictureEvent)event
                 view:(nullable NSView*)view
                 rect:(NSRect)rect;
+// Every thumbnail Chrome makes of the page, as ArcCore's
+// webContents:thumbnailReady:, at one pixel a point.
+- (void)page:(OAPage*)page thumbnailReady:(NSImage*)thumbnail;
 - (void)pageDidCancelClose:(OAPage*)page;
 // `sessionID` is -1 when Chrome kept no record of the tab.
 - (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;
@@ -186,6 +189,9 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
 // Nil while the page has nothing drawn, for example when no window shows it.
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable image))completion;
+// As ArcCore's requestThumbnail:. The delegate gets the result, and from the
+// first request on every other thumbnail Chrome makes of the page.
+- (void)requestThumbnail;
 // NO when the engine refuses: the page has a picture-in-picture video already,
 // or no media session that can enter picture-in-picture.
 - (BOOL)requestPictureInPicture;
