@@ -343,11 +343,14 @@ final class WindowModel {
         let profileID = editing ? selectedTabID.flatMap { state.profile(containing: $0)?.id } : space?.profileID
         guard let profileID else { return }
         commandBar?.autocomplete.stop()
-        let autocomplete = autocompletes[profileID] ?? engine.browserContext(id: profileID).makeAutocomplete()
+        let context = engine.browserContext(id: profileID)
+        let autocomplete = autocompletes[profileID] ?? context.makeAutocomplete()
         autocompletes[profileID] = autocomplete
+        let preferences = context.preferences
         let bar = CommandBar(
             destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
-            currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks
+            currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks,
+            searchEngines: { preferences.activeSearchEngines }
         ) { [weak self] in self?.commandBarTabs ?? [] }
         bar.perform = { [weak self, destination = bar.destination] in self?.perform($0, in: destination) }
         commandBar = bar
@@ -561,9 +564,10 @@ final class WindowModel {
         store.edit { $0.setSpaceIcon(icon, for: spaceID) }
     }
 
-    /// As Arc: the new profile has its Favorites from the start, and Settings selects it.
+    /// As Arc: the new profile has its Favorites and site searches from the start, and Settings selects it.
     func createProfile(named name: String) async -> UUID? {
         guard let profileID = await engine.createBrowserContext(userVisibleName: name) else { return nil }
+        SiteSearchMigrations.seed(engine.browserContext(id: profileID))
         store.edit { $0.addProfile(profileID) }
         store.didCreateProfile(profileID)
         return profileID

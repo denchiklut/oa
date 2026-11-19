@@ -61,6 +61,10 @@ final class CommandBar {
     let currentURL: URL?
     /// What the user typed; the field may show more.
     private(set) var text: String
+    /// As Arc's `scopedSearchType`: Site Search, where Chromium searches only this engine.
+    private(set) var scope: SearchEngine?
+    /// The text typed before Site Search, which Backspace puts back.
+    @ObservationIgnored private var textBeforeScope = ""
     /// Ranked once for each change of the text, of Chromium's answer and of the Space's tabs.
     private(set) var rows: [Row] = []
     /// Oa's own: the highlight stays on its row when results change; Arc keeps a numeric position.
@@ -77,6 +81,7 @@ final class CommandBar {
     @ObservationIgnored private let profileID: UUID
     @ObservationIgnored private let picks: CommandBarPicks
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
+    @ObservationIgnored private let searchEngines: () -> [SearchEngine]
     @ObservationIgnored private var startedFresh = false
     /// As Arc's `pendingSelection`: Return pressed before Chromium answered the text, with its modifiers.
     @ObservationIgnored private var pendingReturn: NSEvent.ModifierFlags?
@@ -84,7 +89,8 @@ final class CommandBar {
 
     init(
         destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, profileID: UUID,
-        picks: CommandBarPicks, tabs: @escaping () -> [CommandBarRanking.Tab]
+        picks: CommandBarPicks, searchEngines: @escaping () -> [SearchEngine],
+        tabs: @escaping () -> [CommandBarRanking.Tab]
     ) {
         self.destination = destination
         self.autocomplete = autocomplete
@@ -92,6 +98,7 @@ final class CommandBar {
         self.profileID = profileID
         self.picks = picks
         self.tabs = tabs
+        self.searchEngines = searchEngines
         let text = currentURL?.absoluteString ?? ""
         self.text = text
         selection = NSRange(location: text.utf16.count, length: 0)
@@ -199,6 +206,61 @@ final class CommandBar {
         acceptedText = string
     }
 
+    /// As Arc's "Search YouTube · Tab": the typed text, not the field's, starts an active engine's keyword. The
+    /// shortest keyword wins, then the engines' order.
+    var siteSearchHint: SearchEngine? {
+        guard scope == nil, !text.isEmpty else { return nil }
+        let typed = text.lowercased()
+        return searchEngines().filter { $0.keyword.lowercased().hasPrefix(typed) }
+            .min { $0.keyword.count < $1.keyword.count }
+    }
+
+    /// As Arc's Tab: into the hinted Site Search with an empty query, or out of Site Search while its query is empty.
+    func pressTab() {
+        if scope != nil {
+            if text.isEmpty { leaveScope(text: "", caret: 0) }
+        } else if let engine = siteSearchHint {
+            enterScope(engine)
+        }
+    }
+
+    func enterScope(_ engine: SearchEngine) {
+        textBeforeScope = text
+        scope = engine
+        replaceText("", caret: 0)
+    }
+
+    /// As Arc's Backspace at the field's start: out of Site Search, the text from before it joined to the query and
+    /// the caret between them.
+    func leaveScopeBackward() {
+        let before = textBeforeScope
+        leaveScope(text: before + text, caret: before.utf16.count)
+    }
+
+    /// As Arc's Escape: out of Site Search with the field cleared. False outside it.
+    func cancelScope() -> Bool {
+        guard scope != nil else { return false }
+        leaveScope(text: "", caret: 0)
+        return true
+    }
+
+    private func leaveScope(text: String, caret: Int) {
+        scope = nil
+        replaceText(text, caret: caret)
+    }
+
+    private func replaceText(_ text: String, caret: Int) {
+        edited = true
+        selectedKey = nil
+        acceptedText = nil
+        suppressesInline = true
+        selection = NSRange(location: caret, length: 0)
+        self.text = text
+        pendingReturn = nil
+        if text.isEmpty { autocomplete.stop() } else { start(preventsInlineAutocomplete: true) }
+        rank()
+    }
+
     /// As Arc's ⇧⌦: a past search goes, while a page from history stays.
     func deleteSelectedRow() {
         guard rows.indices.contains(selectedIndex), case .match(let match) = rows[selectedIndex].source else { return }
@@ -234,12 +296,18 @@ final class CommandBar {
         }
     }
 
-    /// As Arc: open tabs only when the bar makes a new tab, as Switch to Tab.
+    /// As Arc: open tabs only when the bar makes a new tab, as Switch to Tab. In Site Search only the engine's search
+    /// for the text and its past searches, as Arc's `isEligibleInSiteSearch`.
     private func rank() {
+        let answered = !text.isEmpty && autocomplete.input?.keyword == scope?.keyword
+        func kept(_ matches: [AutocompleteMatch]) -> [AutocompleteMatch] {
+            guard answered else { return [] }
+            return scope == nil ? matches : matches.filter { [.searchOtherEngine, .searchHistory].contains($0.kind) }
+        }
         let ranked = CommandBarRanking.rank(
-            query: text, matches: text.isEmpty ? [] : autocomplete.matches,
-            additionalMatches: text.isEmpty ? [] : autocomplete.additionalMatches,
-            tabs: destination == .newTab ? tabs() : [], lastPick: picks.pick(for: text, in: profileID), now: .now)
+            query: text, matches: kept(autocomplete.matches), additionalMatches: kept(autocomplete.additionalMatches),
+            tabs: destination == .newTab && scope == nil ? tabs() : [],
+            lastPick: picks.pick(for: text, in: profileID), now: .now)
         if ranked != rows { rows = ranked }
         let output = suggestedField.string
         guard output != lastSuggestedText else { return }
@@ -257,7 +325,7 @@ final class CommandBar {
             AutocompleteInput(
                 text: text, cursorPosition: min(selection.location, text.utf16.count),
                 preventsInlineAutocomplete: preventsInlineAutocomplete, startsFresh: !startedFresh,
-                currentURL: destination == .currentTab ? currentURL : nil))
+                keyword: scope?.keyword, currentURL: destination == .currentTab ? currentURL : nil))
         startedFresh = true
     }
 }
@@ -292,14 +360,37 @@ struct CommandBarView: View {
         .onChange(of: tabs) { _, _ in bar.answered() }
     }
 
+    /// As Arc's `autoActivatedEngineURLToPrimaryColor`, by the engine's URL; any other engine takes the row
+    /// highlight's colour.
+    private var scopeColor: Color {
+        guard let scope = bar.scope,
+            let site = SearchEngine.enginesToAutoActivate.first(where: { $0.engine.url == scope.url })
+        else { return .accentColor }
+        return Color(nsColor: srgb(site.color))
+    }
+
     private func card(_ rows: [CommandBar.Row]) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: icon(for: rows.indices.contains(bar.selectedIndex) ? rows[bar.selectedIndex] : nil))
+                if let scope = bar.scope {
+                    Image(systemName: "magnifyingglass")
+                        .frame(width: 18)
+                    // As measured in Arc: 13 pt from the icon, the field 11.5 pt after it.
+                    SiteSearchPill(name: scope.name, color: scopeColor)
+                        .padding(.leading, 3)
+                        .padding(.trailing, 1.5)
+                } else {
+                    Image(
+                        systemName: icon(for: rows.indices.contains(bar.selectedIndex) ? rows[bar.selectedIndex] : nil)
+                    )
                     .foregroundStyle(.secondary)
                     .frame(width: 18)
+                }
                 CommandBarField(bar: bar, model: model, isUnderDialog: model.dialog != nil)
                     .frame(height: 23)
+                if let hint = bar.siteSearchHint {
+                    SiteSearchHint(name: hint.name) { bar.enterScope(hint) }
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -325,7 +416,7 @@ struct CommandBarView: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         CommandBarRow(
                             row: row, icon: icon(for: row), favicon: favicon(for: row),
-                            selected: index == bar.selectedIndex
+                            selected: index == bar.selectedIndex, tint: bar.scope == nil ? nil : scopeColor
                         )
                         .id(index)
                         .onTapGesture {
@@ -360,6 +451,8 @@ private struct CommandBarRow: View {
     let icon: String
     let favicon: NSImage?
     let selected: Bool
+    /// As Arc in Site Search: the highlight in the pill's colour, with white text.
+    let tint: Color?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -367,7 +460,8 @@ private struct CommandBarRow: View {
                 if let favicon {
                     Image(nsImage: favicon).resizable().scaledToFit()
                 } else {
-                    Image(systemName: icon).foregroundStyle(.secondary)
+                    Image(systemName: icon).foregroundStyle(
+                        isTinted ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                 }
             }
             .frame(width: 18, height: 18)
@@ -389,17 +483,76 @@ private struct CommandBarRow: View {
         }
         .padding(.horizontal, 8)
         .frame(height: CommandBarView.rowHeight)
-        .background(selected ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .foregroundStyle(isTinted ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .background(
+            selected ? tint ?? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 8)
+        )
         .contentShape(Rectangle())
     }
+
+    private var isTinted: Bool { selected && tint != nil }
 
     private var address: String? {
         row.isHistory || row.kind == .navSuggest ? row.url.map(CommandBarRanking.readable) : nil
     }
 }
 
+/// As measured in Arc: a 24 pt capsule in the engine's colour, glowing about 5 pt around, with its name in white.
+private struct SiteSearchPill: View {
+    let name: String
+    let color: Color
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(color, in: Capsule())
+            .shadow(color: color.opacity(0.35), radius: 5)
+    }
+}
+
+/// As measured in Arc: "Search YouTube" with a 30 × 24 pt "Tab" key cap; a click enters Site Search as Tab does.
+private struct SiteSearchHint: View {
+    private static let label = Color(nsColor: dynamic(0xA8A7A8, 0x656565))
+    private static let keyFill = Color(nsColor: dynamic(0xEEEDEE, 0x252525))
+    private static let keyText = Color(nsColor: dynamic(0x777677, 0xB5B5B5))
+
+    let name: String
+    let enter: () -> Void
+
+    var body: some View {
+        Button(action: enter) {
+            HStack(spacing: 8) {
+                Text("Search \(name)")
+                    .foregroundStyle(Self.label)
+                Text("Tab")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Self.keyText)
+                    .frame(width: 30, height: 24)
+                    .background(Self.keyFill, in: RoundedRectangle(cornerRadius: 4))
+            }
+            .font(.system(size: 14))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Search \(name), Tab")
+    }
+}
+
+private func srgb(_ hex: UInt32) -> NSColor {
+    NSColor(
+        srgbRed: CGFloat(hex >> 16 & 0xFF) / 255, green: CGFloat(hex >> 8 & 0xFF) / 255,
+        blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+}
+
+private func dynamic(_ light: UInt32, _ dark: UInt32) -> NSColor {
+    NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? srgb(dark) : srgb(light) }
+}
+
 /// An AppKit field, which a SwiftUI one can't be: it takes focus over a web page, selects an inline completion and
-/// reports the caret, the arrow keys, Return, Esc and ⇧⌦.
+/// reports the caret, the arrow keys, Return, Esc, Tab, Backspace at its start and ⇧⌦.
 private struct CommandBarField: NSViewRepresentable {
     let bar: CommandBar
     let model: WindowModel
@@ -408,13 +561,15 @@ private struct CommandBarField: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(bar: bar, model: model) }
 
+    private var placeholder: String { bar.scope == nil ? "Search or Enter URL…" : "Search…" }
+
     func makeNSView(context: Context) -> NSTextField {
         let field = NSTextField()
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
         field.font = .systemFont(ofSize: 17)
-        field.placeholderString = "Search or Enter URL…"
+        field.placeholderString = placeholder
         field.cell?.usesSingleLineMode = true
         field.cell?.isScrollable = true
         field.delegate = context.coordinator
@@ -432,6 +587,7 @@ private struct CommandBarField: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         let coordinator = context.coordinator
         coordinator.bar = bar
+        field.placeholderString = placeholder
         if isUnderDialog != coordinator.isUnderDialog {
             coordinator.isUnderDialog = isUnderDialog
             if !isUnderDialog { coordinator.focus() }
@@ -512,8 +668,11 @@ private struct CommandBarField: NSViewRepresentable {
             // ⌘Return and ⌘Enter on the keypad.
             case Selector(("noop:")) where [36, 76].contains(NSApp.currentEvent?.keyCode):
                 bar.submit(NSApp.currentEvent?.modifierFlags ?? [])
-            case #selector(NSResponder.cancelOperation(_:)): model.closeCommandBar()
-            case #selector(NSResponder.insertTab(_:)): break
+            case #selector(NSResponder.cancelOperation(_:)): if !bar.cancelScope() { model.closeCommandBar() }
+            case #selector(NSResponder.insertTab(_:)): bar.pressTab()
+            case #selector(NSResponder.deleteBackward(_:))
+            where bar.scope != nil && textView.selectedRange() == NSRange(location: 0, length: 0):
+                bar.leaveScopeBackward()
             case #selector(NSResponder.deleteForward(_:))
             where NSApp.currentEvent?.modifierFlags.contains(.shift) == true:
                 bar.deleteSelectedRow()

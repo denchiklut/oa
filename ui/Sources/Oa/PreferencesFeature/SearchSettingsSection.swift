@@ -7,16 +7,21 @@ struct SearchSettingsSection: View {
     let preferences: any BrowserContextPreferences
     let openSearchSettings: () -> Void
 
+    /// As Arc's popup: Chromium's prepopulated engines, and the default when it is another.
+    private var defaultChoices: [SearchEngine] {
+        preferences.searchEngines.filter { $0.isPrepopulated || $0 == preferences.defaultSearchEngine }
+    }
+
     var body: some View {
         PreferencesPaneSection {
             PreferenceRow {
                 Text("Search engine")
             } control: {
                 Picker("Search engine", selection: engine) {
-                    ForEach(preferences.searchEngines) { Text($0.name).tag(Optional($0.keyword)) }
+                    ForEach(defaultChoices) { Text($0.name).tag(Optional($0.keyword)) }
                 }
                 .preferencePopup()
-                .disabled(preferences.searchEngines.isEmpty)
+                .disabled(defaultChoices.isEmpty)
             }
             PreferenceRowDivider()
             PreferenceRow {

@@ -52,6 +52,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
 
     private func finishLaunching() {
         isLaunching = false
+        SiteSearchMigrations.seedOnce(in: engine)
         let saved = store.savedWindows
         if windows.isEmpty {
             if saved.isEmpty { openWindow() } else { saved.forEach { openWindow(restoring: $0) } }
