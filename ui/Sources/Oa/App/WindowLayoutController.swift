@@ -79,6 +79,7 @@ final class WindowLayoutController: NSViewController {
         pager.positionUpdateHandler = { [weak self] in
             self?.pagerPosition = $0
             self?.updatePull()
+            self?.updateDock()
         }
         pager.pageSelectionHandler = { [weak self] page in
             guard let model = self?.model else { return }
@@ -154,12 +155,33 @@ final class WindowLayoutController: NSViewController {
     }
 
     /// The dock's share of the Create a Space slot. Oa's own, by the author's decision, as open-arch's
-    /// `draftProgress`: 1 while the panel is open, so the dock springs in on its own rather than with the pull's
-    /// one-frame cut, and the pager's progress once a swipe has moved the panel.
-    var dockSpaceCreationProgress: CGFloat {
-        model.spaceCreation == nil ? 0 : spaceCreationSwiped ? spaceCreationProgress : 1
-    }
+    /// `draftProgress`: it eases to 1 as the panel opens, on its own rather than with the pull's one-frame cut, and
+    /// follows the pager once a swipe has moved the panel. Driven here rather than by a SwiftUI animation, which
+    /// would also ease the dock's colours from the theme the panel has already cut away from.
+    private(set) var dockSpaceCreationProgress: CGFloat = 0
     private var spaceCreationSwiped = false
+    @ObservationIgnored private let dockTicker = DisplayLinkTicker()
+    @ObservationIgnored private var dockEase: (from: CGFloat, to: CGFloat, start: CFTimeInterval)?
+
+    /// As measured in open-arch: the dock settles in about 0.2 s, easing in and out.
+    private func updateDock() {
+        if spaceCreationSwiped, model.spaceCreation != nil {
+            (dockEase, dockSpaceCreationProgress) = (nil, spaceCreationProgress)
+            return dockTicker.stop()
+        }
+        let target: CGFloat = model.spaceCreation == nil ? 0 : 1
+        guard target != (dockEase?.to ?? dockSpaceCreationProgress) else { return }
+        guard let window = view.window else { return dockSpaceCreationProgress = target }
+        dockEase = (dockSpaceCreationProgress, target, CACurrentMediaTime())
+        dockTicker.start(in: window) { [weak self] in
+            guard let self, let ease = dockEase else { return }
+            let t = min((CACurrentMediaTime() - ease.start) / 0.2, 1)
+            dockSpaceCreationProgress = ease.from + (ease.to - ease.from) * t * t * (3 - 2 * t)
+            guard t == 1 else { return }
+            dockEase = nil
+            dockTicker.stop()
+        }
+    }
 
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
     var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
@@ -255,6 +277,7 @@ final class WindowLayoutController: NSViewController {
         if !pager.isTracking, !pager.isAnimating, restingSpaceID != model.selectedSpaceID {
             restingSpaceID = model.selectedSpaceID
         }
+        updateDock()
     }
 
     private func updatePull() {
