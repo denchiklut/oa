@@ -174,6 +174,38 @@ open the engine's results as any row does.
 - **Esc** leaves and clears the field; a second Esc closes the bar.
 - **Tab** with an empty query leaves; with a query it does nothing.
 
+The pill and the highlighted row take the engine's colour by Arc's rule, looked
+up each time a Site Search is entered and never cached:
+
+1. **Arc's table.** An engine Chromium didn't ship gets the colour of the
+   popular site search with the same URL, else of the first one whose host its
+   own host is or is under. So a YouTube engine on `www.youtube.com` is red
+   whatever its template, and one on `youtube.com` isn't. The colour is drawn
+   as it is, read as Display P3 as Arc reads it.
+2. **The site's favicon.** Otherwise the profile's history is searched for the
+   engine's host, and the newest page's stored favicon gives its dominant
+   colour: ColorThief's quantizer over every tenth pixel, the first of five
+   colours that isn't nearly black, darkened by 0.15 of HSL lightness. It
+   arrives a frame after the pill. The pill is drawn in the `focus` colour of
+   the theme that colour generates, light or dark by the app's appearance. The
+   history search matches words, so a host can find another site's page, as in
+   Arc.
+3. **Neither.** The window theme's `focus`.
+
+The pill has continuous 12 pt corners and a shadow in its colour. The pill,
+text and icon change in one frame; the bar bounces whenever a Site Search is
+entered or left, a dip to about 0.988 of its size and back in 0.2 s. On entry
+a block of the colour behind the card blurs out over 1.2 s, starting when the
+colour is known. Oa's card lets more of it through than Arc's, so the card
+tints more strongly in the first frames.
+
+| Layer | What it holds |
+| --- | --- |
+| UI | The pill, the scoped row, the bounce and the glow, with the theme generator that window themes use |
+| DevKit | The table lookup on `SearchEngine`, the quantizer (`DominantColor`), and a profile's history search and stored favicon on `BrowserContext` |
+| Core | Chromium's history text search and favicon service for a profile |
+| Chromium | Patch 0015, which lets `chrome://settings` activate an engine or make one the default without a `BrowserView` |
+
 Not done yet, as later slices: the pill's menu (remove, change, manage),
 Space as a trigger, and an empty scope's recent searches.
 

@@ -179,6 +179,38 @@ window and kept across launches, under Arc's key `topBarURLEnabled`. A page's
 loading shows as Arc's pill, in the margin above the card; that place is Oa's
 own.
 
+The toolbar takes its page's colour by Arc's rule. The colour is one pixel of a
+thumbnail of the page: its top right corner, one row down. The thumbnail is
+Chrome's tab preview of the whole page view, scaled down and sent through JPEG,
+so a hairline at the page's edge blends into its neighbours. Nothing else is
+read: not `theme-color`, not the favicon, not the page's background.
+
+- **When.** A page is sampled while its toolbar shows it: 250 ms after it
+  starts being shown, unless its colour is under half an hour old; after a
+  document loads; and a second after a navigation inside one. Scrolling and a
+  page that recolours itself don't sample. The two load moments are Oa's own,
+  set near the delays measured in Arc, whose triggers aren't decoded.
+- **Settling.** Every sample shows at once. One that differs from the sample
+  before it, and from the host's cached colour, asks for another 400 ms later,
+  at most four times.
+- **Cache.** A settled colour is kept by a hash of the page's host, in the
+  app's defaults under Arc's key `TopBarColorCache` and in its format, the 50
+  used last. It shows when a toolbar meets a page it has no sample for; with
+  neither, the toolbar starts white.
+- **Drawing.** The colour is drawn as sampled. A sample fades in over 0.18 s; a
+  tab switch and showing the toolbar don't animate. Text and icons are white at
+  0.75 or black at 0.6, whichever contrasts more with the colour by WCAG, white
+  on a tie, whatever the app's appearance. With no page the empty card shows
+  through, which is Oa's own.
+- **Toolbar hidden.** Nothing takes the colour and no page is sampled.
+
+| Layer | What it holds |
+| --- | --- |
+| UI | The toolbar's colour, its fade and its foreground |
+| DevKit | `TopBarColorClient`: per-page state, the sample rule, the requests and the cache; a page's `requestThumbnail()` and `thumbnail` event |
+| Core | The thumbnail request, into Chrome's own tab thumbnail, and an event for every thumbnail Chrome makes of the page |
+| Chromium | Nothing: `features::kTabHoverCardImages` is turned on, which gives a tab its thumbnail helper |
+
 The prompt always hangs from wherever the address is. With the toolbar hidden
 and the Library open there is no address on screen, so, as in Arc, no prompt is
 drawn and the request waits. Oa shows it when the Library closes; Arc holds it
@@ -197,9 +229,8 @@ dark gradient, chosen by the system's appearance. Oa has no theme editor yet,
 so a theme gets into a Space only through the saved sidebar. The four textures
 are Oa's own, generated to match Arc's.
 
-Stand-ins, each waiting for its own slice: the toolbar takes the system's
-colours until Oa reads the page's top band; and the sidebar's field opens the
-centred command bar, where Arc anchors a narrow one over the field.
+A stand-in, waiting for its own slice: the sidebar's field opens the centred
+command bar, where Arc anchors a narrow one over the field.
 
 ## Page presentation and recovery
 
