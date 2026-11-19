@@ -45,10 +45,11 @@ final class WindowLayoutController: NSViewController {
     private var restingSpaceID: UUID?
     /// The Spaces' order as the Library opened.
     private var homeOrder: [UUID]?
-    /// Arc's new-Space pull: the overshoot past the last Space's page over 22.5 pt fills the feedback view's ring and
-    /// arms it, over 15 pt slides it in, through a spring of 0.4 s at 0.8 that the display link drives, as SwiftUI's
-    /// don't run while the pager tracks the swipe. Released more than 0.1 s after arming, it opens the Create a Space
-    /// panel.
+    /// Arc's new-Space pull: the overshoot past the last Space's page fills the feedback view's ring and arms it, and
+    /// slides it in, through a spring of 0.4 s at 0.8 that the display link drives, as SwiftUI's don't run while the
+    /// pager tracks the swipe. Released more than 0.1 s after arming, it opens the Create a Space panel. Oa's own, by
+    /// the author's decision: it arms at 20 pt of the rubber-banded page and slides in by 13.5, about a tenth less of
+    /// the fingers' travel than Arc's 22.5 and 15.
     private(set) var spaceCreationPull: (progress: CGFloat, reveal: CGFloat) = (0, 0)
     @ObservationIgnored private var pullTarget: CGFloat = 0
     @ObservationIgnored private var pullVelocity: CGFloat = 0
@@ -351,8 +352,8 @@ final class WindowLayoutController: NSViewController {
         if pullAllowed == true, let last = pager.pages.last, let origin = pager.origin(of: last.id) {
             overshoot = max(pagerPosition - origin, 0)
         }
-        spaceCreationPull.progress = min(overshoot / 22.5, 1)
-        springPull(to: min(overshoot / 15, 1))
+        spaceCreationPull.progress = min(overshoot / 20, 1)
+        springPull(to: min(overshoot / 13.5, 1))
         guard pager.isTracking else { return }
         let armed = spaceCreationPull.progress >= 1
         guard armed != (pullArmedAt != nil) else { return }
