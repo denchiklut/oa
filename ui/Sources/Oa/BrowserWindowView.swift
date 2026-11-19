@@ -104,7 +104,8 @@ struct BrowserWindowView: View {
         }
         .overlay {
             if let bar = model.commandBar {
-                CommandBarView(model: model, bar: bar).id(ObjectIdentifier(bar))
+                CommandBarView(model: model, bar: bar, themeFocus: theme.semanticColorPalette[colorScheme].focus.color)
+                    .id(ObjectIdentifier(bar))
             }
         }
         // As Arc: over the command bar, which ⌘T opens behind a dialog.

@@ -350,7 +350,8 @@ final class WindowModel {
         let bar = CommandBar(
             destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
             currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks,
-            searchEngines: { preferences.activeSearchEngines }
+            searchEngines: { preferences.activeSearchEngines },
+            dominantColor: { await context.siteSearchDominantColor(host: $0) }
         ) { [weak self] in self?.commandBarTabs ?? [] }
         bar.perform = { [weak self, destination = bar.destination] in self?.perform($0, in: destination) }
         commandBar = bar
