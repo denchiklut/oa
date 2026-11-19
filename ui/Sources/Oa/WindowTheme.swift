@@ -201,19 +201,18 @@ extension WindowTheme {
 }
 
 extension WindowTheme {
-    /// The Create a Space panel's theme until one is chosen. Oa's own, by the author's decision: open-arch's unthemed
-    /// Space, an opaque indigo whatever the system's appearance, its top and bottom stops (0.15, 0.14, 0.23) and
-    /// (0.17, 0.13, 0.2) met in the middle, where Arc's is its default theme.
+    /// The Create a Space panel's theme until one is chosen: Arc's default. Oa's own, by the author's decision: its
+    /// light side whatever the system's appearance, drawn as in a light window, as the author's Arc shows it with its
+    /// own appearance set to light under a dark macOS. Arc picks the side by that app-wide setting, which Oa doesn't
+    /// have.
     static let spaceCreation: WindowTheme = {
         var theme = WindowTheme.default
-        let indigo = ThemeColor(red: 0.16, green: 0.135, blue: 0.215, alpha: 1)
-        theme.background = .single(
-            Background(
-                style: .color(.basicColor(BasicColor(color: indigo, translucencyStyle: .dark))),
-                contentOverBackgroundAppearance: .dark, isVibrant: false))
-        theme.semanticColorPalette = .single(theme.semanticColorPalette[.dark])
+        theme.background = .single(spaceCreationBackground)
+        theme.semanticColorPalette = .single(theme.semanticColorPalette[.light])
         return theme
     }()
+
+    static let spaceCreationBackground = WindowTheme.default.background[.light]
 }
 
 extension WindowTheme.PrimaryColorPalette {

@@ -55,12 +55,14 @@ struct WindowSurface: View {
 
     private func layer(_ background: WindowTheme.Background) -> some View {
         ZStack {
-            // Arc's underlay goes by the window's appearance, not the theme's: black under a dark one.
+            // Arc's underlay goes by the window's appearance, not the theme's: black under a dark one. The Create a
+            // Space panel's is drawn as in a light window.
             let alpha = background.alpha
             let underlay = min(alpha, 0.5)
+            let dark = colorScheme == .dark && background != WindowTheme.spaceCreationBackground
             ThemeColors(
                 style: background.style, alpha: alpha,
-                underlay: colorScheme == .dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay))
+                underlay: dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay))
             texture(background.modifiers)
         }
         .compositingGroup()
