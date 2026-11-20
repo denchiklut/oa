@@ -45,12 +45,12 @@ final class ModalItemSwitcher {
         focusedItemID = visible[(index + offset + visible.count) % visible.count]
     }
 
-    /// The list built again after a close, never empty. Oa's own: the focus stays on its tab, or on the card that
-    /// took a closed one's place; where Arc leaves it wasn't traced.
+    /// The list built again after a close, never empty. As Arc's `updateModalItemSwitcher`, the focus keeps its
+    /// place in the row and not its tab, so it lands on the card that took a closed one's place.
     func update(itemIDs: [UUID]) {
         let index = visibleItemIDs.firstIndex(of: focusedItemID) ?? 0
         self.itemIDs = Array(itemIDs.prefix(Self.maxNumberOfItemsToDisplay + 1))
         let visible = visibleItemIDs
-        if !visible.contains(focusedItemID) { focusedItemID = visible[min(index, visible.count - 1)] }
+        focusedItemID = visible[min(index, visible.count - 1)]
     }
 }
