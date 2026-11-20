@@ -31,12 +31,21 @@ struct PeekView: View {
         }
         .onAppear { page.activate() }
         .onChange(of: page.id) { _, _ in page.activate() }
+        .onChange(of: showsToolbar ? page.id : nil, initial: true) { _, _ in
+            model.trackPeekToolbarPage(showsToolbar ? page : nil)
+        }
+        .onDisappear { model.trackPeekToolbarPage(nil) }
     }
 
-    /// Arc's `ModalV2HostView` card: the page's colour shows through the toolbar, which needs View ▸ Show Toolbar.
+    /// Arc's `ModalV2HostView` card. Its toolbar needs View ▸ Show Toolbar.
     private var panel: some View {
         VStack(spacing: 0) {
-            if showsToolbar { toolbar.frame(height: 31.5) }
+            if showsToolbar {
+                PeekToolbar(model: model, page: page)
+                    .frame(height: 31.5)
+                    .id(page.id)
+                    .transition(.identity)
+            }
             PageContentView(page: page)
         }
         .pageRootBackground(page)
@@ -48,7 +57,33 @@ struct PeekView: View {
         }
     }
 
-    private var toolbar: some View {
+    /// As measured in Arc: 13 pt right of the panel at a 43.5 pt pitch.
+    private var controls: some View {
+        VStack(spacing: 10) {
+            ModalButton(symbol: "xmark", size: 12, help: "Close Peek", action: model.closePeek)
+            ModalButton(
+                symbol: "arrow.up.left.and.arrow.down.right", size: 14.5, help: "Expand Peek", action: model.expandPeek)
+        }
+    }
+}
+
+/// The Peek's toolbar. In Arc a Peek's page sits in an ordinary window content controller, whose top bar is the
+/// window's own `TopBarPanelContainerView`, so it takes its page's colour, starts and fades as the window's toolbar
+/// does.
+private struct PeekToolbar: View {
+    let model: WindowModel
+    let page: any Page
+    @State private var initialColor: NSColor
+
+    init(model: WindowModel, page: any Page) {
+        self.model = model
+        self.page = page
+        _initialColor = State(initialValue: model.topBarColors.startingColor(for: page))
+    }
+
+    var body: some View {
+        let color = model.topBarColors.appliedColor(for: page) ?? initialColor
+        let theme = Theme(toolbarOver: color)
         HStack(spacing: 8) {
             Button {
                 page.goBack()
@@ -68,7 +103,7 @@ struct PeekView: View {
                 Image(systemName: page.isLoading ? "xmark" : "arrow.clockwise")
             }
             Spacer()
-            address
+            address(theme)
                 .popover(isPresented: model.permissionPromptBinding(inPeekToolbar: true), arrowEdge: .bottom) {
                     if let request = model.promptedPermissionRequest {
                         PermissionRequestView(model: model, request: request)
@@ -77,27 +112,25 @@ struct PeekView: View {
             Spacer()
             Color.clear.frame(width: 78)
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(ChromeButtonStyle())
         .padding(.horizontal, 10)
+        .frame(maxHeight: .infinity)
+        .environment(\.theme, theme)
+        .background(Color(nsColor: color))
+        .animation(.easeInOut(duration: 0.18), value: color)
     }
 
-    private var address: Text {
+    /// As Arc's toolbar builds its URL: the host in 13 pt medium, the rest in 13 pt regular at five sixths of the
+    /// host's alpha.
+    private func address(_ theme: Theme) -> Text {
         guard let url = page.url else { return Text("") }
         let host = url.host() ?? ""
         var rest = url.absoluteString
         if let scheme = url.scheme { rest = String(rest.dropFirst(scheme.count + 3)) }
         if rest.hasPrefix(host) { rest = String(rest.dropFirst(host.count)) }
         if rest == "/" { rest = "" }
-        return Text(host).fontWeight(.semibold) + Text(rest).foregroundStyle(.secondary)
-    }
-
-    /// As measured in Arc: 13 pt right of the panel at a 43.5 pt pitch.
-    private var controls: some View {
-        VStack(spacing: 10) {
-            ModalButton(symbol: "xmark", size: 12, help: "Close Peek", action: model.closePeek)
-            ModalButton(
-                symbol: "arrow.up.left.and.arrow.down.right", size: 14.5, help: "Expand Peek", action: model.expandPeek)
-        }
+        return Text(host).font(.system(size: 13, weight: .medium)).foregroundStyle(theme.addressText)
+            + Text(rest).font(.system(size: 13)).foregroundStyle(theme.addressText.opacity(5.0 / 6))
     }
 }
 

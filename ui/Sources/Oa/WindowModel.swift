@@ -360,9 +360,19 @@ final class WindowModel {
 
     var topBarColors: TopBarColorClient { store.topBarColors }
 
-    /// As Arc tracks the pages its toolbars show: only this window's page, and only while its toolbar is shown.
+    /// As Arc's `updateTopBarTrackedContent`: the window's visible pages, its Peek's among them, while their
+    /// toolbar is shown.
     func trackToolbarPage(_ shown: Bool) {
-        store.topBarColors.setTrackedPage(shown ? page : nil, for: id)
+        store.topBarColors.setTrackedPage(shown ? page : nil, for: ToolbarOwner.window(id))
+    }
+
+    func trackPeekToolbarPage(_ page: (any Page)?) {
+        store.topBarColors.setTrackedPage(page, for: ToolbarOwner.peek(id))
+    }
+
+    private enum ToolbarOwner: Hashable {
+        case window(UUID)
+        case peek(UUID)
     }
 
     func closeCommandBar() {
