@@ -96,7 +96,8 @@ final class ModalItemSwitcherWindowController {
         parent.addChildWindow(window, ordered: .above)
     }
 
-    /// Oa's own: a card under a pointer at rest doesn't take the focus from the keys as the panel comes up under it.
+    /// As Arc's cards, which follow the pointer's moves and not its presence (ARCUI's `onMouseMove`): a card that
+    /// comes up under a pointer at rest doesn't take the focus.
     private func hover(_ id: UUID) {
         if NSEvent.mouseLocation != pointerWhenShown { switcher.focus(id) }
     }

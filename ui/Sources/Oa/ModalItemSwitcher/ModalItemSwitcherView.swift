@@ -77,11 +77,9 @@ private struct ModalItemSwitcherItemView: View {
         .contentShape(Rectangle())
     }
 
-    /// The Space's theme colour as fitted to Arc's fill over its default theme: the palette's darkest entry at a
-    /// quarter in light, and its `hover` in dark.
+    /// As Arc's focused card: the Space palette's `hover` in dark, and its `focus` at half in light.
     private var selectionFill: Color {
-        let theme = model.space?.theme ?? .default
-        return scheme == .dark
-            ? theme.semanticColorPalette[.dark].hover.color : theme.primaryColorPalette.shadedDark.opacity(0.25).color
+        let palette = (model.space?.theme ?? .default).semanticColorPalette[scheme]
+        return scheme == .dark ? palette.hover.color : palette.focus.opacity(0.5).color
     }
 }
