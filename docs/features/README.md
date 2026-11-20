@@ -39,7 +39,7 @@ that every online integration still works.
 - [Downloads](downloads/README.md)
 - [Page context menu](context-menu/README.md)
 - [Command bar and history](command-bar/README.md)
-- [Shortcuts over a page](key-bindings/README.md)
+- [Shortcuts](key-bindings/README.md)
 - [Extensions](extensions/README.md)
 - [Picture-in-picture](picture-in-picture/README.md)
 - [Recent-tab switcher](tab-switcher/README.md)
@@ -155,10 +155,10 @@ Sources: Arc [2022][arc22], [2023][arc23].
 | Enable/disable search suggestions per profile | ✅ | ✅ |
 | Delete individual command-bar suggestions † | ✅ | ✅ |
 | Keyboard shortcuts | ✅ | ☐ |
-| Customize keyboard shortcuts | ✅ | ☐ |
-| Search/filter shortcut settings | ✅ | ☐ |
-| Reset individual/all keyboard shortcuts | ✅ | ☐ |
-| Prefer Arc versus website keyboard shortcuts | ✅ | ☐ |
+| Customize keyboard shortcuts | ✅ | ✅ |
+| Search/filter shortcut settings | ✅ | ✅ |
+| Reset individual/all keyboard shortcuts | ✅ | ✅ |
+| Prefer Arc versus website keyboard shortcuts | ✅ | ✅ |
 | Include/exclude Favorites in numbered navigation † | ✅ | ☐ |
 | Choose ninth-item versus last-item shortcut behavior † | ✅ | ☐ |
 | Copy the current URL with confirmation | ✅ | ☐ |
