@@ -209,7 +209,7 @@ read: not `theme-color`, not the favicon, not the page's background.
 | UI | The toolbar's colour, its fade and its foreground |
 | DevKit | `TopBarColorClient`: per-page state, the sample rule, the requests and the cache; a page's `requestThumbnail()` and `thumbnail` event |
 | Core | The thumbnail request, into Chrome's own tab thumbnail, and an event for every thumbnail Chrome makes of the page |
-| Chromium | Nothing: `features::kTabHoverCardImages` is turned on, which gives a tab its thumbnail helper |
+| Chromium | `features::kTabHoverCardImages` is turned on, which gives a tab its thumbnail helper; patches 0016 and 0017 give its thumbnails ArcCore's rules ([Recent-tab switcher](../tab-switcher/README.md)) |
 
 The prompt always hangs from wherever the address is. With the toolbar hidden
 and the Library open there is no address on screen, so, as in Arc, no prompt is

@@ -60,19 +60,37 @@ picture of the page, its favicon and a one-line title; the highlight a rounded
 rectangle in the Space palette's `hover` in dark and its `focus` at half
 strength in light, as Arc's. Nothing animates.
 
-The shown page's picture is asked for when the shortcut is pressed. Every other
-tab has the picture taken when its page was last hidden in a window, kept in
-memory by DevKit's `ContentSnapshotClient`, named after Arc's cache. Like
-Arc's it holds 20 pages and drops the one stored or shown longest ago. A tab
-with no page, or whose picture was dropped, has a blank card.
+## The pictures
 
-Arc fills its cache differently: its engine makes tab thumbnails (Chromium's
-`ThumbnailTabHelper` behind ArcCore's thumbnails generator) and the app stores
-each one it is handed. Oa's Core reports such thumbnails too, and so far only
-the toolbar's colour uses them. The switcher doesn't yet: the UI asks for the
-page's `snapshot` as it hides the page and keeps it at up to 600 pixels across.
-So a card shows its tab as it was left, where Arc's shows it as it was after
-its last load, URL change or return.
+A card's picture is the engine's thumbnail of its tab's page, as in Arc:
+Chromium's own tab thumbnail, the page's whole view scaled down to about 512
+pixels across. The app starts observing a page's thumbnails the first time a
+window shows it, and keeps every one the engine makes in DevKit's
+`ContentSnapshotClient`, named after Arc's cache. Like Arc's it holds 20 pages
+in memory and drops the one stored or shown longest ago. The card draws the
+picture across its width from the top.
+
+The engine makes a thumbnail at these moments, and a card shows the newest:
+
+| When | As in Arc? |
+| --- | --- |
+| just after a document's `load` event, shown or hidden | yes |
+| just after a URL change inside the document (`pushState`, `replaceState`, a fragment), shown or hidden | yes |
+| ⌃⇥ or ⌃⇧⇥ pressed, for the shown tab | yes |
+| as the tab stops being the window's shown one | Arc asks for it then too, but gets it only when the tab is next shown |
+
+So a card shows its tab as it was left. Arc's shows it as it was when it last
+came back, loaded or changed its URL, since its copy of a leaving tab arrives
+late; Oa keeps the picture the same request gives it at once. Nothing else
+makes one: not time on screen, a repaint, a title change or a subframe's load.
+
+A tab that was never shown has a blank card, as in Arc, and so does a tab
+with no page or one whose picture was dropped. While a document loads, its tab
+has no thumbnail. After a relaunch the cache starts empty.
+
+Two Chromium patches carry ArcCore's changes to the thumbnail code: when a
+thumbnail is ready (0016), and the whole view copied without the strips a
+scrollbar would take (0017).
 
 ## What is left out
 
@@ -84,4 +102,6 @@ its last load, URL change or return.
 | Layer | Holds |
 | --- | --- |
 | UI | `ModalItemSwitcher/`: the cards' state, the window controller with the key monitor, the panel view; the list, commit and close in `WindowModel` |
-| DevKit | `ContentSnapshotClient`: a page's last picture, taken through its `snapshot` |
+| DevKit | `ContentSnapshotClient`: a page's last thumbnail; a page's `startObservingThumbnails()`, `stopObservingThumbnails()` and `requestThumbnail()` |
+| Core | Observing a page's thumbnails, which subscribes to Chrome's tab thumbnail; the request, through Chrome's own copy |
+| Chromium | Patches 0016 and 0017: ArcCore's readiness rule and whole-view copy |
