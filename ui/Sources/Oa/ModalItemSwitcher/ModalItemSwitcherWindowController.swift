@@ -15,7 +15,7 @@ final class ModalItemSwitcherWindowController {
     private var window: NSWindow?
     private var monitor: Any?
     private var presentationTimer: Timer?
-    private var resignObserver: NSObjectProtocol?
+    private var resignObservers: [NSObjectProtocol] = []
     private var pointerWhenShown = NSPoint.zero
 
     init(model: WindowModel, switcher: ModalItemSwitcher, parent: NSWindow) {
@@ -24,17 +24,22 @@ final class ModalItemSwitcherWindowController {
         self.parent = parent
     }
 
-    /// As Arc's: with the shortcut's modifiers already up, the tap commits at once.
+    /// As Arc's, which tests the modifiers of its shortcuts together: with Control and Shift both up already, the tap
+    /// commits at once, and Shift alone still down keeps the switcher until it goes.
     func beginObservingEvents() {
         guard !NSEvent.modifierFlags.isDisjoint(with: [.control, .shift]) else { return complete(selecting: true) }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             self?.handle(event)
             return nil
         }
-        resignObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.complete(selecting: false) }
+        // Arc's ends on the app resigning active. Oa's own, where Arc's is unknown: also on its window giving up the
+        // keyboard, so that the monitor doesn't take another window's keys.
+        var endings: [(NSNotification.Name, AnyObject?)] = [(NSApplication.didResignActiveNotification, nil)]
+        if let parent { endings.append((NSWindow.didResignKeyNotification, parent)) }
+        resignObservers = endings.map { name, object in
+            NotificationCenter.default.addObserver(forName: name, object: object, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.complete(selecting: false) }
+            }
         }
         let delay = Self.presentationDelay - Date().timeIntervalSince(switcher.presentationRequestTime)
         guard delay > 0 else { return showWindow() }
@@ -47,8 +52,8 @@ final class ModalItemSwitcherWindowController {
         presentationTimer?.invalidate()
         monitor.map(NSEvent.removeMonitor)
         monitor = nil
-        resignObserver.map(NotificationCenter.default.removeObserver)
-        resignObserver = nil
+        resignObservers.forEach(NotificationCenter.default.removeObserver)
+        resignObservers = []
         guard let window else { return }
         self.window = nil
         window.parent?.removeChildWindow(window)
