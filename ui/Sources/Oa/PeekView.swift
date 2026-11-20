@@ -46,7 +46,7 @@ struct PeekView: View {
                     .id(page.id)
                     .transition(.identity)
             }
-            PageContentView(page: page)
+            PageContentView(page: page).toast(of: model, on: page)
         }
         .pageRootBackground(page)
         .background(ARCUIColor.gray1)

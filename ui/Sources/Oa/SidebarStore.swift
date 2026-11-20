@@ -31,6 +31,8 @@ final class SidebarStore {
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored let keyBindings: KeyBindingsClient
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
+    /// Settings ▸ Shortcuts on a binding.
+    @ObservationIgnored var showShortcut: (String) -> Void = { _ in }
 
     init(directory: URL) {
         persistence = SidebarPersistence(directory: directory)

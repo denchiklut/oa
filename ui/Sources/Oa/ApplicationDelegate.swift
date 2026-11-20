@@ -39,6 +39,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         pictureInPicture = PictureInPicture(store: store)
         super.init()
         store.didCreateProfile = { [weak self] in self?.settings.profileCreated($0) }
+        store.showShortcut = { [weak self] in self?.settings.showShortcuts(selecting: $0) }
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) { AppAppearance.restore() }
