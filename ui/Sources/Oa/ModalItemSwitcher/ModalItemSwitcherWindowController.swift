@@ -78,11 +78,14 @@ final class ModalItemSwitcherWindowController {
     }
 
     /// As Arc's monitor: the modifiers of any of its shortcuts keep the switcher, any other change of modifiers
-    /// commits, and a key it has no use for is swallowed.
+    /// commits, and a key it has no use for is swallowed. Oa's own: with every modifier up it commits even when a
+    /// shortcut has none, a function key's, where Arc's monitor as read would keep the switcher and the keyboard.
     private func handle(_ event: NSEvent) {
         guard event.type == .keyDown else {
             let modifiers = event.modifierFlags.intersection(ARCKeyboardShortcut.modifierMask)
-            if !shortcuts.contains(where: { $0.modifiers == modifiers }) { complete(selecting: true) }
+            if modifiers.isEmpty || !shortcuts.contains(where: { $0.modifiers == modifiers }) {
+                complete(selecting: true)
+            }
             return
         }
         let shortcut = ARCKeyboardShortcut(event: event)
