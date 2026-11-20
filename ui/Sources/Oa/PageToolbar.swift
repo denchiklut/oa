@@ -1,3 +1,4 @@
+import DevKit
 import SwiftUI
 
 /// Arc's toolbar along the top of the page, shown by View ▸ Show Toolbar: back, forward and reload at its start,
@@ -20,9 +21,7 @@ struct PageToolbar: View {
 
     init(model: WindowModel) {
         self.model = model
-        let colors = model.topBarColors
-        _initialColor = State(
-            initialValue: model.page.map { colors.appliedColor(for: $0) ?? colors.cachedColor(for: $0) ?? .white })
+        _initialColor = State(initialValue: model.page.map(model.topBarColors.startingColor))
     }
 
     var body: some View {
@@ -68,5 +67,12 @@ struct PageToolbar: View {
         // As Arc: a sample fades in; the colour a page's toolbar starts with doesn't.
         .animation(.easeInOut(duration: 0.18), value: color)
         .background(WindowDragRegion())
+    }
+}
+
+extension TopBarColorClient {
+    /// As Arc's toolbar when its page changes: the page's last colour, else its host's cached one, else white.
+    func startingColor(for page: any Page) -> NSColor {
+        appliedColor(for: page) ?? cachedColor(for: page) ?? .white
     }
 }
