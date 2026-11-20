@@ -28,7 +28,9 @@ Arc's `Gray1` card, near-white or near-black. Over the card is the page's root
 background colour, as under the window's page card, so a page that draws nothing
 shows its own colour. The 31.5 pt toolbar with back, forward, reload or stop and
 the scheme-less URL with the host in bold shows only with View ▸ Show Toolbar,
-as Arc's does, and has no fill of its own: the page's colour shows through it.
+as Arc's does, and takes its page's colour and inks as the
+[window's toolbar](../sidebar/README.md) does: in Arc it is the same view, and
+the Peek's page is sampled as any page a toolbar shows.
 With the toolbar hidden the page starts at the Peek's top and the sidebar stands
 in for the toolbar: its URL field shows the Peek's host, its back, forward and
 reload act on the Peek, and a permission prompt from the Peek hangs from the
