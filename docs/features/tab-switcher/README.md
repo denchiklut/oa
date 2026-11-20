@@ -21,7 +21,8 @@ that has shown nothing in the profile has no switcher.
 
 ## Keys
 
-The two shortcuts are hidden items of the Tabs menu, as in Arc's. They close the
+The two shortcuts are hidden items of the Tabs menu, as in Arc's, and a page
+never gets them ([Shortcuts over a page](../key-bindings/README.md)). They close the
 command bar first. ⌃⇥ starts on the second card, which is the previous tab, or
 on the first when the window shows no tab; ⌃⇧⇥ starts on the last card.
 
@@ -79,9 +80,6 @@ its last load, URL change or return.
 - The shortcuts can't be rebound; Arc's Settings ▸ Shortcuts can.
 - Arc's flag-gated Cycle Tab Forward and Backward, which walk a per-Space
   history with no panel.
-- A page that cancels every key press also keeps ⌃⇥ from the menu, as it does
-  any of Oa's shortcuts: the page gets a key first and the menu only what it
-  leaves.
 
 | Layer | Holds |
 | --- | --- |
