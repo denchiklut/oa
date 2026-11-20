@@ -199,6 +199,10 @@ final class ChromiumPage: Page, MediaSession {
         if page != nil { continuation.yield(.thumbnail(thumbnail)) }
     }
 
+    fileprivate func consumedKey(_ keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
+        if page != nil { continuation.yield(.consumedKey(keyCode: keyCode, modifierFlags: modifierFlags)) }
+    }
+
     fileprivate func closeCancelled() {
         if page != nil { continuation.yield(.closeCancelled) }
     }
@@ -286,6 +290,10 @@ final class PageDelegate: NSObject, CorePageDelegate {
     }
 
     func page(_ page: CorePage, thumbnailReady thumbnail: NSImage) { content?.thumbnailReady(thumbnail) }
+
+    func page(_ page: CorePage, didConsumeKey keyCode: UInt16, withModifierFlags modifierFlags: NSEvent.ModifierFlags) {
+        content?.consumedKey(keyCode, modifierFlags: modifierFlags)
+    }
 
     func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }
 
