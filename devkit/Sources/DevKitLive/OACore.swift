@@ -277,6 +277,8 @@ import AppKit
     @objc(page:pictureInPicture:view:rect:)
     func page(_ page: CorePage, pictureInPicture event: Int, view: NSView?, rect: NSRect)
     @objc(page:thumbnailReady:) func page(_ page: CorePage, thumbnailReady thumbnail: NSImage)
+    @objc(page:didConsumeKey:withModifierFlags:)
+    func page(_ page: CorePage, didConsumeKey keyCode: UInt16, withModifierFlags modifierFlags: NSEvent.ModifierFlags)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
     @objc(page:didCloseWithSessionID:) func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32)
 }

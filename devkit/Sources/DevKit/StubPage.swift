@@ -37,6 +37,8 @@ final class StubPage: Page, MediaSession {
     }
     /// A `beforeunload` handler that wants to stay, as a page with unsaved changes.
     var asksBeforeClosing = false
+    /// Stands for a page whose key handler cancels every key: it takes a shortcut the menu would get after it.
+    var consumesShortcuts = false
     let events: AsyncStream<PageEvent>
 
     private var history: [URL] = []
@@ -59,6 +61,11 @@ final class StubPage: Page, MediaSession {
         view.movedToWindow = { [weak self] in self?.showPendingDialog() }
         view.leavingWindow = { [weak self] in self?.makeThumbnail() }
         view.contextMenu = { [weak self] in self?.contextMenu() }
+        view.consumesKey = { [weak self] event in
+            guard let self, consumesShortcuts else { return false }
+            continuation?.yield(.consumedKey(keyCode: event.keyCode, modifierFlags: event.modifierFlags))
+            return true
+        }
         return view
     }()
 
@@ -560,8 +567,14 @@ private final class StubHostingView: NSHostingView<StubPageView> {
     var movedToWindow: () -> Void = {}
     var leavingWindow: () -> Void = {}
     var contextMenu: () -> NSMenu? = { nil }
+    var consumesKey: (NSEvent) -> Bool = { _ in false }
 
     override func menu(for event: NSEvent) -> NSMenu? { contextMenu() }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.type == .keyDown, window != nil, !isHiddenOrHasHiddenAncestor, consumesKey(event) { return true }
+        return super.performKeyEquivalent(with: event)
+    }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
@@ -610,6 +623,8 @@ private struct StubPageView: View {
                             Button("Prompt") { page.prompt() }
                             Button("Alert in 3 s") { page.alertLater() }
                             Toggle("Ask before closing", isOn: Bindable(page).asksBeforeClosing)
+                                .toggleStyle(.checkbox)
+                            Toggle("Consume shortcuts", isOn: Bindable(page).consumesShortcuts)
                                 .toggleStyle(.checkbox)
                         }
                         HStack(spacing: 16) {

@@ -606,6 +606,9 @@ public enum PageEvent {
     case extensionRequestClosed(PageExtensionRequest)
     /// What the engine asks of the app's window for the page's picture-in-picture video.
     case pictureInPicture(PictureInPictureEvent)
+    /// The page consumed a key down, as ADK's `webContents:didConsumeKey:withModifierFlags:underlyingEventType:`
+    /// for a raw key down: the key's code and the modifier flags of its event.
+    case consumedKey(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags)
     /// A thumbnail the engine made of the page, at one pixel a point, as ADK's thumbnail listeners get every one:
     /// the answer to `requestThumbnail()`, or one the engine made by itself while observed.
     case thumbnail(NSImage)
