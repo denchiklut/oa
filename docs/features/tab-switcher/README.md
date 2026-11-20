@@ -41,7 +41,8 @@ Releasing Control selects the highlighted tab the way a click on it would, and
 switches Space when the tab is in another. Releasing only Shift keeps the
 switcher. Moving the pointer over a card highlights it and a click selects it.
 The app losing focus, or the window changing Space, closes the switcher with
-nothing selected.
+nothing selected. So does the window giving up the keyboard to another window,
+which is Oa's own: what Arc does then is unknown.
 
 As in Arc, the cards follow the pointer's moves, so a card that comes up under
 a pointer at rest isn't highlighted, and after a close the highlight keeps its
@@ -66,8 +67,11 @@ with no page, or whose picture was dropped, has a blank card.
 
 Arc fills its cache differently: its engine makes tab thumbnails (Chromium's
 `ThumbnailTabHelper` behind ArcCore's thumbnails generator) and the app stores
-each one it is handed. Oa has no such seam in Core yet, so the UI asks for the
+each one it is handed. Oa's Core reports such thumbnails too, and so far only
+the toolbar's colour uses them. The switcher doesn't yet: the UI asks for the
 page's `snapshot` as it hides the page and keeps it at up to 600 pixels across.
+So a card shows its tab as it was left, where Arc's shows it as it was after
+its last load, URL change or return.
 
 ## What is left out
 
