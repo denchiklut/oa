@@ -149,6 +149,8 @@ Implementation details live with their features:
   Controls section, the consent panels, action popups and the pages an extension opens.
 - <a id="picture-in-picture"></a>[Picture-in-picture](../../features/picture-in-picture/README.md): when a
   playing video leaves its tab for the floating window, and the window and its controls.
+- <a id="tab-switcher"></a>[Recent-tab switcher](../../features/tab-switcher/README.md): ⌃⇥ over a window's
+  recent tabs, its keys and its panel.
 
 The [feature inventory](../../features/README.md) tracks candidate capabilities
 separately; its unchecked entries have not been assessed for implementation.
