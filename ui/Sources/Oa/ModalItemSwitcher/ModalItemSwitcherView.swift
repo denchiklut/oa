@@ -51,7 +51,8 @@ private struct ModalItemSwitcherItemView: View {
     var body: some View {
         VStack(spacing: 12) {
             Color(white: scheme == .dark ? 0.11 : 0.973)
-                .overlay {
+                // As Arc's card: the picture fills the width from its top.
+                .overlay(alignment: .top) {
                     if let snapshot = model.snapshot(for: tab) {
                         Image(nsImage: snapshot).resizable().interpolation(.high).scaledToFill()
                     }

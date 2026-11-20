@@ -248,12 +248,12 @@ final class WindowModel {
     }
 
     /// As Arc's presentation updates, which its picture-in-picture rule answers: the page the window shows changed.
-    /// The page it stops showing leaves its picture for the switcher's card, asked for while it still draws here.
+    /// A page's thumbnails are observed from the first time a window shows it, as Arc starts when its view loads.
     private func presentationChanged() {
         let page = page
         guard presentedPage?.id != page?.id else { return }
         for changed in [presentedPage, page] { changed.map(pictureInPicture.presentationChanged) }
-        if let hidden = presentedPage, holds(hidden.id) { store.contentSnapshots.capture(hidden) }
+        page?.startObservingThumbnails()
         presentedPage = page
     }
 
@@ -490,13 +490,13 @@ final class WindowModel {
     }
 
     /// As Arc's `onHighlightAdjacentRecentTab`: the command bar closes and the switcher comes up over the recent
-    /// tabs, or not at all with none. The shown page is asked for a fresh picture, the others have their last.
+    /// tabs, or not at all with none. The shown page is asked for a fresh thumbnail, the others have their last.
     func highlightAdjacentRecentTab(_ target: ModalItemSwitcher.Target) {
         closeCommandBar()
         guard modalItemSwitcher == nil,
             let switcher = ModalItemSwitcher(itemIDs: recentTabIDs, currentID: selectedTabID, target: target)
         else { return }
-        if let page { store.contentSnapshots.capture(page) }
+        page?.requestThumbnail()
         modalItemSwitcher = switcher
     }
 
@@ -1337,8 +1337,11 @@ final class WindowModel {
         case .extensionRequestClosed(let request):
             return forget(request)
         case .thumbnail(let thumbnail):
-            // As Arc's WebContent feature: every thumbnail goes to the toolbar's colours, which sample a shown page's.
-            return store.topBarColors.process(thumbnail: thumbnail, ofPage: pageID, at: page(id: pageID)?.url)
+            // As Arc's thumbnail listener: every thumbnail is kept as its page's snapshot, then goes to the toolbar's
+            // colours, which sample a shown page's.
+            let page = page(id: pageID)
+            if let page { store.contentSnapshots.storeSnapshot(thumbnail, of: page) }
+            return store.topBarColors.process(thumbnail: thumbnail, ofPage: pageID, at: page?.url)
         case .closeCancelled:
             return closeCancelled(pageID)
         case .wantsActivation:
