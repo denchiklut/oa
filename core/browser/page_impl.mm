@@ -47,7 +47,10 @@
 #include "oa/browser/window_browser.h"
 #include "services/media_session/public/mojom/media_session.mojom.h"
 #include "skia/ext/skia_utils_mac.h"
+#include "third_party/blink/public/common/input/web_input_event.h"
+#include "third_party/blink/public/common/input/web_keyboard_event.h"
 #include "third_party/blink/public/common/renderer_preferences/renderer_preferences.h"
+#include "third_party/blink/public/mojom/input/input_event_result.mojom-shared.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
@@ -248,11 +251,13 @@ void PageImpl::Bind(content::WebContents* contents) {
   if (observing_thumbnails_) {
     SubscribeToThumbnail();
   }
+  ObserveMainWidget();
 }
 
 void PageImpl::Unbind() {
   favicon_observation_.Reset();
   thumbnail_subscription_.reset();
+  StopObservingMainWidget();
   if (content::WebContents* contents = web_contents()) {
     contents->RemoveUserData(kPageMarkerKey);
     if (contents->GetDelegate() == this) {
@@ -966,7 +971,72 @@ void PageImpl::OnFrameMetadata(content::RenderWidgetHost* widget_host,
   page->NotifyStateChanged();
 }
 
+void PageImpl::RenderFrameHostChanged(content::RenderFrameHost* old_host,
+                                      content::RenderFrameHost* new_host) {
+  ObserveMainWidget();
+}
+
+// The acks of the primary main frame's widget are watched for the keys the
+// page consumes. Chromium's own observer, Oa's choice: where ArcCore takes
+// its report from isn't known, and Arc too hears nothing from a frame in
+// another process, which has a widget of its own.
+void PageImpl::ObserveMainWidget() {
+  content::RenderWidgetHost* widget_host =
+      web_contents()
+          ? web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost()
+          : nullptr;
+  if (main_widget_observation_.GetSource() == widget_host) {
+    return;
+  }
+  StopObservingMainWidget();
+  if (widget_host) {
+    widget_host->AddInputEventObserver(this);
+    main_widget_observation_.Observe(widget_host);
+  }
+}
+
+void PageImpl::StopObservingMainWidget() {
+  if (main_widget_observation_.IsObserving()) {
+    main_widget_observation_.GetSource()->RemoveInputEventObserver(this);
+    main_widget_observation_.Reset();
+  }
+}
+
+void PageImpl::RenderWidgetHostDestroyed(
+    content::RenderWidgetHost* widget_host) {
+  StopObservingMainWidget();
+}
+
+// As ArcCore's didConsumeKey for the event Arc acts on: a raw key down, with
+// the NSEvent's key code and modifier flags.
+void PageImpl::OnInputEventAck(const content::RenderWidgetHost& widget_host,
+                               blink::mojom::InputEventResultSource source,
+                               blink::mojom::InputEventResultState state,
+                               const blink::WebInputEvent& event) {
+  if (!observer_ || state != blink::mojom::InputEventResultState::kConsumed ||
+      event.GetType() != blink::WebInputEvent::Type::kRawKeyDown) {
+    return;
+  }
+  NSEventModifierFlags flags = 0;
+  if (event.GetModifiers() & blink::WebInputEvent::kShiftKey) {
+    flags |= NSEventModifierFlagShift;
+  }
+  if (event.GetModifiers() & blink::WebInputEvent::kControlKey) {
+    flags |= NSEventModifierFlagControl;
+  }
+  if (event.GetModifiers() & blink::WebInputEvent::kAltKey) {
+    flags |= NSEventModifierFlagOption;
+  }
+  if (event.GetModifiers() & blink::WebInputEvent::kMetaKey) {
+    flags |= NSEventModifierFlagCommand;
+  }
+  observer_->OnPageConsumedKey(
+      static_cast<const blink::WebKeyboardEvent&>(event).native_key_code,
+      flags);
+}
+
 void PageImpl::WebContentsDestroyed() {
+  StopObservingMainWidget();
   favicon_observation_.Reset();
   set_inner(nullptr);
   NotifyClosed(std::nullopt);

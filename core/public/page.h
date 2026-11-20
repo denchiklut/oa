@@ -229,6 +229,11 @@ class Page {
     // asked, as ArcCore's thumbnailReady: an NSImage of one pixel a point that
     // lives only for the call.
     virtual void OnPageThumbnail(void* ns_image) = 0;
+    // The page consumed a raw key down, as ArcCore's didConsumeKey: the key's
+    // code and its NSEvent modifier flags. Only the page's main widget
+    // reports, so a key consumed in a frame of another process doesn't.
+    virtual void OnPageConsumedKey(int key_code,
+                                   unsigned long modifier_flags) = 0;
     // A beforeunload handler kept the page after Close().
     virtual void OnPageCloseCancelled() = 0;
     virtual void OnPageClosed(std::optional<int32_t> session_id) = 0;

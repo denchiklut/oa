@@ -33,6 +33,8 @@
 - (void)pagePictureInPicture:(const oa::PictureInPictureEvent&)event
                         view:(nullable NSView*)view;
 - (void)pageThumbnail:(NSImage*)thumbnail;
+- (void)pageConsumedKey:(unsigned short)keyCode
+          modifierFlags:(NSEventModifierFlags)modifierFlags;
 - (void)pageCloseCancelled;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
@@ -241,6 +243,9 @@ class PageObserverBridge : public oa::Page::Observer {
   }
   void OnPageThumbnail(void* ns_image) override {
     [page_ pageThumbnail:(__bridge NSImage*)ns_image];
+  }
+  void OnPageConsumedKey(int key_code, unsigned long modifier_flags) override {
+    [page_ pageConsumedKey:key_code modifierFlags:modifier_flags];
   }
   void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
   void OnPageClosed(std::optional<int32_t> session_id) override {
@@ -774,6 +779,13 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (void)pageThumbnail:(NSImage*)thumbnail {
   [self.delegate page:self thumbnailReady:thumbnail];
+}
+
+- (void)pageConsumedKey:(unsigned short)keyCode
+          modifierFlags:(NSEventModifierFlags)modifierFlags {
+  [self.delegate page:self
+          didConsumeKey:keyCode
+      withModifierFlags:modifierFlags];
 }
 
 - (void)pageCloseCancelled {

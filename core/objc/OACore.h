@@ -150,6 +150,11 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 // Every thumbnail Chrome makes of the page, as ArcCore's
 // webContents:thumbnailReady:, at one pixel a point.
 - (void)page:(OAPage*)page thumbnailReady:(NSImage*)thumbnail;
+// A raw key down the page consumed, as ArcCore's
+// webContents:didConsumeKey:withModifierFlags:underlyingEventType:.
+- (void)page:(OAPage*)page
+        didConsumeKey:(unsigned short)keyCode
+    withModifierFlags:(NSEventModifierFlags)modifierFlags;
 - (void)pageDidCancelClose:(OAPage*)page;
 // `sessionID` is -1 when Chrome kept no record of the tab.
 - (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;
