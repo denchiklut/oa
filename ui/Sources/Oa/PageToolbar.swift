@@ -48,7 +48,7 @@ struct PageToolbar: View {
                         model.openCommandBar(.currentTab)
                     } label: {
                         Text(model.addressLabel ?? "Search or Enter URL…")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
                             .foregroundStyle(model.address == nil ? theme.secondaryText : theme.addressText)
                             .frame(height: 24)
