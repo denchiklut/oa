@@ -124,7 +124,7 @@ final class WindowLayoutController: NSViewController {
         let content = NSHostingView(rootView: BrowserWindowView(model: model, layout: self))
         content.sizingOptions = []
         content.autoresizingMask = [.width, .height]
-        view = KeyboardShortcutInterceptionView()
+        view = KeyboardShortcutInterceptionView(keyBindings: model.keyBindings)
         view.addSubview(content)
     }
 

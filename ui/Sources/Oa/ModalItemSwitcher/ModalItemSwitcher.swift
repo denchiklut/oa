@@ -11,6 +11,8 @@ final class ModalItemSwitcher {
     }
 
     static let maxNumberOfItemsToDisplay = 5
+    static let cycleNextTabID = "cycleNextTab"
+    static let cyclePreviousTabID = "cyclePreviousTab"
 
     /// One more than is shown, as Arc builds it, so the next tab is at hand when a card closes.
     private(set) var itemIDs: [UUID]

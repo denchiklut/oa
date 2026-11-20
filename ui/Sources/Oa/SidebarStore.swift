@@ -29,6 +29,7 @@ final class SidebarStore {
     @ObservationIgnored let topBarColors = TopBarColorClient()
     @ObservationIgnored let contentSnapshots = ContentSnapshotClient()
     @ObservationIgnored let home: StorableHome
+    @ObservationIgnored let keyBindings: KeyBindingsClient
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
 
     init(directory: URL) {
@@ -36,6 +37,7 @@ final class SidebarStore {
         favicons = FaviconCache(directory: directory)
         commandBarPicks = CommandBarPicks(directory: directory)
         home = StorableHome(directory: directory)
+        keyBindings = KeyBindingsClient(directory: directory)
         state = persistence.loadSidebar() ?? .initial()
         let windows = persistence.loadWindows()
         savedWindows = windows?.windows ?? []
