@@ -4,8 +4,8 @@ import Observation
 /// Arc's `ContentSnapshotClient`: pages' pictures kept in memory by page, for what shows a page that isn't drawn, as
 /// its tab switcher's cards. Observable: a new picture changes its page's `snapshot`.
 ///
-/// Arc's holds the tab thumbnails its engine hands up. Oa's own until the engine has that seam: the app asks as the
-/// page is hidden, and a picture goes with its page.
+/// Arc's holds the tab thumbnails its engine hands up. Oa's own until the engine's thumbnails fill it: the app asks
+/// as the page is hidden, and a picture goes with its page.
 @MainActor
 @Observable
 public final class ContentSnapshotClient {
