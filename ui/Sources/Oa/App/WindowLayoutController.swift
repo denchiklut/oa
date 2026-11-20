@@ -123,7 +123,9 @@ final class WindowLayoutController: NSViewController {
     override func loadView() {
         let content = NSHostingView(rootView: BrowserWindowView(model: model, layout: self))
         content.sizingOptions = []
-        view = content
+        content.autoresizingMask = [.width, .height]
+        view = KeyboardShortcutInterceptionView()
+        view.addSubview(content)
     }
 
     override func viewDidLayout() {
