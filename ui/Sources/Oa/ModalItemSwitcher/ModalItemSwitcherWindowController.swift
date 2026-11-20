@@ -8,9 +8,14 @@ import SwiftUI
 @MainActor
 final class ModalItemSwitcherWindowController {
     private static let presentationDelay = 0.1
+    /// Arc's second key for backward, which is no binding.
+    private static let alternatePreviousShortcut = ARCKeyboardShortcut(key: "`", modifiers: .control)
 
     private let model: WindowModel
     private let switcher: ModalItemSwitcher
+    /// As Arc's state holds them: the two bindings as they were when the switcher came up.
+    private let nextShortcut: ARCKeyboardShortcut?
+    private let previousShortcut: ARCKeyboardShortcut?
     private weak var parent: NSWindow?
     private var window: NSWindow?
     private var monitor: Any?
@@ -22,12 +27,19 @@ final class ModalItemSwitcherWindowController {
         self.model = model
         self.switcher = switcher
         self.parent = parent
+        nextShortcut = model.keyBindings.state.shortcut(for: ModalItemSwitcher.cycleNextTabID)
+        previousShortcut = model.keyBindings.state.shortcut(for: ModalItemSwitcher.cyclePreviousTabID)
     }
 
-    /// As Arc's, which tests the modifiers of its shortcuts together: with Control and Shift both up already, the tap
-    /// commits at once, and Shift alone still down keeps the switcher until it goes.
+    private var shortcuts: [ARCKeyboardShortcut] {
+        [nextShortcut, previousShortcut, Self.alternatePreviousShortcut].compactMap { $0 }
+    }
+
+    /// As Arc's, which tests the modifiers of its shortcuts together: with all of them up already, the tap commits
+    /// at once, and with the default keys Shift alone still down keeps the switcher until it goes.
     func beginObservingEvents() {
-        guard !NSEvent.modifierFlags.isDisjoint(with: [.control, .shift]) else { return complete(selecting: true) }
+        let held = shortcuts.reduce(into: NSEvent.ModifierFlags()) { $0.formUnion($1.modifiers) }
+        guard !NSEvent.modifierFlags.isDisjoint(with: held) else { return complete(selecting: true) }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             self?.handle(event)
             return nil
@@ -65,19 +77,22 @@ final class ModalItemSwitcherWindowController {
         model.dismissModalItemSwitcher(selecting: selecting ? switcher.focusedItemID : nil)
     }
 
-    /// As Arc's monitor: Control alone or with Shift keeps the switcher, any other change of modifiers commits, and
-    /// a key it has no use for is swallowed.
+    /// As Arc's monitor: the modifiers of any of its shortcuts keep the switcher, any other change of modifiers
+    /// commits, and a key it has no use for is swallowed.
     private func handle(_ event: NSEvent) {
-        let modifiers = event.modifierFlags.intersection([.control, .shift, .option, .command])
         guard event.type == .keyDown else {
-            if modifiers != .control, modifiers != [.control, .shift] { complete(selecting: true) }
+            let modifiers = event.modifierFlags.intersection(ARCKeyboardShortcut.modifierMask)
+            if !shortcuts.contains(where: { $0.modifiers == modifiers }) { complete(selecting: true) }
             return
         }
+        let shortcut = ARCKeyboardShortcut(event: event)
+        if let shortcut, shortcut == nextShortcut { return switcher.focusAdjacentItem(1) }
+        if let shortcut, shortcut == previousShortcut || shortcut == Self.alternatePreviousShortcut {
+            return switcher.focusAdjacentItem(-1)
+        }
         switch Int(event.keyCode) {
-        case kVK_Tab: switcher.focusAdjacentItem(modifiers.contains(.shift) ? -1 : 1)
         case kVK_RightArrow: switcher.focusAdjacentItem(1)
         case kVK_LeftArrow: switcher.focusAdjacentItem(-1)
-        case kVK_ANSI_Grave where modifiers == .control: switcher.focusAdjacentItem(-1)
         case kVK_Escape: complete(selecting: false)
         case kVK_ANSI_W: model.close(switcher.focusedItemID)
         default: break

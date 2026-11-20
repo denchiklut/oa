@@ -2,7 +2,7 @@ import AppKit
 import DevKit
 import SwiftUI
 
-/// Arc's Settings, with the panes Oa has so far: General and Profiles. As Arc's: toolbar tabs, one fixed size for
+/// Arc's Settings, with the panes Oa has so far: General, Profiles and Shortcuts. As Arc's: toolbar tabs, one fixed size for
 /// every pane, and the title is the pane's name.
 @MainActor
 final class SettingsWindowController: NSWindowController {
@@ -33,6 +33,11 @@ final class SettingsWindowController: NSWindowController {
                 rename: { [weak self] in self?.rename($0) },
                 askAboutArchive: { [weak self] in self?.askAboutArchive($0, for: $1) })
         }
+        add("Shortcuts", symbol: "keyboard") {
+            ShortcutsPane(keyBindings: store.keyBindings, state: state) {
+                openSettings(.extensionShortcuts, frontProfile() ?? SidebarProfile.defaultID)
+            }
+        }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
         window.toolbarStyle = .preference
@@ -47,10 +52,19 @@ final class SettingsWindowController: NSWindowController {
     override func showWindow(_ sender: Any?) {
         if window?.isVisible != true {
             tabs.selectedTabViewItemIndex = 0
+            state.selectedKeyBindableActionIdentifier = nil
             state.currentProfileID = SidebarProfile.defaultID
             state.reload()
         }
         super.showWindow(sender)
+    }
+
+    /// As Arc's `showPreferences(pane:initiallySelectedKeyBindableActionIdentifier:)`: the Shortcuts pane with the
+    /// binding on its detail side, and the list left where it is.
+    func showShortcuts(selecting identifier: String) {
+        showWindow(nil)
+        tabs.selectedTabViewItemIndex = 2
+        state.selectedKeyBindableActionIdentifier = identifier
     }
 
     /// As Arc: an open Settings comes back in front, key, once a create sheet ends with no question about Spaces
@@ -132,6 +146,8 @@ struct ProfileState: Identifiable, Equatable {
 @Observable
 final class PreferencesState {
     var currentProfileID = SidebarProfile.defaultID
+    /// Arc's `initiallySelectedKeyBindableActionIdentifier`, and the Shortcuts pane's selection after.
+    var selectedKeyBindableActionIdentifier: String?
     private(set) var profiles: [ProfileState] = []
     @ObservationIgnored private let engine: any BrowserApplication
 

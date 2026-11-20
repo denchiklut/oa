@@ -364,6 +364,7 @@ final class WindowModel {
     }
 
     var topBarColors: TopBarColorClient { store.topBarColors }
+    var keyBindings: KeyBindingsClient { store.keyBindings }
 
     /// As Arc's `updateTopBarTrackedContent`: the window's visible pages, its Peek's among them, while their
     /// toolbar is shown.
