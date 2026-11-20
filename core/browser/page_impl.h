@@ -15,6 +15,8 @@
 #include "components/favicon/core/favicon_driver.h"
 #include "components/favicon/core/favicon_driver_observer.h"
 #include "components/sessions/core/session_id.h"
+#include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/render_widget_host_observer.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "oa/browser/forwarding_web_contents_delegate.h"
 #include "oa/public/page.h"
@@ -27,7 +29,6 @@ class RenderFrameMetadata;
 }
 
 namespace content {
-class RenderWidgetHost;
 class WebContents;
 }  // namespace content
 
@@ -41,6 +42,8 @@ class WindowBrowser;
 class PageImpl : public Page,
                  public ForwardingWebContentsDelegate,
                  public content::WebContentsObserver,
+                 public content::RenderWidgetHost::InputEventObserver,
+                 public content::RenderWidgetHostObserver,
                  public favicon::FaviconDriverObserver,
                  public MediaStreamCaptureIndicator::Observer {
  public:
@@ -160,7 +163,19 @@ class PageImpl : public Page,
   void LoadProgressChanged(double progress) override;
   void TitleWasSet(content::NavigationEntry* entry) override;
   void DidChangeVisibleSecurityState() override;
+  void RenderFrameHostChanged(content::RenderFrameHost* old_host,
+                              content::RenderFrameHost* new_host) override;
   void WebContentsDestroyed() override;
+
+  // content::RenderWidgetHost::InputEventObserver:
+  void OnInputEventAck(const content::RenderWidgetHost& widget_host,
+                       blink::mojom::InputEventResultSource source,
+                       blink::mojom::InputEventResultState state,
+                       const blink::WebInputEvent& event) override;
+
+  // content::RenderWidgetHostObserver:
+  void RenderWidgetHostDestroyed(
+      content::RenderWidgetHost* widget_host) override;
 
   // favicon::FaviconDriverObserver:
   void OnFaviconUpdated(favicon::FaviconDriver* favicon_driver,
@@ -188,6 +203,8 @@ class PageImpl : public Page,
   static void OnFrameMetadata(content::RenderWidgetHost* widget_host,
                               content::WebContents* web_contents,
                               const cc::RenderFrameMetadata& metadata);
+  void ObserveMainWidget();
+  void StopObservingMainWidget();
   ThumbnailTabHelper* ThumbnailHelper() const;
   void SubscribeToThumbnail();
   void OnThumbnail(gfx::ImageSkia image);
@@ -210,6 +227,9 @@ class PageImpl : public Page,
   base::ScopedObservation<MediaStreamCaptureIndicator,
                           MediaStreamCaptureIndicator::Observer>
       capture_observation_{this};
+  base::ScopedObservation<content::RenderWidgetHost,
+                          content::RenderWidgetHostObserver>
+      main_widget_observation_{this};
   bool observing_thumbnails_ = false;
   std::unique_ptr<ThumbnailImage::Subscription> thumbnail_subscription_;
   base::WeakPtrFactory<PageImpl> weak_factory_{this};
