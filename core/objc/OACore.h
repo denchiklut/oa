@@ -189,8 +189,11 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
 // Nil while the page has nothing drawn, for example when no window shows it.
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable image))completion;
-// As ArcCore's requestThumbnail:. The delegate gets the result, and from the
-// first request on every other thumbnail Chrome makes of the page.
+// As adding and removing an observer of ArcCore's thumbnails generator: while
+// observed, the delegate gets every thumbnail Chrome makes of the page.
+- (void)startObservingThumbnails;
+- (void)stopObservingThumbnails;
+// As ArcCore's requestThumbnail:, which does nothing unobserved.
 - (void)requestThumbnail;
 // NO when the engine refuses: the page has a picture-in-picture video already,
 // or no media session that can enter picture-in-picture.

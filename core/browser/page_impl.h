@@ -15,11 +15,12 @@
 #include "components/favicon/core/favicon_driver.h"
 #include "components/favicon/core/favicon_driver_observer.h"
 #include "components/sessions/core/session_id.h"
-#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "oa/browser/forwarding_web_contents_delegate.h"
 #include "oa/public/page.h"
 #include "third_party/skia/include/core/SkColor.h"
+
+class ThumbnailTabHelper;
 
 namespace cc {
 class RenderFrameMetadata;
@@ -108,6 +109,8 @@ class PageImpl : public Page,
   void SetKeepsAddress(bool keeps_address) override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
+  void StartObservingThumbnails() override;
+  void StopObservingThumbnails() override;
   void RequestThumbnail() override;
   bool RequestPictureInPicture() override;
   bool EndPictureInPicture(bool pause_video) override;
@@ -185,8 +188,8 @@ class PageImpl : public Page,
   static void OnFrameMetadata(content::RenderWidgetHost* widget_host,
                               content::WebContents* web_contents,
                               const cc::RenderFrameMetadata& metadata);
-  ThumbnailImage* Thumbnail() const;
-  void StoreThumbnail(const content::CopyFromSurfaceResult& result);
+  ThumbnailTabHelper* ThumbnailHelper() const;
+  void SubscribeToThumbnail();
   void OnThumbnail(gfx::ImageSkia image);
   void NotifyStateChanged();
   void NotifyClosed(std::optional<SessionID> session_id);
@@ -207,6 +210,7 @@ class PageImpl : public Page,
   base::ScopedObservation<MediaStreamCaptureIndicator,
                           MediaStreamCaptureIndicator::Observer>
       capture_observation_{this};
+  bool observing_thumbnails_ = false;
   std::unique_ptr<ThumbnailImage::Subscription> thumbnail_subscription_;
   base::WeakPtrFactory<PageImpl> weak_factory_{this};
 };

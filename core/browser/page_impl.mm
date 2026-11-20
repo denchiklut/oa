@@ -25,7 +25,6 @@
 #include "chrome/browser/ui/browser_live_tab_context.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
-#include "chrome/browser/ui/tabs/tab_style.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_tab_helper.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/security_state/core/security_state.h"
@@ -54,7 +53,6 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/image/image_skia.h"
 #include "url/gurl.h"
@@ -245,6 +243,10 @@ void PageImpl::Bind(content::WebContents* contents) {
   favicon_observation_.Reset();
   if (auto* driver = favicon::ContentFaviconDriver::FromWebContents(contents)) {
     favicon_observation_.Observe(driver);
+  }
+  // As ArcCore subscribes again where a page's WebContents is replaced.
+  if (observing_thumbnails_) {
+    SubscribeToThumbnail();
   }
 }
 
@@ -534,65 +536,50 @@ void PageImpl::Snapshot(SnapshotCallback callback) {
           std::move(callback))));
 }
 
-ThumbnailImage* PageImpl::Thumbnail() const {
+ThumbnailTabHelper* PageImpl::ThumbnailHelper() const {
   content::WebContents* contents = web_contents();
   tabs::TabInterface* tab =
       contents ? tabs::TabInterface::MaybeGetFromContents(contents) : nullptr;
-  ThumbnailTabHelper* helper = tab ? ThumbnailTabHelper::From(tab) : nullptr;
-  return helper ? helper->thumbnail().get() : nullptr;
+  return tab ? ThumbnailTabHelper::From(tab) : nullptr;
 }
 
-void PageImpl::RequestThumbnail() {
-  ThumbnailImage* thumbnail = Thumbnail();
-  if (!thumbnail) {
+void PageImpl::StartObservingThumbnails() {
+  observing_thumbnails_ = true;
+  SubscribeToThumbnail();
+}
+
+void PageImpl::StopObservingThumbnails() {
+  observing_thumbnails_ = false;
+  thumbnail_subscription_.reset();
+}
+
+// As ArcCore's generator with an observer: it holds a subscription to the tab's
+// thumbnail, which is what makes Chrome capture one, and sends the stored
+// thumbnail again.
+void PageImpl::SubscribeToThumbnail() {
+  ThumbnailTabHelper* helper = ThumbnailHelper();
+  if (!helper) {
     return;
   }
   if (!thumbnail_subscription_) {
-    thumbnail_subscription_ = thumbnail->Subscribe();
+    thumbnail_subscription_ = helper->thumbnail()->Subscribe();
     thumbnail_subscription_->SetUncompressedImageCallback(base::BindRepeating(
         &PageImpl::OnThumbnail, weak_factory_.GetWeakPtr()));
   }
-  if (web_contents()->GetVisibility() != content::Visibility::VISIBLE) {
-    thumbnail->RequestThumbnailImage();
-    return;
-  }
-  // Chrome's helper copies a visible page only without the strips a scrollbar
-  // would take at its right and bottom. ArcCore's copies the whole view, so
-  // the copy is made here by the helper's other rules
-  // (ThumbnailTabHelper::GetInitialCaptureInfo): none before the navigation
-  // commits, and at the smallest size of the view's shape that covers Chrome's
-  // tab preview.
-  content::RenderWidgetHostView* view =
-      web_contents()->GetRenderWidgetHostView();
-  if (thumbnail->GetCaptureReadiness() ==
-          ThumbnailImage::CaptureReadiness::kNotReady ||
-      !view || !view->IsSurfaceAvailableForCopy()) {
-    return;
-  }
-  const gfx::Size size = view->GetViewBounds().size();
-  if (size.IsEmpty()) {
-    return;
-  }
-  gfx::Size preview = TabStyle::Get()->GetPreviewImageSize();
-  preview.SetToMax({175, 175});
-  const gfx::Size least = gfx::ScaleToFlooredSize(
-      preview, std::max(view->GetDeviceScaleFactor(), 1.5f));
-  const float ratio =
-      std::min(static_cast<float>(size.width()) / least.width(),
-               static_cast<float>(size.height()) / least.height());
-  // The result can arrive on another sequence.
-  view->CopyFromSurface(
-      gfx::Rect(size),
-      ratio <= 1 ? size : gfx::ScaleToCeiledSize(size, 1 / ratio),
-      base::TimeDelta(),
-      base::BindPostTaskToCurrentDefault(base::BindOnce(
-          &PageImpl::StoreThumbnail, weak_factory_.GetWeakPtr())));
+  helper->thumbnail()->RequestThumbnailImage();
 }
 
-void PageImpl::StoreThumbnail(const content::CopyFromSurfaceResult& result) {
-  ThumbnailImage* thumbnail = Thumbnail();
-  if (thumbnail && result.has_value() && !result->bitmap.drawsNothing()) {
-    thumbnail->AssignSkBitmap(result->bitmap);
+void PageImpl::RequestThumbnail() {
+  ThumbnailTabHelper* helper = ThumbnailHelper();
+  if (!helper || !thumbnail_subscription_) {
+    return;
+  }
+  // The copy Chrome makes of a tab that stops being active, as ArcCore's
+  // request calls it: of the whole view since patch 0017.
+  if (web_contents()->GetVisibility() == content::Visibility::VISIBLE) {
+    helper->CaptureThumbnailOnTabBackgrounded();
+  } else {
+    helper->thumbnail()->RequestThumbnailImage();
   }
 }
 

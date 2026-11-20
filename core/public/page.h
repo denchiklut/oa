@@ -276,12 +276,18 @@ class Page {
   // Fails while the page has nothing drawn, for example when no window shows
   // it.
   virtual void Snapshot(SnapshotCallback callback) = 0;
-  // As ArcCore's request, into Chrome's tab thumbnail: a visible page's whole
-  // view is copied, scaled down to Chrome's tab preview size and sent through
-  // JPEG, in the display's colours; a hidden one gives its stored thumbnail
-  // again. Nothing comes between a navigation's start and its commit. The
-  // observer gets the result, and from the first request on every other
-  // thumbnail too.
+  // As adding and removing an observer of ArcCore's thumbnails generator.
+  // While observed, Chrome makes the page's tab thumbnail by itself, after a
+  // load and after a URL change inside the document, hidden or not, and as
+  // its tab stops being the window's active one; the observer gets every one.
+  // Starting sends the stored thumbnail again.
+  virtual void StartObservingThumbnails() = 0;
+  virtual void StopObservingThumbnails() = 0;
+  // As ArcCore's request, which does nothing unobserved: Chrome copies a
+  // visible page's whole view into its tab thumbnail, scaled down to its tab
+  // preview size and sent through JPEG, in the display's colours; a hidden
+  // page's stored thumbnail is sent again. Nothing comes while a navigation
+  // loads.
   virtual void RequestThumbnail() = 0;
   // Through the page's media session, as ArcCore's request: false when the
   // page has a picture-in-picture video already, has no media session, or the
