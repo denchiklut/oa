@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Fri, 20 Nov 2026 09:39:38 -0700
+Subject: [PATCH] oa: make a tab's thumbnail ready as ArcCore does
+
+ThumbnailReadinessTracker follows ArcCore's rule. A navigation inside the document (pushState, replaceState, a fragment) is no longer ignored: it clears the thumbnail when it starts and is ready for the final capture when it finishes, so a URL change takes a new thumbnail. A new document is no longer ready for an initial capture when its navigation finishes, only for the final one at its load event, so nothing is captured while it loads.
+---
+ .../ui/thumbnails/thumbnail_readiness_tracker.cc | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/chrome/browser/ui/thumbnails/thumbnail_readiness_tracker.cc b/chrome/browser/ui/thumbnails/thumbnail_readiness_tracker.cc
+index b0e3f16c46ef54a6c88c27147d68be90ae63d7ce..1d95221c4180f09a80002026e04fa2a059a3ce70 100644
+--- a/chrome/browser/ui/thumbnails/thumbnail_readiness_tracker.cc
++++ b/chrome/browser/ui/thumbnails/thumbnail_readiness_tracker.cc
+@@ -17,15 +17,6 @@ bool NavigationShouldInvalidateThumbnail(
+     return false;
+   }
+ 
+-  // Some navigations change the tab URL but don't create a new
+-  // document. They aren't considered loading; onload is never triggered
+-  // after they complete. They shouldn't affect the thumbnail.
+-  //
+-  // See crbug.com/40715186 for why this is necessary.
+-  if (navigation->IsSameDocument()) {
+-    return false;
+-  }
+-
+   return true;
+ }
+ 
+@@ -60,7 +51,12 @@ void ThumbnailReadinessTracker::DidFinishNavigation(
+   }
+ 
+   pending_navigation_ = nullptr;
+-  UpdateReadiness(Readiness::kReadyForInitialCapture);
++  // A new document is ready at its load event, with nothing captured while it
++  // loads. A navigation inside the document never gets that event, so it is
++  // ready here.
++  if (navigation_handle->IsSameDocument()) {
++    UpdateReadiness(Readiness::kReadyForFinalCapture);
++  }
+ }
+ 
+ void ThumbnailReadinessTracker::DocumentOnLoadCompletedInPrimaryMainFrame() {

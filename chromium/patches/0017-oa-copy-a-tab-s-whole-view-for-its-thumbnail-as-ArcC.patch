@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Fri, 20 Nov 2026 09:39:39 -0700
+Subject: [PATCH] oa: copy a tab's whole view for its thumbnail, as ArcCore
+ does
+
+ThumbnailTabHelper::CaptureThumbnailOnTabBackgrounded() copies the whole view. Upstream it leaves out the strips at the right and bottom where a scrollbar would be; ArcCore's GetInitialCaptureInfo() has no such option and always copies the view's full rect.
+---
+ chrome/browser/ui/thumbnails/thumbnail_tab_helper.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/chrome/browser/ui/thumbnails/thumbnail_tab_helper.cc b/chrome/browser/ui/thumbnails/thumbnail_tab_helper.cc
+index 900a6ed22ee9249a1424f25ada2bd102ecfd314f..2e23dfd24db5a29fa5645ce498bb10f0eadd89f0 100644
+--- a/chrome/browser/ui/thumbnails/thumbnail_tab_helper.cc
++++ b/chrome/browser/ui/thumbnails/thumbnail_tab_helper.cc
+@@ -138,7 +138,7 @@ void ThumbnailTabHelper::CaptureThumbnailOnTabBackgrounded() {
+ 
+   const float scale_factor = source_view->GetDeviceScaleFactor();
+   ThumbnailCaptureInfo copy_info = GetInitialCaptureInfo(
+-      source_size, scale_factor, /* include_scrollbars_in_capture */ false);
++      source_size, scale_factor, /* include_scrollbars_in_capture */ true);
+ 
+   // Use CopyFromSurfaceSecure() because tab thumbnail previews are a trusted
+   // internal browser UI feature.
