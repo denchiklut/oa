@@ -29,6 +29,7 @@ The shortcuts that override the page:
 | ⌘W, ⇧⌘W | Close Tab, Close Window |
 | ⌘[, ⌘] | Back, Forward |
 | ⌥⌘↓, ⌥⌘↑ | Next Tab, Previous Tab |
+| ⌃⇥, ⌃⇧⇥ | Tab Switcher (forward), (backward) |
 | ⌘H, ⌘M, ⌘Q | Hide, Minimize, Quit |
 
 Everything else is the page's first, as it was: ⌘R, ⌘1 to ⌘9, ⇧⌘] and ⇧⌘[,
