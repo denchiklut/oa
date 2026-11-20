@@ -82,6 +82,20 @@ final class MainMenu {
         tabs.addItem(item("Next Tab (Alternate)", next, key: "\u{F701}", modifiers: [.command, .option]))
         tabs.addItem(item("Previous Tab", previous, key: "{"))
         tabs.addItem(item("Previous Tab (Alternate)", previous, key: "\u{F700}", modifiers: [.command, .option]))
+        // Hidden with their keys kept, as in Arc's menu.
+        let switcher = [
+            item(
+                "Tab Switcher (forward)", #selector(BrowserWindowController.cycleToNextRecentTab(_:)), key: "\t",
+                modifiers: .control),
+            item(
+                "Tab Switcher (backward)", #selector(BrowserWindowController.cycleToPreviousRecentTab(_:)),
+                key: "\u{19}", modifiers: [.control, .shift]),
+        ]
+        for item in switcher {
+            item.isHidden = true
+            item.allowsKeyEquivalentWhenHidden = true
+            tabs.addItem(item)
+        }
         tabs.addItem(.separator())
         for position in 1..<MainMenu.lastTabTag {
             let go = item(

@@ -27,6 +27,7 @@ final class SidebarStore {
     @ObservationIgnored let commandBarPicks: CommandBarPicks
     /// One for the app, as Arc's.
     @ObservationIgnored let topBarColors = TopBarColorClient()
+    @ObservationIgnored let contentSnapshots = ContentSnapshotClient()
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
 

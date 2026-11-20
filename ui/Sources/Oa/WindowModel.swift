@@ -14,6 +14,7 @@ final class WindowModel {
             closeCommandBarIfSelectionChanged()
             loadExtensions()
             presentationChanged()
+            dismissModalItemSwitcher()
         }
     }
     private(set) var selectedTabIDs: [UUID: UUID] = [:] {
@@ -63,6 +64,8 @@ final class WindowModel {
     /// `itemLastActiveDates` and `itemCreatedDates`, which order its empty command bar.
     private(set) var lastActiveDates: [UUID: Date] = [:]
     private(set) var createdDates: [UUID: Date] = [:]
+    /// As Arc's `WindowState.modalItemSwitcherPresentation`: the ⌃⇥ switcher while it is up.
+    private(set) var modalItemSwitcher: ModalItemSwitcher?
     /// The selection the command bar was opened over, which its destination is for.
     @ObservationIgnored private var commandBarSelection: (spaceID: UUID, tabID: UUID?)?
     @ObservationIgnored var bringToFront: () -> Void = {}
@@ -245,10 +248,12 @@ final class WindowModel {
     }
 
     /// As Arc's presentation updates, which its picture-in-picture rule answers: the page the window shows changed.
+    /// The page it stops showing leaves its picture for the switcher's card, asked for while it still draws here.
     private func presentationChanged() {
         let page = page
         guard presentedPage?.id != page?.id else { return }
         for changed in [presentedPage, page] { changed.map(pictureInPicture.presentationChanged) }
+        if let hidden = presentedPage, holds(hidden.id) { store.contentSnapshots.capture(hidden) }
         presentedPage = page
     }
 
@@ -470,6 +475,51 @@ final class WindowModel {
     /// Arc's pass each minute over what a window shows.
     func markShownViewed() {
         if !showingArchive, let tabID = selectedTabID { markViewed(tabID) }
+    }
+
+    /// As Arc's `sortedLastActiveOrNewestItemIDs` under its switcher's filter: the tabs this window showed or made,
+    /// newest first behind the one it shows, in the window's profile and whatever their Space.
+    private var recentTabIDs: [UUID] {
+        let dates = createdDates.merging(lastActiveDates) { $1 }
+        var tabIDs = dates.keys.sorted { dates[$0]! > dates[$1]! }
+        if let selectedTabID {
+            tabIDs.removeAll { $0 == selectedTabID }
+            tabIDs.insert(selectedTabID, at: 0)
+        }
+        return tabIDs.filter { state.tree.tab($0) != nil && state.profile(containing: $0)?.id == space?.profileID }
+    }
+
+    /// As Arc's `onHighlightAdjacentRecentTab`: the command bar closes and the switcher comes up over the recent
+    /// tabs, or not at all with none. The shown page is asked for a fresh picture, the others have their last.
+    func highlightAdjacentRecentTab(_ target: ModalItemSwitcher.Target) {
+        closeCommandBar()
+        guard modalItemSwitcher == nil,
+            let switcher = ModalItemSwitcher(itemIDs: recentTabIDs, currentID: selectedTabID, target: target)
+        else { return }
+        if let page { store.contentSnapshots.capture(page) }
+        modalItemSwitcher = switcher
+    }
+
+    /// As Arc's `dismissModalItemSwitcher(itemToSelect:)`: a commit selects as a click on the tab would, its Space
+    /// first when it is in another.
+    func dismissModalItemSwitcher(selecting tabID: UUID? = nil) {
+        guard modalItemSwitcher != nil else { return }
+        modalItemSwitcher = nil
+        if let tabID { show(tabID) }
+    }
+
+    /// As Arc's `updateModalItemSwitcher(confirmedItemIDsToClose:)`: once a tab has closed, the list is built again
+    /// without it, and the switcher goes with its last card.
+    private func updateModalItemSwitcher(closing tabID: UUID) {
+        guard let switcher = modalItemSwitcher else { return }
+        switcher.closedItemIDs.insert(tabID)
+        let tabIDs = recentTabIDs.filter { !switcher.closedItemIDs.contains($0) }
+        if tabIDs.isEmpty { dismissModalItemSwitcher() } else { switcher.update(itemIDs: tabIDs) }
+    }
+
+    /// Nothing for a tab without a page, as Arc's card for an unloaded tab is blank.
+    func snapshot(for tab: SidebarTab) -> NSImage? {
+        livePage(for: tab.id).flatMap(store.contentSnapshots.snapshot(of:))
     }
 
     /// Wraps at either end. With no selection, forward selects the first tab and backward the last.
@@ -856,7 +906,8 @@ final class WindowModel {
             if let tab = state.tree.tab(tabID), let url = tab.url, let page = pages[tabID], !tab.isAt(page.url) {
                 page.load(url)
             }
-            return deselect(tabID)
+            deselect(tabID)
+            return updateModalItemSwitcher(closing: tabID)
         }
         let page = store.windows.lazy.compactMap { $0.pages[tabID] }.first
         let request: CloseRequest = reason == .auto ? .auto : .window(id, group: group)
@@ -1055,6 +1106,7 @@ final class WindowModel {
             selectedTabIDs[spaceID] = next
             if let next, spaceID == selectedSpaceID { ensurePage(next) }
         }
+        for window in store.windows { window.updateModalItemSwitcher(closing: tabID) }
     }
 
     /// A close the user asked for goes on the stack of the window they asked in, as Arc's does. The session ID

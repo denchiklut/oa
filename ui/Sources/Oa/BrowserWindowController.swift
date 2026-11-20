@@ -12,6 +12,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private var asking = false
     private let downloadPreview = DownloadPreviewWindow()
     private let extensionPopup = ExtensionPopupWindow()
+    private var modalItemSwitcher: (state: ModalItemSwitcher, controller: ModalItemSwitcherWindowController)?
     private var viewTimer: Task<Void, Never>?
     /// As Arc's `BrowserWindow.windowButtons`: the title bar's own, taken before the sidebar's header makes its set,
     /// which the window would hand out in their place. They show only in full screen.
@@ -66,6 +67,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         observeTitle()
         observeDownloadPreview()
         observeExtensionPopup()
+        observeModalItemSwitcher()
         // As Arc's per-window timer: each minute the shown tab counts as viewed, unless the window is fully hidden.
         viewTimer = Task { [weak self] in
             while !Task.isCancelled {
@@ -95,6 +97,22 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         guard let window, let popup else { return extensionPopup.close() }
         extensionPopup.show(popup, over: window) { [weak self] in self?.model.closeExtensionPopup() }
+    }
+
+    /// As Arc's `WindowViewController`: the switcher's window controller lives as long as the window's switcher.
+    private func observeModalItemSwitcher() {
+        let switcher = withObservationTracking {
+            model.modalItemSwitcher
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeModalItemSwitcher() }
+        }
+        guard modalItemSwitcher?.state !== switcher else { return }
+        modalItemSwitcher?.controller.close()
+        modalItemSwitcher = nil
+        guard let window, let switcher else { return }
+        let controller = ModalItemSwitcherWindowController(model: model, switcher: switcher, parent: window)
+        modalItemSwitcher = (switcher, controller)
+        controller.beginObservingEvents()
     }
 
     private func observeTitle() {
@@ -129,6 +147,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowWillClose(_ notification: Notification) {
         viewTimer?.cancel()
+        model.dismissModalItemSwitcher()
+        modalItemSwitcher?.controller.close()
         downloadPreview.close()
         extensionPopup.close()
         model.dropAll(handingOff: true)
@@ -146,6 +166,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
     @objc func selectNextTab(_ sender: Any?) { model.selectAdjacentTab(1) }
     @objc func selectPreviousTab(_ sender: Any?) { model.selectAdjacentTab(-1) }
+    @objc func cycleToNextRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.next) }
+    @objc func cycleToPreviousRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.previous) }
     @objc func togglePin(_ sender: Any?) { model.togglePin() }
     @objc func toggleFavorite(_ sender: Any?) { model.toggleFavorite() }
 
@@ -227,8 +249,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// The window's commands wait while a dialog is up, as Arc swallows them; other windows and quit stay usable.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         // Arc takes Archive Tab out of the menu while a download's preview shows.
-        if item.action == #selector(closeTab(_:)) { item.isHidden = model.previewedDownload != nil }
-        if model.dialog != nil || model.extensionRequest != nil || item.isHidden { return false }
+        if item.action == #selector(closeTab(_:)) {
+            item.isHidden = model.previewedDownload != nil
+            if item.isHidden { return false }
+        }
+        if model.dialog != nil || model.extensionRequest != nil { return false }
         // As Arc: the Create a Space panel holds back creating and editing a Space, not moving between them.
         let editsSpace = [#selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(changeProfile(_:))]
         if model.spaceCreation != nil, let action = item.action, editsSpace.contains(action) { return false }
