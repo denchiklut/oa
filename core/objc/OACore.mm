@@ -621,6 +621,18 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
       [handler](void* image) { handler((__bridge NSImage*)image); });
 }
 
+- (void)startObservingThumbnails {
+  if (_page) {
+    _page->StartObservingThumbnails();
+  }
+}
+
+- (void)stopObservingThumbnails {
+  if (_page) {
+    _page->StopObservingThumbnails();
+  }
+}
+
 - (void)requestThumbnail {
   if (_page) {
     _page->RequestThumbnail();
