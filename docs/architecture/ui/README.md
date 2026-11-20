@@ -145,6 +145,8 @@ Implementation details live with their features:
   page, the items kept and where the pages it opens go.
 - <a id="command-bar"></a>[Command bar and history](../../features/command-bar/README.md): the bar, its rows and
   ranking, Return and its modifiers, search engines and View History.
+- <a id="key-bindings"></a>[Shortcuts over a page](../../features/key-bindings/README.md): the shortcuts a page
+  never gets, and the view that keeps them from it.
 - <a id="extensions"></a>[Extensions](../../features/extensions/README.md): the Extensions menu, the Site
   Controls section, the consent panels, action popups and the pages an extension opens.
 - <a id="picture-in-picture"></a>[Picture-in-picture](../../features/picture-in-picture/README.md): when a
