@@ -41,6 +41,7 @@ that every online integration still works.
 - [Command bar and history](command-bar/README.md)
 - [Extensions](extensions/README.md)
 - [Picture-in-picture](picture-in-picture/README.md)
+- [Recent-tab switcher](tab-switcher/README.md)
 - [Ad blocker](ad-blocker/README.md)
 
 These pages describe existing slices and their product choices. Moving the
@@ -82,7 +83,7 @@ notes here does not assess or change the checklist status below.
 | Custom tab icons | ✅ | ☐ |
 | Reset a pinned tab to its pinned URL | ✅ | ☐ |
 | Select and act on multiple tabs | ✅ | ☐ |
-| Recent-tab switcher | ✅ | ☐ |
+| Recent-tab switcher | ✅ | ✅ |
 | Close tabs and reopen the last closed tab | ✅ | ☐ |
 | Clear all ordinary tabs | ✅ | ☐ |
 | Automatic tab archiving | ✅ | ☐ |
