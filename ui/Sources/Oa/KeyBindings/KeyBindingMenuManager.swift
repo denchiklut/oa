@@ -9,11 +9,12 @@ final class KeyBindableMenuItem: NSMenuItem {
 }
 
 extension NSMenu {
-    /// As Arc's `firstItem(with:)`, through the submenus.
-    func firstItem(with shortcut: ARCKeyboardShortcut) -> NSMenuItem? {
+    /// A binding's menu item, through the submenus. Arc's `firstItem(with:)` goes by the shortcut, which finds an
+    /// item that is no binding first when one has the same key, as Copy would for an action moved to ⌘C.
+    func item(withKeyBindingID identifier: String) -> NSMenuItem? {
         for item in items {
-            if item.keyboardShortcut == shortcut { return item }
-            if let found = item.submenu?.firstItem(with: shortcut) { return found }
+            if (item as? KeyBindableMenuItem)?.arcKeyBindingID == identifier { return item }
+            if let found = item.submenu?.item(withKeyBindingID: identifier) { return found }
         }
         return nil
     }
