@@ -1,0 +1,146 @@
+import AppKit
+import DevKit
+import SwiftUI
+
+/// Arc's toast as its views draw it with `newToastBackgroundEnabled` off, which is how Arc ships: the Space
+/// theme's colour at 0.8 over a light material with a sheen, the key caps, the words, and under the card's bottom
+/// edge the accessory, half a second later. The card's paddings are the ones measured on Arc's, which are a
+/// point under the ones its code names.
+struct ToastView: View {
+    let toast: WindowToast
+    let background: WindowTheme.Background
+    let onAccessoryTap: () -> Void
+    @State private var showsAccessory = false
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        let base = background.toastBaseColor
+        let isLight = base.hslLightness >= 0.45
+        let foreground = isLight ? Color.black : .white
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        if case .webContentConsumedHotkey(_, let shortcut, let title) = toast.type {
+            HStack(spacing: 7.5) {
+                Text(shortcut.symbols.joined())
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.horizontal, 7.25)
+                    .frame(minHeight: 27)
+                    .background(foreground.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                Text("again to \(title)").font(.system(size: 14, weight: .medium))
+            }
+            .fixedSize()
+            .padding(.leading, 11)
+            .padding(.trailing, 11.5)
+            .padding(.vertical, 10)
+            .frame(minHeight: 42)
+            .background {
+                fill(base, in: shape)
+                LinearGradient(
+                    colors: isLight
+                        ? [.white.opacity(0.4), .white.opacity(0.2)] : [.black.opacity(0.2), .black.opacity(0.4)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .clipShape(shape)
+            }
+            .overlay(shape.strokeBorder(.black.opacity(0.3), lineWidth: 1 / displayScale))
+            // Cast from a point inside the card and cut out under it, so it doesn't darken the see-through fill.
+            .background {
+                shape.padding(1)
+                    .shadow(color: .black.opacity(0.2), radius: 16, y: 6)
+                    .mask {
+                        Rectangle().padding(-60).overlay { shape.blendMode(.destinationOut) }.compositingGroup()
+                    }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                Button(action: onAccessoryTap) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("Edit the shortcut")
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(foreground)
+                    .fixedSize()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background { fill(base, in: RoundedRectangle(cornerRadius: 12)) }
+                }
+                .buttonStyle(.plain)
+                .opacity(showsAccessory ? 1 : 0)
+                .alignmentGuide(.bottom) { $0[.top] }
+                .padding(.trailing, 13)
+            }
+            .foregroundStyle(foreground)
+            .task {
+                try? await Task.sleep(for: .seconds(0.5))
+                withAnimation(Self.animation) { showsAccessory = true }
+            }
+        }
+    }
+
+    static let animation = Animation.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1)
+
+    private func fill(_ base: NSColor, in shape: RoundedRectangle) -> some View {
+        ZStack {
+            WindowMaterial(
+                material: NSVisualEffectView.Material(rawValue: 1)!, blendingMode: .withinWindow, state: .active)
+            Color(nsColor: base).opacity(0.8)
+        }
+        .clipShape(shape)
+    }
+}
+
+extension WindowTheme.Background {
+    /// Arc's colour for a toast: the theme's own, or the mean of a gradient's base colours, worked in Display P3.
+    var toastBaseColor: NSColor {
+        let colors: [ThemeColor] =
+            switch style {
+            case .color(.blendedGradient(let gradient)): gradient.baseColors
+            case .color(.blendedSingleColor(let single)): [single.color]
+            case .color(.basicColor(let basic)): [basic.color]
+            }
+        let components = colors.compactMap { color -> [CGFloat]? in
+            let color = NSColor(
+                colorSpace: .extendedSRGB,
+                components: [color.red, color.green, color.blue, 1].map { CGFloat($0) }, count: 4
+            ).usingColorSpace(.displayP3)
+            return color.map { [$0.redComponent, $0.greenComponent, $0.blueComponent] }
+        }
+        guard !components.isEmpty else { return .white }
+        let mean = (0..<3).map { index in components.reduce(0) { $0 + $1[index] } / CGFloat(components.count) }
+        return NSColor(displayP3Red: mean[0], green: mean[1], blue: mean[2], alpha: 1)
+    }
+}
+
+extension NSColor {
+    fileprivate var hslLightness: CGFloat {
+        let components = [redComponent, greenComponent, blueComponent]
+        return (components.max()! + components.min()!) / 2
+    }
+}
+
+extension View {
+    /// As Arc's toast on a page: 8 pt in from the page's top and right, coming and going on one spring, growing
+    /// from a point a tenth of the way down its middle.
+    func toast(of model: WindowModel, on page: any Page) -> some View {
+        overlay(alignment: .topTrailing) { PageToast(model: model, pageID: page.id) }
+    }
+}
+
+private struct PageToast: View {
+    let model: WindowModel
+    let pageID: UUID
+    @Environment(\.windowColorScheme) private var scheme
+
+    var body: some View {
+        ZStack {
+            if let toast = model.toast, toast.pageID == pageID {
+                ToastView(toast: toast, background: (model.space?.theme ?? .default).background[scheme]) {
+                    model.editShortcut(of: toast)
+                }
+                .id(toast.id)
+                .transition(.scale(scale: 0.001, anchor: UnitPoint(x: 0.5, y: 0.1)).combined(with: .opacity))
+            }
+        }
+        .padding([.top, .trailing], 8)
+        .animation(ToastView.animation, value: model.toast?.id)
+    }
+}

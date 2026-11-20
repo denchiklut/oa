@@ -116,14 +116,15 @@ extension WindowTheme.Background {
     }
 }
 
-private struct WindowMaterial: NSViewRepresentable {
+struct WindowMaterial: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     let blendingMode: NSVisualEffectView.BlendingMode
+    var state = NSVisualEffectView.State.followsWindowActiveState
 
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.blendingMode = blendingMode
-        view.state = .followsWindowActiveState
+        view.state = state
         view.isEmphasized = true
         return view
     }

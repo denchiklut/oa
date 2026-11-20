@@ -66,6 +66,10 @@ final class WindowModel {
     private(set) var createdDates: [UUID: Date] = [:]
     /// As Arc's `WindowState.modalItemSwitcherPresentation`: the ⌃⇥ switcher while it is up.
     private(set) var modalItemSwitcher: ModalItemSwitcher?
+    private(set) var toast: WindowToast?
+    /// Arc's `WindowState.queuedHotkey`: the menu item a consumed shortcut asked about, while its toast is up.
+    @ObservationIgnored private weak var queuedHotkey: NSMenuItem?
+    @ObservationIgnored private var toastRemoval: Task<Void, Never>?
     /// The selection the command bar was opened over, which its destination is for.
     @ObservationIgnored private var commandBarSelection: (spaceID: UUID, tabID: UUID?)?
     @ObservationIgnored var bringToFront: () -> Void = {}
@@ -518,6 +522,49 @@ final class WindowModel {
         switcher.closedItemIDs.insert(tabID)
         let tabIDs = recentTabIDs.filter { !switcher.closedItemIDs.contains($0) }
         if tabIDs.isEmpty { dismissModalItemSwitcher() } else { switcher.update(itemIDs: tabIDs) }
+    }
+
+    /// As Arc's `onWebContentsDidConsumeShortcut`. A shortcut whose binding prompts shows its toast and waits, and
+    /// the same one consumed again while the toast is up runs its menu item, which the page has had first both
+    /// times. Another shortcut takes the toast and the wait, and a key with no modifier is nobody's shortcut here.
+    private func webContentDidConsume(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags, pageID: UUID) {
+        guard page?.id == pageID || peek?.id == pageID,
+            !modifierFlags.isDisjoint(with: ARCKeyboardShortcut.modifierMask),
+            let shortcut = ARCKeyboardShortcut(keyCode: keyCode, modifiers: modifierFlags),
+            let binding = keyBindings.state.shortcutToBinding[shortcut],
+            binding.priority == .promptAfterConsumedByWebView,
+            let item = NSApplication.shared.mainMenu?.firstItem(with: shortcut)
+        else { return }
+        item.menu?.update()
+        guard item.isEnabled else { return }
+        if queuedHotkey === item {
+            queuedHotkey = nil
+            if let action = item.action { NSApplication.shared.sendAction(action, to: item.target, from: item) }
+            return
+        }
+        queuedHotkey = item
+        let toast = WindowToast(
+            type: .webContentConsumedHotkey(binding.id, shortcut: shortcut, title: item.title), pageID: pageID)
+        self.toast = toast
+        toastRemoval?.cancel()
+        toastRemoval = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(ToastConstants.toastVisibilityDuration), tolerance: .zero)
+            if !Task.isCancelled, self?.toast?.id == toast.id { self?.dismissToast() }
+        }
+    }
+
+    /// The wait ends with the toast, as Arc's does.
+    private func dismissToast() {
+        toastRemoval?.cancel()
+        toast = nil
+        queuedHotkey = nil
+    }
+
+    /// As Arc's "Edit the shortcut": the toast goes, and Settings opens on the binding.
+    func editShortcut(of toast: WindowToast) {
+        guard case .webContentConsumedHotkey(let identifier?, _, _) = toast.type else { return }
+        dismissToast()
+        store.showShortcut(identifier)
     }
 
     /// Nothing for a tab without a page, as Arc's card for an unloaded tab is blank.
@@ -1344,6 +1391,8 @@ final class WindowModel {
             return
         case .extensionRequestClosed(let request):
             return forget(request)
+        case .consumedKey(let keyCode, let modifierFlags):
+            return webContentDidConsume(keyCode: keyCode, modifierFlags: modifierFlags, pageID: pageID)
         case .thumbnail(let thumbnail):
             // As Arc's thumbnail listener: every thumbnail is kept as its page's snapshot, then goes to the toolbar's
             // colours, which sample a shown page's.
