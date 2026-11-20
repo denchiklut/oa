@@ -567,8 +567,14 @@ public protocol Page: AnyObject, Observable {
     /// Asks now for the page's last frame, for a window it leaves, as Arc's ADK does with a completion so a move need
     /// not wait for it. Nil while it has nothing drawn.
     func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void)
-    /// Asks the engine for a small picture of the page, as ADK's `requestThumbnail()`. It comes as a `thumbnail`
-    /// event, or not at all while a navigation hasn't committed.
+    /// As ADK's thumbnail observing, which Arc starts when a page's view loads. While observed, the engine makes a
+    /// small picture of the page by itself and each comes as a `thumbnail` event: after a load and after a URL
+    /// change inside the document, shown or not, and as the page stops being shown.
+    func startObservingThumbnails()
+    func stopObservingThumbnails()
+    /// Asks the engine for a picture of the page now, as ADK's `requestThumbnail()`, which starts the observing it
+    /// needs. A shown page's comes as a `thumbnail` event, or not at all while a navigation loads; a hidden page's
+    /// last one comes again.
     func requestThumbnail()
     /// Closes as the user would: unload handlers run, and `closed` or `closeCancelled` follows.
     func close()
@@ -601,7 +607,7 @@ public enum PageEvent {
     /// What the engine asks of the app's window for the page's picture-in-picture video.
     case pictureInPicture(PictureInPictureEvent)
     /// A thumbnail the engine made of the page, at one pixel a point, as ADK's thumbnail listeners get every one:
-    /// the answer to `requestThumbnail()`, or one the engine made by itself since the first request.
+    /// the answer to `requestThumbnail()`, or one the engine made by itself while observed.
     case thumbnail(NSImage)
     /// A `beforeunload` handler kept the page after `close()`.
     case closeCancelled
