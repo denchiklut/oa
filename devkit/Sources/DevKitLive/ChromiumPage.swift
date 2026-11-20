@@ -33,6 +33,7 @@ final class ChromiumPage: Page, MediaSession {
     @ObservationIgnored private var permissionRequests: [ObjectIdentifier: PagePermissionRequest] = [:]
     @ObservationIgnored private var extensionRequests: [ObjectIdentifier: PageExtensionRequest] = [:]
     @ObservationIgnored private var hasPictureInPictureController = false
+    @ObservationIgnored private var isObservingThumbnails = false
 
     var view: NSView { hostingView }
     var isAudible: Bool { page?.isAudible ?? false }
@@ -70,7 +71,22 @@ final class ChromiumPage: Page, MediaSession {
         page.snapshot { image in MainActor.assumeIsolated { completion(image) } }
     }
 
-    func requestThumbnail() { page?.requestThumbnail() }
+    func startObservingThumbnails() {
+        guard !isObservingThumbnails, let page else { return }
+        isObservingThumbnails = true
+        page.startObservingThumbnails()
+    }
+
+    func stopObservingThumbnails() {
+        guard isObservingThumbnails else { return }
+        isObservingThumbnails = false
+        page?.stopObservingThumbnails()
+    }
+
+    func requestThumbnail() {
+        startObservingThumbnails()
+        page?.requestThumbnail()
+    }
 
     func close() { page?.close() }
 

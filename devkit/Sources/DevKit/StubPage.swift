@@ -51,10 +51,13 @@ final class StubPage: Page, MediaSession {
     @ObservationIgnored private var hasPlayedVideo = false
     @ObservationIgnored private var pictureInPictureController: PictureInPictureController?
     @ObservationIgnored private var isInPictureInPicture = false
+    @ObservationIgnored private var isObservingThumbnails = false
+    @ObservationIgnored private var thumbnail: NSImage?
     @ObservationIgnored private lazy var hostingView: NSView = {
         let view = StubHostingView(rootView: StubPageView(page: self))
         view.sizingOptions = []
         view.movedToWindow = { [weak self] in self?.showPendingDialog() }
+        view.leavingWindow = { [weak self] in self?.makeThumbnail() }
         view.contextMenu = { [weak self] in self?.contextMenu() }
         return view
     }()
@@ -148,17 +151,29 @@ final class StubPage: Page, MediaSession {
         completion(image)
     }
 
-    /// The page's view as it is drawn, in its display's colours at a pixel a point, as the engine's is; nothing while
-    /// it loads.
+    func startObservingThumbnails() {
+        guard !isObservingThumbnails else { return }
+        isObservingThumbnails = true
+        if let thumbnail { continuation?.yield(.thumbnail(thumbnail)) }
+    }
+
+    func stopObservingThumbnails() { isObservingThumbnails = false }
+
     func requestThumbnail() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, navigationResult != nil else { return }
-            snapshot { image in
-                guard let image, let bitmap = image.representations.first as? NSBitmapImageRep else { return }
-                let thumbnail = NSImage(size: NSSize(width: bitmap.pixelsWide, height: bitmap.pixelsHigh))
-                thumbnail.addRepresentation(bitmap)
-                self.continuation?.yield(.thumbnail(thumbnail))
-            }
+        startObservingThumbnails()
+        DispatchQueue.main.async { [weak self] in self?.makeThumbnail() }
+    }
+
+    /// The page's view as it is drawn, in its display's colours at a pixel a point, as the engine's is; nothing
+    /// while it loads or unobserved. The engine's moments: after a load, as the page leaves its window, on request.
+    private func makeThumbnail() {
+        guard isObservingThumbnails, navigationResult != nil else { return }
+        snapshot { [weak self] image in
+            guard let self, let image, let bitmap = image.representations.first as? NSBitmapImageRep else { return }
+            let thumbnail = NSImage(size: NSSize(width: bitmap.pixelsWide, height: bitmap.pixelsHigh))
+            thumbnail.addRepresentation(bitmap)
+            self.thumbnail = thumbnail
+            continuation?.yield(.thumbnail(thumbnail))
         }
     }
 
@@ -474,6 +489,7 @@ final class StubPage: Page, MediaSession {
         closePermissionRequest()
         crash = nil
         navigationResult = nil
+        thumbnail = nil
         isLoading = true
         loadProgress = 0.1
         load = Task { [weak self] in
@@ -497,6 +513,7 @@ final class StubPage: Page, MediaSession {
         }
         isLoading = false
         loadProgress = 1
+        DispatchQueue.main.async { [weak self] in self?.makeThumbnail() }
     }
 
     private static var openedCount = 0
@@ -541,9 +558,15 @@ final class StubMenuItem: NSMenuItem {
 
 private final class StubHostingView: NSHostingView<StubPageView> {
     var movedToWindow: () -> Void = {}
+    var leavingWindow: () -> Void = {}
     var contextMenu: () -> NSMenu? = { nil }
 
     override func menu(for event: NSEvent) -> NSMenu? { contextMenu() }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if window != nil, newWindow == nil { leavingWindow() }
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

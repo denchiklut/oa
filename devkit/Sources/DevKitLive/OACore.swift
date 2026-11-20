@@ -221,6 +221,8 @@ import AppKit
     func activate()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
     @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
+    func startObservingThumbnails()
+    func stopObservingThumbnails()
     func requestThumbnail()
     func requestPictureInPicture() -> Bool
     @objc(exitPictureInPictureAndPause:) func exitPictureInPicture(pausing: Bool) -> Bool
