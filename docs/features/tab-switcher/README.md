@@ -43,10 +43,11 @@ switcher. Moving the pointer over a card highlights it and a click selects it.
 The app losing focus, or the window changing Space, closes the switcher with
 nothing selected.
 
-Oa's own: a card under a pointer at rest isn't highlighted as the panel comes up
-under it; after a close the highlight stays on its tab, or on the card that
-took the closed one's place; and a tab closed from its card stays out of the
-row until the switcher goes, a pinned tab or a Favorite too.
+As in Arc, the cards follow the pointer's moves, so a card that comes up under
+a pointer at rest isn't highlighted, and after a close the highlight keeps its
+place in the row, which is the card that took the closed one's place. Oa's own:
+a tab closed from its card stays out of the row until the switcher goes, a
+pinned tab or a Favorite too.
 
 ## The panel
 
@@ -54,13 +55,19 @@ A borderless child window of the browser window, centred on its frame, that
 never takes the keyboard. The sizes and colours are Arc's as measured: a 190 pt
 strip, 32 + 181.75 pt a card wide, with 24 pt corners; each card a 157.5 × 105
 picture of the page, its favicon and a one-line title; the highlight a rounded
-rectangle in the Space's theme colour. Nothing animates.
+rectangle in the Space palette's `hover` in dark and its `focus` at half
+strength in light, as Arc's. Nothing animates.
 
 The shown page's picture is asked for when the shortcut is pressed. Every other
 tab has the picture taken when its page was last hidden in a window, kept in
-memory at up to 600 pixels across by DevKit's `ContentSnapshotClient`, named
-after Arc's cache. When the page is hidden is Oa's choice of moment: who fills
-Arc's cache wasn't traced. A tab with no page has a blank card, as in Arc.
+memory by DevKit's `ContentSnapshotClient`, named after Arc's cache. Like
+Arc's it holds 20 pages and drops the one stored or shown longest ago. A tab
+with no page, or whose picture was dropped, has a blank card.
+
+Arc fills its cache differently: its engine makes tab thumbnails (Chromium's
+`ThumbnailTabHelper` behind ArcCore's thumbnails generator) and the app stores
+each one it is handed. Oa has no such seam in Core yet, so the UI asks for the
+page's `snapshot` as it hides the page and keeps it at up to 600 pixels across.
 
 ## What is left out
 
