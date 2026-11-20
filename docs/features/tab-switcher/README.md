@@ -22,25 +22,29 @@ that has shown nothing in the profile has no switcher.
 ## Keys
 
 The two shortcuts are hidden items of the Tabs menu, as in Arc's, and a page
-never gets them ([Shortcuts over a page](../key-bindings/README.md)). They close the
-command bar first. ⌃⇥ starts on the second card, which is the previous tab, or
+never gets them. They are the bindings `cycleNextTab` and `cyclePreviousTab`
+([Shortcuts](../key-bindings/README.md)), so Settings ▸ Shortcuts can change
+them, and the switcher reads the two as they are when it comes up. They close
+the command bar first. ⌃⇥ starts on the second card, which is the previous tab, or
 on the first when the window shows no tab; ⌃⇧⇥ starts on the last card.
 
-If Control is already up when the shortcut is handled, the tab is selected at
-once and nothing is drawn. Otherwise a local event monitor takes every key
-until the switcher goes, and the panel appears 0.1 s after the shortcut:
+If the shortcuts' modifiers are already up when the shortcut is handled, the
+tab is selected at once and nothing is drawn. Otherwise a local event monitor
+takes every key until the switcher goes, and the panel appears 0.1 s after the
+shortcut. With the default keys:
 
 | Key | Does |
 | --- | --- |
-| Tab, → | next card, wrapping |
-| ⇧Tab, ←, ⌃\` | previous card, wrapping |
+| ⌃⇥ (the forward shortcut), → | next card, wrapping |
+| ⌃⇧⇥ (the backward shortcut), ←, ⌃\` | previous card, wrapping |
 | W | closes the highlighted card's tab as ⌘W would |
 | Escape | closes the switcher, the tab stays |
 | anything else | nothing, Return and ↑ ↓ included |
 
 Releasing Control selects the highlighted tab the way a click on it would, and
 switches Space when the tab is in another. Releasing only Shift keeps the
-switcher. Moving the pointer over a card highlights it and a click selects it.
+switcher: as in Arc, the modifiers of any of the shortcuts keep it and any
+other change of modifiers commits. Moving the pointer over a card highlights it and a click selects it.
 The app losing focus, or the window changing Space, closes the switcher with
 nothing selected. So does the window giving up the keyboard to another window,
 which is Oa's own: what Arc does then is unknown.
@@ -84,6 +88,13 @@ came back, loaded or changed its URL, since its copy of a leaving tab arrives
 late; Oa keeps the picture the same request gives it at once. Nothing else
 makes one: not time on screen, a repaint, a title change or a subframe's load.
 
+A tab with a Peek on it has the Peek on its card, as in Arc: the tab's picture
+under black at a half, the Peek's page inset 12 pt from each edge with 4 pt
+corners and a small shadow, and the Peek page's favicon at the right end of the
+title row. A Peek's page is observed from the moment it opens, so its picture
+is there for a tab that was left with a Peek on it, and ⌃⇥ asks the shown
+Peek's page for a fresh one beside its tab's.
+
 A tab that was never shown has a blank card, as in Arc, and so does a tab
 with no page or one whose picture was dropped. While a document loads, its tab
 has no thumbnail. After a relaunch the cache starts empty.
@@ -94,10 +105,8 @@ scrollbar would take (0017).
 
 ## What is left out
 
-- A Peek isn't drawn on its tab's card.
-- The shortcuts can't be rebound; Arc's Settings ▸ Shortcuts can.
 - Arc's flag-gated Cycle Tab Forward and Backward, which walk a per-Space
-  history with no panel.
+  history with no panel. The flag is off in Arc as it ships.
 
 | Layer | Holds |
 | --- | --- |
