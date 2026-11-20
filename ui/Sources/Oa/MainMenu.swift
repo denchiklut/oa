@@ -103,10 +103,10 @@ final class MainMenu {
         let switcher = [
             item(
                 "Tab Switcher (forward)", #selector(BrowserWindowController.cycleToNextRecentTab(_:)), key: "\t",
-                modifiers: .control),
+                modifiers: .control, priority: .overrideWebView),
             item(
                 "Tab Switcher (backward)", #selector(BrowserWindowController.cycleToPreviousRecentTab(_:)),
-                key: "\u{19}", modifiers: [.control, .shift]),
+                key: "\u{19}", modifiers: [.control, .shift], priority: .overrideWebView),
         ]
         for item in switcher {
             item.isHidden = true
