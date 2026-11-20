@@ -49,16 +49,21 @@ private struct ModalItemSwitcherItemView: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let peek = model.peeks[tab.id]
         VStack(spacing: 12) {
-            Color(white: scheme == .dark ? 0.11 : 0.973)
-                // As Arc's card: the picture fills the width from its top.
-                .overlay(alignment: .top) {
-                    if let snapshot = model.snapshot(for: tab) {
-                        Image(nsImage: snapshot).resizable().interpolation(.high).scaledToFill()
-                    }
-                }
+            picture(model.snapshot(for: tab))
+                .overlay { if peek != nil { Color.black.opacity(0.5) } }
                 .frame(height: 105)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                // As Arc's card for a tab with a Peek: the Peek's page over the dimmed tab's.
+                .overlay {
+                    if peek != nil {
+                        picture(model.peekSnapshot(for: tab))
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .shadow(color: .black.opacity(0.3), radius: 2, y: 0.5)
+                            .padding(12)
+                    }
+                }
                 .shadow(color: .black.opacity(0.06), radius: 1, y: 2)
                 .shadow(color: .black.opacity(0.25), radius: 8, y: 2.5)
             HStack(spacing: 8) {
@@ -68,6 +73,13 @@ private struct ModalItemSwitcherItemView: View {
                     .lineLimit(1)
                     .foregroundStyle(scheme == .dark ? .white : focused ? .black : Color(white: 0.29))
                 Spacer(minLength: 0)
+                if let icon = peek?.favicon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 16, height: 16)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                }
             }
             .padding(.horizontal, 2)
         }
@@ -76,6 +88,14 @@ private struct ModalItemSwitcherItemView: View {
             if focused { RoundedRectangle(cornerRadius: 10, style: .continuous).fill(selectionFill) }
         }
         .contentShape(Rectangle())
+    }
+
+    /// As Arc's card: a picture fills the width from its top, over the grey a page without one has.
+    private func picture(_ snapshot: NSImage?) -> some View {
+        Color(white: scheme == .dark ? 0.11 : 0.973)
+            .overlay(alignment: .top) {
+                if let snapshot { Image(nsImage: snapshot).resizable().interpolation(.high).scaledToFill() }
+            }
     }
 
     /// As Arc's focused card: the Space palette's `hover` in dark, and its `focus` at half in light.

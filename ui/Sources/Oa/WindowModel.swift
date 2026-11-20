@@ -490,13 +490,15 @@ final class WindowModel {
     }
 
     /// As Arc's `onHighlightAdjacentRecentTab`: the command bar closes and the switcher comes up over the recent
-    /// tabs, or not at all with none. The shown page is asked for a fresh thumbnail, the others have their last.
+    /// tabs, or not at all with none. The shown page and its Peek's are asked for a fresh thumbnail, the others have
+    /// their last.
     func highlightAdjacentRecentTab(_ target: ModalItemSwitcher.Target) {
         closeCommandBar()
         guard modalItemSwitcher == nil,
             let switcher = ModalItemSwitcher(itemIDs: recentTabIDs, currentID: selectedTabID, target: target)
         else { return }
         page?.requestThumbnail()
+        peek?.requestThumbnail()
         modalItemSwitcher = switcher
     }
 
@@ -520,6 +522,10 @@ final class WindowModel {
     /// Nothing for a tab without a page, as Arc's card for an unloaded tab is blank.
     func snapshot(for tab: SidebarTab) -> NSImage? {
         livePage(for: tab.id).flatMap(store.contentSnapshots.snapshot(of:))
+    }
+
+    func peekSnapshot(for tab: SidebarTab) -> NSImage? {
+        peeks[tab.id].flatMap(store.contentSnapshots.snapshot(of:))
     }
 
     /// Wraps at either end. With no selection, forward selects the first tab and backward the last.
@@ -812,6 +818,7 @@ final class WindowModel {
             guard showingArchive, archivePeekID == entryID else { return page.drop() }
             peeks[entryID] = page
             listen(to: page)
+            page.startObservingThumbnails()
             page.load(url)
         }
     }
@@ -1447,6 +1454,8 @@ final class WindowModel {
         }
         peeks[openerID] = page
         listen(to: page)
+        // As Arc, whose card for a tab left with a Peek on it has the Peek's picture from its page's load.
+        page.startObservingThumbnails()
     }
 
     /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown and for another
