@@ -6,8 +6,17 @@ describes the broader intended responsibilities.
 One bar types every address and search, as in Arc. ⌘T, ⌘L, a click on the
 toolbar's URL, the sidebar's New Tab row and a new window all open the same
 card. It is drawn in the browser window, 766 pt wide and centred on the whole
-window, with five 50 pt rows showing before the list scrolls. Esc or a click
+window, with five 50 pt rows showing before the list scrolls. Its top is
+169.5 pt above the window's middle, however many rows it has. Esc or a click
 outside closes it and leaves nothing behind.
+
+The card and its text go by the app's light or dark, as Arc's do, not by the
+theme's content. The card is near-white or near-black and about 90% opaque, so
+the theme behind tints it. Titles are black or white at 80%, "Switch to Tab" at
+33% and the prompt at about half. Only the chosen row takes the theme: it is
+filled with the palette's `focus` under white text, its favicon on a white
+tile and its arrow in `focus` on another. Whether Arc blurs what lies behind
+the card isn't known; Oa doesn't.
 
 - **⌘T** opens it empty and makes no tab: Return makes one, at the top of the
   Space's unpinned tabs, and selects it. The sidebar's New Tab row is
@@ -196,8 +205,7 @@ The pill has continuous 12 pt corners and a shadow in its colour. The pill,
 text and icon change in one frame; the bar bounces whenever a Site Search is
 entered or left, a dip to about 0.988 of its size and back in 0.2 s. On entry
 a block of the colour behind the card blurs out over 1.2 s, starting when the
-colour is known. Oa's card lets more of it through than Arc's, so the card
-tints more strongly in the first frames.
+colour is known.
 
 | Layer | What it holds |
 | --- | --- |
