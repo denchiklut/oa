@@ -1230,8 +1230,21 @@ final class WindowModel {
         case .undoCloseItems(let groupID):
             guard let index = closedGroups.firstIndex(where: { $0.id == groupID }) else { return }
             let group = closedGroups.remove(at: index)
-            for closed in group.steps.reversed() {
-                reopen(closed, of: group, selecting: closed.id == group.focusedTabID)
+            if let split = group.splitView, state.tree[split.id] == nil {
+                // As seen in Arc: the split comes back whole, with its ID, where it was.
+                let steps = Dictionary(group.steps.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                let tabs = split.tabIDs.compactMap { id in
+                    steps[id].map { SidebarTab(id: id, title: $0.title, url: $0.url, viewedAt: .now) }
+                }
+                store.edit { $0.restoreSplitView(split, tabs: tabs) }
+                for tab in tabs { createdDates[tab.id] = .now }
+                if let focused = group.focusedTabID, state.tree.tab(focused) != nil {
+                    select(focused, restoring: steps[focused]?.sessionID)
+                }
+            } else {
+                for closed in group.steps.reversed() {
+                    reopen(closed, of: group, selecting: closed.id == group.focusedTabID)
+                }
             }
             if case .peek(let ownerID)? = group.steps.first?.place {
                 undoManager?.registerUndos([.closePeek(ownerID: ownerID)], group.undoPrompt)
@@ -1245,8 +1258,10 @@ final class WindowModel {
             // Oa's own: on the stack before its pages have closed, so the step is filed while the redo runs and
             // the other redos stay. Arc files it when they have, and a redone close of a loaded tab leaves a
             // second step that does nothing.
-            let group = ClosedGroup(
+            var group = ClosedGroup(
                 undoPrompt: undoPrompt, order: tabIDs, siblings: state.tree[parentID]?.childIDs ?? [])
+            // A split's close again closes it whole, so its undo brings it back again.
+            if Set(state.tree[parentID]?.childIDs ?? []) == Set(tabIDs) { group.splitView = closedSplitView(parentID) }
             push(group)
             // A Favorite and a pinned tab are archived one at a time, by their own closes.
             if state.isFavorite(first) {
@@ -1352,17 +1367,27 @@ final class WindowModel {
 
     /// As seen in Arc: a split's ✕ archives its tabs in one step, "Archive Tabs" to undo.
     func closeSplitView(_ splitID: UUID) {
-        closeTogether((state.tree[splitID]?.childIDs ?? []).reversed(), asSplitView: true)
+        guard let closed = closedSplitView(splitID) else { return }
+        closeTogether(closed.tabIDs.reversed(), splitView: closed)
+    }
+
+    private func closedSplitView(_ splitID: UUID) -> ClosedSplitView? {
+        guard let data = state.splitView(splitID), let place = state.tree.location(of: splitID) else { return nil }
+        return ClosedSplitView(
+            id: splitID, data: data, parentID: place.parentID, index: place.index,
+            tabIDs: state.tree[splitID]?.childIDs ?? [])
     }
 
     /// One close of several tabs from this window, one entry on its stack, the steps going back from the last.
-    private func closeTogether(_ tabIDs: [UUID], asSplitView: Bool = false) {
+    private func closeTogether(_ tabIDs: [UUID], splitView: ClosedSplitView? = nil) {
         guard !tabIDs.isEmpty else { return }
+        let asSplitView = splitView != nil
         let closing = Set(tabIDs)
-        let group = ClosedGroup(
+        var group = ClosedGroup(
             undoPrompt: asSplitView ? UndoStrings.archiveTabs : UndoStrings.clearTabs(tabIDs.count),
             focusedTabID: selectedTabID.flatMap { closing.contains($0) ? $0 : nil },
             completionToast: asSplitView ? nil : .clearedTabs, order: tabIDs, siblings: unpinnedTabs.map(\.id))
+        group.splitView = splitView
         if let selected = selectedTabID, closing.contains(selected) {
             let next = nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
             selectedTabIDs[selectedSpaceID] = next

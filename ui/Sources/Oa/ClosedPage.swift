@@ -17,6 +17,14 @@ struct ClosedPage {
     let sessionID: PageSessionID?
 }
 
+struct ClosedSplitView {
+    let id: UUID
+    let data: SidebarSplitViewData
+    let parentID: UUID
+    let index: Int
+    let tabIDs: [UUID]
+}
+
 /// Arc's `CloseItemsCompletionToast`.
 enum CloseItemsCompletionToast {
     case clearedTabs
@@ -31,6 +39,8 @@ struct ClosedGroup: Equatable {
     /// As Arc's `focusedTabItemID`: the tab the window was showing, which an undo shows again.
     var focusedTabID: UUID?
     var completionToast: CloseItemsCompletionToast?
+    /// A split closed whole, which an undo rebuilds with its ID, as Arc's does.
+    var splitView: ClosedSplitView?
     /// The tabs of a close of several, in the order their steps go on, whatever order their pages end in.
     var order: [UUID] = []
     /// Their list as it was before the close, so each goes back between its old neighbours in any order.
