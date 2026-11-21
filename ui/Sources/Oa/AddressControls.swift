@@ -41,16 +41,14 @@ struct SiteControlsButton: View {
     }
 }
 
-/// Arc's Copy Current URL button, without its toast.
+/// Arc's Copy Current URL button.
 struct CopyLinkButton: View {
     let model: WindowModel
     let size: CGFloat
 
     var body: some View {
         Button {
-            guard let address = model.address else { return }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(address.absoluteString, forType: .string)
+            model.copyCurrentURLs()
         } label: {
             Image(systemName: "link")
                 .font(.system(size: 13))
