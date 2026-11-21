@@ -792,13 +792,13 @@ final class WindowModel {
 
     /// Remove Favorite: archived under no Space once its page has closed, and nothing selected in its place, as
     /// Arc does.
-    func removeFavorite(_ tabID: UUID) {
+    func removeFavorite(_ tabID: UUID, group: ClosedGroup? = nil) {
         guard state.isFavorite(tabID) else { return }
         guard let page = store.windows.lazy.compactMap({ $0.pages[tabID] }).first else {
             for window in store.windows { window.placeholders[tabID] = nil }
-            return archive(tabID, reason: .manual, closedBy: .window(id), sessionID: nil)
+            return archive(tabID, reason: .manual, closedBy: .window(id, group: group), sessionID: nil)
         }
-        store.closing[page.id] = .window(id)
+        store.closing[page.id] = .window(id, group: group)
         page.close()
     }
 
@@ -963,18 +963,25 @@ final class WindowModel {
         case .closeItems(let tabIDs, let undoPrompt):
             let tabIDs = tabIDs.filter { state.tree.tab($0) != nil }
             guard let first = tabIDs.first, let parentID = state.tree.location(of: first)?.parentID else { return }
-            // A Favorite and a pinned tab are archived one at a time, by their own closes.
-            if state.isFavorite(first) { return removeFavorite(first) }
-            if state.isPinned(first) { return archivePinned(first) }
-            // Oa's own: on the stack before its pages have closed, so the step is filed while the redo runs.
-            // Arc files it when they have, and a redone close of a loaded tab leaves a second step that does nothing.
+            // Oa's own: on the stack before its pages have closed, so the step is filed while the redo runs and
+            // the other redos stay. Arc files it when they have, and a redone close of a loaded tab leaves a
+            // second step that does nothing.
             let group = ClosedGroup(
                 undoPrompt: undoPrompt, order: tabIDs, siblings: state.tree[parentID]?.childIDs ?? [])
             push(group)
-            for tabID in tabIDs { close(tabID, group: group) }
+            // A Favorite and a pinned tab are archived one at a time, by their own closes.
+            if state.isFavorite(first) {
+                removeFavorite(first, group: group)
+            } else if state.isPinned(first) {
+                archivePinned(first, group: group)
+            } else {
+                for tabID in tabIDs { close(tabID, group: group) }
+            }
         case .closePeek(let ownerID):
             guard let page = peeks[ownerID] else { return }
-            store.closing[page.id] = .window(id)
+            let group = ClosedGroup(undoPrompt: UndoStrings.closePeek)
+            push(group)
+            store.closing[page.id] = .window(id, group: group)
             page.close()
         }
     }
@@ -1028,13 +1035,13 @@ final class WindowModel {
     }
 
     /// A pinned row's ✕, which archives it as a Today row's does, as Arc's close button does.
-    func archivePinned(_ tabID: UUID) {
-        guard state.isPinned(tabID) else { return close(tabID) }
+    func archivePinned(_ tabID: UUID, group: ClosedGroup? = nil) {
+        guard state.isPinned(tabID) else { return close(tabID, group: group) }
         store.archivingPins.insert(tabID)
         guard let page = store.windows.lazy.compactMap({ $0.pages[tabID] }).first else {
-            return end(tabID, reason: .manual, closedBy: .window(id)) { page, _ in page.drop() }
+            return end(tabID, reason: .manual, closedBy: .window(id, group: group)) { page, _ in page.drop() }
         }
-        store.closing[page.id] = .window(id)
+        store.closing[page.id] = .window(id, group: group)
         page.close()
     }
 
@@ -1526,7 +1533,7 @@ final class WindowModel {
             store.windows.first { $0.id == request.windowID }?.remember(
                 ClosedPage(
                     id: page.id, title: page.title, url: page.url, place: .peek(ownerID: ownerID),
-                    sessionID: sessionID), in: ClosedGroup(undoPrompt: UndoStrings.closePeek))
+                    sessionID: sessionID), in: request.group ?? ClosedGroup(undoPrompt: UndoStrings.closePeek))
         }
         if ownerID == archivePeekID { archivePeekID = nil }
         self.page?.activate()
