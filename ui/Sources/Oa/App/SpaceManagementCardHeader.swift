@@ -35,17 +35,33 @@ struct SpaceManagementCardHeader: View {
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: showsIcon)
                 .overlay(alignment: .leading) { iconButton(highlighted: highlighted) }
             profileMenu
-            Image(systemName: "paintbrush.pointed")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(hoverInk.opacity(0.3))
-                .frame(width: 24, height: 24)
-                .accessibilityHidden(true)
+            themeButton
         }
         .padding(.horizontal, 6)
         .frame(height: 36)
         .background(highlighted ? rowFill : .clear, in: row)
         .contentShape(row)
         .onHover { isHovered = $0 }
+    }
+
+    private var themeButton: some View {
+        let presentation = model.spaceStyleEditor
+        return Button {
+            model.presentSpaceStyleEditor(for: space.id, from: .library)
+        } label: {
+            Image(systemName: "paintbrush.pointed")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(hoverInk.opacity(0.3))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Edit Space theme")
+        .background(
+            SpaceStyleEditorAnchor(
+                isPresented: presentation?.spaceID == space.id && presentation?.origin == .library,
+                onClose: { [model] in model.dismissSpaceStyleEditor() }
+            ) { WindowSpaceStyleEditorView(model: model) })
     }
 
     private func iconButton(highlighted: Bool) -> some View {

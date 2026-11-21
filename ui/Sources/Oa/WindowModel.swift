@@ -11,6 +11,7 @@ final class WindowModel {
     let id: UUID
     private(set) var selectedSpaceID: UUID {
         didSet {
+            dismissSpaceStyleEditor()
             closeCommandBarIfSelectionChanged()
             loadExtensions()
             presentationChanged()
@@ -38,6 +39,10 @@ final class WindowModel {
             presentationChanged()
         }
     }
+    /// As Arc's `WindowState.spaceStyleEditorPresentation`.
+    private(set) var spaceStyleEditor: WindowSpaceStyleEditorPresentation?
+    /// As Arc: the window keeps the editor's preset page, for every editor it opens.
+    var spaceStyleEditorPresetPage = 0
     /// As Arc's per-window `spacesWithCollapsedPinnedSections`: the Spaces whose pinned tabs this window folds away.
     private(set) var collapsedPinnedSpaces: Set<UUID> = []
     private(set) var library: LibrarySection? {
@@ -692,6 +697,46 @@ final class WindowModel {
         store.edit { $0.setSpaceIcon(icon, for: spaceID) }
     }
 
+    /// The theme the window draws a Space in: while its editor is open, the one the editor makes.
+    func theme(of space: SidebarSpace) -> WindowTheme {
+        guard let presentation = spaceStyleEditor, presentation.spaceID == space.id else { return space.theme }
+        return presentation.editor.theme ?? .default
+    }
+
+    /// As Arc's `presentStyleEditor`: from the editor's state built from the Space's theme. Oa's own: the window
+    /// shows the Space first, as it does for the icon picker.
+    func presentSpaceStyleEditor(for spaceID: UUID, from origin: WindowSpaceStyleEditorPresentation.Origin) {
+        guard let space = state.space(spaceID) else { return }
+        dismissSpaceStyleEditor()
+        if origin == .sidebar { selectSpace(spaceID) }
+        spaceStyleEditor = WindowSpaceStyleEditorPresentation(
+            spaceID: spaceID, origin: origin, editor: SpaceStyleEditor(theme: space.customInfo?.windowTheme))
+    }
+
+    /// A change in the open editor. What it returns is the state Arc files an "Update Theme" undo step for.
+    func updateSpaceStyleEditor(_ change: (inout SpaceStyleEditor) -> SpaceStyleEditor.State?) {
+        guard var presentation = spaceStyleEditor else { return }
+        let old = change(&presentation.editor)
+        spaceStyleEditor = presentation
+        if let old { registerThemeUndo(SpaceStyleEditor(state: old).theme, for: presentation.spaceID) }
+    }
+
+    /// As Arc: the theme is written as the editor closes, however it closes, and there is no Cancel.
+    func dismissSpaceStyleEditor() {
+        guard let presentation = spaceStyleEditor else { return }
+        spaceStyleEditor = nil
+        setSpaceTheme(presentation.editor.theme, for: presentation.spaceID)
+    }
+
+    private func setSpaceTheme(_ theme: WindowTheme?, for spaceID: UUID) {
+        guard state.space(spaceID) != nil else { return }
+        store.edit { $0.setSpaceTheme(theme, for: spaceID) }
+    }
+
+    private func registerThemeUndo(_ theme: WindowTheme?, for spaceID: UUID) {
+        undoManager?.registerUndos([.updateSpaceTheme(spaceID: spaceID, theme: theme)], UndoStrings.updateTheme)
+    }
+
     /// As Arc: the new profile has its Favorites and site searches from the start, and Settings selects it.
     func createProfile(named name: String) async -> UUID? {
         guard let profileID = await engine.createBrowserContext(userVisibleName: name) else { return nil }
@@ -948,6 +993,14 @@ final class WindowModel {
     /// The redone close leaves nothing selected in its place, as Arc's does.
     func perform(_ action: UndoAction) {
         switch action {
+        // As Arc: an undo with the editor open on the Space sets the theme and starts the editor over from it.
+        case .updateSpaceTheme(let spaceID, let theme):
+            guard let space = state.space(spaceID) else { return }
+            let editing = spaceStyleEditor?.spaceID == spaceID
+            registerThemeUndo(
+                editing ? spaceStyleEditor?.editor.theme : space.customInfo?.windowTheme, for: spaceID)
+            setSpaceTheme(theme, for: spaceID)
+            if editing { spaceStyleEditor?.editor = SpaceStyleEditor(theme: theme) }
         case .undoCloseItems(let groupID):
             guard let index = closedGroups.firstIndex(where: { $0.id == groupID }) else { return }
             let group = closedGroups.remove(at: index)

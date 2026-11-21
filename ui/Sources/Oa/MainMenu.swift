@@ -169,6 +169,7 @@ final class MainMenu {
         let spaces = submenu("Spaces", in: menu)
         spaces.addItem(item("New Space…", #selector(BrowserWindowController.newSpace(_:)), id: "newSpace"))
         spaces.addItem(item("Rename Space…", #selector(BrowserWindowController.renameSpace(_:))))
+        spaces.addItem(item("Edit Theme…", #selector(BrowserWindowController.editTheme(_:))))
         spaces.addItem(item("Change Profile", #selector(BrowserWindowController.changeProfile(_:))))
         spaces.addItem(item("Delete Space", #selector(BrowserWindowController.deleteSpace(_:))))
 

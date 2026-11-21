@@ -251,6 +251,8 @@ private struct SpaceManagementCollectionViewItem: View {
                     isPickingIcon = true
                 } rename: {
                     isEditingName = true
+                } editTheme: {
+                    model.presentSpaceStyleEditor(for: space.id, from: .library)
                 }
             } label: {
                 Image(systemName: "ellipsis")

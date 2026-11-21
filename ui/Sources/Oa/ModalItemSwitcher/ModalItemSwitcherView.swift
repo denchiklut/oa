@@ -100,7 +100,7 @@ private struct ModalItemSwitcherItemView: View {
 
     /// As Arc's focused card: the Space palette's `hover` in dark, and its `focus` at half in light.
     private var selectionFill: Color {
-        let palette = (model.space?.theme ?? .default).semanticColorPalette[scheme]
+        let palette = (model.space.map(model.theme(of:)) ?? .default).semanticColorPalette[scheme]
         return scheme == .dark ? palette.hover.color : palette.focus.opacity(0.5).color
     }
 }
