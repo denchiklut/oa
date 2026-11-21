@@ -828,6 +828,14 @@ public enum OpenDisposition: Sendable, Equatable {
     case popup
     /// As ADK's `splitView`: beside the page that opened it, in the app's split view.
     case splitView
+
+    /// ADK's mapping of an engine's open: a foreground one while ⌥ is held, by the event that caused it, is a split
+    /// view.
+    @MainActor
+    public static func withModifiers(_ disposition: OpenDisposition) -> OpenDisposition {
+        disposition == .foregroundTab && NSApp.currentEvent?.modifierFlags.contains(.option) == true
+            ? .splitView : disposition
+    }
 }
 
 /// Why a page's renderer is gone.
