@@ -458,9 +458,14 @@ struct SidebarState {
         return due
     }
 
-    /// A move to the end of the other section.
+    /// A move to the end of the other section. As seen in Arc, a split's tab takes its split whole, and an unpinned
+    /// split goes to the top of the list.
     mutating func togglePin(_ tabID: UUID) {
         guard let space = space(containing: tabID) else { return }
+        if let splitID = splitViewID(containing: tabID) {
+            return isPinned(tabID)
+                ? tree.move(splitID, into: space.unpinnedRootID, at: 0) : tree.move(splitID, into: space.pinnedRootID)
+        }
         tree.move(tabID, into: isPinned(tabID) ? space.unpinnedRootID : space.pinnedRootID)
     }
 

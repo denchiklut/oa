@@ -114,7 +114,7 @@ extension SidebarState {
 
     /// Oa's own for now: unpinned tabs of one Space only. Arc pins a split whole and files one under Favorites.
     func canAddSplitViewPane(beside anchorID: UUID) -> Bool {
-        space(containing: anchorID) != nil && !isPinned(anchorID)
+        space(containing: anchorID) != nil && (!isPinned(anchorID) || splitViewID(containing: anchorID) != nil)
             && presentedTabIDs(with: anchorID).count < SidebarSplitViewData.maxNumberSplit
     }
 
@@ -123,7 +123,7 @@ extension SidebarState {
     }
 
     func canJoinSplitView(_ tabID: UUID, of anchorID: UUID) -> Bool {
-        tabID != anchorID && !isPinned(tabID) && !isPinned(anchorID)
+        tabID != anchorID && !isPinned(tabID) && (!isPinned(anchorID) || splitViewID(containing: anchorID) != nil)
             && space(containing: tabID)?.id == space(containing: anchorID)?.id && splitViewID(containing: tabID) == nil
     }
 

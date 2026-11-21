@@ -14,6 +14,7 @@ struct SplitViewCellView: View {
 
     var body: some View {
         let selected = tabs.contains { $0.id == model.selectedTabIDs[spaceID] }
+        let pinned = tabs.first.map { model.state.isPinned($0.id) } ?? false
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
         HStack(spacing: 0) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
@@ -21,11 +22,11 @@ struct SplitViewCellView: View {
                     // Arc's `ChildItem.separatorHeight`.
                     theme.separator.frame(width: 0.5, height: 16).frame(width: 8.5).opacity(selected ? 0 : 1)
                 }
-                ChildItem(model: model, tab: tab, isSelected: selected, showsClose: selected && hovering)
+                ChildItem(model: model, tab: tab, isSelected: selected, showsClose: selected && hovering && !pinned)
             }
         }
         .padding(.leading, 4)
-        .padding(.trailing, hovering && !selected ? 34 : 4)
+        .padding(.trailing, hovering && (!selected || pinned) ? 34 : 4)
         .frame(height: 36)
         .background {
             card.fill(selected ? theme.selectedCard : hovering ? theme.itemFill : .clear)
@@ -36,11 +37,14 @@ struct SplitViewCellView: View {
         .padding(.horizontal, 1.5)
         .onTapGesture { if !selected { model.selectSplitView(splitID) } }
         .overlay(alignment: .trailing) {
-            // As seen in Arc: the ✕ of a split that isn't selected closes all its tabs.
-            if hovering, !selected {
-                SidebarCellButton(glyph: .close) { model.closeSplitView(splitID) }
-                    .help("Archive this Split View")
-                    .padding(.trailing, 7.5)
+            // As seen in Arc: the ✕ of a split that isn't selected closes all its tabs, and a selected pinned split
+            // has one "—" that unloads its pages, as a pinned tab's.
+            if hovering, !selected || pinned {
+                SidebarCellButton(glyph: selected ? .minus : .close) {
+                    if selected { model.closeSplitViewPages(splitID) } else { model.closeSplitView(splitID) }
+                }
+                .help(selected ? "Close and Keep Pinned" : "Archive this Split View")
+                .padding(.trailing, 7.5)
             }
         }
         .frame(height: 40)

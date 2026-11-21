@@ -251,7 +251,7 @@ final class SidebarDrag {
             return Target(section: .favorites, index: min(index, others))
         }
         guard list.area.contains(point) else { return nil }
-        let pinnedIDs = model.state.tabs(in: model.selectedSpaceID, pinned: true).map(\.id)
+        let pinnedIDs = model.state.entries(in: model.selectedSpaceID, pinned: true).map(\.id)
         let boundary =
             list.divider?.midY ?? (list.newTab != .zero ? list.newTab.minY : nil)
             ?? pinnedIDs.compactMap { rows[$0]?.rect.maxY }.max() ?? list.pinnedTop

@@ -203,7 +203,8 @@ final class WindowModel {
     func title(for tab: SidebarTab) -> String {
         guard let url = leftAddress(tab), let page = pages[tab.id] else { return tab.displayTitle }
         let live = page.title.isEmpty ? url.host() ?? url.absoluteString : page.title
-        return state.isFavorite(tab.id) ? live : "/ " + live
+        // As seen in Arc: a split's pane shows no "/".
+        return state.isFavorite(tab.id) || state.splitViewID(containing: tab.id) != nil ? live : "/ " + live
     }
 
     func leftAddress(_ tab: SidebarTab) -> URL? {
@@ -1365,6 +1366,15 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    /// As seen in Arc: ⌘W and the "—" of a pinned split unload all its pages and leave nothing selected, and the
+    /// split stays pinned.
+    func closeSplitViewPages(_ splitID: UUID) {
+        let tabIDs = state.tree[splitID]?.childIDs ?? []
+        guard let first = tabIDs.first, let spaceID = state.space(containing: first)?.id else { return }
+        if tabIDs.contains(where: { selectedTabIDs[spaceID] == $0 }) { selectedTabIDs[spaceID] = nil }
+        for tabID in tabIDs where store.windows.contains(where: { $0.pages[tabID] != nil }) { close(tabID) }
+    }
+
     /// As seen in Arc: a split's ✕ archives its tabs in one step, "Archive Tabs" to undo.
     func closeSplitView(_ splitID: UUID) {
         guard let closed = closedSplitView(splitID) else { return }
@@ -1393,7 +1403,9 @@ final class WindowModel {
             selectedTabIDs[selectedSpaceID] = next
             ensurePresentedPages()
         }
-        for tabID in tabIDs { close(tabID, group: group) }
+        for tabID in tabIDs {
+            if state.isPinned(tabID) { archivePinned(tabID, group: group) } else { close(tabID, group: group) }
+        }
     }
 
     func respond(to request: PagePermissionRequest, with response: PermissionResponse) {

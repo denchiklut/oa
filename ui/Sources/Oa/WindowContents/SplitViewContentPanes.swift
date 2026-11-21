@@ -278,8 +278,9 @@ struct ContentPanelTopBar: View {
                         hostsPermissionPrompt: false)
                 }
                 if isFocused, let splitID { splitViewMenu(splitID, vertical: vertical) }
+                // As seen in Arc: on a pinned split it archives the pane's tab, and the other stays pinned.
                 Button {
-                    model.close(tabID)
+                    model.archivePinned(tabID)
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 13))
