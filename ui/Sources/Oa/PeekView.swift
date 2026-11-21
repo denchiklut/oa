@@ -63,6 +63,14 @@ struct PeekView: View {
             ModalButton(symbol: "xmark", size: 12, help: "Close Peek", action: model.closePeek)
             ModalButton(
                 symbol: "arrow.up.left.and.arrow.down.right", size: 14.5, help: "Expand Peek", action: model.expandPeek)
+            // Arc's third control, by its `ModalParentSplitState`: Create Split View on a lone tab, Add to Split View
+            // on a split with room.
+            if model.canAddPeekToSplitView {
+                let inSplit = model.presentedTabIDs.count > 1
+                ModalButton(
+                    symbol: inSplit ? "square.split.1x2" : "square.split.2x1", size: 14,
+                    help: inSplit ? "Add to Split View" : "Create Split View", action: model.addPeekToSplitView)
+            }
         }
     }
 }
