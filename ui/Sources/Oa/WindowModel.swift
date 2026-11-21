@@ -533,7 +533,7 @@ final class WindowModel {
             let shortcut = ARCKeyboardShortcut(keyCode: keyCode, modifiers: modifierFlags),
             let binding = keyBindings.state.shortcutToBinding[shortcut],
             binding.priority == .promptAfterConsumedByWebView,
-            let item = NSApplication.shared.mainMenu?.item(withKeyBindingID: binding.id)
+            let item = NSApplication.shared.mainMenu?.firstItem(with: shortcut)
         else { return }
         item.menu?.update()
         guard item.isEnabled else { return }
