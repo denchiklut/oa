@@ -615,6 +615,19 @@ final class WindowModel {
         openCommandBar(.newTab)
     }
 
+    /// Arc's `switchToSplitViewPane(at:)`.
+    func switchToSplitViewPane(at index: Int) {
+        let tabIDs = presentedTabIDs
+        if tabIDs.count > 1, tabIDs.indices.contains(index) { select(tabIDs[index]) }
+    }
+
+    /// Arc's `switchToAdjacentSplitViewPane(offset:)`, with wraparound.
+    func switchToAdjacentSplitViewPane(offset: Int) {
+        let tabIDs = presentedTabIDs
+        guard tabIDs.count > 1, let index = selectedTabID.flatMap(tabIDs.firstIndex(of:)) else { return }
+        select(tabIDs[(index + offset + tabIDs.count) % tabIDs.count])
+    }
+
     func moveSplitViewPane(_ tabID: UUID, by offset: Int) {
         store.edit { $0.moveSplitViewPane(tabID, by: offset) }
     }
