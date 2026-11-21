@@ -8,6 +8,10 @@ import simd
 struct WindowSurface: View {
     typealias Next = (background: WindowTheme.Background, progress: Double)
 
+    /// Arc's `WindowBackgroundViewRendererType`: the window draws with its Metal renderer, the Library's cards with
+    /// its SwiftUI one (`WindowBackgroundViewLegacy`), whose gradient runs from corner to corner.
+    enum Renderer { case metal, swiftUI }
+
     let background: WindowTheme.Background
     /// Arc's `.transitioning` pair during a swipe between Spaces: the next Space's background and how far toward it.
     /// Its colours cross-fade with these, as measured on Arc, uniformly and in encoded values, and its material goes
@@ -16,6 +20,7 @@ struct WindowSurface: View {
     /// The window in this surface's space, for a part of the window's background drawn elsewhere: the floating
     /// sidebar's.
     var window: CGRect?
+    var renderer = Renderer.metal
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.controlActiveState) private var activeState
     @Environment(\.displayScale) private var displayScale
@@ -55,12 +60,14 @@ struct WindowSurface: View {
 
     private func layer(_ background: WindowTheme.Background) -> some View {
         ZStack {
-            // Arc's underlay goes by the window's appearance, not the theme's: black under a dark one.
+            // Arc's underlay goes by its view's appearance, not the theme's: the window's, or a Library card's, which
+            // Arc sets from that Space's theme.
             let alpha = background.alpha
             let underlay = min(alpha, 0.5)
             ThemeColors(
                 style: background.style, alpha: alpha,
-                underlay: colorScheme == .dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay))
+                underlay: colorScheme == .dark ? .black.opacity(0.35 * underlay) : .white.opacity(underlay),
+                renderer: renderer)
             texture(background.modifiers)
         }
         .compositingGroup()
@@ -142,6 +149,7 @@ private struct ThemeColors: NSViewRepresentable, Equatable {
     let style: WindowTheme.Style
     let alpha: Double
     let underlay: ThemeColor
+    let renderer: WindowSurface.Renderer
 
     func makeNSView(context: Context) -> Bitmap {
         let view = Bitmap()
@@ -199,7 +207,13 @@ private struct ThemeColors: NSViewRepresentable, Equatable {
             let rest = alpha * (1 - cover)
             for column in 0..<side {
                 let u = (Double(column) + 0.5) / Double(side)
-                let along = (u * size.width + v * size.height) / (size.width + size.height)
+                let along =
+                    switch renderer {
+                    case .metal: (u * size.width + v * size.height) / (size.width + size.height)
+                    case .swiftUI:
+                        (u * size.width * size.width + v * size.height * size.height)
+                            / (size.width * size.width + size.height * size.height)
+                    }
                 let below = ThemeColor.linear(oklab: ends.0 + (ends.1 - ends.0) * min(along * 4 / 3, 1))
                 let layer = ThemeColor(linear: (above * cover + below * rest) / (cover + rest))
                     .opacity(cover + rest).over(underlay)

@@ -31,14 +31,16 @@ struct SpaceManagementCardHeader: View {
             : Color(.sRGB, red: 0.055, green: 0.059, blue: 0.063, opacity: 0.05)
         HStack(spacing: 5) {
             name
-                .padding(.leading, showsIcon ? 28 : 0)
+                .padding(.leading, showsIcon ? 30.5 : 0)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: showsIcon)
                 .overlay(alignment: .leading) { iconButton(highlighted: highlighted) }
             profileMenu
             themeButton
         }
         .padding(.horizontal, 6)
-        .frame(height: 36)
+        // As measured on Arc: the name, badge and brush are centred 25 pt below the card's top.
+        .frame(height: 34)
+        .padding(.bottom, 2)
         .background(highlighted ? rowFill : .clear, in: row)
         .contentShape(row)
         .onHover { isHovered = $0 }
@@ -48,8 +50,9 @@ struct SpaceManagementCardHeader: View {
         Button {
             model.presentSpaceStyleEditor(for: space.id, from: .library)
         } label: {
-            Image(systemName: "paintbrush.pointed")
-                .font(.system(size: 13, weight: .semibold))
+            Image(systemName: "paintbrush.pointed.fill")
+                .font(.system(size: 12.5, weight: .regular))
+                .offset(x: -0.5)
                 .foregroundStyle(hoverInk.opacity(0.3))
                 .frame(width: 24, height: 24)
                 .contentShape(Rectangle())
@@ -67,9 +70,10 @@ struct SpaceManagementCardHeader: View {
             ZStack {
                 well.fill(hoverInk.opacity(isIconHovered ? 0.1 : 0))
                 if let icon = space.icon {
+                    // As measured on Arc: in the card's `maxContrastColor`, like the sidebar's template icons.
                     SpaceIconGlyph(icon: icon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(theme.foreground)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(theme.maxContrast)
                 }
                 well.strokeBorder(hoverInk.opacity(highlighted ? 0.3 : 0), style: StrokeStyle(dash: [4, 2]))
             }

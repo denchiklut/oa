@@ -186,16 +186,19 @@ private struct SpaceNameRow: View {
                 Group {
                     if showsChevron {
                         Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(theme.sectionHeaderText)
                             .rotationEffect(.degrees(collapsed ? -90 : 0))
                             .animation(.easeOut(duration: 0.1), value: collapsed)
                     } else if let icon = space.icon {
+                        // As measured on Arc: in the Space's `maxContrastColor`, the name starting where titles do.
                         SpaceIconGlyph(icon: icon)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(theme.maxContrast)
                     }
                 }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.sectionHeaderText)
                 .frame(width: 26, height: 26)
-                .padding(.trailing, 2)
+                .padding(.trailing, 5)
             }
             if renaming {
                 TextField("", text: $draft)
