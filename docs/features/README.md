@@ -136,8 +136,8 @@ Sources: Arc [2022][arc22], [2023][arc23], [profile migration guide][arc-migrati
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
 | Multiple pages in a Split View | ✅ | ✅ |
-| Horizontal and vertical splits | ✅ | ☐ |
-| Resize, reorder and focus split panes | ✅ | ☐ |
+| Horizontal and vertical splits | ✅ | ✅ |
+| Resize, reorder and focus split panes | ✅ | ✅ |
 | Create splits by dragging tabs or links | ✅ | ☐ |
 | Pin and save Split Views | ✅ | ☐ |
 | Separate a page from a split | ✅ | ✅ |
