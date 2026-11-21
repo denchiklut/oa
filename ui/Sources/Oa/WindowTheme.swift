@@ -79,7 +79,7 @@ struct WindowTheme: Hashable, Codable {
         case complimentary, analogous
     }
 
-    enum Overlay: String, Hashable, Codable {
+    enum Overlay: String, Hashable, Codable, CaseIterable {
         case grain, sand, denim, tweed
     }
 
