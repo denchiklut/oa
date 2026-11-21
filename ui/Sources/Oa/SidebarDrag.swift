@@ -40,6 +40,8 @@ final class SidebarDrag {
     @ObservationIgnored var grid = CGRect.zero
     @ObservationIgnored var gap = CGRect.zero
     @ObservationIgnored var tiles: [UUID: CGRect] = [:]
+    /// Where the window's page or panes are.
+    @ObservationIgnored var pageArea = CGRect.zero
 
     private(set) var tab: SidebarTab?
     private(set) var source: Section?
@@ -54,21 +56,36 @@ final class SidebarDrag {
     private(set) var rowAnchor = CGPoint.zero
     private(set) var tileAnchor = CGPoint.zero
     @ObservationIgnored private var origin = CGRect.zero
+    /// The tab the window showed before the press selected the dragged one.
+    @ObservationIgnored private var previousTabID: UUID?
+    @ObservationIgnored private var showsPrevious = false
+    /// As measured on Arc: the edge of a pane the pointer entered, which holds until the pane's middle.
+    @ObservationIgnored private var heldEdge: (pane: Int, edge: Edge)?
+
+    private enum Edge {
+        case left
+        case right
+        case top
+        case bottom
+    }
 
     var lineRect: CGRect? { settling ? nil : target?.line }
 
     func update(
         _ tab: SidebarTab, from section: Section, glyph: SidebarCellButton.Glyph, at location: CGPoint,
-        start: CGPoint, model: WindowModel, layout: WindowLayoutController
+        start: CGPoint, previous: UUID? = nil, model: WindowModel, layout: WindowLayoutController
     ) {
         guard !settling else { return }
         if self.tab?.id != tab.id {
             guard hypot(location.x - start.x, location.y - start.y) >= 4 else { return }
             begin(tab, from: section, glyph: glyph, start: start, model: model, layout: layout)
+            previousTabID = previous
         }
         self.location = location
         let next = target(at: location, model: model)
         if next != target { target = next }
+        let dropTarget = next == nil ? splitViewDropTarget(at: location, model: model) : nil
+        if dropTarget != model.proposedSplitViewDropTarget { model.proposedSplitViewDropTarget = dropTarget }
         let shape: CGFloat = next?.section == .favorites ? 1 : 0
         if next != nil, shape != morph {
             withAnimation(.easeInOut(duration: shape == 1 ? 0.28 : 0.2)) { morph = shape }
@@ -78,6 +95,17 @@ final class SidebarDrag {
     /// Over a place, the tab moves there at once and the copy glides onto it; elsewhere it glides back.
     func finish(model: WindowModel, layout: WindowLayoutController) {
         guard let tab, !settling else { return }
+        heldEdge = nil
+        if model.proposedSplitViewDropTarget != nil {
+            model.acceptSplitViewDrop(of: tab.id)
+            self.tab = nil
+            source = nil
+            showsPrevious = false
+            return layout.setHold(.drag, false)
+        }
+        // Oa's own: a tab dropped anywhere else is the selected one, as before it was dragged over the page.
+        if showsPrevious { model.select(tab.id) }
+        showsPrevious = false
         settling = true
         let target = target
         if let target {
@@ -143,6 +171,71 @@ final class SidebarDrag {
         source = section
         self.glyph = glyph
         layout.setHold(.drag, true)
+    }
+
+    /// Arc's page drop. Over the page the window shows what it showed before the press, as Arc's does once the drag
+    /// begins. An edge of a pane inserts there and the rest of it replaces its tab. As measured on a lone page: the
+    /// outer 40 % at the sides, 50 pt at the top and 40 pt at the bottom, and an edge once entered holds over the
+    /// half its preview takes. In a split, whose edges weren't measured: those of its orientation while it has room,
+    /// LIKELY by Arc's other sizes, a third of the pane up to 80 pt at the sides and 50 pt at the ends, with no hold.
+    /// Oa's own for now: only a tab that can be in a split, so not a pinned one or a Favorite.
+    private func splitViewDropTarget(at point: CGPoint, model: WindowModel) -> SplitViewDropTarget? {
+        guard let tab, pageArea.contains(point), model.library == nil, !model.coversWindow else {
+            heldEdge = nil
+            return nil
+        }
+        if !showsPrevious, let previousTabID, previousTabID != tab.id, model.selectedTabID == tab.id {
+            model.select(previousTabID)
+            showsPrevious = true
+        }
+        let tabIDs = model.presentedTabIDs
+        guard let anchorID = model.selectedTabID, !tabIDs.contains(tab.id),
+            model.state.canJoinSplitView(tab.id, of: anchorID)
+        else { return nil }
+        let splitID = model.state.splitViewID(containing: anchorID)
+        let orientation = model.splitViewLayoutOrientation
+        let frames = SplitViewContentPanes.frames(
+            splitID.map(model.paneShares(of:)) ?? [1], in: pageArea, vertical: orientation == .vertical)
+        guard let pane = frames.firstIndex(where: { $0.insetBy(dx: -5, dy: -5).contains(point) }) else { return nil }
+        let frame = frames[pane]
+        let x = (point.x - frame.minX) / frame.width
+        let y = (point.y - frame.minY) / frame.height
+        var edge: Edge?
+        if splitID == nil {
+            let holds =
+                switch heldEdge?.edge {
+                case .left: x < 0.5
+                case .right: x > 0.5
+                case .top: y < 0.5
+                case .bottom: y > 0.5
+                case nil: false
+                }
+            if holds {
+                edge = heldEdge?.edge
+            } else if point.y <= frame.minY + min(frame.height / 3, 50) {
+                edge = .top
+            } else if point.y >= frame.maxY - 40 {
+                edge = .bottom
+            } else if x <= 0.4 {
+                edge = .left
+            } else if x >= 0.6 {
+                edge = .right
+            }
+        } else if orientation == .horizontal {
+            let side = min(frame.width / 3, 80)
+            edge = point.x <= frame.minX + side ? .left : point.x >= frame.maxX - side ? .right : nil
+        } else {
+            let end = min(frame.height / 3, 50)
+            edge = point.y <= frame.minY + end ? .top : point.y >= frame.maxY - end ? .bottom : nil
+        }
+        guard let edge, tabIDs.count < SidebarSplitViewData.maxNumberSplit else {
+            heldEdge = nil
+            return SplitViewDropTarget(target: .replaceContent(pane), layoutOrientation: orientation)
+        }
+        heldEdge = (pane, edge)
+        return SplitViewDropTarget(
+            target: .insertContent(edge == .left || edge == .top ? pane : pane + 1),
+            layoutOrientation: splitID != nil ? orientation : edge == .left || edge == .right ? .horizontal : .vertical)
     }
 
     /// The pointer picks the place, as AppKit's drag destinations do: among the Favorites the slot under it, in the
