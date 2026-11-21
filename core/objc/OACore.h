@@ -179,6 +179,7 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 @property(nonatomic, readonly, getter=isCameraOn) BOOL cameraOn;
 @property(nonatomic, readonly, getter=isMicrophoneOn) BOOL microphoneOn;
 @property(nonatomic, readonly, getter=isAudible) BOOL audible;
+@property(nonatomic, readonly) BOOL hasFocus;
 // None while the page has no media session.
 @property(nonatomic, readonly) OAPageMediaSessionStatus mediaSessionStatus;
 @property(nonatomic, readonly) OAPageMediaContentType mediaContentType;
