@@ -238,12 +238,15 @@ struct PlaceholderView: View {
 
 struct PageHostView: NSViewRepresentable {
     let view: NSView
+    /// The host is in a window: only then can the engine give its page the keyboard.
+    var movedToWindow: () -> Void = {}
 
     func makeNSView(context: Context) -> Container { Container() }
 
     /// A host updated with the view it already placed leaves it alone: another host may have taken it since, as
     /// the window's does on Expand, and SwiftUI still updates the Peek's host on its way out.
     func updateNSView(_ container: Container, context: Context) {
+        container.movedToWindow = movedToWindow
         guard container.hosted !== view else { return }
         container.hosted = view
         container.subviews.forEach { $0.removeFromSuperview() }
@@ -255,8 +258,14 @@ struct PageHostView: NSViewRepresentable {
 
     final class Container: NSView {
         weak var hosted: NSView?
+        var movedToWindow: () -> Void = {}
 
         override var isFlipped: Bool { true }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window != nil { movedToWindow() }
+        }
 
         override func resizeSubviews(withOldSize oldSize: NSSize) { fit() }
 

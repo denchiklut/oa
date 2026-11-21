@@ -48,7 +48,10 @@ private struct SplitViewContentPane: View {
             if let placeholder = model.placeholder(for: tabID) {
                 PlaceholderView(image: placeholder)
             } else if let page {
-                PageContentView(page: page).toast(of: model, on: page).pageRootBackground(page)
+                // A pane's host is made once its page is, after the window activated the page: the focused pane's
+                // page takes the keyboard when the host is in the window.
+                PageContentView(page: page) { model.activatePresented(page) }
+                    .toast(of: model, on: page).pageRootBackground(page)
             } else {
                 Color.clear
             }
