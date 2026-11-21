@@ -680,7 +680,14 @@ final class WindowModel {
             tabIDs.removeAll { $0 == selectedTabID }
             tabIDs.insert(selectedTabID, at: 0)
         }
+        // As Arc's filter, which keeps the items that are their own selectable root: a split is one card, here the
+        // pane this window focuses in it.
+        var cards = Set<UUID>()
         return tabIDs.filter { state.tree.tab($0) != nil && state.profile(containing: $0)?.id == space?.profileID }
+            .compactMap { tabID in
+                let card = state.splitViewID(containing: tabID).flatMap(focusedTabID(of:)) ?? tabID
+                return cards.insert(card).inserted ? card : nil
+            }
     }
 
     /// As Arc's `onHighlightAdjacentRecentTab`: the command bar closes and the switcher comes up over the recent
@@ -691,7 +698,7 @@ final class WindowModel {
         guard modalItemSwitcher == nil,
             let switcher = ModalItemSwitcher(itemIDs: recentTabIDs, currentID: selectedTabID, target: target)
         else { return }
-        page?.requestThumbnail()
+        presentedTabIDs.forEach { pages[$0]?.requestThumbnail() }
         peek?.requestThumbnail()
         modalItemSwitcher = switcher
     }
