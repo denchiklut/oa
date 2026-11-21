@@ -326,9 +326,17 @@ struct SidebarState {
     }
 
     mutating func setSpaceIcon(_ icon: String?, for id: UUID) {
+        editCustomInfo(of: id) { $0.icon = icon }
+    }
+
+    mutating func setSpaceTheme(_ theme: WindowTheme?, for id: UUID) {
+        editCustomInfo(of: id) { $0.windowTheme = theme }
+    }
+
+    private mutating func editCustomInfo(of id: UUID, _ change: (inout SidebarSpace.CustomInfo) -> Void) {
         guard let index = spaces.firstIndex(where: { $0.id == id }) else { return }
         var info = spaces[index].customInfo ?? SidebarSpace.CustomInfo()
-        info.icon = icon
+        change(&info)
         spaces[index].customInfo = info.icon == nil && info.windowTheme == nil ? nil : info
     }
 

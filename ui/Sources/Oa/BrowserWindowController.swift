@@ -190,6 +190,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         model.renameSpace(space.id, to: name)
     }
 
+    @objc func editTheme(_ sender: Any?) {
+        if let space = model.space { model.presentSpaceStyleEditor(for: space.id, from: .sidebar) }
+    }
+
     @objc func changeProfile(_ sender: Any?) {
         if let space = model.space { ProfileDialogUtils.changeProfile(of: space, in: model) }
     }
@@ -257,7 +261,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         if model.dialog != nil || model.extensionRequest != nil { return false }
         // As Arc: the Create a Space panel holds back creating and editing a Space, not moving between them.
-        let editsSpace = [#selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(changeProfile(_:))]
+        let editsSpace = [
+            #selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(editTheme(_:)), #selector(changeProfile(_:)),
+        ]
         if model.spaceCreation != nil, let action = item.action, editsSpace.contains(action) { return false }
         if item.action == #selector(runExtension(_:)) {
             return model.extensionActions.contains { $0.id == item.representedObject as? String }

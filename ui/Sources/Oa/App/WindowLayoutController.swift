@@ -75,6 +75,7 @@ final class WindowLayoutController: NSViewController {
     var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
     @ObservationIgnored private var holds: Set<Hold> = []
+    @ObservationIgnored private var spaceStyleEditorPopover: (spaceID: UUID, popover: SpaceStyleEditorPopover)?
     @ObservationIgnored private var monitor: Any?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var appAppearance: NSKeyValueObservation?
@@ -211,7 +212,9 @@ final class WindowLayoutController: NSViewController {
 
     /// Oa's own, by the author's decision, after open-arch: the Library is in the first Space's theme, blended in
     /// with the Library's progress. Arc's is the window's Space's.
-    var libraryTheme: WindowTheme { model.state.spaces.first?.theme ?? .default }
+    var libraryTheme: WindowTheme { model.state.spaces.first.map(model.theme(of:)) ?? .default }
+
+    private var spaceTheme: WindowTheme { model.space.map(model.theme(of:)) ?? .default }
 
     var spaceCreationFade: SpaceCreationFade? {
         if let runningFade { return runningFade }
@@ -241,7 +244,7 @@ final class WindowLayoutController: NSViewController {
     /// panel. As open-arch, the panel's cross-fade and a swipe away from it switch it halfway.
     var chromeTheme: WindowTheme {
         if let fade = spaceCreationFade { return fade.theme < 0.5 ? fade.themes.from : fade.themes.to }
-        guard model.spaceCreation != nil else { return model.space?.theme ?? .default }
+        guard model.spaceCreation != nil else { return spaceTheme }
         let pages = sidebarPages
         guard spaceCreationSwiped, !pages.isEmpty else { return .default }
         return theme(of: pages[min(max(Int(sidebarPage.rounded()), 0), pages.count - 1)])
@@ -249,7 +252,7 @@ final class WindowLayoutController: NSViewController {
 
     private func theme(of page: WindowLayoutPage) -> WindowTheme {
         switch page {
-        case .space(let id): model.state.space(id)?.theme ?? .default
+        case .space(let id): model.state.space(id).map(model.theme(of:)) ?? .default
         case .spaceCreation: .default
         case .home: .default
         }
@@ -258,17 +261,17 @@ final class WindowLayoutController: NSViewController {
     var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         if let fade = spaceCreationFade { return (fade.themes.from, (fade.themes.to, fade.theme)) }
         let spaces = model.state.spaces
-        guard restingSpaceID != nil, !spaces.isEmpty else { return (model.space?.theme ?? .default, nil) }
+        guard restingSpaceID != nil, !spaces.isEmpty else { return (spaceTheme, nil) }
         let progress = min(libraryProgress, 1)
         guard progress > 0 else { return spaceThemes }
         let beside = spaces[min(leadingSpace, spaces.count - 1)]
         if progress == 1 || beside.id == spaces[0].id { return (libraryTheme, nil) }
-        return (beside.theme, (libraryTheme, progress))
+        return (model.theme(of: beside), (libraryTheme, progress))
     }
 
     private var spaceThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         let pages = sidebarPages
-        guard let restingSpaceID, !pages.isEmpty else { return (model.space?.theme ?? .default, nil) }
+        guard let restingSpaceID, !pages.isEmpty else { return (spaceTheme, nil) }
         // The Create a Space page is in its own theme until one is chosen.
         let themes = pages.map(theme(of:))
         let last = pages.count - 1
@@ -461,6 +464,7 @@ final class WindowLayoutController: NSViewController {
         observe(NSMenu.didBeginTrackingNotification, nil) { $0.setHold(.menu, $0.view.window?.isKeyWindow == true) }
         observe(NSMenu.didEndTrackingNotification, nil) { $0.setHold(.menu, false) }
         observeModel()
+        observeSpaceStyleEditor()
         observeWindowAppearance()
         appAppearance = NSApplication.shared.observe(\.effectiveAppearance) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.updateWindowAppearance() }
@@ -553,6 +557,41 @@ final class WindowLayoutController: NSViewController {
         if window.appearance?.name != appearance?.name { window.appearance = appearance }
     }
 
+    private func observeSpaceStyleEditor() {
+        let spaceID = withObservationTracking {
+            model.spaceStyleEditor.flatMap { $0.origin == .sidebar ? $0.spaceID : nil }
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeSpaceStyleEditor() }
+        }
+        updateSpaceStyleEditorPopover(for: spaceID)
+    }
+
+    /// As Arc's sidebar: the editor hangs from its outer edge, level with the pointer, with no arrow.
+    private func updateSpaceStyleEditorPopover(for presentation: UUID?) {
+        guard presentation != spaceStyleEditorPopover?.spaceID else { return }
+        if let shown = spaceStyleEditorPopover {
+            spaceStyleEditorPopover = nil
+            shown.popover.close(notifying: false)
+        }
+        trackPointer()
+        guard let spaceID = presentation, let window = view.window else { return }
+        let popover = SpaceStyleEditorPopover(
+            hidesArrow: true, pageView: { [weak model] in model?.frontPage?.view },
+            onClose: { [weak self] in
+                self?.spaceStyleEditorPopover = nil
+                self?.model.dismissSpaceStyleEditor()
+                self?.trackPointer()
+            }
+        ) { WindowSpaceStyleEditorView(model: model) }
+        spaceStyleEditorPopover = (spaceID, popover)
+        let docked = model.sidebarMode == .anchored
+        let left = docked ? 0 : Self.floatingInset
+        let height = window.contentLayoutRect.height
+        let pointer = min(max(window.mouseLocationOutsideOfEventStream.y, 0), height - 1)
+        let rect = view.convert(NSRect(x: left, y: pointer, width: sidebarWidth, height: 1), from: nil)
+        popover.show(relativeTo: rect, of: view)
+    }
+
     private func observeModel() {
         withObservationTracking {
             _ = (model.sidebarMode, model.library, model.selectedTabID, model.selectedSpaceID, model.sidebarWidth)
@@ -595,7 +634,9 @@ final class WindowLayoutController: NSViewController {
         let floating = sidebarPresentation == .floating
         let allowTop = !PageToolbar.isShown || model.selectedTabID != nil
         let prompts = model.permissionRequest != nil && !PageToolbar.isShown
-        if hover.reveals(active: floating, allowTop: allowTop) || model.selectedTabID == nil || prompts {
+        // As Arc: the theme editor beside the sidebar brings it out and keeps it out.
+        let editsTheme = model.spaceStyleEditor?.origin == .sidebar
+        if hover.reveals(active: floating, allowTop: allowTop) || model.selectedTabID == nil || prompts || editsTheme {
             return .floating
         }
         return floating && !holds.isEmpty ? .floating : .hidden

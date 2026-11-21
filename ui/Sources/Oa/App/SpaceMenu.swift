@@ -10,6 +10,7 @@ struct SpaceMenu {
     var inLibrary = false
     let changeIcon: () -> Void
     let rename: () -> Void
+    let editTheme: () -> Void
 
     func make() -> NSMenu {
         let menu = NSMenu()
@@ -17,7 +18,7 @@ struct SpaceMenu {
         menu.items = [
             SpaceMenuItem("Change Space Icon…", changeIcon),
             SpaceMenuItem("Rename Space…", rename),
-            SpaceMenuItem("Edit Theme Color…"),
+            SpaceMenuItem("Edit Theme Color…", editTheme),
             SpaceMenuItem("Set Profile", submenu: profiles()),
             .separator(),
             SpaceMenuItem("New Folder"),
@@ -65,6 +66,8 @@ extension SpaceMenu {
             layout.iconPickerSpaceID = space.id
         } rename: {
             if let name = NamePrompt.run("Rename Space", name: space.name) { model.renameSpace(space.id, to: name) }
+        } editTheme: {
+            model.presentSpaceStyleEditor(for: space.id, from: .sidebar)
         }
     }
 }

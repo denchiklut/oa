@@ -172,7 +172,8 @@ private struct ToastSlot: View {
     var body: some View {
         ZStack {
             if let toast = model.toast, toast.location == location {
-                ToastView(toast: toast, background: (model.space?.theme ?? .default).background[scheme]) {
+                ToastView(toast: toast, background: (model.space.map(model.theme(of:)) ?? .default).background[scheme])
+                {
                     model.editShortcut(of: toast)
                 }
                 .id(toast.id)
