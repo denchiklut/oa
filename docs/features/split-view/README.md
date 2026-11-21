@@ -13,7 +13,9 @@ order, and each pane is an ordinary tab with its own page.
   The new pane takes the focus. A split holds four panes at most, Arc's limit.
 - **From a link.** The page menu's Open Link in Split View opens the link in a
   pane on the right of its page, focused. A Peek's third control does the same
-  with the Peek's page.
+  with the Peek's page. So does any open of a page in a new foreground tab while
+  ⌥ is held, as a `target=_blank` link or a `window.open` from a click: Arc's
+  ADK turns those into a split by the event's modifiers.
 - **Dropping a tab on the page.** A sidebar tab dragged over the page shows
   where it would go. On a lone page an edge makes a split with it: the outer
   40 % at the sides, 50 pt at the top and 40 pt at the bottom, and the top and
@@ -144,5 +146,6 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: ⌥-click on a link, dragging a split's cell, dropping a link or a
+Not there yet: a plain ⌥-click on a link, which Chromium makes a download
+before the app sees it and Arc somehow doesn't, dragging a split's cell, dropping a link or a
 tab on a sidebar row, and a split's Change Icon…, Duplicate and Move to.
