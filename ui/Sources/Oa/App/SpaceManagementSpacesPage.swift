@@ -222,7 +222,7 @@ private struct SpaceManagementCollectionViewItem: View {
                 .animation(
                     .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: model.state.tabs(in: space.id).map(\.id))
             }
-            footer
+            footer(isDark: appearance == .dark)
         }
         .environment(\.colorScheme, appearance.colorScheme)
         .environment(\.theme, theme)
@@ -258,7 +258,7 @@ private struct SpaceManagementCollectionViewItem: View {
     }
 
     /// Arc's `SpaceControlsView`: the handle and "⋯", 28 pt each with GrayA4 under the pointer.
-    private var footer: some View {
+    private func footer(isDark: Bool) -> some View {
         HStack(spacing: 0) {
             SpaceManagementDraggerView()
                 .gesture(
@@ -286,7 +286,8 @@ private struct SpaceManagementCollectionViewItem: View {
             .help("More options")
             .accessibilityLabel("More options")
         }
-        .foregroundStyle(.primary.opacity(0.5))
+        // As measured on Arc over three themes.
+        .foregroundStyle(isDark ? Color.white.opacity(0.55) : .black.opacity(0.5))
         .padding(8)
     }
 

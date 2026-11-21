@@ -48,8 +48,9 @@ struct SpaceManagementCardHeader: View {
         Button {
             model.presentSpaceStyleEditor(for: space.id, from: .library)
         } label: {
-            Image(systemName: "paintbrush.pointed")
-                .font(.system(size: 13, weight: .semibold))
+            Image(systemName: "paintbrush.pointed.fill")
+                .font(.system(size: 12.5, weight: .regular))
+                .offset(x: -0.5, y: -1)
                 .foregroundStyle(hoverInk.opacity(0.3))
                 .frame(width: 24, height: 24)
                 .contentShape(Rectangle())
