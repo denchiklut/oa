@@ -112,25 +112,44 @@ extension SidebarState {
         }
     }
 
-    /// Oa's own for now: unpinned tabs of one Space only. Arc pins a split whole and files one under Favorites.
-    func canAddSplitViewPane(beside anchorID: UUID) -> Bool {
-        space(containing: anchorID) != nil && (!isPinned(anchorID) || splitViewID(containing: anchorID) != nil)
+    /// The Space a tab goes into a split in: its own, or for a Favorite the one shown.
+    private func splitViewSpace(of tabID: UUID, shown spaceID: UUID) -> UUID? {
+        isFavorite(tabID) ? (isSelectable(tabID, in: spaceID) ? spaceID : nil) : space(containing: tabID)?.id
+    }
+
+    /// As seen in Arc: a Favorite split takes no pane, its Add Tab… off.
+    func canAddSplitViewPane(beside anchorID: UUID, in spaceID: UUID) -> Bool {
+        splitViewSpace(of: anchorID, shown: spaceID) == spaceID
+            && !(isFavorite(anchorID) && splitViewID(containing: anchorID) != nil)
             && presentedTabIDs(with: anchorID).count < SidebarSplitViewData.maxNumberSplit
     }
 
-    func canOpenInSplitView(_ tabID: UUID, beside anchorID: UUID) -> Bool {
-        canAddSplitViewPane(beside: anchorID) && canJoinSplitView(tabID, of: anchorID)
+    func canOpenInSplitView(_ tabID: UUID, beside anchorID: UUID, in spaceID: UUID) -> Bool {
+        canAddSplitViewPane(beside: anchorID, in: spaceID) && canJoinSplitView(tabID, of: anchorID, in: spaceID)
     }
 
-    func canJoinSplitView(_ tabID: UUID, of anchorID: UUID) -> Bool {
-        tabID != anchorID && !isPinned(tabID) && (!isPinned(anchorID) || splitViewID(containing: anchorID) != nil)
-            && space(containing: tabID)?.id == space(containing: anchorID)?.id && splitViewID(containing: tabID) == nil
+    func canJoinSplitView(_ tabID: UUID, of anchorID: UUID, in spaceID: UUID) -> Bool {
+        tabID != anchorID && splitViewID(containing: tabID) == nil
+            && splitViewSpace(of: tabID, shown: spaceID) == spaceID
+            && splitViewSpace(of: anchorID, shown: spaceID) == spaceID
+    }
+
+    /// As seen in Arc: a lone pinned tab or Favorite goes into a split as its own item, at the top of the Space's
+    /// list, and a copy of it keeps its place. Returns the copy's ID.
+    mutating func takeIntoSplitView(_ tabID: UUID, in spaceID: UUID) -> UUID? {
+        guard keepsAddress(tabID), splitViewID(containing: tabID) == nil, let tab = tree.tab(tabID),
+            let place = tree.location(of: tabID), let space = space(containing: tabID) ?? space(spaceID)
+        else { return nil }
+        let copy = SidebarTab(id: UUID(), title: tab.title, url: tab.url, viewedAt: .now)
+        tree.insert(SidebarItem(id: copy.id, kind: .tab(copy)), into: place.parentID, at: place.index)
+        tree.move(tabID, into: space.unpinnedRootID, at: 0)
+        return copy.id
     }
 
     /// As Arc's `presentSplitViewWindowContent` with `newPane`: the tab becomes pane `index`, the last when nil, of the
     /// anchor's split, whose panes are equal again as Arc resets them, or of a split made where a lone anchor was.
-    mutating func openInSplitView(_ tabID: UUID, beside anchorID: UUID, at index: Int? = nil) {
-        guard canOpenInSplitView(tabID, beside: anchorID) else { return }
+    mutating func openInSplitView(_ tabID: UUID, beside anchorID: UUID, in spaceID: UUID, at index: Int? = nil) {
+        guard canOpenInSplitView(tabID, beside: anchorID, in: spaceID) else { return }
         if let splitID = splitViewID(containing: anchorID) {
             tree.move(tabID, into: splitID, at: index)
             updateSplitView(splitID) { $0.itemWidthFactors = [:] }
@@ -146,8 +165,8 @@ extension SidebarState {
 
     /// As seen in Arc: the tab takes the pane and its factor, and the pane's tab is a plain one again right after the
     /// split.
-    mutating func replaceSplitViewPane(_ targetID: UUID, with tabID: UUID) {
-        guard canJoinSplitView(tabID, of: targetID), let splitID = splitViewID(containing: targetID),
+    mutating func replaceSplitViewPane(_ targetID: UUID, with tabID: UUID, in spaceID: UUID) {
+        guard canJoinSplitView(tabID, of: targetID, in: spaceID), let splitID = splitViewID(containing: targetID),
             let pane = tree.location(of: targetID), let place = tree.location(of: splitID)
         else { return }
         tree.move(tabID, into: splitID, at: pane.index)

@@ -178,7 +178,7 @@ final class SidebarDrag {
     /// outer 40 % at the sides, 50 pt at the top and 40 pt at the bottom, and an edge once entered holds over the
     /// half its preview takes. In a split, whose edges weren't measured: those of its orientation while it has room,
     /// LIKELY by Arc's other sizes, a third of the pane up to 80 pt at the sides and 50 pt at the ends, with no hold.
-    /// Oa's own for now: only a tab that can be in a split, so not a pinned one or a Favorite.
+    /// A pinned tab or a Favorite goes in as itself and a copy keeps its place, LIKELY as by Arc's other ways in.
     private func splitViewDropTarget(at point: CGPoint, model: WindowModel) -> SplitViewDropTarget? {
         guard let tab, pageArea.contains(point), model.library == nil, !model.coversWindow else {
             heldEdge = nil
@@ -190,7 +190,7 @@ final class SidebarDrag {
         }
         let tabIDs = model.presentedTabIDs
         guard let anchorID = model.selectedTabID, !tabIDs.contains(tab.id),
-            model.state.canJoinSplitView(tab.id, of: anchorID)
+            model.state.canJoinSplitView(tab.id, of: anchorID, in: model.selectedSpaceID)
         else { return nil }
         let splitID = model.state.splitViewID(containing: anchorID)
         let orientation = model.splitViewLayoutOrientation
