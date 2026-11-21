@@ -146,8 +146,9 @@ dropped, and so are the picks of a profile that is gone.
 - **Return** opens the selected row once Chromium has answered what is typed.
   A tab is switched to, with no new tab and no reload. ⌘Return opens a new tab
   in the background, ⇧Return is plain Return. From ⌘L, ⌘Return doing the same
-  is Oa's own; Arc's wasn't tested. ⌥Return is Arc's Split View, so it is plain
-  Return until Oa has splits.
+  is Oa's own; Arc's wasn't tested. ⌥Return from ⌘T opens the row in a
+  [split](../split-view/README.md) beside the current tab, as Arc's does; from
+  ⌘L it is plain Return, Oa's own.
 - **⇧⌦** deletes a past search; a page from history stays, as in Arc.
 
 ## Search and history

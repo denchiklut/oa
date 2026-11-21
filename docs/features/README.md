@@ -47,6 +47,7 @@ that every online integration still works.
 - [Picture-in-picture](picture-in-picture/README.md)
 - [Recent-tab switcher](tab-switcher/README.md)
 - [Ad blocker](ad-blocker/README.md)
+- [Split View](split-view/README.md)
 
 These pages describe existing slices and their product choices. Moving the
 notes here does not assess or change the checklist status below.
@@ -134,12 +135,12 @@ Sources: Arc [2022][arc22], [2023][arc23], [profile migration guide][arc-migrati
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Multiple pages in a Split View | ✅ | ☐ |
+| Multiple pages in a Split View | ✅ | ✅ |
 | Horizontal and vertical splits | ✅ | ☐ |
 | Resize, reorder and focus split panes | ✅ | ☐ |
 | Create splits by dragging tabs or links | ✅ | ☐ |
 | Pin and save Split Views | ✅ | ☐ |
-| Separate a page from a split | ✅ | ☐ |
+| Separate a page from a split | ✅ | ✅ |
 | Custom Split View titles | ✅ | ☐ |
 | Expand Current Split | ✅ | ☐ |
 
