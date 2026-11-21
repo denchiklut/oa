@@ -236,8 +236,9 @@ extension WindowModel {
 
 /// Arc's `ContentPanel` bar on a split's pane, as measured: 32 pt in its page's colour as the window's toolbar takes
 /// it, back and forward at its start, the host in the middle, the whole address in a stacked split, and the ✕ that
-/// closes the pane's tab at its end, on every pane. On the focused pane, reload while it has the room and the Split
-/// View menu before the ✕.
+/// closes the pane's tab at its end, on every pane, with copy link before the host while there is room and Arc's
+/// "Site is not secure" mark on a page that isn't. On the focused pane, reload and Site Controls while it has the
+/// room, and the Split View menu before the ✕.
 struct ContentPanelTopBar: View {
     /// Oa's own cut: Arc's pane had no reload at 278 pt and one at 421 pt.
     static let reloadMinimumWidth: CGFloat = 300
@@ -248,6 +249,7 @@ struct ContentPanelTopBar: View {
     let isFocused: Bool
     let width: CGFloat
     @State private var initialColor: NSColor?
+    @State private var showingSiteControls = false
     @Environment(\.theme) private var windowTheme
 
     init(model: WindowModel, tabID: UUID, splitID: UUID?, isFocused: Bool, width: CGFloat) {
@@ -270,6 +272,11 @@ struct ContentPanelTopBar: View {
                 NavigationButtons(
                     page: page, size: CGSize(width: 32, height: 24), spacing: 5, showsReload: showsReload)
                 Spacer()
+                if showsReload {
+                    SiteControlsButton(
+                        model: model, size: CGSize(width: 32, height: 28), showingSiteControls: $showingSiteControls,
+                        hostsPermissionPrompt: false)
+                }
                 if isFocused, let splitID { splitViewMenu(splitID, vertical: vertical) }
                 Button {
                     model.close(tabID)
@@ -282,20 +289,42 @@ struct ContentPanelTopBar: View {
                 .accessibilityLabel("Close Split View Pane")
             }
             .padding(.horizontal, 5)
-            // As Arc: the URL opens the command bar on its pane's tab.
-            Button {
-                model.select(tabID)
-                model.openCommandBar(.currentTab)
-            } label: {
-                Text(model.addressLabel(of: tabID, whole: vertical) ?? "Search or Enter URL…")
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.head)
-                    .foregroundStyle(page?.url == nil ? theme.secondaryText : theme.addressText)
-                    .frame(height: 24)
-                    .contentShape(Rectangle())
+            HStack(spacing: 3) {
+                // As measured on Arc: copy link goes under about 300 pt, the mark stays.
+                if width >= Self.reloadMinimumWidth, page?.url != nil {
+                    Button {
+                        model.copyURL(of: tabID)
+                    } label: {
+                        Image(systemName: "link")
+                            .font(.system(size: 13))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(ChromeButtonStyle())
+                    .accessibilityLabel("Copy Current URL")
+                }
+                // LIKELY only on a page that isn't secure: Arc's was seen on plain HTTP pages.
+                if let level = page?.securityLevel, level == .warning || level == .dangerous {
+                    Image(systemName: "lock.slash.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                        .frame(width: 24, height: 24)
+                        .accessibilityLabel("Site is not secure")
+                }
+                // As Arc: the URL opens the command bar on its pane's tab.
+                Button {
+                    model.select(tabID)
+                    model.openCommandBar(.currentTab)
+                } label: {
+                    Text(model.addressLabel(of: tabID, whole: vertical) ?? "Search or Enter URL…")
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .foregroundStyle(page?.url == nil ? theme.secondaryText : theme.addressText)
+                        .frame(height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.horizontal, showsReload ? 116 : 79)
         }
         .frame(height: 32)
