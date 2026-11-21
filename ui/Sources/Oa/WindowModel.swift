@@ -87,6 +87,7 @@ final class WindowModel {
     @ObservationIgnored private let engine: any BrowserApplication
     @ObservationIgnored private let store: SidebarStore
     @ObservationIgnored private var previousTabID: UUID?
+    @ObservationIgnored private var focusedPaneIDs: [UUID: UUID] = [:]
     @ObservationIgnored private var pendingURLs: [UUID: URL] = [:]
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
     /// By profile: ArcCore keeps one omnibox per window.
@@ -103,8 +104,11 @@ final class WindowModel {
     var space: SidebarSpace? { state.space(selectedSpaceID) }
     var selectedTabID: UUID? { spaceCreation == nil ? selectedTabIDs[selectedSpaceID] : nil }
     var selectedTab: SidebarTab? { selectedTabID.flatMap { state.tree.tab($0) } }
+    /// As Arc's `SplitViewState.windowContentIDs`, its focused one the selected tab: the selected tab's split in
+    /// pane order, or the tab alone.
+    var presentedTabIDs: [UUID] { selectedTabID.map(state.presentedTabIDs(with:)) ?? [] }
     var page: (any Page)? { selectedTabID.flatMap { pages[$0] } }
-    var placeholder: NSImage? { page == nil ? selectedTabID.flatMap { placeholders[$0] } : nil }
+    var placeholder: NSImage? { selectedTabID.flatMap(placeholder(for:)) }
     var peek: (any Page)? { peekOwnerID.flatMap { peeks[$0] } }
     /// What the toolbar commands act on: the Peek while one is shown.
     var frontPage: (any Page)? { peek ?? page }
@@ -143,7 +147,13 @@ final class WindowModel {
     var favorites: [SidebarTab] { state.favorites(for: selectedSpaceID) }
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }
-    var selectableTabs: [SidebarTab] { state.selectableTabs(in: selectedSpaceID) }
+    /// As Arc's `selectableItemInfo`, whose root for a split's tab is the split: a split counts once, as the pane
+    /// this window focuses in it.
+    var selectableTabs: [SidebarTab] {
+        state.selectableTabs(in: selectedSpaceID).filter { tab in
+            state.splitViewID(containing: tab.id).map { focusedTabID(of: $0) == tab.id } ?? true
+        }
+    }
     var canRestoreLastClosed: Bool { closedGroups.contains { !$0.steps.isEmpty } }
 
     var record: WindowRecord {
@@ -386,9 +396,14 @@ final class WindowModel {
         store.topBarColors.setTrackedPage(page, for: ToolbarOwner.peek(id))
     }
 
+    func trackPaneToolbarPage(_ tabID: UUID, shown: Bool) {
+        store.topBarColors.setTrackedPage(shown ? pages[tabID] : nil, for: ToolbarOwner.pane(id, tabID))
+    }
+
     private enum ToolbarOwner: Hashable {
         case window(UUID)
         case peek(UUID)
+        case pane(UUID, UUID)
     }
 
     func closeCommandBar() {
@@ -416,10 +431,12 @@ final class WindowModel {
             selectableTabs.map { ($0, nil) }
             + others.flatMap { other in state.tabs(in: other.id).map { ($0, other.name) } }
         return tabs.compactMap { tab, spaceName in
-            guard tab.id != selectedTabID, let url = livePage(for: tab.id)?.url ?? tab.url else { return nil }
+            guard !presentedTabIDs.contains(tab.id), let url = livePage(for: tab.id)?.url ?? tab.url else {
+                return nil
+            }
             return CommandBarRanking.Tab(
                 tab: tab, url: url, spaceName: spaceName, activeAt: lastActiveDates[tab.id] ?? createdDates[tab.id],
-                isVisible: store.windows.contains { $0.selectedTabID == tab.id },
+                isVisible: store.windows.contains { $0.presentedTabIDs.contains(tab.id) },
                 saveLevel: state.keepsAddress(tab.id) ? folderDepth(of: tab.id) : nil)
         }
     }
@@ -438,6 +455,16 @@ final class WindowModel {
         closeCommandBar()
         switch action {
         case .switchTo(let tabID): show(tabID)
+        case .openInSplitView(let url):
+            // Oa's own where the tab can't take a pane, as a pinned one for now: a new tab.
+            guard let anchorID = selectedTabID, state.canAddSplitViewPane(beside: anchorID) else { return newTab(url) }
+            let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+            store.edit {
+                $0.insertTab(tab, atTopOf: selectedSpaceID)
+                $0.openInSplitView(tab.id, beside: anchorID)
+            }
+            createdDates[tab.id] = .now
+            select(tab.id)
         case .open(let url, background: true):
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
@@ -466,14 +493,59 @@ final class WindowModel {
         cancelSpaceCreation()
         guard selectedTabID != tabID else { return }
         library = nil
-        if let current = selectedTabID {
+        let presented = state.presentedTabIDs(with: tabID)
+        if let current = selectedTabID, !presented.contains(current) {
             if pages[current] != nil { previousTabID = current }
-            placeholders[current] = nil
-            handOff(current)
+            for leaving in presentedTabIDs {
+                placeholders[leaving] = nil
+                handOff(leaving)
+            }
         }
         selectedTabIDs[selectedSpaceID] = tabID
-        markViewed(tabID)
-        ensurePage(tabID, restoring: sessionID)
+        for shown in presented {
+            markViewed(shown)
+            ensurePage(shown, restoring: shown == tabID ? sessionID : nil)
+        }
+        if let splitID = state.splitViewID(containing: tabID) { focusedPaneIDs[splitID] = tabID }
+    }
+
+    /// As seen in Arc: a window comes back to the pane it focused in a split, and to the last pane of a split it
+    /// hasn't shown. Arc's stored `focusItemID` isn't kept up to date and isn't read here.
+    func focusedTabID(of splitID: UUID) -> UUID? {
+        let tabIDs = state.tree[splitID]?.childIDs ?? []
+        return focusedPaneIDs[splitID].flatMap { tabIDs.contains($0) ? $0 : nil } ?? tabIDs.last
+    }
+
+    func placeholder(for tabID: UUID) -> NSImage? { pages[tabID] == nil ? placeholders[tabID] : nil }
+
+    private func ensurePresentedPages() {
+        for tabID in presentedTabIDs { ensurePage(tabID) }
+    }
+
+    func canOpenInSplitView(_ tabID: UUID) -> Bool {
+        selectedTabID.map { state.canOpenInSplitView(tabID, beside: $0) } ?? false
+    }
+
+    /// As Arc's Open in Split View: the tab joins the selected one on its right and takes the focus.
+    func openInSplitView(_ tabID: UUID) {
+        guard let anchorID = selectedTabID, state.canOpenInSplitView(tabID, beside: anchorID) else { return }
+        store.edit { $0.openInSplitView(tabID, beside: anchorID) }
+        select(tabID)
+    }
+
+    /// As seen in Arc: the tab is selected, alone, right after the split it left.
+    func separateFromSplitView(_ tabID: UUID) {
+        store.edit { $0.removeFromSplitView([tabID]) }
+        select(tabID)
+    }
+
+    /// As seen in Arc: the focused tab stays selected.
+    func separateAllSplitViewChildren(_ splitID: UUID) {
+        store.edit { $0.separateAllSplitViewChildren(splitID) }
+    }
+
+    func selectSplitView(_ splitID: UUID) {
+        if let tabID = focusedTabID(of: splitID) { select(tabID) }
     }
 
     /// As Arc's `selectItem`: a tab the window shows by a selection is stamped for the window and for itself. The
@@ -485,7 +557,7 @@ final class WindowModel {
 
     /// Arc's pass each minute over what a window shows.
     func markShownViewed() {
-        if !showingArchive, let tabID = selectedTabID { markViewed(tabID) }
+        if !showingArchive { presentedTabIDs.forEach(markViewed) }
     }
 
     /// As Arc's `sortedLastActiveOrNewestItemIDs` under its switcher's filter: the tabs this window showed or made,
@@ -608,19 +680,19 @@ final class WindowModel {
         cancelSpaceCreation()
         guard spaceID != selectedSpaceID else { return }
         selectedSpaceID = spaceID
-        if let tabID = selectedTabID {
-            ensurePage(tabID)
-            markViewed(tabID)
-        }
+        ensurePresentedPages()
+        presentedTabIDs.forEach(markViewed)
         store.windowStateChanged()
     }
 
     /// On becoming key, the selected tab takes its page back from the window that holds or is making it.
     func showSelected() {
-        guard let tabID = selectedTabID, pages[tabID] == nil,
-            store.windows.contains(where: { $0 !== self && ($0.pages[tabID] != nil || $0.creating[tabID] != nil) })
-        else { return }
-        ensurePage(tabID)
+        for tabID in presentedTabIDs
+        where pages[tabID] == nil
+            && store.windows.contains(where: { $0 !== self && ($0.pages[tabID] != nil || $0.creating[tabID] != nil) })
+        {
+            ensurePage(tabID)
+        }
     }
 
     /// Arc's Create a Space panel, on the window's Space's profile, after `spaceID` or, as Arc's `.absolute(-1)`, at
@@ -1112,7 +1184,7 @@ final class WindowModel {
     func clearTabs(in spaceID: UUID? = nil, all: Bool = false) {
         let spaceID = spaceID ?? selectedSpaceID
         var tabIDs = state.tabs(in: spaceID, pinned: false).map(\.id)
-        if !all, !clearsAllTabs(in: spaceID), let selectedTabID { tabIDs.removeAll { $0 == selectedTabID } }
+        if !all, !clearsAllTabs(in: spaceID) { tabIDs.removeAll(where: presentedTabIDs.contains) }
         closeTogether(tabIDs.sorted { lastActiveDates[$0] ?? .distantPast < lastActiveDates[$1] ?? .distantPast })
     }
 
@@ -1130,18 +1202,23 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    /// As seen in Arc: a split's ✕ archives its tabs in one step, "Archive Tabs" to undo.
+    func closeSplitView(_ splitID: UUID) {
+        closeTogether((state.tree[splitID]?.childIDs ?? []).reversed(), asSplitView: true)
+    }
+
     /// One close of several tabs from this window, one entry on its stack, the steps going back from the last.
-    private func closeTogether(_ tabIDs: [UUID]) {
+    private func closeTogether(_ tabIDs: [UUID], asSplitView: Bool = false) {
         guard !tabIDs.isEmpty else { return }
         let closing = Set(tabIDs)
         let group = ClosedGroup(
-            undoPrompt: UndoStrings.clearTabs(tabIDs.count),
-            focusedTabID: selectedTabID.flatMap { closing.contains($0) ? $0 : nil }, completionToast: .clearedTabs,
-            order: tabIDs, siblings: unpinnedTabs.map(\.id))
+            undoPrompt: asSplitView ? UndoStrings.archiveTabs : UndoStrings.clearTabs(tabIDs.count),
+            focusedTabID: selectedTabID.flatMap { closing.contains($0) ? $0 : nil },
+            completionToast: asSplitView ? nil : .clearedTabs, order: tabIDs, siblings: unpinnedTabs.map(\.id))
         if let selected = selectedTabID, closing.contains(selected) {
             let next = nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
             selectedTabIDs[selectedSpaceID] = next
-            if let next { ensurePage(next) }
+            ensurePresentedPages()
         }
         for tabID in tabIDs { close(tabID, group: group) }
     }
@@ -1240,10 +1317,13 @@ final class WindowModel {
         for tabID in Array(lastActiveDates.keys) where state.tree.tab(tabID) == nil { lastActiveDates[tabID] = nil }
         for tabID in Array(createdDates.keys) where state.tree.tab(tabID) == nil { createdDates[tabID] = nil }
         if let previousTabID, state.tree.tab(previousTabID) == nil { self.previousTabID = nil }
+        for splitID in Array(focusedPaneIDs.keys) where state.splitView(splitID) == nil {
+            focusedPaneIDs[splitID] = nil
+        }
     }
 
     private func shows(_ tabID: UUID) -> Bool {
-        selectedTabID == tabID && pages[tabID] == nil
+        presentedTabIDs.contains(tabID) && pages[tabID] == nil
     }
 
     private func spaceID(ofPeekOwner ownerID: UUID) -> UUID? {
@@ -1282,7 +1362,7 @@ final class WindowModel {
         if let page { finish(page, pinned) }
         if wasSelected {
             selectedTabIDs[spaceID] = next
-            if let next, spaceID == selectedSpaceID { ensurePage(next) }
+            if spaceID == selectedSpaceID { ensurePresentedPages() }
         }
         for window in store.windows { window.updateModalItemSwitcher(closing: tabID) }
     }
@@ -1331,7 +1411,7 @@ final class WindowModel {
     private func deselect(_ tabID: UUID) {
         guard selectedTabID == tabID else { return }
         selectedTabIDs[selectedSpaceID] = nextSelection(closing: tabID, pinned: true, in: selectedSpaceID)
-        if let next = selectedTabID { ensurePage(next) }
+        ensurePresentedPages()
     }
 
     /// The opener's group first, as in Arc; else the tab shown before, if its page is still live; an unpinned close
@@ -1340,6 +1420,11 @@ final class WindowModel {
     private func nextSelection(
         closing tabID: UUID, pinned: Bool, in spaceID: UUID, alsoClosing others: Set<UUID> = []
     ) -> UUID? {
+        // As seen in Arc: closing a pane focuses the next one, or the one before the last.
+        let panes = state.presentedTabIDs(with: tabID).filter { $0 == tabID || !others.contains($0) }
+        if panes.count > 1, let index = panes.firstIndex(of: tabID) {
+            return panes[index + 1 < panes.count ? index + 1 : index - 1]
+        }
         if let successor = state.openerSuccessor(of: tabID), !others.contains(successor) { return successor }
         if let previousTabID, previousTabID != tabID, !others.contains(previousTabID), pages[previousTabID] != nil,
             state.isSelectable(previousTabID, in: spaceID)
@@ -1421,20 +1506,20 @@ final class WindowModel {
 
     /// Asked before the page leaves, while it still draws here, and not waited for, as Arc's ingest does.
     private func keepFrame(of page: any Page, for tabID: UUID) {
-        guard selectedTabID == tabID else { return }
+        guard presentedTabIDs.contains(tabID) else { return }
         page.snapshot { [weak self] image in
-            guard let self, selectedTabID == tabID, pages[tabID] == nil else { return }
+            guard let self, shows(tabID) else { return }
             if let image { placeholders[tabID] = image } else { keepFrameLater(of: page, for: tabID) }
         }
     }
 
     private func keepFrameLater(of page: any Page, for tabID: UUID, attempts: Int = 2) {
-        guard attempts > 0, placeholders[tabID] == nil, selectedTabID == tabID, pages[tabID] == nil else { return }
+        guard attempts > 0, placeholders[tabID] == nil, shows(tabID) else { return }
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
-            guard let self, placeholders[tabID] == nil, selectedTabID == tabID, pages[tabID] == nil else { return }
+            guard let self, placeholders[tabID] == nil, shows(tabID) else { return }
             page.snapshot { [weak self] image in
-                guard let self, selectedTabID == tabID, pages[tabID] == nil else { return }
+                guard let self, shows(tabID) else { return }
                 if let image {
                     placeholders[tabID] = image
                 } else {
@@ -1672,10 +1757,13 @@ final class WindowModel {
             _ = page.url
             _ = page.favicon
             _ = page.navigationResult
+            _ = page.hasFocus
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, let page = pages[tabID], ObjectIdentifier(page) == identity else { return }
                 save(page, for: tabID)
+                // As Arc's `onDidFocus`: the pane whose page takes the keyboard is the focused one.
+                if page.hasFocus, presentedTabIDs.contains(tabID) { select(tabID) }
                 observe(page, for: tabID)
             }
         }

@@ -93,12 +93,14 @@ private struct SidebarSpacePage: View {
         static let newTabID = UUID()
 
         case tab(SidebarTab)
+        case splitView(id: UUID, tabs: [SidebarTab])
         case divider
         case newTab
 
         var id: UUID {
             switch self {
             case .tab(let tab): tab.id
+            case .splitView(let id, _): id
             case .divider: Self.dividerID
             case .newTab: Self.newTabID
             }
@@ -112,13 +114,18 @@ private struct SidebarSpacePage: View {
     @Environment(\.sidebarRevealsControls) private var revealed
 
     var body: some View {
-        let unpinned = model.state.tabs(in: space.id, pinned: false)
+        let unpinned = model.state.entries(in: space.id, pinned: false).map { entry in
+            switch entry {
+            case .tab(let tab): Item.tab(tab)
+            case .splitView(let id, let tabs): Item.splitView(id: id, tabs: tabs)
+            }
+        }
         let collapsed = model.collapsedPinnedSpaces.contains(space.id)
         // As Arc: a collapsed section still shows its selected tab.
         let pinned = model.state.tabs(in: space.id, pinned: true).filter { !collapsed || $0.id == model.selectedTabID }
         let pinnedIDs = Set(pinned.map(\.id))
         let items =
-            pinned.map(Item.tab) + (unpinned.isEmpty ? [] : [.divider]) + [.newTab] + unpinned.map(Item.tab)
+            pinned.map(Item.tab) + (unpinned.isEmpty ? [] : [.divider]) + [.newTab] + unpinned
         ScrollView {
             // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
             VStack(spacing: 1) {
@@ -135,6 +142,9 @@ private struct SidebarSpacePage: View {
                                     ? .asymmetric(
                                         insertion: .opacity.animation(.easeOut(duration: 0.08)), removal: .identity)
                                     : .opacity)
+                    case .splitView(let id, let tabs):
+                        SplitViewCellView(model: model, splitID: id, tabs: tabs, spaceID: space.id)
+                            .transition(.opacity)
                     case .divider:
                         ClearDivider(model: model, spaceID: space.id, showsClear: revealed)
                             .sidebarDragFrame { drag?.lists[space.id, default: .init()].divider = $0 }

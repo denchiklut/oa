@@ -643,6 +643,12 @@ struct TabRow: View {
         .spaceMenuExclusion()
         .contextMenu {
             if !pinned {
+                // Arc's row offers it on every row but the selected one, which has Add Split View.
+                if model.selectedTabIDs[spaceID] != tab.id {
+                    Button("Open in Split View") { model.openInSplitView(tab.id) }
+                        .disabled(!model.canOpenInSplitView(tab.id))
+                    Divider()
+                }
                 Button("Archive Tab") { model.close(tab.id) }
                 Button("Archive Tabs Below") { model.archiveTabs(below: tab.id) }
                     .disabled(model.state.tabs(in: spaceID, pinned: false).last?.id == tab.id)

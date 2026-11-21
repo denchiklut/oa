@@ -271,12 +271,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if item.action == #selector(togglePin(_:)) {
             guard let tabID = model.selectedTabID, !model.state.isFavorite(tabID) else { return false }
             item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"
-            return true
+            // Oa's own for now: Arc pins a split whole.
+            return model.state.splitViewID(containing: tabID) == nil
         }
         if item.action == #selector(toggleFavorite(_:)) {
             guard let tabID = model.selectedTabID else { return false }
             item.title = model.state.isFavorite(tabID) ? "Unfavorite Tab" : "Favorite Tab"
-            return true
+            // Oa's own for now: Arc files a split whole under Favorites.
+            return model.state.splitViewID(containing: tabID) == nil
         }
         if item.action == #selector(togglePinnedSection(_:)) {
             let collapsed = model.space.map { model.collapsedPinnedSpaces.contains($0.id) } ?? false

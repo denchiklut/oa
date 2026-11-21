@@ -141,6 +141,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         }
         if item.action == #selector(toggleToolbar(_:)) {
             item.title = PageToolbar.isShown ? "Hide Toolbar" : "Show Toolbar"
+            // As seen in Arc: not while the window shows a split, which has no window toolbar.
+            let controller = NSApplication.shared.keyWindow?.windowController as? BrowserWindowController
+            return (controller?.model.presentedTabIDs.count ?? 0) < 2
         }
         return true
     }

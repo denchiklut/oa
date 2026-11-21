@@ -82,7 +82,7 @@ struct SidebarItem: Identifiable, Hashable {
         case container(Container)
         case tab(SidebarTab)
         case folder(title: String)
-        case splitView
+        case splitView(SidebarSplitViewData)
     }
 
     let id: UUID
@@ -415,7 +415,8 @@ struct SidebarState {
     mutating func reopenTab(_ tab: SidebarTab, in parentID: UUID, at index: Int, else fallbackSpaceID: UUID) {
         archive.removeAll { $0.id == tab.id }
         let item = SidebarItem(id: tab.id, kind: .tab(tab))
-        if tree[parentID] != nil {
+        let isFull = (tree[parentID]?.childIDs.count ?? 0) >= SidebarSplitViewData.maxNumberSplit
+        if tree[parentID] != nil, splitView(parentID) == nil || !isFull {
             tree.insert(item, into: parentID, at: index)
         } else if let space = space(fallbackSpaceID) {
             tree.insert(item, into: space.unpinnedRootID, at: 0)

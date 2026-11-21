@@ -163,7 +163,7 @@ final class SidebarDrag {
             list.divider?.midY ?? (list.newTab != .zero ? list.newTab.minY : nil)
             ?? pinnedIDs.compactMap { rows[$0]?.rect.maxY }.max() ?? list.pinnedTop
         let pinned = point.y < boundary
-        let ids = pinned ? pinnedIDs : model.state.tabs(in: model.selectedSpaceID, pinned: false).map(\.id)
+        let ids = pinned ? pinnedIDs : model.state.entries(in: model.selectedSpaceID, pinned: false).map(\.id)
         let index = ids.filter { (rows[$0]?.rect.midY ?? .infinity) < point.y }.count
         let y: CGFloat =
             if index < ids.count, let rect = rows[ids[index]]?.rect {
