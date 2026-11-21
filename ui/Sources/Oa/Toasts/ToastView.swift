@@ -72,7 +72,7 @@ struct ToastView: View {
         switch toast.type {
         case .webContentConsumedHotkey(_, let shortcut, let title):
             HStack(spacing: 7.5) {
-                keyCap(shortcut.symbols.joined(), foreground)
+                keyCap(shortcut.symbols.joined(), foreground, padding: 7.25)
                 label("again to \(title)")
             }
             .padding(.leading, 11)
@@ -87,6 +87,13 @@ struct ToastView: View {
                 }
             label(words)
                 .padding(.horizontal, 12)
+        case .undo(let text):
+            HStack(spacing: 6) {
+                label("\(text)! Use")
+                keyCap("⌘Z", foreground, padding: 8)
+                label("to undo.")
+            }
+            .padding(.horizontal, 12)
         }
     }
 
@@ -94,10 +101,10 @@ struct ToastView: View {
         Text(text).font(.system(size: 14, weight: .medium))
     }
 
-    private func keyCap(_ keys: String, _ foreground: Color) -> some View {
+    private func keyCap(_ keys: String, _ foreground: Color, padding: CGFloat) -> some View {
         Text(keys)
             .font(.system(size: 13, weight: .semibold))
-            .padding(.horizontal, 7.25)
+            .padding(.horizontal, padding)
             .frame(minHeight: 27)
             .background(foreground.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
     }

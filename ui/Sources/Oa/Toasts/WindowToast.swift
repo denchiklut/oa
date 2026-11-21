@@ -5,6 +5,8 @@ enum ToastType: Equatable {
     /// A shortcut the page consumed: its binding's ID, the shortcut, and its menu item's title at that moment.
     case webContentConsumedHotkey(String?, shortcut: ARCKeyboardShortcut, title: String)
     case copyTabURL(trackingRemoved: Bool, urls: [URL])
+    /// What was done, for the toast that says ⌘Z takes it back.
+    case undo(String)
 }
 
 /// Arc's `WindowToast`: on a page, or on the window.
