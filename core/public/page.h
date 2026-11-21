@@ -264,6 +264,9 @@ class Page {
   virtual bool IsCameraOn() const = 0;
   virtual bool IsMicrophoneOn() const = 0;
   virtual bool IsAudible() const = 0;
+  // While the page's main widget has the keyboard, as ArcCore's hasFocus: its
+  // view is the window's first responder and the window is key.
+  virtual bool HasFocus() const = 0;
   // Null while the page has no media session.
   virtual std::optional<MediaSessionState> GetMediaSessionState() const = 0;
 

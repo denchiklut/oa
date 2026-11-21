@@ -373,6 +373,10 @@ bool PageImpl::IsAudible() const {
   return web_contents() && web_contents()->IsCurrentlyAudible();
 }
 
+bool PageImpl::HasFocus() const {
+  return has_focus_;
+}
+
 std::optional<MediaSessionState> PageImpl::GetMediaSessionState() const {
   content::MediaSession* session =
       web_contents() ? content::MediaSession::GetIfExists(web_contents())
@@ -922,6 +926,26 @@ void PageImpl::TitleWasSet(content::NavigationEntry* entry) {
 }
 
 void PageImpl::DidChangeVisibleSecurityState() {
+  NotifyStateChanged();
+}
+
+void PageImpl::OnWebContentsFocused(
+    content::RenderWidgetHost* render_widget_host) {
+  if (render_widget_host !=
+      web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost()) {
+    return;
+  }
+  has_focus_ = true;
+  NotifyStateChanged();
+}
+
+void PageImpl::OnWebContentsLostFocus(
+    content::RenderWidgetHost* render_widget_host) {
+  if (render_widget_host !=
+      web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost()) {
+    return;
+  }
+  has_focus_ = false;
   NotifyStateChanged();
 }
 

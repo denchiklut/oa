@@ -102,6 +102,7 @@ class PageImpl : public Page,
   bool IsCameraOn() const override;
   bool IsMicrophoneOn() const override;
   bool IsAudible() const override;
+  bool HasFocus() const override;
   std::optional<MediaSessionState> GetMediaSessionState() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
@@ -165,6 +166,10 @@ class PageImpl : public Page,
   void DidChangeVisibleSecurityState() override;
   void RenderFrameHostChanged(content::RenderFrameHost* old_host,
                               content::RenderFrameHost* new_host) override;
+  void OnWebContentsFocused(
+      content::RenderWidgetHost* render_widget_host) override;
+  void OnWebContentsLostFocus(
+      content::RenderWidgetHost* render_widget_host) override;
   void WebContentsDestroyed() override;
 
   // content::RenderWidgetHost::InputEventObserver:
@@ -221,6 +226,7 @@ class PageImpl : public Page,
   double load_progress_ = 0;
   NavigationResult navigation_result_ = NavigationResult::kNone;
   std::optional<SkColor4f> root_background_color_;
+  bool has_focus_ = false;
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>
       favicon_observation_{this};

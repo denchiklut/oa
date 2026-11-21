@@ -526,6 +526,10 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   return _page && _page->IsAudible();
 }
 
+- (BOOL)hasFocus {
+  return _page && _page->HasFocus();
+}
+
 - (OAPageMediaSessionStatus)mediaSessionStatus {
   std::optional<oa::MediaSessionState> state;
   if (_page) {
