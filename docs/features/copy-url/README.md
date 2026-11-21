@@ -21,7 +21,9 @@ in the address field is the same command.
   "Copied a clean link without trackers" when something was stripped.
 
 As in Arc, a URL with a query is put together again from its items even when
-none was a tracker, so `%2B` in a value is copied as `+`.
+none was a tracker, so `%2B` in a value is copied as `+`. And an Amazon path
+that loses its `ref=` end is escaped a second time, so `%20` in it is copied
+as `%2520`.
 
 Oa's own: with no tab the item is off; Arc's stays on and offers to share the
 Space. Arc's toast also has a Share button, which Oa's doesn't yet. Copy URL as

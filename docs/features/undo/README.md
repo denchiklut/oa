@@ -34,9 +34,10 @@ makes Redo: AppKit files a step registered during an undo on the redo side.
 - **Typing in the command bar** has its own steps, as Arc's bar has, so ⌘Z
   there never reaches the sidebar's.
 
-Oa's own: a redone close is on the window's ten before its pages have closed,
-so its step is filed while the redo runs. Arc files it once they have, and a
-redone close of a loaded tab leaves a second step that does nothing.
+Oa's own: a redone close, of tabs or of a Peek, is on the window's ten before
+its pages have closed, so its step is filed while the redo runs and the redos
+after it stay. Arc files it once they have, and a redone close of a loaded tab
+leaves a second step that does nothing.
 
 ## The toast
 
