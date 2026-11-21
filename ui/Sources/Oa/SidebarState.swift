@@ -476,15 +476,26 @@ struct SidebarState {
     }
 
     /// Into the profile's grid at `index`, where a drop lands in Arc; appended when nil, as Arc's Favorite Tab does.
+    /// As seen in Arc, a split's tab takes its split whole.
     mutating func favoriteTab(_ tabID: UUID, at index: Int? = nil) {
         guard let profile = profile(containing: tabID) else { return }
-        tree.move(tabID, into: profile.favoritesRootID, at: index)
+        tree.move(splitViewID(containing: tabID) ?? tabID, into: profile.favoritesRootID, at: index)
     }
 
     /// To the top of the Space's unpinned section. Arc moves it to that section; the position is Oa's own.
     mutating func unfavoriteTab(_ tabID: UUID, in spaceID: UUID) {
         guard isFavorite(tabID), let space = space(spaceID) else { return }
-        tree.move(tabID, into: space.unpinnedRootID, at: 0)
+        tree.move(splitViewID(containing: tabID) ?? tabID, into: space.unpinnedRootID, at: 0)
+    }
+
+    /// The profile's Favorites as its grid shows them: a split is one tile.
+    func favoriteEntries(for spaceID: UUID) -> [SidebarEntry] {
+        guard let space = space(spaceID), let profile = profile(space.profileID) else { return [] }
+        return (tree[profile.favoritesRootID]?.childIDs ?? []).compactMap { id in
+            if let tab = tree.tab(id) { return .tab(tab) }
+            if splitView(id) != nil { return .splitView(id: id, tabs: tree.tabs(under: id)) }
+            return nil
+        }
     }
 
     /// Write-back from a live page. A tab that keeps its address takes the title only while the page is at it.

@@ -111,7 +111,7 @@ final class SidebarDrag {
         if let target {
             switch target.section {
             case .favorites:
-                let favorites = model.state.favorites(for: model.selectedSpaceID)
+                let favorites = model.state.favoriteEntries(for: model.selectedSpaceID)
                 let from = source == .favorites ? favorites.firstIndex { $0.id == tab.id } : nil
                 // The grid's index leaves the tile out; the tree counts it where it was.
                 model.favorite(
@@ -150,7 +150,7 @@ final class SidebarDrag {
         _ tab: SidebarTab, from section: Section, glyph: SidebarCellButton.Glyph, start: CGPoint, model: WindowModel,
         layout: WindowLayoutController
     ) {
-        let others = model.state.favorites(for: model.selectedSpaceID).filter { $0.id != tab.id }.count
+        let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != tab.id }.count
         let slots = FavoritesGrid.Layout(count: others + 1, width: layout.sidebarWidth)
         rowSize = CGSize(width: layout.sidebarWidth - 16, height: 36)
         tileSize = CGSize(width: slots.tileWidth, height: 47)
@@ -243,7 +243,7 @@ final class SidebarDrag {
     private func target(at point: CGPoint, model: WindowModel) -> Target? {
         guard let tab, let list = lists[model.selectedSpaceID] else { return nil }
         if grid.contains(point) {
-            let others = model.state.favorites(for: model.selectedSpaceID).filter { $0.id != tab.id }.count
+            let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != tab.id }.count
             let slots = FavoritesGrid.Layout(count: others + 1, width: grid.width)
             let column = Int((point.x - grid.minX - 4) / (slots.tileWidth + 8))
             let row = Int((point.y - grid.minY - 4) / 55)

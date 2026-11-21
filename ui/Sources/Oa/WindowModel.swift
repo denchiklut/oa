@@ -1395,6 +1395,11 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    /// As seen in Arc: ⌘W on a Favorite split leaves nothing selected, its pages hidden, not unloaded.
+    func deselectSplitView() {
+        selectedTabIDs[selectedSpaceID] = nil
+    }
+
     /// As seen in Arc: ⌘W and the "—" of a pinned split unload all its pages and leave nothing selected, and the
     /// split stays pinned.
     func closeSplitViewPages(_ splitID: UUID) {
