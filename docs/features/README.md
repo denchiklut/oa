@@ -139,9 +139,9 @@ Sources: Arc [2022][arc22], [2023][arc23], [profile migration guide][arc-migrati
 | Horizontal and vertical splits | ✅ | ✅ |
 | Resize, reorder and focus split panes | ✅ | ✅ |
 | Create splits by dragging tabs or links | ✅ | ☐ |
-| Pin and save Split Views | ✅ | ☐ |
+| Pin and save Split Views | ✅ | ✅ |
 | Separate a page from a split | ✅ | ✅ |
-| Custom Split View titles | ✅ | ☐ |
+| Custom Split View titles | ✅ | ✅ |
 | Expand Current Split | ✅ | ☐ |
 
 Sources: Arc [2022][arc22], [2023][arc23].
