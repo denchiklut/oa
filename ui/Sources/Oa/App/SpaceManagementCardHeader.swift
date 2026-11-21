@@ -128,7 +128,8 @@ struct SpaceManagementCardHeader: View {
         return Menu {
             SpaceProfileMenuItems(model: model, space: space)
         } label: {
-            HStack(spacing: 2) {
+            // As measured on Arc: a 14 pt icon 6 pt in, the name 3.75 pt after it.
+            HStack(spacing: 3.75) {
                 Image(systemName: "person.crop.circle")
                     .foregroundStyle(Color(white: isDark ? 0.93 : 0.09))
                     .frame(width: 14, height: 14)
@@ -139,8 +140,7 @@ struct SpaceManagementCardHeader: View {
             }
             .font(.system(size: 11, weight: .medium))
             .padding(.vertical, 4)
-            .padding(.leading, 5)
-            .padding(.trailing, 6)
+            .padding(.horizontal, 6)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Profile: \(profile)")
         }
