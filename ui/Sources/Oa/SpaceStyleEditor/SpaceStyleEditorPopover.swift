@@ -84,10 +84,11 @@ final class SpaceStyleEditorPopover: NSObject, NSPopoverDelegate {
 }
 
 /// Hangs the editor from the view it backs: pointing at it, or, as from Arc's sidebar, off its right edge at the
-/// pointer's height with no arrow.
+/// pointer's height with no arrow. The dock's "+" menu hangs above its own the same way.
 struct SpaceStyleEditorAnchor<Content: View>: NSViewRepresentable {
     let isPresented: Bool
     var atPointer = false
+    var above = false
     let onClose: () -> Void
     @ViewBuilder let content: () -> Content
 
@@ -97,13 +98,15 @@ struct SpaceStyleEditorAnchor<Content: View>: NSViewRepresentable {
         let coordinator = context.coordinator
         if isPresented, coordinator.popover == nil, view.window != nil {
             let popover = SpaceStyleEditorPopover(
-                hidesArrow: atPointer,
+                hidesArrow: atPointer || above,
                 onClose: { [weak coordinator] in
                     coordinator?.popover = nil
                     onClose()
                 }, content: content)
             coordinator.popover = popover
-            popover.show(relativeTo: atPointer ? pointerStrip(in: view) : view.bounds, of: view)
+            popover.show(
+                relativeTo: atPointer ? pointerStrip(in: view) : view.bounds, of: view,
+                preferredEdge: above ? .maxY : .maxX)
         } else if !isPresented, let popover = coordinator.popover {
             coordinator.popover = nil
             popover.close(notifying: false)
