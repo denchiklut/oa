@@ -242,8 +242,11 @@ std::unique_ptr<PageImpl> PageImpl::Wrap(
 void PageImpl::Bind(content::WebContents* contents) {
   set_inner(contents->GetDelegate());
   contents->SetDelegate(this);
+  // As ArcCore, on every page: the renderer hands every top-level navigation to
+  // the browser, so a link that keeps its address can open a new page and an
+  // ⌥-clicked one reaches the app rather than being saved in the renderer.
   contents->GetMutableRendererPrefs()->browser_handles_all_top_level_requests =
-      keeps_address_;
+      true;
   contents->SyncRendererPrefs();
   Observe(contents);
   favicon_observation_.Reset();
@@ -478,15 +481,10 @@ void PageImpl::Activate() {
   }
 }
 
-// As Arc: the renderer hands every top-level navigation to the browser, which
-// then sends a link to another host to a new page from OpenURLFromTab.
+// As Arc: the browser sends a link to another host to a new page from
+// OpenURLFromTab.
 void PageImpl::SetKeepsAddress(bool keeps_address) {
   keeps_address_ = keeps_address;
-  if (content::WebContents* contents = web_contents()) {
-    contents->GetMutableRendererPrefs()
-        ->browser_handles_all_top_level_requests = keeps_address;
-    contents->SyncRendererPrefs();
-  }
 }
 
 // Hosts, not origins: Arc peeks example.com → www.example.com and navigates
@@ -755,6 +753,12 @@ content::WebContents* PageImpl::OpenURLFromTab(
                                                            std::move(callback));
     }
     disposition = OpenDisposition::kForegroundTab;
+  } else if (params.disposition == WindowOpenDisposition::SAVE_TO_DISK &&
+             params.is_renderer_initiated) {
+    // As ArcCore: a link the page sends as a save, as Blink does an
+    // ⌥-clicked one, opens as a background page, which the app may make a
+    // split view.
+    disposition = OpenDisposition::kBackgroundTab;
   } else if (!ToOpenDisposition(params.disposition, &disposition)) {
     return nullptr;
   }
