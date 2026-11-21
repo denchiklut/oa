@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Sat, 21 Nov 2026 16:34:35 -0700
+Subject: [PATCH] oa: let an embedder's browser take a top-level
+ download-policy link click at once
+
+---
+ .../blink/renderer/core/html/html_anchor_element.cc      | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/third_party/blink/renderer/core/html/html_anchor_element.cc b/third_party/blink/renderer/core/html/html_anchor_element.cc
+index a9f2c1b74fe90cc30b2a2cf54f77c1cf7bf946a8..ace19f720fdfff3d444774cd4e4822829a737885 100644
+--- a/third_party/blink/renderer/core/html/html_anchor_element.cc
++++ b/third_party/blink/renderer/core/html/html_anchor_element.cc
+@@ -541,7 +541,14 @@ void HTMLAnchorElementBase::HandleClick(MouseEvent& event) {
+       std::move(request), navigation_policy, event.isTrusted(),
+       event.PlatformTimeStamp(), std::move(completed_url));
+ 
+-  if (navigation_policy == kNavigationPolicyDownload) {
++  // An embedder whose browser handles a top-level frame's navigations decides
++  // what such a click does, so it gets it at once, as Arc's does.
++  const bool browser_decides =
++      frame->IsOutermostMainFrame() && frame->GetPage() &&
++      frame->GetPage()
++          ->GetRendererPreferences()
++          .browser_handles_all_top_level_requests;
++  if (navigation_policy == kNavigationPolicyDownload && !browser_decides) {
+     // We distinguish single/double click with some modifiers.
+     // See the comment of `EventHandler.delayed_navigation_task_handle_`.
+     auto task_handle = PostDelayedCancellableTask(
