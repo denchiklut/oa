@@ -700,9 +700,13 @@ final class WindowModel {
     }
 
     /// The theme the window draws a Space in: while its editor is open, the one the editor makes.
-    func theme(of space: SidebarSpace) -> WindowTheme {
-        guard let presentation = spaceStyleEditor, presentation.spaceID == space.id else { return space.theme }
-        return presentation.editor.theme ?? .default
+    func theme(of space: SidebarSpace) -> WindowTheme { customTheme(of: space) ?? .default }
+
+    func customTheme(of space: SidebarSpace) -> WindowTheme? {
+        guard let presentation = spaceStyleEditor, presentation.spaceID == space.id else {
+            return space.customInfo?.windowTheme
+        }
+        return presentation.editor.theme
     }
 
     /// As Arc's `presentStyleEditor`: from the editor's state built from the Space's theme. Oa's own: the window

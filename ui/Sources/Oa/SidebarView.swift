@@ -275,7 +275,7 @@ private struct SidebarDockItem: View {
     /// As measured on Arc, the hovered or current icon takes its own Space's `maxContrastColor`, not the window's.
     /// Oa's own: a Space without a theme stays grey, as Arc's icon colour is optional and its source isn't traced.
     private func tint(_ space: SidebarSpace) -> Color {
-        guard let windowTheme = space.customInfo?.windowTheme else { return theme.dockInk }
+        guard let windowTheme = model.customTheme(of: space) else { return theme.dockInk }
         return windowTheme.semanticColorPalette[theme.isDark ? .dark : .light].maxContrastColor.color
     }
 
