@@ -650,6 +650,13 @@ private func dynamic(_ light: UInt32, _ dark: UInt32) -> NSColor {
     NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? srgb(dark) : srgb(light) }
 }
 
+/// As Arc's `commandBarUndoManager`: the bar's typing has its own undo steps, apart from the window's.
+private final class CommandBarTextField: NSTextField {
+    private let commandBarUndoManager = UndoManager()
+
+    override var undoManager: UndoManager? { commandBarUndoManager }
+}
+
 /// An AppKit field, which a SwiftUI one can't be: it takes focus over a web page, selects an inline completion and
 /// reports the caret, the arrow keys, Return, Esc, Tab, Backspace at its start and ⇧⌦.
 private struct CommandBarField: NSViewRepresentable {
@@ -663,7 +670,7 @@ private struct CommandBarField: NSViewRepresentable {
     private var placeholder: String { bar.scope == nil ? "Search or Enter URL…" : "Search…" }
 
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
+        let field = CommandBarTextField()
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
