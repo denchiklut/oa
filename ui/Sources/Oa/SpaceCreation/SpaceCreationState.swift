@@ -10,6 +10,8 @@ struct SpaceCreationState: Equatable {
     var title = ""
     var profileID: UUID
     var icon: String?
+    /// As Arc's `spaceStyleEditor`: the theme the Space will be made with, which the window shows meanwhile.
+    var spaceStyleEditor = SpaceStyleEditor()
     var phase = Phase.editing
 
     var canCreate: Bool { !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

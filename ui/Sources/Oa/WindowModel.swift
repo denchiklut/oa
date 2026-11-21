@@ -668,7 +668,9 @@ final class WindowModel {
         guard let profileID = state.profile(creation.profileID)?.id ?? space?.profileID else { return }
         var created: SidebarSpace?
         store.edit {
-            created = $0.addSpace(name: name, profileID: profileID, icon: creation.icon, after: creation.insertAfter)
+            created = $0.addSpace(
+                name: name, profileID: profileID, icon: creation.icon, theme: creation.spaceStyleEditor.theme,
+                after: creation.insertAfter)
         }
         if selecting, let created { selectSpace(created.id) }
     }

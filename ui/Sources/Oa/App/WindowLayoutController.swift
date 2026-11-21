@@ -216,16 +216,23 @@ final class WindowLayoutController: NSViewController {
 
     private var spaceTheme: WindowTheme { model.space.map(model.theme(of:)) ?? .default }
 
+    /// As Arc: the Create a Space panel shows the theme chosen for it, else the default.
+    private func spaceCreationTheme(_ creation: SpaceCreationState?) -> WindowTheme {
+        creation?.spaceStyleEditor.theme ?? .default
+    }
+
     var spaceCreationFade: SpaceCreationFade? {
         if let runningFade { return runningFade }
         // A frame can be drawn before the pager has caught up with the panel opening or closing: the fade's first.
         if model.spaceCreation != nil, laidOutSpaceCreation == nil, !spaceCreationSwiped {
-            return SpaceCreationFade(panel: nil, themes: (theme(of: .space(model.selectedSpaceID)), .default))
+            return SpaceCreationFade(
+                panel: nil, themes: (theme(of: .space(model.selectedSpaceID)), spaceCreationTheme(model.spaceCreation)))
         }
         if model.spaceCreation == nil, let panel = laidOutSpaceCreation, panel.phase == .editing,
             pager.selectedPageID == .spaceCreation
         {
-            return SpaceCreationFade(panel: panel, themes: (.default, theme(of: .space(model.selectedSpaceID))))
+            return SpaceCreationFade(
+                panel: panel, themes: (spaceCreationTheme(panel), theme(of: .space(model.selectedSpaceID))))
         }
         return nil
     }
@@ -246,14 +253,14 @@ final class WindowLayoutController: NSViewController {
         if let fade = spaceCreationFade { return fade.theme < 0.5 ? fade.themes.from : fade.themes.to }
         guard model.spaceCreation != nil else { return spaceTheme }
         let pages = sidebarPages
-        guard spaceCreationSwiped, !pages.isEmpty else { return .default }
+        guard spaceCreationSwiped, !pages.isEmpty else { return spaceCreationTheme(model.spaceCreation) }
         return theme(of: pages[min(max(Int(sidebarPage.rounded()), 0), pages.count - 1)])
     }
 
     private func theme(of page: WindowLayoutPage) -> WindowTheme {
         switch page {
         case .space(let id): model.state.space(id).map(model.theme(of:)) ?? .default
-        case .spaceCreation: .default
+        case .spaceCreation: spaceCreationTheme(model.spaceCreation)
         case .home: .default
         }
     }
