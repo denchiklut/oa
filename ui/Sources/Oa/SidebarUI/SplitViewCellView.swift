@@ -49,6 +49,8 @@ struct SplitViewCellView: View {
         .onDisappear { drag?.rows[splitID] = nil }
         .spaceMenuExclusion()
         .contextMenu {
+            Button("Share Split View…") {}.disabled(true)
+            Divider()
             Button("Separate All Tabs") { model.separateAllSplitViewChildren(splitID) }
             Button("Add Tab…") {
                 model.selectSplitView(splitID)

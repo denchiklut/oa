@@ -343,7 +343,7 @@ struct ContentPanelTopBar: View {
     }
 
     /// Arc's Split View Options, as seen: its items follow the split's orientation, a pane at an end can't move past
-    /// it, a full split takes no pane, and Share Split View… isn't here.
+    /// it, and a full split takes no pane. Share Split View… is off: Oa has no sharing.
     private func splitViewMenu(_ splitID: UUID, vertical: Bool) -> some View {
         let tabIDs = model.state.presentedTabIDs(with: tabID)
         let index = tabIDs.firstIndex(of: tabID) ?? 0
@@ -376,6 +376,8 @@ struct ContentPanelTopBar: View {
                 vertical ? "Convert to Horizontal Split View" : "Convert to Vertical Split View",
                 systemImage: vertical ? "square.split.2x1" : "square.split.1x2"
             ) { model.flipSplitViewLayoutOrientation(splitID) }
+            Divider()
+            Button("Share Split View…", systemImage: "square.and.arrow.up") {}.disabled(true)
         } label: {
             Image(systemName: "square.split.2x1")
                 .font(.system(size: 14))

@@ -73,23 +73,51 @@ struct SidebarAddressField: View {
         Button {
             model.openCommandBar(.currentTab)
         } label: {
-            // While the Create a Space panel is in, the field shows its Space's, whose page it goes with.
-            AddressFieldLabel(label: model.addressLabel(in: model.selectedSpaceID))
-                .font(.system(size: 13, weight: .medium))
-                .lineLimit(1)
-                .foregroundStyle(theme.tertiaryText)
-                .frame(height: Self.height)
-                .background(theme.fieldFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .contentShape(Rectangle())
+            // While the Create a Space panel is in, the field shows its Space's, whose page it goes with. As seen
+            // in Arc: the prompt while a split's empty pane waits for the command bar.
+            AddressFieldLabel(
+                label: model.emptySplitViewPaneIndex == nil ? model.addressLabel(in: model.selectedSpaceID) : nil
+            )
+            .font(.system(size: 13, weight: .medium))
+            .lineLimit(1)
+            .foregroundStyle(theme.tertiaryText)
+            .frame(height: Self.height)
+            .background(theme.fieldFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .overlay(alignment: .trailing) {
-            if model.address != nil {
+            if model.address != nil, model.emptySplitViewPaneIndex == nil {
                 HStack(spacing: -2) {
                     CopyLinkButton(model: model, size: 30)
-                    SiteControlsButton(
-                        model: model, size: CGSize(width: 30, height: 30), showingSiteControls: $showingSiteControls)
+                    if model.presentedTabIDs.count > 1 {
+                        // As seen in Arc: in a split, Share Split View… takes Site Controls' place, which the
+                        // focused pane's bar has. Oa has no sharing, so it is off; the permission prompt still
+                        // hangs from here, as Arc's does.
+                        Button {
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 14))
+                                .frame(width: 30, height: 30)
+                        }
+                        .buttonStyle(ChromeButtonStyle())
+                        .accessibilityLabel("Share Split View…")
+                        .disabled(true)
+                        .background {
+                            Color.clear.popover(
+                                isPresented: model.permissionPromptBinding(inPeekToolbar: false), arrowEdge: .bottom
+                            ) {
+                                if let request = model.promptedPermissionRequest {
+                                    PermissionRequestView(model: model, request: request)
+                                }
+                            }
+                        }
+                    } else {
+                        SiteControlsButton(
+                            model: model, size: CGSize(width: 30, height: 30),
+                            showingSiteControls: $showingSiteControls)
+                    }
                 }
                 .padding(.trailing, 4)
                 .opacity(
