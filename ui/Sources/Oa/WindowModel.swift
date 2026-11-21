@@ -20,6 +20,7 @@ final class WindowModel {
     }
     private(set) var selectedTabIDs: [UUID: UUID] = [:] {
         didSet {
+            selectionCount += 1
             closeCommandBarIfSelectionChanged()
             presentationChanged()
         }
@@ -88,6 +89,7 @@ final class WindowModel {
     @ObservationIgnored private let store: SidebarStore
     @ObservationIgnored private var previousTabID: UUID?
     @ObservationIgnored private var focusedPaneIDs: [UUID: UUID] = [:]
+    @ObservationIgnored private var selectionCount = 0
     @ObservationIgnored private var pendingURLs: [UUID: URL] = [:]
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
     /// By profile: ArcCore keeps one omnibox per window.
@@ -1759,11 +1761,13 @@ final class WindowModel {
             _ = page.navigationResult
             _ = page.hasFocus
         } onChange: { [weak self] in
+            let selections = MainActor.assumeIsolated { self?.selectionCount }
             Task { @MainActor [weak self] in
                 guard let self, let page = pages[tabID], ObjectIdentifier(page) == identity else { return }
                 save(page, for: tabID)
-                // As Arc's `onDidFocus`: the pane whose page takes the keyboard is the focused one.
-                if page.hasFocus, presentedTabIDs.contains(tabID) { select(tabID) }
+                // As Arc's `onDidFocus`: the pane whose page takes the keyboard is the focused one. A page the window
+                // gave the keyboard itself, before it selected another, isn't followed.
+                if page.hasFocus, presentedTabIDs.contains(tabID), selections == selectionCount { select(tabID) }
                 observe(page, for: tabID)
             }
         }
