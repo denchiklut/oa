@@ -14,6 +14,16 @@ order, and each pane is an ordinary tab with its own page.
 - **From a link.** The page menu's Open Link in Split View opens the link in a
   pane on the right of its page, focused. A Peek's third control does the same
   with the Peek's page.
+- **Dropping a tab on the page.** A sidebar tab dragged over the page shows
+  where it would go. On a lone page an edge makes a split with it: the outer
+  40 % at the sides, 50 pt at the top and 40 pt at the bottom, and the top and
+  bottom make a stacked one. The page moves aside without being resized, over
+  0.2 s, and an outlined pane takes the other half; an edge once entered holds
+  over that half. The page's middle only outlines it, and a drop there selects
+  the tab. In a split, an edge of a pane inserts the tab there while there is
+  room, and the rest of the pane replaces its tab, which is a plain tab again
+  right after the split. The dropped tab takes the focus. While the tab is over
+  the page the window shows what it showed before the press.
 - **Add Split View.** View ▸ Add Split View ⌃⇧=, New Split in the dock's "+", Add
   Split View in the selected row's menu and Add Tab… in a split's open an empty
   pane at the end with the command bar. Return opens the row in a new tab in
@@ -81,6 +91,11 @@ Oa's own:
   measured.
 - Closing a split from its ✕ comes back with ⇧⌘T a tab at a time, as plain
   tabs. Arc's undo brings the split back.
+- A split's drop edges are Arc's other zone sizes, a third of the pane up to
+  80 pt at the sides and 50 pt at the ends, with no hold; Arc's weren't measured
+  in a split. The page comes back when the dragged tab reaches the page, where
+  Arc's comes back as the drag begins. Only a tab that can be in a split can be
+  dropped, and the dragged copy stays a row.
 - Open Link in Split View from a pinned tab or a Favorite opens a Peek, and
   their Peeks have no split control, until a split can be pinned. Arc builds the
   split from a copy of the pinned page.
@@ -89,6 +104,6 @@ A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
 Not there yet: Arc's pane shortcuts, ⌥-click on a link, Share Split View…, Site
-Controls and the link and lock on a pane's bar, dropping a tab on the page,
-pinned and Favorite splits, a split's title, its card in the tab switcher and
+Controls and the link and lock on a pane's bar, dropping a link or a tab on a
+sidebar row, pinned and Favorite splits, a split's title, its card in the tab switcher and
 its row in the command bar.
