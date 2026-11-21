@@ -46,11 +46,15 @@ order, and each pane is an ordinary tab with its own page.
   for the split it shows, and the split's stored factors take them when the
   resize ends, so another window and a later selection start from those.
 - **Panes.** They share the page's area by the split's factors, equal until a
-  pane is resized or one is added, 10 pt apart and none under 220 pt, so panes that don't fit
-  run past the window's edge. Each has a 32 pt bar in its page's colour: back
-  and forward, the host, and a ✕ that closes its tab; reload shows on the
-  focused pane while it is wide enough. A split has no window toolbar, and
-  Show Toolbar is off while one is shown.
+  pane is resized or one is added, 10 pt apart and none under 220 pt, so panes
+  that don't fit run past the window's edge. Each has a 32 pt bar in its page's
+  colour: back and forward, copy link while it is wide enough, Arc's "Site is
+  not secure" mark on a page that isn't, the host, and a ✕ that closes its tab.
+  The focused pane also has reload and Site Controls while it is wide enough,
+  and the Split View menu. A split has no window toolbar, and Show Toolbar is
+  off while one is shown. In a split the sidebar's address field has Share
+  Split View… in Site Controls' place, and shows the search prompt while an
+  empty pane waits.
 - **Focus.** The focused pane is the window's selected tab. It has a 2 pt
   outline inside its edge and a glow into the gaps beside it. A click on a
   pane's page reaches the page and focuses the pane: the engine reports which
@@ -60,8 +64,16 @@ order, and each pane is an ordinary tab with its own page.
   click selects the split with the pane the window focused in it last, and on
   the selected split the tab clicked. Under the pointer the selected split
   shows a ✕ for each tab, and one that isn't selected a single ✕ that archives
-  all its tabs. Its menu has Separate All Tabs, and for each tab Separate from
-  Split View and Archive Item.
+  all its tabs; Edit ▸ Undo, "Undo Archive Tabs", brings the split back whole,
+  with its ID, where it was. Its menu has Share Split View…, Separate All Tabs,
+  Add Tab…, Convert, and for each tab Separate from Split View and Archive Item.
+- **Shortcuts.** As Arc's, and bindable in Settings ▸ Shortcuts: ⌃⇧1 to ⌃⇧4 focus
+  a pane, ⌃⇧] and ⌃⇧[ the next and previous with wraparound, ⌃⇧- (View ▸ Close
+  this Split Pane) closes the focused pane's tab, and View ▸ Separate Page from
+  Split View has no key. The numbered ones are hidden menu items, as Arc's are.
+- **Elsewhere.** The ⌃⇥ switcher shows a split as one card, its panes' pictures
+  side by side in a white frame with a favicon under each, as Arc's. The command
+  bar lists a split once, as Switch to Split View.
 - **Closing and separating.** ⌘W and a pane's ✕ close that pane's tab, and the
   next pane takes the focus. A split left with one tab is that tab again, where
   the split was. A separated tab is selected, alone, right after the split.
@@ -89,8 +101,14 @@ Oa's own:
 - The focus outline is the theme palette's shaded entry in dark and its darkest
   in light, which gives Arc's blues on the default theme; other themes weren't
   measured.
-- Closing a split from its ✕ comes back with ⇧⌘T a tab at a time, as plain
-  tabs. Arc's undo brings the split back.
+- ⇧⌘T after a split's ✕ brings its tabs back one at a time, as plain tabs;
+  only Edit ▸ Undo rebuilds the split. A pane's tab closed by its ✕ or ⌘W comes
+  back into its split while the split is there, else as a plain tab. Arc's
+  result for both wasn't seen.
+- Share Split View… is there but off: Oa has no sharing.
+- A split's row in the command bar takes its focused pane's title; Arc's row
+  title wasn't recorded. Picking it from an empty pane switches to the split;
+  Arc's rule there wasn't made out.
 - A split's drop edges are Arc's other zone sizes, a third of the pane up to
   80 pt at the sides and 50 pt at the ends, with no hold; Arc's weren't measured
   in a split. The page comes back when the dragged tab reaches the page, where
@@ -103,7 +121,5 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: Arc's pane shortcuts, ⌥-click on a link, Share Split View…, Site
-Controls and the link and lock on a pane's bar, dropping a link or a tab on a
-sidebar row, pinned and Favorite splits, a split's title, its card in the tab switcher and
-its row in the command bar.
+Not there yet: ⌥-click on a link, dropping a link or a tab on a sidebar row,
+pinned and Favorite splits, and a split's title, icon, Duplicate and Move to.
