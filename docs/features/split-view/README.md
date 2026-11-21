@@ -67,6 +67,28 @@ order, and each pane is an ordinary tab with its own page.
   all its tabs; Edit ▸ Undo, "Undo Archive Tabs", brings the split back whole,
   with its ID, where it was. Its menu has Share Split View…, Separate All Tabs,
   Add Tab…, Convert, and for each tab Separate from Split View and Archive Item.
+- **Pinned splits.** Pin Tab on a split's tab pins the whole split, Unpin Tab
+  puts it back at the top of the list, children and sizes kept. A pinned split's
+  tabs keep their pinned address, and its panes show no "/". On the selected
+  pinned split the cell has one "—" under the pointer, and it and ⌘W unload all
+  its pages and leave nothing selected, the split staying pinned; a pane's ✕
+  archives that pane's tab and the other stays as a plain pinned tab. The ✕ of
+  a pinned split that isn't selected archives its tabs.
+- **Favorite splits.** Favorite Tab on a split's tab files the whole split under
+  the profile's Favorites, as one tile in the grid: a 12 pt favicon on each
+  pane's part; selected, one card with the panes' favicons' tint and ring, the
+  ring also between the parts; not selected, a card for each part, 2 pt apart.
+  A click selects the split with the pane focused last, ⌘W leaves nothing
+  selected with its pages kept, and the tile's menu has Archive Item, which
+  archives its tabs, and no Remove Favorite or Rename….
+- **A pinned tab or a Favorite in a split.** Every way of making a split with
+  one, as either tab, takes the tab's own item and page into a new split at the
+  top of the list, and a copy keeps its place, its page loaded at once in the
+  background at the address the page was at. Open Link in Split View from a
+  pinned tab does the same, with no Peek.
+- **A split's title.** Rename… in the cell's menu edits it in place, starting
+  with "2 Tabs" selected. A titled split shows a 16 pt badge with its count
+  where a row's favicon is and the title where a row's is, in place of its tabs.
 - **Shortcuts.** As Arc's, and bindable in Settings ▸ Shortcuts: ⌃⇧1 to ⌃⇧4 focus
   a pane, ⌃⇧] and ⌃⇧[ the next and previous with wraparound, ⌃⇧- (View ▸ Close
   this Split Pane) closes the focused pane's tab, and View ▸ Separate Page from
@@ -89,13 +111,17 @@ Oa's own:
 - After a split is selected again, the outline and the keyboard are both on the
   pane the window focused last. Arc draws the outline there and sends typing to
   the last pane.
-- Only unpinned tabs of one Space can be in a split for now, and Pin Tab and
-  Favorite Tab are off on a split's tab. Arc pins a split whole and files one
-  under Favorites.
+- Favorite Tab files a split under Favorites, where Arc's way is dragging it
+  onto the grid; Oa's split cell can't be dragged yet. Unfavorite Tab puts it
+  back at the top of the list. A tab dropped on the page of a pinned tab or a
+  Favorite follows the copy rule, LIKELY as Arc's other ways in; Arc's wasn't
+  tried.
+- A titled split's badge is in the focus outline's colour, LIKELY Arc's (#2932E5
+  and #2229DD measured on the default theme), and its corner radius is a guess.
+  Clearing the title brings the tabs back; Arc's wasn't seen. With a title, a
+  click selects the split, and the selected one has no ✕ under the pointer.
 - The panes are equal while one is empty; Arc's sizes with an empty pane beside
   resized ones weren't seen. The menu's icons are near Arc's, not its own.
-- From the empty pane, Switch to Tab on a tab that can't be in a split, as a
-  pinned one, switches to it.
 - Reload leaves a pane's bar under 300 pt. Arc's had none at 278 pt and one at
   421 pt.
 - The focus outline is the theme palette's shaded entry in dark and its darkest
@@ -114,12 +140,9 @@ Oa's own:
   in a split. The page comes back when the dragged tab reaches the page, where
   Arc's comes back as the drag begins. Only a tab that can be in a split can be
   dropped, and the dragged copy stays a row.
-- Open Link in Split View from a pinned tab or a Favorite opens a Peek, and
-  their Peeks have no split control, until a split can be pinned. Arc builds the
-  split from a copy of the pinned page.
 
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: ⌥-click on a link, dropping a link or a tab on a sidebar row,
-pinned and Favorite splits, and a split's title, icon, Duplicate and Move to.
+Not there yet: ⌥-click on a link, dragging a split's cell, dropping a link or a
+tab on a sidebar row, and a split's Change Icon…, Duplicate and Move to.
