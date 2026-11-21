@@ -148,6 +148,8 @@ OAPageOpenDisposition ToDisposition(oa::OpenDisposition disposition) {
       return OAPageOpenDispositionNewWindow;
     case oa::OpenDisposition::kPopup:
       return OAPageOpenDispositionPopup;
+    case oa::OpenDisposition::kSplitView:
+      return OAPageOpenDispositionSplitView;
   }
 }
 

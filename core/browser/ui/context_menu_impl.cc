@@ -25,7 +25,6 @@ constexpr auto kHiddenCommands = base::MakeFixedFlatSet<int>({
     IDC_CONTENT_CONTEXT_OPENLINK_ISOLATED,
     IDC_CONTENT_CONTEXT_OPENLINKINPROFILE,
     IDC_CONTENT_CONTEXT_OPENLINKBOOKMARKAPP,
-    IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW,
     IDC_CONTENT_CONTEXT_ADD_LINK_TO_READING_LIST,
     IDC_CONTENT_CONTEXT_INSPECTELEMENT,
     IDC_CONTENT_CONTEXT_TRANSLATE,
@@ -84,6 +83,14 @@ void EditModel(const content::ContextMenuParams& params,
         IsHidden(model->GetCommandIdAt(index))) {
       model->RemoveItemAt(index);
     }
+  }
+  // As Arc's item: its label, no icon and no layout submenu. Chromium runs it
+  // as an open with the split view disposition (patch 0019).
+  if (const std::optional<size_t> split =
+          model->GetIndexOfCommandId(IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW)) {
+    model->RemoveItemAt(*split);
+    model->InsertItemAt(*split, IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW,
+                        u"Open Link in Split View");
   }
   // As Arc: the search for selected text leads the menu, ahead of Copy and
   // of spelling suggestions; on a link it stays where Chrome puts it.

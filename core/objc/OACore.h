@@ -15,6 +15,7 @@ typedef NS_ENUM(NSInteger, OAPageOpenDisposition) {
   OAPageOpenDispositionBackgroundTab,
   OAPageOpenDispositionNewWindow,
   OAPageOpenDispositionPopup,
+  OAPageOpenDispositionSplitView,
 };
 
 typedef NS_ENUM(NSInteger, OAPageSecurityLevel) {
