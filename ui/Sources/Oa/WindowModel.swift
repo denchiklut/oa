@@ -520,6 +520,12 @@ final class WindowModel {
 
     func placeholder(for tabID: UUID) -> NSImage? { pages[tabID] == nil ? placeholders[tabID] : nil }
 
+    func activatePresented(_ page: any Page) {
+        if page.id == self.page?.id, peek == nil, commandBar == nil, dialog == nil, extensionRequest == nil {
+            page.activate()
+        }
+    }
+
     private func ensurePresentedPages() {
         for tabID in presentedTabIDs { ensurePage(tabID) }
     }

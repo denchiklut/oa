@@ -33,12 +33,13 @@ struct CrashedPageView: View {
 
 struct PageContentView: View {
     let page: any Page
+    var movedToWindow: () -> Void = {}
 
     var body: some View {
         if page.crash != nil {
             CrashedPageView(page: page)
         } else {
-            PageHostView(view: page.view)
+            PageHostView(view: page.view, movedToWindow: movedToWindow)
         }
     }
 }
