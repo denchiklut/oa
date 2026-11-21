@@ -103,6 +103,35 @@ final class MainMenu {
             item(
                 "Add Split View", #selector(BrowserWindowController.addSplitView(_:)), key: "=",
                 modifiers: [.control, .shift], id: "addSplitView", priority: .promptAfterConsumedByWebView))
+        view.addItem(
+            item(
+                "Close this Split Pane", #selector(BrowserWindowController.closeFocusedSplitViewPanel(_:)), key: "-",
+                modifiers: [.control, .shift], id: "removeSplitView", priority: .promptAfterConsumedByWebView))
+        view.addItem(
+            item(
+                "Separate Page from Split View", #selector(BrowserWindowController.separateTabFromSplitView(_:)),
+                id: "separateTabFromSplitView"))
+        // Hidden with their keys kept, as in Arc's menu. The numbered IDs are Oa's own: Arc builds its own.
+        var panes = (1...SidebarSplitViewData.maxNumberSplit).map { position in
+            let pane = item(
+                "Switch to Split View \(position)", #selector(BrowserWindowController.switchToSplitViewPane(_:)),
+                key: "\(position)", modifiers: [.control, .shift], id: "switchToWindowPane\(position)")
+            pane.tag = position
+            return pane
+        }
+        panes.append(
+            item(
+                "Switch to next Split View", #selector(BrowserWindowController.switchToNextSplitViewPane(_:)),
+                key: "]", modifiers: [.control, .shift], id: "switchToNextWindowPane"))
+        panes.append(
+            item(
+                "Switch to previous Split View", #selector(BrowserWindowController.switchToPreviousSplitViewPane(_:)),
+                key: "[", modifiers: [.control, .shift], id: "switchToPreviousWindowPane"))
+        for pane in panes {
+            pane.isHidden = true
+            pane.allowsKeyEquivalentWhenHidden = true
+            view.addItem(pane)
+        }
 
         let archive = submenu("Archive", in: menu)
         archive.addItem(

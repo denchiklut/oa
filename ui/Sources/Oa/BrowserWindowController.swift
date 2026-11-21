@@ -166,6 +166,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
     @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
     @objc func addSplitView(_ sender: Any?) { model.addSplitViewPane() }
+    /// As seen in Arc: the same as closing the focused pane's tab.
+    @objc func closeFocusedSplitViewPanel(_ sender: Any?) { model.selectedTabID.map { model.close($0) } }
+    @objc func separateTabFromSplitView(_ sender: Any?) { model.selectedTabID.map(model.separateFromSplitView) }
+    @objc func switchToSplitViewPane(_ sender: NSMenuItem) { model.switchToSplitViewPane(at: sender.tag - 1) }
+    @objc func switchToNextSplitViewPane(_ sender: Any?) { model.switchToAdjacentSplitViewPane(offset: 1) }
+    @objc func switchToPreviousSplitViewPane(_ sender: Any?) { model.switchToAdjacentSplitViewPane(offset: -1) }
     @objc func selectNextTab(_ sender: Any?) { model.selectAdjacentTab(1) }
     @objc func selectPreviousTab(_ sender: Any?) { model.selectAdjacentTab(-1) }
     @objc func cycleToNextRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.next) }
@@ -309,6 +315,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(stopLoading(_:)): model.frontPage?.isLoading ?? false
         case #selector(expandPeek(_:)): model.peek != nil
         case #selector(addSplitView(_:)): model.canAddSplitViewPane
+        case #selector(closeFocusedSplitViewPanel(_:)), #selector(separateTabFromSplitView(_:)),
+            #selector(switchToNextSplitViewPane(_:)), #selector(switchToPreviousSplitViewPane(_:)):
+            model.presentedTabIDs.count > 1
+        case #selector(switchToSplitViewPane(_:)):
+            model.presentedTabIDs.count > 1 && item.tag <= model.presentedTabIDs.count
         case #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)): !model.selectableTabs.isEmpty
         case #selector(selectTab(_:)): tabIndex(for: item) != nil
         case #selector(deleteSpace(_:)): model.state.spaces.count > 1
