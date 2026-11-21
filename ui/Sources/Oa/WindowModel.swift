@@ -962,7 +962,10 @@ final class WindowModel {
             }
         case .closeItems(let tabIDs, let undoPrompt):
             let tabIDs = tabIDs.filter { state.tree.tab($0) != nil }
-            guard let parentID = tabIDs.first.flatMap({ state.tree.location(of: $0)?.parentID }) else { return }
+            guard let first = tabIDs.first, let parentID = state.tree.location(of: first)?.parentID else { return }
+            // A Favorite and a pinned tab are archived one at a time, by their own closes.
+            if state.isFavorite(first) { return removeFavorite(first) }
+            if state.isPinned(first) { return archivePinned(first) }
             // Oa's own: on the stack before its pages have closed, so the step is filed while the redo runs.
             // Arc files it when they have, and a redone close of a loaded tab leaves a second step that does nothing.
             let group = ClosedGroup(
