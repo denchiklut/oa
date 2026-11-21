@@ -475,20 +475,24 @@ final class WindowModel {
         closeCommandBar()
         switch action {
         case .switchTo(let tabID):
-            // As seen in Arc: Switch to Tab from the empty pane moves that tab into it. Oa's own: a tab that can't
-            // be in a split is switched to.
-            // Oa's own: a split's row switches to it, where Arc's rule from the empty pane wasn't made out.
-            guard let anchorID = selectedTabID, paneIndex != nil, state.canOpenInSplitView(tabID, beside: anchorID)
+            // As seen in Arc: Switch to Tab from the empty pane moves that tab into it. Oa's own: a split's row
+            // switches to it, where Arc's rule from the empty pane wasn't made out.
+            guard let anchorID = selectedTabID, paneIndex != nil,
+                state.canOpenInSplitView(tabID, beside: anchorID, in: selectedSpaceID)
             else { return show(tabID) }
-            store.edit { $0.openInSplitView(tabID, beside: anchorID, at: paneIndex) }
+            editSplitView(taking: [anchorID, tabID]) {
+                $0.openInSplitView(tabID, beside: anchorID, in: self.selectedSpaceID, at: paneIndex)
+            }
             select(tabID)
         case .open(let url, background: false) where paneIndex != nil, .openInSplitView(let url):
-            // Oa's own where the tab can't take a pane, as a pinned one for now: a new tab.
-            guard let anchorID = selectedTabID, state.canAddSplitViewPane(beside: anchorID) else { return newTab(url) }
+            // Oa's own where the tab can't take a pane, as a full split: a new tab.
+            guard let anchorID = selectedTabID, state.canAddSplitViewPane(beside: anchorID, in: selectedSpaceID)
+            else { return newTab(url) }
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
-            store.edit {
-                $0.insertTab(tab, atTopOf: selectedSpaceID)
-                $0.openInSplitView(tab.id, beside: anchorID, at: paneIndex)
+            let spaceID = selectedSpaceID
+            editSplitView(taking: [anchorID]) {
+                $0.insertTab(tab, atTopOf: spaceID)
+                $0.openInSplitView(tab.id, beside: anchorID, in: spaceID, at: paneIndex)
             }
             createdDates[tab.id] = .now
             select(tab.id)
@@ -557,14 +561,34 @@ final class WindowModel {
     }
 
     func canOpenInSplitView(_ tabID: UUID) -> Bool {
-        selectedTabID.map { state.canOpenInSplitView(tabID, beside: $0) } ?? false
+        selectedTabID.map { state.canOpenInSplitView(tabID, beside: $0, in: selectedSpaceID) } ?? false
     }
 
     /// As Arc's Open in Split View: the tab joins the selected one on its right and takes the focus.
     func openInSplitView(_ tabID: UUID) {
-        guard let anchorID = selectedTabID, state.canOpenInSplitView(tabID, beside: anchorID) else { return }
-        store.edit { $0.openInSplitView(tabID, beside: anchorID) }
+        guard let anchorID = selectedTabID, canOpenInSplitView(tabID) else { return }
+        editSplitView(taking: [anchorID, tabID]) {
+            $0.openInSplitView(tabID, beside: anchorID, in: self.selectedSpaceID)
+        }
         select(tabID)
+    }
+
+    /// As seen in Arc: a lone pinned tab or Favorite among `tabIDs` goes into the split as its own item and page, and
+    /// a copy keeps its place, its page loaded at once at the address the page was at.
+    private func editSplitView(taking tabIDs: [UUID], _ change: (inout SidebarState) -> Void) {
+        let spaceID = selectedSpaceID
+        var copies: [(original: UUID, copy: UUID)] = []
+        store.edit { state in
+            for tabID in tabIDs {
+                if let copy = state.takeIntoSplitView(tabID, in: spaceID) { copies.append((tabID, copy)) }
+            }
+            change(&state)
+        }
+        for (original, copy) in copies {
+            createdDates[copy] = .now
+            if let url = livePage(for: original)?.url { pendingURLs[copy] = url }
+            ensurePage(copy)
+        }
     }
 
     /// As seen in Arc: the tab is selected, alone, right after the split it left.
@@ -600,22 +624,26 @@ final class WindowModel {
         guard let proposed = proposedSplitViewDropTarget, let anchorID = selectedTabID else { return }
         proposedSplitViewDropTarget = nil
         let presented = presentedTabIDs
+        let spaceID = selectedSpaceID
         switch proposed.target {
         case .insertContent(let index):
-            store.edit {
-                $0.openInSplitView(tabID, beside: anchorID, at: index)
+            editSplitView(taking: [anchorID, tabID]) {
+                $0.openInSplitView(tabID, beside: anchorID, in: spaceID, at: index)
                 if presented.count == 1, let splitID = $0.splitViewID(containing: tabID) {
                     $0.updateSplitView(splitID) { $0.layoutOrientation = proposed.layoutOrientation }
                 }
             }
         case .replaceContent(let index):
-            if presented.count > 1 { store.edit { $0.replaceSplitViewPane(presented[index], with: tabID) } }
+            if presented.count > 1 {
+                editSplitView(taking: [tabID]) { $0.replaceSplitViewPane(presented[index], with: tabID, in: spaceID) }
+            }
         }
         select(tabID)
     }
 
     var canAddSplitViewPane: Bool {
-        emptySplitViewPaneIndex == nil && selectedTabID.map(state.canAddSplitViewPane(beside:)) ?? false
+        emptySplitViewPaneIndex == nil
+            && selectedTabID.map { state.canAddSplitViewPane(beside: $0, in: selectedSpaceID) } ?? false
     }
 
     /// Arc's `addPanel`: an empty pane, the last one unless a pane's menu placed it, and the command bar to fill it.
@@ -1155,9 +1183,9 @@ final class WindowModel {
         select(tab.id)
     }
 
-    /// Oa's own for now: only where the tab under the Peek can take a pane, so not on a pinned tab or a Favorite.
     var canAddPeekToSplitView: Bool {
-        peek != nil && !showingArchive && selectedTabID.map(state.canAddSplitViewPane(beside:)) ?? false
+        peek != nil && !showingArchive
+            && selectedTabID.map { state.canAddSplitViewPane(beside: $0, in: selectedSpaceID) } ?? false
     }
 
     /// Arc's `addModalToSplit`: the Peek's page becomes a tab on the right of the one it was opened from, focused.
@@ -1166,10 +1194,11 @@ final class WindowModel {
             return
         }
         let tab = SidebarTab(id: UUID(), title: page.title, url: page.url, viewedAt: .now, openerID: ownerID)
-        store.edit {
-            $0.openTab(tab, from: ownerID, in: selectedSpaceID)
+        let spaceID = selectedSpaceID
+        editSplitView(taking: [ownerID]) {
+            $0.openTab(tab, from: ownerID, in: spaceID)
             let index = $0.presentedTabIDs(with: ownerID).firstIndex(of: ownerID).map { $0 + 1 }
-            $0.openInSplitView(tab.id, beside: ownerID, at: index)
+            $0.openInSplitView(tab.id, beside: ownerID, in: spaceID, at: index)
         }
         createdDates[tab.id] = .now
         install(page, for: tab.id)
@@ -1893,17 +1922,20 @@ final class WindowModel {
             return inWindow ? openWindow(tab.id) : select(tab.id)
         }
         let background = disposition == .backgroundTab
-        if !insidePeek, !inWindow, disposition == .newWindow || (!background && state.keepsAddress(openerID)) {
+        let split = disposition == .splitView
+        if !insidePeek, !inWindow, disposition == .newWindow || (!background && !split && state.keepsAddress(openerID))
+        {
             return peek(page, from: openerID)
         }
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now, openerID: openerID)
-        store.edit {
-            $0.openTab(tab, from: openerID, in: selectedSpaceID)
-            // As seen in Arc: the link's page on the right of the one it came from, focused. Oa's own where that
-            // one can't take a pane: a tab.
-            if disposition == .splitView {
+        let spaceID = selectedSpaceID
+        // As seen in Arc: the link's page on the right of the one it came from, focused, a pinned tab or Favorite
+        // going in as itself. Oa's own where that one can't take a pane: a tab.
+        editSplitView(taking: split ? [openerID] : []) {
+            $0.openTab(tab, from: openerID, in: spaceID)
+            if split {
                 let index = $0.presentedTabIDs(with: openerID).firstIndex(of: openerID).map { $0 + 1 }
-                $0.openInSplitView(tab.id, beside: openerID, at: index)
+                $0.openInSplitView(tab.id, beside: openerID, in: spaceID, at: index)
             }
         }
         createdDates[tab.id] = .now
