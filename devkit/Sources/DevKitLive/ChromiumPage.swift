@@ -19,6 +19,7 @@ final class ChromiumPage: Page, MediaSession {
     private(set) var navigationResult: NavigationResult?
     private(set) var isCameraOn = false
     private(set) var isMicrophoneOn = false
+    private(set) var hasFocus = false
     private(set) var crash: PageCrash?
     var keepsAddress = false {
         didSet { page?.keepsAddress = keepsAddress }
@@ -115,6 +116,7 @@ final class ChromiumPage: Page, MediaSession {
         if result != navigationResult { navigationResult = result }
         if page.isCameraOn != isCameraOn { isCameraOn = page.isCameraOn }
         if page.isMicrophoneOn != isMicrophoneOn { isMicrophoneOn = page.isMicrophoneOn }
+        if page.hasFocus != hasFocus { hasFocus = page.hasFocus }
         updateHostedView()
     }
 
