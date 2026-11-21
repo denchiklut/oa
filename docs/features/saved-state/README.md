@@ -16,7 +16,8 @@ where `tree` lists `rootIDs` and `items` in display order. A profile has its
 names; without it the Space shows Arc's default. Each item has `id`,
 optional `parentID` and `childIDs`, a `type` of `container`, `tab`, `folder` or
 `splitView`, and for a container its `container` kind, for a tab its `title`,
-`url`, `viewedAt` and `openerID`, the tab whose page opened it. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
+`url`, `viewedAt` and `openerID`, the tab whose page opened it, for a split its
+`splitView` with `itemWidthFactors` and `layoutOrientation` as Arc stores them. Each `archive` entry has `id`, `title`, `url`, `spaceID`,
 absent for a Favorite and a Favorite's Peek, `archivedAt`, a `reason` of
 `manual` or `auto`, and `position`. Dates are ISO
 8601. A file without `archive`, `viewedAt` or `openerID` reads as an empty Archive, no

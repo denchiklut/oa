@@ -37,6 +37,7 @@ const sidebars = {
         { type: "doc", id: "features/extensions/README", label: "Extensions" },
         { type: "doc", id: "features/picture-in-picture/README", label: "Picture-in-picture" },
         { type: "doc", id: "features/tab-switcher/README", label: "Recent-tab switcher" },
+        { type: "doc", id: "features/split-view/README", label: "Split View" },
       ],
     },
   ],
