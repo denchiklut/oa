@@ -199,9 +199,10 @@ private struct SpaceManagementCollectionViewItem: View {
     @Environment(\.windowColorScheme) private var windowColorScheme
 
     var body: some View {
-        let background = space.theme.background[windowColorScheme]
+        let spaceTheme = model.theme(of: space)
+        let background = spaceTheme.background[windowColorScheme]
         let appearance = background.contentOverBackgroundAppearance
-        let theme = Theme(palette: space.theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
+        let theme = Theme(palette: spaceTheme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         let unpinned = model.state.tabs(in: space.id, pinned: false)
         VStack(alignment: .leading, spacing: 0) {
             SpaceManagementCardHeader(
