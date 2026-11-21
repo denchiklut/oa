@@ -12,6 +12,7 @@ final class CommandBar {
     /// As Arc's `CommandBarSelectionOptions.Action`.
     enum Action {
         case open(URL, background: Bool)
+        case openInSplitView(URL)
         case switchTo(UUID)
     }
 
@@ -293,9 +294,9 @@ final class CommandBar {
         if match.kind == .searchHistory, match.isDeletable { autocomplete.delete(match) }
     }
 
-    /// As Arc from ⌘T: ⌘ opens a new tab in the background; ⇧ is plain Return. From ⌘L, where Arc's ⌘Return wasn't
-    /// tested, it does the same as Oa's own. ⌥ is Arc's Split View, which Oa doesn't have yet, so it is plain Return
-    /// too, as Oa's own.
+    /// As Arc from ⌘T: ⌘ opens a new tab in the background, ⌥ one in a split beside the current tab; ⇧ is plain
+    /// Return. From ⌘L, where Arc's ⌘Return and ⌥Return weren't tested, ⌘ does the same and ⌥ is plain Return, as
+    /// Oa's own.
     func submit(_ modifiers: NSEvent.ModifierFlags) {
         guard text.isEmpty || answersText else {
             pendingReturn = modifiers
@@ -322,7 +323,12 @@ final class CommandBar {
         switch row.source {
         case .tab(let tab): perform(.switchTo(tab.tab.id))
         case .match(let match):
-            if let url = match.url { perform(.open(url, background: modifiers.contains(.command))) }
+            guard let url = match.url else { return }
+            if modifiers.contains(.option), destination == .newTab {
+                perform(.openInSplitView(url))
+            } else {
+                perform(.open(url, background: modifiers.contains(.command)))
+            }
         }
     }
 

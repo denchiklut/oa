@@ -148,6 +148,7 @@ struct NavigationButtons: View {
     let page: (any Page)?
     let size: CGSize
     let spacing: CGFloat
+    var showsReload = true
 
     var body: some View {
         HStack(spacing: spacing) {
@@ -155,10 +156,12 @@ struct NavigationButtons: View {
                 .disabled(!(page?.canGoBack ?? false))
             button("arrow.right", 17, "Go forward") { page?.goForward() }
                 .disabled(!(page?.canGoForward ?? false))
-            button(page?.isLoading == true ? "xmark" : "arrow.clockwise", 16, "Reload this page") {
-                if page?.isLoading == true { page?.stopLoading() } else { page?.reload() }
+            if showsReload {
+                button(page?.isLoading == true ? "xmark" : "arrow.clockwise", 16, "Reload this page") {
+                    if page?.isLoading == true { page?.stopLoading() } else { page?.reload() }
+                }
+                .disabled(page == nil)
             }
-            .disabled(page == nil)
         }
         .buttonStyle(ChromeButtonStyle())
     }

@@ -13,6 +13,7 @@ enum UndoAction {
 /// Arc's names for what Edit ▸ Undo takes back.
 enum UndoStrings {
     static let archiveTab = "Archive Tab"
+    static let archiveTabs = "Archive Tabs"
     static let closePeek = "Close Peek"
     static let updateTheme = "Update Theme"
     static func clearTabs(_ count: Int) -> String { count == 1 ? "Clear Tab" : "Clear Tabs" }

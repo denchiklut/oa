@@ -61,7 +61,7 @@ struct BrowserWindowView: View {
             }
             // As Arc's `DimState`: under a Peek the card shrinks 9 pt at every edge as it fades.
             let cardSize = CGSize(width: layout.size.width - lead - 10, height: layout.size.height - 20)
-            card
+            content
                 .scaleEffect(
                     x: fadesCard ? 1 - 18 / max(cardSize.width, 18) : 1,
                     y: fadesCard ? 1 - 18 / max(cardSize.height, 18) : 1
@@ -142,6 +142,15 @@ struct BrowserWindowView: View {
     /// As measured in Arc: under a Peek over the page, the opener's card shows at 30% over the window's theme.
     private var fadesCard: Bool { model.peek != nil && !model.showingArchive }
 
+    /// As Arc: a split's panes take the page's place.
+    @ViewBuilder private var content: some View {
+        if let tabID = model.selectedTabID, let splitID = model.state.splitViewID(containing: tabID) {
+            SplitViewContentPanes(model: model, splitID: splitID)
+        } else {
+            card
+        }
+    }
+
     /// Arc's page as measured: a card flush with the sidebar and 10 pt in from the window's other edges, with 6 pt
     /// corners, no border and a soft shadow.
     private var card: some View {
@@ -209,7 +218,7 @@ private struct SidebarHomeTransition: ViewModifier {
     }
 }
 
-private struct PlaceholderView: View {
+struct PlaceholderView: View {
     /// Measured in Arc: a placeholder keeps about 57% of its page's contrast.
     static let snapshotOpacity = 0.57
 

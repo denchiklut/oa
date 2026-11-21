@@ -50,6 +50,7 @@ final class SidebarStore {
     func edit(_ change: (inout SidebarState) -> Void) {
         let profiles = state.profiles.map(\.id)
         change(&state)
+        state.dissolveSplitViews()
         if state.profiles.map(\.id) != profiles { commandBarPicks.prune(keeping: state.profiles.map(\.id)) }
         for window in windows { window.reconcile() }
         scheduleSave()
@@ -134,7 +135,7 @@ final class SidebarStore {
     /// A tab with a live page is closed as the user would, so a `beforeunload` handler can keep it, as Arc's idle
     /// unload lets a page stay; the rest are archived outright.
     private func autoArchive() {
-        let due = state.tabsDueForArchive(shown: Set(windows.compactMap(\.selectedTabID))) {
+        let due = state.tabsDueForArchive(shown: Set(windows.flatMap(\.presentedTabIDs))) {
             AutoArchiveThresholds.threshold(for: $0).seconds
         }
         guard !due.isEmpty else { return }
@@ -145,6 +146,7 @@ final class SidebarStore {
                 state.archiveTab(tabID, reason: .auto)
             }
         }
+        state.dissolveSplitViews()
         for window in windows { window.reconcile() }
         scheduleSave()
     }

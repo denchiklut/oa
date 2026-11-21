@@ -67,8 +67,11 @@ extension WindowModel {
     /// What the field shows on a Space's page: its selected tab's, the window's Space's with its Peek.
     func addressLabel(in spaceID: UUID) -> String? {
         if spaceID == selectedSpaceID, spaceCreation == nil { return addressLabel }
-        guard let tabID = selectedTabIDs[spaceID] else { return nil }
-        return (pages[tabID]?.url ?? state.tree.tab(tabID)?.url).map(Self.addressLabel)
+        return selectedTabIDs[spaceID].flatMap(addressLabel(of:))
+    }
+
+    func addressLabel(of tabID: UUID) -> String? {
+        (pages[tabID]?.url ?? state.tree.tab(tabID)?.url).map(Self.addressLabel)
     }
 
     private static func addressLabel(_ url: URL) -> String {

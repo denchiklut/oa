@@ -42,7 +42,7 @@ struct SidebarSnapshot: Codable {
         var kind: SidebarItem.Kind
 
         private enum Key: String, CodingKey {
-            case id, parentID, childIDs, type, title, url, viewedAt, openerID, container
+            case id, parentID, childIDs, type, title, url, viewedAt, openerID, container, splitView
         }
 
         init(_ item: SidebarItem) {
@@ -69,7 +69,10 @@ struct SidebarSnapshot: Codable {
                         viewedAt: try values.decodeIfPresent(Date.self, forKey: .viewedAt),
                         openerID: try values.decodeIfPresent(UUID.self, forKey: .openerID)))
             case "folder": kind = .folder(title: title)
-            case "splitView": kind = .splitView
+            case "splitView":
+                kind = .splitView(
+                    try values.decodeIfPresent(SidebarSplitViewData.self, forKey: .splitView)
+                        ?? SidebarSplitViewData())
             case let type:
                 throw DecodingError.dataCorruptedError(
                     forKey: .type, in: values, debugDescription: "unknown item type \(type)")
@@ -94,8 +97,9 @@ struct SidebarSnapshot: Codable {
             case .folder(let title):
                 try values.encode("folder", forKey: .type)
                 try values.encode(title, forKey: .title)
-            case .splitView:
+            case .splitView(let data):
                 try values.encode("splitView", forKey: .type)
+                try values.encode(data, forKey: .splitView)
             }
         }
     }
