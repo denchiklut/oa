@@ -14,6 +14,7 @@ struct SpaceCreationView: View {
     /// Off for the copy that fades out once the panel has gone.
     var focusesName = true
     @State private var pickingIcon = false
+    @State private var choosingTheme = false
     @State private var lifted = false
     @State private var glowing = false
     @State private var cardFaded = false
@@ -108,13 +109,24 @@ struct SpaceCreationView: View {
                         .foregroundStyle(theme.foreground.opacity(0.8))
                         .help("You can use a Profile to give this Space its own logins, history, and browsing data.")
                 }
-                card {
-                    icon { Image(systemName: "paintbrush.pointed.fill") }
-                    Text("Choose a Theme")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(theme.foreground)
-                    Spacer(minLength: 0)
+                Button {
+                    choosingTheme = true
+                } label: {
+                    card {
+                        icon { Image(systemName: "paintbrush.pointed.fill") }
+                        Text("Choose a Theme")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(theme.foreground)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                // As Arc: its popover points at the row, and what is chosen shows on the window before Create.
+                .background(
+                    SpaceStyleEditorAnchor(isPresented: choosingTheme, onClose: { choosingTheme = false }) {
+                        SpaceCreationStyleEditorView(model: model)
+                    })
             }
             .padding(.top, 31)
             Spacer(minLength: 16)
@@ -127,7 +139,7 @@ struct SpaceCreationView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 36)
                     .background(
-                        Self.createColor.opacity(creation.canCreate ? 1 : 0.4),
+                        createColor.opacity(creation.canCreate ? 1 : 0.4),
                         in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                     )
                     .contentShape(Rectangle())
@@ -143,8 +155,11 @@ struct SpaceCreationView: View {
         }
     }
 
-    /// Arc's Create Space blue, as measured: #1F2AFF, at 0.4 while disabled.
-    private static let createColor = Color(red: 0x1F / 255, green: 0x2A / 255, blue: 1)
+    /// As measured on Arc: #1F2AFF on its default theme, light or dark, and a dark green on its green preset; both
+    /// are the darkest entry of the chosen theme's palette.
+    private var createColor: Color {
+        (creation.spaceStyleEditor.theme ?? .default).primaryColorPalette.shadedDark.color
+    }
 
     private var title: Binding<String> {
         Binding {
@@ -253,5 +268,24 @@ private struct SpaceCreationArtwork: View, Animatable {
             .frame(width: 31, height: 39)
             .overlay(Text(emoji).font(.system(size: 15)))
             .shadow(color: .black.opacity(0.15), radius: 1.5, y: 0.5)
+    }
+}
+
+/// The editor over the Create a Space panel's theme. Oa's own: its changes file no undo, as where Arc's go from
+/// there isn't traced.
+private struct SpaceCreationStyleEditorView: View {
+    let model: WindowModel
+
+    var body: some View {
+        if let editor = model.spaceCreation?.spaceStyleEditor {
+            SpaceStyleEditorView(
+                editor: editor,
+                presetPage: Binding {
+                    model.spaceStyleEditorPresetPage
+                } set: {
+                    model.spaceStyleEditorPresetPage = $0
+                },
+                update: { change in model.updateSpaceCreation { _ = change(&$0.spaceStyleEditor) } })
+        }
     }
 }
