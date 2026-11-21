@@ -50,6 +50,15 @@ struct SplitViewCellView: View {
         .spaceMenuExclusion()
         .contextMenu {
             Button("Separate All Tabs") { model.separateAllSplitViewChildren(splitID) }
+            Button("Add Tab…") {
+                model.selectSplitView(splitID)
+                model.addSplitViewPane()
+            }
+            .disabled(tabs.count >= SidebarSplitViewData.maxNumberSplit)
+            Button(
+                model.state.splitView(splitID)?.layoutOrientation == .vertical
+                    ? "Convert to Horizontal Split View" : "Convert to Vertical Split View"
+            ) { model.flipSplitViewLayoutOrientation(splitID) }
             Section("Tab Options") {
                 ForEach(tabs) { tab in
                     Menu(model.title(for: tab)) {

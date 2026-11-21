@@ -144,8 +144,8 @@ struct BrowserWindowView: View {
 
     /// As Arc: a split's panes take the page's place.
     @ViewBuilder private var content: some View {
-        if let tabID = model.selectedTabID, let splitID = model.state.splitViewID(containing: tabID) {
-            SplitViewContentPanes(model: model, splitID: splitID)
+        if model.splitViewPanes.count > 1 {
+            SplitViewContentPanes(model: model)
         } else {
             card
         }

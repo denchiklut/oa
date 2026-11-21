@@ -67,11 +67,14 @@ extension WindowModel {
     /// What the field shows on a Space's page: its selected tab's, the window's Space's with its Peek.
     func addressLabel(in spaceID: UUID) -> String? {
         if spaceID == selectedSpaceID, spaceCreation == nil { return addressLabel }
-        return selectedTabIDs[spaceID].flatMap(addressLabel(of:))
+        return selectedTabIDs[spaceID].flatMap { addressLabel(of: $0) }
     }
 
-    func addressLabel(of tabID: UUID) -> String? {
-        (pages[tabID]?.url ?? state.tree.tab(tabID)?.url).map(Self.addressLabel)
+    /// `whole`, as seen on a stacked split's panes: the address after its scheme.
+    func addressLabel(of tabID: UUID, whole: Bool = false) -> String? {
+        guard let url = pages[tabID]?.url ?? state.tree.tab(tabID)?.url else { return nil }
+        guard whole, let scheme = url.scheme else { return Self.addressLabel(url) }
+        return String(url.absoluteString.dropFirst(scheme.count + 3))
     }
 
     private static func addressLabel(_ url: URL) -> String {

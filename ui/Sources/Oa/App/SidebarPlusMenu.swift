@@ -72,7 +72,10 @@ private struct SidebarPlusMenu: View {
                 Row(title: "New Boost", symbol: "wand.and.sparkles"),
             ],
             [
-                Row(title: "New Split", symbol: "rectangle.split.2x1", shortcut: "⌃⇧="),
+                model.canAddSplitViewPane
+                    ? Row(title: "New Split", symbol: "rectangle.split.2x1", shortcut: "⌃⇧=") {
+                        model.addSplitViewPane()
+                    } : Row(title: "New Split", symbol: "rectangle.split.2x1", shortcut: "⌃⇧="),
                 Row(title: "New Tab", symbol: "plus.square", shortcut: "⌘T") { model.openCommandBar(.newTab) },
             ],
         ]

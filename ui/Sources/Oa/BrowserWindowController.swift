@@ -165,6 +165,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
     @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
+    @objc func addSplitView(_ sender: Any?) { model.addSplitViewPane() }
     @objc func selectNextTab(_ sender: Any?) { model.selectAdjacentTab(1) }
     @objc func selectPreviousTab(_ sender: Any?) { model.selectAdjacentTab(-1) }
     @objc func cycleToNextRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.next) }
@@ -307,6 +308,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(goForward(_:)): model.frontPage?.canGoForward ?? false
         case #selector(stopLoading(_:)): model.frontPage?.isLoading ?? false
         case #selector(expandPeek(_:)): model.peek != nil
+        case #selector(addSplitView(_:)): model.canAddSplitViewPane
         case #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)): !model.selectableTabs.isEmpty
         case #selector(selectTab(_:)): tabIndex(for: item) != nil
         case #selector(deleteSpace(_:)): model.state.spaces.count > 1
