@@ -44,7 +44,10 @@ shortcut. With the default keys:
 Releasing Control selects the highlighted tab the way a click on it would, and
 switches Space when the tab is in another. Releasing only Shift keeps the
 switcher: as in Arc, the modifiers of any of the shortcuts keep it and any
-other change of modifiers commits. Moving the pointer over a card highlights it and a click selects it.
+other change of modifiers commits. A switcher shortcut rebound to a function
+key alone has none, so the switcher then stays when every modifier is up,
+until Escape or a click, as Arc's monitor reads. Moving the pointer over a
+card highlights it and a click selects it.
 The app losing focus, or the window changing Space, closes the switcher with
 nothing selected. So does the window giving up the keyboard to another window,
 which is Oa's own: what Arc does then is unknown.
