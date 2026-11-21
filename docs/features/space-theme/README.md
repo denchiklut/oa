@@ -12,7 +12,8 @@ item's), from a Library card's brush, and from Choose a Theme in Create a Space.
 - **From the menus** it hangs off the sidebar's right edge, level with the
   pointer, with no arrow. With the sidebar hidden, the floating sidebar comes
   out for it and stays out until it closes.
-- **From the Library** it opens beside the card's brush.
+- **From the Library**, a card being the Space's sidebar, it hangs off the
+  card's right edge the same way.
 - **From Create a Space** it points at the Choose a Theme row.
 
 It is a transient popover, as Arc's. A click outside closes it, and so does
