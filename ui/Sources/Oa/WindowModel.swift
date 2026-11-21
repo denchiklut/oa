@@ -542,11 +542,16 @@ final class WindowModel {
             if let action = item.action { NSApplication.shared.sendAction(action, to: item.target, from: item) }
             return
         }
+        present(
+            .webContentConsumedHotkey(binding.id, shortcut: shortcut, title: item.title), at: .windowContent(pageID))
         queuedHotkey = item
-        let toast = WindowToast(
-            type: .webContentConsumedHotkey(binding.id, shortcut: shortcut, title: item.title), pageID: pageID)
+    }
+
+    /// One toast at a time, for Arc's five seconds; a new one takes the place of the one that is up.
+    func present(_ type: ToastType, at location: WindowToast.Location) {
+        dismissToast()
+        let toast = WindowToast(type: type, location: location)
         self.toast = toast
-        toastRemoval?.cancel()
         toastRemoval = Task { [weak self] in
             try? await Task.sleep(for: .seconds(ToastConstants.toastVisibilityDuration), tolerance: .zero)
             if !Task.isCancelled, self?.toast?.id == toast.id { self?.dismissToast() }

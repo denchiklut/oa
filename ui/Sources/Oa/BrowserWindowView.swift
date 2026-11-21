@@ -102,6 +102,7 @@ struct BrowserWindowView: View {
                 .offset(x: overPage ? (libraryWidth - lead) * progress : 0)
             }
         }
+        .windowToast(of: model)
         .overlay {
             if let bar = model.commandBar {
                 CommandBarView(model: model, bar: bar, themeFocus: theme.semanticColorPalette[colorScheme].focus.color)

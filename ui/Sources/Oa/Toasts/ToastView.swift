@@ -3,9 +3,9 @@ import DevKit
 import SwiftUI
 
 /// Arc's toast as its views draw it with `newToastBackgroundEnabled` off, which is how Arc ships: the Space
-/// theme's colour at 0.8 over a light material with a sheen, the key caps, the words, and under the card's bottom
-/// edge the accessory, half a second later. The card's paddings are the ones measured on Arc's, which are a
-/// point under the ones its code names.
+/// theme's colour at 0.8 over a light material with a sheen, the words and key caps of its kind, and for a
+/// consumed shortcut the accessory under the card's bottom edge, half a second later. The consumed shortcut's
+/// paddings are the ones measured on Arc's, which are a point under the ones its code names.
 struct ToastView: View {
     let toast: WindowToast
     let background: WindowTheme.Background
@@ -18,18 +18,8 @@ struct ToastView: View {
         let isLight = base.hslLightness >= 0.45
         let foreground = isLight ? Color.black : .white
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        if case .webContentConsumedHotkey(_, let shortcut, let title) = toast.type {
-            HStack(spacing: 7.5) {
-                Text(shortcut.symbols.joined())
-                    .font(.system(size: 13, weight: .semibold))
-                    .padding(.horizontal, 7.25)
-                    .frame(minHeight: 27)
-                    .background(foreground.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
-                Text("again to \(title)").font(.system(size: 14, weight: .medium))
-            }
+        content(foreground)
             .fixedSize()
-            .padding(.leading, 11)
-            .padding(.trailing, 11.5)
             .padding(.vertical, 10)
             .frame(minHeight: 42)
             .background {
@@ -51,29 +41,65 @@ struct ToastView: View {
                     }
             }
             .overlay(alignment: .bottomTrailing) {
-                Button(action: onAccessoryTap) {
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("Edit the shortcut")
-                        Image(systemName: "arrow.up.right")
+                if case .webContentConsumedHotkey = toast.type {
+                    Button(action: onAccessoryTap) {
+                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                            Text("Edit the shortcut")
+                            Image(systemName: "arrow.up.right")
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(foreground)
+                        .fixedSize()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background { fill(base, in: RoundedRectangle(cornerRadius: 12)) }
                     }
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(foreground)
-                    .fixedSize()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background { fill(base, in: RoundedRectangle(cornerRadius: 12)) }
+                    .buttonStyle(.plain)
+                    .opacity(showsAccessory ? 1 : 0)
+                    .alignmentGuide(.bottom) { $0[.top] }
+                    .padding(.trailing, 13)
+                    .task {
+                        try? await Task.sleep(for: .seconds(0.5))
+                        withAnimation(Self.animation) { showsAccessory = true }
+                    }
                 }
-                .buttonStyle(.plain)
-                .opacity(showsAccessory ? 1 : 0)
-                .alignmentGuide(.bottom) { $0[.top] }
-                .padding(.trailing, 13)
             }
             .foregroundStyle(foreground)
-            .task {
-                try? await Task.sleep(for: .seconds(0.5))
-                withAnimation(Self.animation) { showsAccessory = true }
+    }
+
+    @ViewBuilder
+    private func content(_ foreground: Color) -> some View {
+        switch toast.type {
+        case .webContentConsumedHotkey(_, let shortcut, let title):
+            HStack(spacing: 7.5) {
+                keyCap(shortcut.symbols.joined(), foreground)
+                label("again to \(title)")
             }
+            .padding(.leading, 11)
+            .padding(.trailing, 11.5)
+        case .copyTabURL(let trackingRemoved, let urls):
+            let words =
+                switch (trackingRemoved, urls.count > 1) {
+                case (false, false): "Copied Current URL"
+                case (false, true): "Copied URLs"
+                case (true, false): "Copied a clean link without trackers"
+                case (true, true): "Copied clean links without trackers"
+                }
+            label(words)
+                .padding(.horizontal, 12)
         }
+    }
+
+    private func label(_ text: String) -> some View {
+        Text(text).font(.system(size: 14, weight: .medium))
+    }
+
+    private func keyCap(_ keys: String, _ foreground: Color) -> some View {
+        Text(keys)
+            .font(.system(size: 13, weight: .semibold))
+            .padding(.horizontal, 7.25)
+            .frame(minHeight: 27)
+            .background(foreground.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
     }
 
     static let animation = Animation.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1)
@@ -121,18 +147,24 @@ extension View {
     /// As Arc's toast on a page: 8 pt in from the page's top and right, coming and going on one spring, growing
     /// from a point a tenth of the way down its middle.
     func toast(of model: WindowModel, on page: any Page) -> some View {
-        overlay(alignment: .topTrailing) { PageToast(model: model, pageID: page.id) }
+        overlay(alignment: .topTrailing) { ToastSlot(model: model, location: .windowContent(page.id), inset: 8) }
+    }
+
+    /// As Arc's toast on the window: 4 pt in from its top and right.
+    func windowToast(of model: WindowModel) -> some View {
+        overlay(alignment: .topTrailing) { ToastSlot(model: model, location: .window, inset: 4) }
     }
 }
 
-private struct PageToast: View {
+private struct ToastSlot: View {
     let model: WindowModel
-    let pageID: UUID
+    let location: WindowToast.Location
+    let inset: CGFloat
     @Environment(\.windowColorScheme) private var scheme
 
     var body: some View {
         ZStack {
-            if let toast = model.toast, toast.pageID == pageID {
+            if let toast = model.toast, toast.location == location {
                 ToastView(toast: toast, background: (model.space?.theme ?? .default).background[scheme]) {
                     model.editShortcut(of: toast)
                 }
@@ -140,7 +172,7 @@ private struct PageToast: View {
                 .transition(.scale(scale: 0.001, anchor: UnitPoint(x: 0.5, y: 0.1)).combined(with: .opacity))
             }
         }
-        .padding([.top, .trailing], 8)
+        .padding([.top, .trailing], inset)
         .animation(ToastView.animation, value: model.toast?.id)
     }
 }
