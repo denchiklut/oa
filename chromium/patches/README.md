@@ -23,6 +23,7 @@ can't live in `//oa` (`core/`). Every patch is rebased at each Chromium update, 
 | 0016 | Makes a tab's thumbnail ready by ArcCore's rule: a navigation inside the document takes a new thumbnail when it finishes, where upstream ignores it, and a new document is ready only at its load event, so nothing is captured while it loads |
 | 0017 | Copies a tab's whole view for the thumbnail Chrome makes as the tab stops being active, as ArcCore's does; upstream leaves out the strips where a scrollbar would be |
 | 0018 | Makes ⌘Z and ⇧⌘Z the page's first and the window's after, as ArcCore does: `RenderWidgetHostViewCocoa`'s `undo:` and `redo:` send the command to the focused frame with a reply, through a new `ExecuteEditCommandWithResult` on the view's host and on the frame's input handler, and when the frame ran nothing, the first undo manager up the responder chain that can undo or redo does. Upstream sends the command with no reply, so the app's own steps were never reached while a page had the keyboard |
+| 0019 | Runs the page menu's Open Link in Split View, for an embedder that edits the menu, as an open with Chromium's `NEW_SPLIT_VIEW` disposition through the page's delegate, as ArcCore's item goes to the app with its own disposition; upstream joins the link's tab to the active one in the tab strip |
 
 Don't edit these files by hand. Commit on the `oa-patches` branch in `.local/chromium/src`, then run
 `scripts/patches.sh export`. `scripts/build.sh` applies the series before building.

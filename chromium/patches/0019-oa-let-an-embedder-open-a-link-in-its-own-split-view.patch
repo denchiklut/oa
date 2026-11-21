@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Sat, 21 Nov 2026 15:07:59 -0700
+Subject: [PATCH] oa: let an embedder open a link in its own split view
+
+---
+ .../render_view_context_menu.cc                     | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+index 05eb76937659ed32a3b226ecffe6e945b74450fe..0e2efbfe976b7dbec70cd481cf83ea14c752821d 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+@@ -3969,6 +3969,19 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
+ 
+     case IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW:
+ #if !BUILDFLAG(IS_ANDROID)
++      // An embedder that edits the menu has a split view of its own, not the
++      // tab strip's: the link goes to the page's delegate as an open with the
++      // split view disposition.
++      if (g_embedder_model_editor) {
++        OpenURLWithExtraHeaders(
++            params_.link_url, params_.frame_url, params_.frame_origin,
++            WindowOpenDisposition::NEW_SPLIT_VIEW, ui::PAGE_TRANSITION_LINK,
++            /*extra_headers=*/std::string(),
++            /*started_from_context_menu=*/true,
++            page_load_metrics::NavigationInitiatorHolder::AttacherCallback(
++                chrome_navigation_initiator::kContextMenuOpenLink));
++        break;
++      }
+       OpenLinkInSplitView(split_tabs::SplitTabLayout::kSideBySide);
+ #endif  // !BUILDFLAG(IS_ANDROID)
+       break;
