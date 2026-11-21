@@ -22,6 +22,7 @@ can't live in `//oa` (`core/`). Every patch is rebased at each Chromium update, 
 | 0015 | Stops `settings_utils::MaybeNotifySettingsCustomEvent` after its feature check, as ArcCore's does: upstream it CHECKs for a `BrowserView` element to send the settings journey event to, which crashed `chrome://settings` on activating a search engine or making one the default |
 | 0016 | Makes a tab's thumbnail ready by ArcCore's rule: a navigation inside the document takes a new thumbnail when it finishes, where upstream ignores it, and a new document is ready only at its load event, so nothing is captured while it loads |
 | 0017 | Copies a tab's whole view for the thumbnail Chrome makes as the tab stops being active, as ArcCore's does; upstream leaves out the strips where a scrollbar would be |
+| 0018 | Makes ⌘Z and ⇧⌘Z the page's first and the window's after, as ArcCore does: `RenderWidgetHostViewCocoa`'s `undo:` and `redo:` send the command to the focused frame with a reply, through a new `ExecuteEditCommandWithResult` on the view's host and on the frame's input handler, and when the frame ran nothing, the first undo manager up the responder chain that can undo or redo does. Upstream sends the command with no reply, so the app's own steps were never reached while a page had the keyboard |
 
 Don't edit these files by hand. Commit on the `oa-patches` branch in `.local/chromium/src`, then run
 `scripts/patches.sh export`. `scripts/build.sh` applies the series before building.
