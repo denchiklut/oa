@@ -177,6 +177,16 @@ extension SidebarState {
         tree.move(tabID, into: splitID, at: place.index + offset + (offset > 0 ? 1 : 0))
     }
 
+    /// A closed split again, with its ID, data and place, holding those of its tabs that are back.
+    mutating func restoreSplitView(_ closed: ClosedSplitView, tabs: [SidebarTab]) {
+        guard tree[closed.id] == nil, tree[closed.parentID] != nil else { return }
+        tree.insert(SidebarItem(id: closed.id, kind: .splitView(closed.data)), into: closed.parentID, at: closed.index)
+        for tab in tabs where tree[tab.id] == nil {
+            archive.removeAll { $0.id == tab.id }
+            tree.append(SidebarItem(id: tab.id, kind: .tab(tab)), to: closed.id)
+        }
+    }
+
     /// Arc's `updateSplitView(_:modify:)`.
     mutating func updateSplitView(_ id: UUID, _ modify: (inout SidebarSplitViewData) -> Void) {
         tree.update(id) { item in
