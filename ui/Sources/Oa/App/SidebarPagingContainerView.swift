@@ -33,7 +33,7 @@ struct SidebarPagingContainerView: View {
                     if let space {
                         let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
                         let tiles = FavoritesGrid.slots(
-                            model.state.favorites(for: space.id), drag: current ? drag : nil)
+                            model.state.favoriteEntries(for: space.id), drag: current ? drag : nil)
                         SidebarSpacePage(model: model, layout: layout, space: space)
                             .padding(
                                 .top, FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16
@@ -51,7 +51,7 @@ struct SidebarPagingContainerView: View {
                 let (first, last) = (run.pages.lowerBound, run.pages.upperBound)
                 let shown =
                     model.spaceCreation == nil && pages[run.pages].contains { $0?.id == model.selectedSpaceID }
-                let favorites = model.state.favorites(for: run.space.id)
+                let favorites = model.state.favoriteEntries(for: run.space.id)
                 FavoritesGrid(
                     model: model, layout: layout, slots: FavoritesGrid.slots(favorites, drag: shown ? drag : nil)
                 )

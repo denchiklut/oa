@@ -330,8 +330,23 @@ struct FavoritesGrid: View {
         static let gapID = UUID()
         let id: UUID
         let tab: SidebarTab?
+        var splitTabs: [SidebarTab]?
         /// The dragged tile: out of the layout but mounted, so its drag goes on.
         var isLifted = false
+
+        init(id: UUID, tab: SidebarTab?, splitTabs: [SidebarTab]? = nil, isLifted: Bool = false) {
+            self.id = id
+            self.tab = tab
+            self.splitTabs = splitTabs
+            self.isLifted = isLifted
+        }
+
+        init(_ entry: SidebarEntry) {
+            switch entry {
+            case .tab(let tab): self.init(id: tab.id, tab: tab)
+            case .splitView(let id, let tabs): self.init(id: id, tab: nil, splitTabs: tabs)
+            }
+        }
     }
 
     let model: WindowModel
@@ -339,9 +354,9 @@ struct FavoritesGrid: View {
     let slots: [Slot]
 
     /// The tiles as the drag leaves them: a dragged tile has left its place, and the slot opens where it would land.
-    static func slots(_ favorites: [SidebarTab], drag: SidebarDrag?) -> [Slot] {
-        guard let drag, let dragged = drag.tab else { return favorites.map { Slot(id: $0.id, tab: $0) } }
-        var slots = favorites.filter { $0.id != dragged.id }.map { Slot(id: $0.id, tab: $0) }
+    static func slots(_ favorites: [SidebarEntry], drag: SidebarDrag?) -> [Slot] {
+        guard let drag, let dragged = drag.tab else { return favorites.map(Slot.init) }
+        var slots = favorites.filter { $0.id != dragged.id }.map(Slot.init)
         if let target = drag.target, target.section == .favorites {
             slots.insert(Slot(id: Slot.gapID, tab: nil), at: min(target.index, slots.count))
         }
@@ -374,6 +389,8 @@ struct FavoritesGrid: View {
                 Group {
                     if let tab = slot.tab {
                         FavoriteTile(model: model, layout: layout, tab: tab, width: grid.tileWidth)
+                    } else if let tabs = slot.splitTabs {
+                        FavoriteSplitTile(model: model, splitID: slot.id, tabs: tabs, width: grid.tileWidth)
                     } else {
                         Color.clear.sidebarDragFrame { drag?.gap = $0 }
                     }
@@ -456,6 +473,74 @@ private struct FavoriteTile: View {
             if selected { Button("Close Tab") { model.close(tab.id) } }
             Button("Unfavorite") { model.unfavorite(tab.id) }
             Button("Remove Favorite") { model.removeFavorite(tab.id) }
+        }
+    }
+}
+
+/// A split Favorite as seen in Arc: one tile with a 12 pt favicon centred on each pane's part. Selected, one card with
+/// the panes' favicons' tint and ring, the ring also between the parts; not selected, a card for each part, 2 pt apart.
+/// A click selects the split with the pane the window focused in it last.
+private struct FavoriteSplitTile: View {
+    let model: WindowModel
+    let splitID: UUID
+    let tabs: [SidebarTab]
+    let width: CGFloat
+    @State private var hovering = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let selected = tabs.contains { $0.id == model.selectedTabID }
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let favicons = tabs.map(model.favicon(for:))
+        ZStack {
+            if selected {
+                shape.fill(theme.selectedTile).shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                SplitAppTrayVisualEffect(favicons: favicons, tileWidth: width)
+                    .opacity(theme.isDark ? (hovering ? 0.3 : 0.2) : (hovering ? 0.1 : 0))
+                SplitAppTrayRing(favicons: favicons, tileWidth: width)
+            } else {
+                HStack(spacing: 2) {
+                    ForEach(tabs) { _ in shape.fill(hovering ? theme.itemHoveredFill : theme.itemFill) }
+                }
+                .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
+            }
+            HStack(spacing: 2) {
+                ForEach(tabs) { tab in
+                    Group {
+                        if let favicon = model.favicon(for: tab) {
+                            Image(nsImage: favicon)
+                                .resizable()
+                                .interpolation(.high)
+                                .frame(width: 12, height: 12)
+                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .frame(width: width, height: 47)
+        .contentShape(shape)
+        .onTapGesture { model.selectSplitView(splitID) }
+        .onHover { hovering = $0 }
+        .contextMenu {
+            // As seen in Arc's tile menu: no Rename… and no Remove Favorite; Archive Item archives its tabs.
+            Button("Share Split View…") {}.disabled(true)
+            Divider()
+            Button("Separate All Tabs") { model.separateAllSplitViewChildren(splitID) }
+            Button("Add Tab…") {}.disabled(true)
+            Button(
+                model.state.splitView(splitID)?.layoutOrientation == .vertical
+                    ? "Convert to Horizontal Split View" : "Convert to Vertical Split View"
+            ) { model.flipSplitViewLayoutOrientation(splitID) }
+            Section("Tab Options") {
+                ForEach(tabs) { tab in
+                    Menu(model.title(for: tab)) {
+                        Button("Separate from Split View") { model.separateFromSplitView(tab.id) }
+                    }
+                }
+            }
+            Button("Archive Item") { model.closeSplitView(splitID) }
         }
     }
 }
