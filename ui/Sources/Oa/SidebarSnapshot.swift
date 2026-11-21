@@ -70,9 +70,11 @@ struct SidebarSnapshot: Codable {
                         openerID: try values.decodeIfPresent(UUID.self, forKey: .openerID)))
             case "folder": kind = .folder(title: title)
             case "splitView":
-                kind = .splitView(
+                var data =
                     try values.decodeIfPresent(SidebarSplitViewData.self, forKey: .splitView)
-                        ?? SidebarSplitViewData())
+                    ?? SidebarSplitViewData()
+                data.title = title.isEmpty ? nil : title
+                kind = .splitView(data)
             case let type:
                 throw DecodingError.dataCorruptedError(
                     forKey: .type, in: values, debugDescription: "unknown item type \(type)")
@@ -99,6 +101,7 @@ struct SidebarSnapshot: Codable {
                 try values.encode(title, forKey: .title)
             case .splitView(let data):
                 try values.encode("splitView", forKey: .type)
+                try values.encodeIfPresent(data.title, forKey: .title)
                 try values.encode(data, forKey: .splitView)
             }
         }

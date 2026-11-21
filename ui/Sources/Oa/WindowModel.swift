@@ -1395,6 +1395,10 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    func renameSplitView(_ splitID: UUID, to title: String) {
+        store.edit { $0.renameSplitView(splitID, to: title) }
+    }
+
     /// As seen in Arc: ⌘W on a Favorite split leaves nothing selected, its pages hidden, not unloaded.
     func deselectSplitView() {
         selectedTabIDs[selectedSpaceID] = nil

@@ -14,6 +14,8 @@ struct SidebarSplitViewData: Hashable {
     /// an equal part of what the others leave.
     var itemWidthFactors: [UUID: CGFloat] = [:]
     var layoutOrientation = LayoutOrientation.horizontal
+    /// Arc keeps it as the split item's own `title`, not with this data.
+    var title: String?
 
     func shares(of tabIDs: [UUID]) -> [CGFloat] {
         let known = tabIDs.compactMap { itemWidthFactors[$0] }
@@ -204,6 +206,12 @@ extension SidebarState {
             archive.removeAll { $0.id == tab.id }
             tree.append(SidebarItem(id: tab.id, kind: .tab(tab)), to: closed.id)
         }
+    }
+
+    /// Oa's own: an empty title clears it, and the cell shows the tabs again.
+    mutating func renameSplitView(_ id: UUID, to title: String) {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updateSplitView(id) { $0.title = title.isEmpty ? nil : title }
     }
 
     /// Arc's `updateSplitView(_:modify:)`.

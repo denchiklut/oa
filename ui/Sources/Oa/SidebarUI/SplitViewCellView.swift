@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Arc's `SplitViewCellView` as measured: a tab row's card with a 28 pt card for each of the split's tabs, 4 pt in
-/// and 8.5 pt apart, a hairline between them while the split isn't selected. A click selects the split with the pane
+/// and 8.5 pt apart, a hairline between them while the split isn't selected. A split with a title shows a 16 pt
+/// badge with its count where a row's favicon is and the title where a row's is, in place of its tabs. A click selects the split with the pane
 /// the window focused in it last, and on the selected split the tab clicked.
 struct SplitViewCellView: View {
     let model: WindowModel
@@ -9,23 +10,65 @@ struct SplitViewCellView: View {
     let tabs: [SidebarTab]
     let spaceID: UUID
     @State private var hovering = false
+    @State private var renaming = false
+    @State private var draft = ""
+    @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
+    @Environment(\.windowColorScheme) private var colorScheme
     @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
         let selected = tabs.contains { $0.id == model.selectedTabIDs[spaceID] }
         let pinned = tabs.first.map { model.state.isPinned($0.id) } ?? false
+        let title = model.state.splitView(splitID)?.title
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
         HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
-                if index > 0 {
-                    // Arc's `ChildItem.separatorHeight`.
-                    theme.separator.frame(width: 0.5, height: 16).frame(width: 8.5).opacity(selected ? 0 : 1)
+            if renaming || title != nil {
+                Text("\(tabs.count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    // LIKELY the focus outline's colour: #2932E5 and #2229DD were measured on the default theme.
+                    .background(
+                        model.splitViewFocusColor(dark: colorScheme == .dark), in: RoundedRectangle(cornerRadius: 4)
+                    )
+                    .frame(width: 24, height: 24)
+                Group {
+                    if renaming {
+                        TextField("Title", text: $draft)
+                            .textFieldStyle(.plain)
+                            .focused($renameFocused)
+                            .onSubmit {
+                                model.renameSplitView(splitID, to: draft)
+                                renaming = false
+                            }
+                            .onExitCommand { renaming = false }
+                            // After the menu has closed and given the window back its first responder.
+                            .task {
+                                try? await Task.sleep(for: .milliseconds(100))
+                                renameFocused = true
+                            }
+                            .onChange(of: renameFocused) { _, focused in if !focused { renaming = false } }
+                    } else if let title {
+                        Text(title).lineLimit(1).truncationMode(.tail)
+                    }
                 }
-                ChildItem(model: model, tab: tab, isSelected: selected, showsClose: selected && hovering && !pinned)
+                .font(.system(size: 14))
+                .foregroundStyle(theme.foreground)
+                .padding(.leading, 6)
+                Spacer(minLength: 0)
+            } else {
+                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                    if index > 0 {
+                        // Arc's `ChildItem.separatorHeight`.
+                        theme.separator.frame(width: 0.5, height: 16).frame(width: 8.5).opacity(selected ? 0 : 1)
+                    }
+                    ChildItem(
+                        model: model, tab: tab, isSelected: selected, showsClose: selected && hovering && !pinned)
+                }
             }
         }
-        .padding(.leading, 4)
+        .padding(.leading, renaming || title != nil ? 4.5 : 4)
         .padding(.trailing, hovering && (!selected || pinned) ? 34 : 4)
         .frame(height: 36)
         .background {
@@ -35,7 +78,8 @@ struct SplitViewCellView: View {
         .contentShape(card)
         // As measured on Arc: the split's card is 1.5 pt narrower at each side than a tab's.
         .padding(.horizontal, 1.5)
-        .onTapGesture { if !selected { model.selectSplitView(splitID) } }
+        // A titled split has no tabs to click, so it selects itself.
+        .onTapGesture { if !selected || title != nil { model.selectSplitView(splitID) } }
         .overlay(alignment: .trailing) {
             // As seen in Arc: the ✕ of a split that isn't selected closes all its tabs, and a selected pinned split
             // has one "—" that unloads its pages, as a pinned tab's.
@@ -74,6 +118,13 @@ struct SplitViewCellView: View {
                     }
                 }
             }
+            Divider()
+            // As seen in Arc: the field starts with the split's count, all selected.
+            Button("Rename…") {
+                draft = model.state.splitView(splitID)?.title ?? "\(tabs.count) Tabs"
+                renaming = true
+            }
+            Divider()
             Button("Archive Item") { model.closeSplitView(splitID) }
         }
     }
