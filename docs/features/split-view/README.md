@@ -13,9 +13,13 @@ order, and each pane is an ordinary tab with its own page.
   The new pane takes the focus. A split holds four panes at most, Arc's limit.
 - **From a link.** The page menu's Open Link in Split View opens the link in a
   pane on the right of its page, focused. A Peek's third control does the same
-  with the Peek's page. So does any open of a page in a new foreground tab while
-  ⌥ is held, as a `target=_blank` link or a `window.open` from a click: Arc's
-  ADK turns those into a split by the event's modifiers.
+  with the Peek's page. So does an ⌥-click on a link, also on an image link or a
+  `download` one: Blink makes it a save, which every page hands to the browser
+  at once (patch 0020), Core passes it on as a background page, and the window
+  puts a background page in a split while ⌥ alone is held, as Arc's does. Any
+  open of a page in a new foreground tab while the click had ⌥, as a
+  `target=_blank` link or a `window.open`, is a split too, by ADK's rule. An
+  ⌥-click inside a frame is a download, as in Arc.
 - **Dropping a tab on the page.** A sidebar tab dragged over the page shows
   where it would go. On a lone page an edge makes a split with it: the outer
   40 % at the sides, 50 pt at the top and 40 pt at the bottom, and the top and
@@ -134,6 +138,8 @@ Oa's own:
   back into its split while the split is there, else as a plain tab. Arc's
   result for both wasn't seen.
 - Share Split View… is there but off: Oa has no sharing.
+- ⌘⌥ on a link opens a background page; Arc opens Little Arc, which Oa doesn't
+  have.
 - A split's row in the command bar takes its focused pane's title; Arc's row
   title wasn't recorded. Picking it from an empty pane switches to the split;
   Arc's rule there wasn't made out.
@@ -146,6 +152,5 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: a plain ⌥-click on a link, which Chromium makes a download
-before the app sees it and Arc somehow doesn't, dragging a split's cell, dropping a link or a
-tab on a sidebar row, and a split's Change Icon…, Duplicate and Move to.
+Not there yet: dragging a split's cell, dropping a link or a tab on a sidebar
+row, and a split's Change Icon…, Duplicate and Move to.

@@ -8,9 +8,9 @@ Arc does: a pinned tab's cross-origin link clicks, `target=_blank` links,
 `window.open` calls and sized popups, and a Shift-click on a link in any tab,
 which Chromium reports as a new-window open. Same-host links navigate the
 pinned tab in place. The pinned tab's page is marked as keeping its address
-through DevKit, and Core does what Arc does: it sets Chromium's renderer
+through DevKit, and Core does what Arc does: every page has Chromium's renderer
 preference that hands every top-level navigation to the browser, so the
-navigation reaches the page's `OpenURLFromTab`, where one to another host
+navigation reaches the page's `OpenURLFromTab`, where for such a page one to another host
 becomes a new page, reported like any opened page, and the rest navigate in
 place. Hosts, not origins: Arc peeks `example.com` → `www.example.com` and
 navigates an http → https change in place. Script navigations without a
