@@ -254,7 +254,7 @@ final class StubPage: Page, MediaSession {
         guard let target = components.url else { return }
         let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
         opened.load(target)
-        continuation?.yield(.opened(opened, url: target, disposition: disposition, byPage: byPage))
+        continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(disposition), byPage: byPage))
     }
 
     func clickCrossOriginLink() {
@@ -265,7 +265,7 @@ final class StubPage: Page, MediaSession {
         guard keepsAddress else { return load(target) }
         let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
         opened.load(target)
-        continuation?.yield(.opened(opened, url: target, disposition: .foregroundTab, byPage: true))
+        continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(.foregroundTab), byPage: true))
     }
 
     /// A short stand-in for the engine's page menu: the items the app's own parts answer.

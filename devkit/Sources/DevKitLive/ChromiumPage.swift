@@ -123,7 +123,8 @@ final class ChromiumPage: Page, MediaSession {
     fileprivate func opened(_ page: CorePage, url: URL?, disposition: Int, byPage: Bool) {
         let opened = ChromiumPage(id: UUID(), page: page, delegate: PageDelegate())
         continuation.yield(
-            .opened(opened, url: url, disposition: OpenDisposition(core: disposition), byPage: byPage))
+            .opened(
+                opened, url: url, disposition: .withModifiers(OpenDisposition(core: disposition)), byPage: byPage))
     }
 
     fileprivate func wantsActivation() {
