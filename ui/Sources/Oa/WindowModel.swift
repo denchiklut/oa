@@ -90,6 +90,8 @@ final class WindowModel {
     @ObservationIgnored private var previousTabID: UUID?
     @ObservationIgnored private var focusedPaneIDs: [UUID: UUID] = [:]
     @ObservationIgnored private var selectionCount = 0
+    /// Arc's `interactionState.proposedWindowContentDropTarget`, while a tab is dragged over the page.
+    var proposedSplitViewDropTarget: SplitViewDropTarget?
     /// As Arc's empty pane, which isn't stored: where Add Split View's command bar puts what it opens.
     private(set) var emptySplitViewPaneIndex: Int?
     /// Arc's `SplitViewLayoutCache` entry for the window, as seen: its own pane sizes for the split it shows, given
@@ -569,7 +571,37 @@ final class WindowModel {
     var splitViewPanes: [SplitViewPane] {
         var panes = presentedTabIDs.map(SplitViewPane.tab)
         if let index = emptySplitViewPaneIndex { panes.insert(.empty, at: min(index, panes.count)) }
+        if case .insertContent(let index) = proposedSplitViewDropTarget?.target {
+            panes.insert(.dropTarget, at: min(index, panes.count))
+        }
         return panes
+    }
+
+    /// The shown split's, or the one a drop on a lone page proposes.
+    var splitViewLayoutOrientation: SidebarSplitViewData.LayoutOrientation {
+        selectedTabID.flatMap(state.splitViewID(containing:)).flatMap(state.splitView)?.layoutOrientation
+            ?? proposedSplitViewDropTarget?.layoutOrientation ?? .horizontal
+    }
+
+    /// Arc's `handleSidebarItemDroppedOnSplitView`, as seen: at an edge the tab becomes a pane there, in a split made
+    /// with the lone page in the edge's orientation; on a pane of a split it replaces that pane's tab; on a lone
+    /// page it is only selected. The tab takes the focus.
+    func acceptSplitViewDrop(of tabID: UUID) {
+        guard let proposed = proposedSplitViewDropTarget, let anchorID = selectedTabID else { return }
+        proposedSplitViewDropTarget = nil
+        let presented = presentedTabIDs
+        switch proposed.target {
+        case .insertContent(let index):
+            store.edit {
+                $0.openInSplitView(tabID, beside: anchorID, at: index)
+                if presented.count == 1, let splitID = $0.splitViewID(containing: tabID) {
+                    $0.updateSplitView(splitID) { $0.layoutOrientation = proposed.layoutOrientation }
+                }
+            }
+        case .replaceContent(let index):
+            if presented.count > 1 { store.edit { $0.replaceSplitViewPane(presented[index], with: tabID) } }
+        }
+        select(tabID)
     }
 
     var canAddSplitViewPane: Bool {

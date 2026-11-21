@@ -541,6 +541,7 @@ struct TabRow: View {
     @State private var hovering = false
     @State private var size = CGSize.zero
     @State private var pressed = false
+    @State private var previousTabID: UUID?
     @State private var bounces = 0
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
@@ -583,12 +584,13 @@ struct TabRow: View {
                 .onChanged { value in
                     if !pressed {
                         pressed = true
+                        previousTabID = model.selectedTabIDs[spaceID]
                         if !inCard { model.select(tab.id) }
                     }
                     guard !inCard else { return }
                     drag?.update(
                         tab, from: pinned ? .pinned : .today, glyph: glyph, at: value.location,
-                        start: value.startLocation, model: model, layout: layout)
+                        start: value.startLocation, previous: previousTabID, model: model, layout: layout)
                 }
                 .onEnded { value in
                     pressed = false

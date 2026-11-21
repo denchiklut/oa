@@ -16,27 +16,33 @@ struct SplitViewContentPanes: View {
         let panes = model.splitViewPanes
         let tabIDs = model.presentedTabIDs
         let splitID = model.selectedTabID.flatMap(model.state.splitViewID(containing:))
-        let vertical = splitID.flatMap(model.state.splitView)?.layoutOrientation == .vertical
-        // Oa's own: equal panes while one is empty. Arc's sizes with an empty pane beside resized ones weren't seen.
+        let vertical = model.splitViewLayoutOrientation == .vertical
+        let stored = splitID.map(model.paneShares(of:)) ?? [1]
+        // Oa's own: equal panes while one is empty or waits for a drop. Arc's sizes beside resized ones weren't seen.
         let resizes = panes.count == tabIDs.count
-        let equal = panes.map { _ in 1 / CGFloat(panes.count) }
-        let shares = resizes ? splitID.map(model.paneShares(of:)) ?? equal : equal
+        let shares = resizes ? stored : panes.map { _ in 1 / CGFloat(panes.count) }
+        let dropTarget = model.proposedSplitViewDropTarget
         GeometryReader { geometry in
-            let room =
-                (vertical ? geometry.size.height : geometry.size.width)
-                - Self.draggerHandleWidth * CGFloat(panes.count - 1)
-            let lengths = shares.map { max(room * $0, Self.minimumPaneWidth) }
+            let length = vertical ? geometry.size.height : geometry.size.width
+            let lengths = Self.lengths(shares, in: length)
+            // As seen in Arc: during a drop's preview a page is moved, not resized.
+            let resting = dropTarget == nil ? nil : Self.lengths(stored, in: length)
             let layout = vertical ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
             layout {
                 ForEach(Array(panes.enumerated()), id: \.element) { index, pane in
                     Group {
                         switch pane {
                         case .tab(let tabID):
+                            let position = tabIDs.firstIndex(of: tabID) ?? 0
                             SplitViewContentPane(
                                 model: model, tabID: tabID, splitID: splitID,
-                                width: vertical ? geometry.size.width : lengths[index])
+                                width: vertical ? geometry.size.width : lengths[index],
+                                restingLength: resting.map { $0[min(position, $0.count - 1)] }, isVertical: vertical,
+                                isDropTarget: dropTarget?.target == .replaceContent(position))
                         case .empty:
                             SplitViewContentPlaceholderView(model: model)
+                        case .dropTarget:
+                            SplitViewDropTargetView(model: model)
                         }
                     }
                     .frame(width: vertical ? nil : lengths[index], height: vertical ? lengths[index] : nil)
@@ -80,6 +86,24 @@ struct SplitViewContentPanes: View {
                     }
                 }
             }
+            // As measured on Arc: the panes take a drop's preview over about 0.2 s, easing out.
+            .animation(.easeOut(duration: 0.2), value: dropTarget)
+        }
+    }
+
+    static func lengths(_ shares: [CGFloat], in length: CGFloat) -> [CGFloat] {
+        let room = length - draggerHandleWidth * CGFloat(shares.count - 1)
+        return shares.map { max(room * $0, minimumPaneWidth) }
+    }
+
+    /// The panes' frames in `area`, as the layout places them.
+    static func frames(_ shares: [CGFloat], in area: CGRect, vertical: Bool) -> [CGRect] {
+        var start: CGFloat = 0
+        return lengths(shares, in: vertical ? area.height : area.width).map { length in
+            defer { start += length + draggerHandleWidth }
+            return vertical
+                ? CGRect(x: area.minX, y: area.minY + start, width: area.width, height: length)
+                : CGRect(x: area.minX + start, y: area.minY, width: length, height: area.height)
         }
     }
 
@@ -136,28 +160,44 @@ private struct SplitViewContentPane: View {
     let tabID: UUID
     let splitID: UUID?
     let width: CGFloat
+    /// The pane's length while a drop's preview has moved it: its page keeps that size.
+    var restingLength: CGFloat?
+    var isVertical = false
+    var isDropTarget = false
     @Environment(\.windowColorScheme) private var colorScheme
 
     var body: some View {
         let page = model.pages[tabID]
-        // As seen in Arc: no pane is outlined while the empty one waits for the command bar.
-        let focused = model.selectedTabID == tabID && model.emptySplitViewPaneIndex == nil
+        // As seen in Arc: no pane is outlined while the empty one waits for the command bar, or while a tab is
+        // dragged over the page.
+        let focused =
+            model.selectedTabID == tabID && model.emptySplitViewPaneIndex == nil
+            && model.proposedSplitViewDropTarget == nil
         let dark = colorScheme == .dark
-        // LIKELY 10 pt: read off one corner of Arc's pane.
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        // LIKELY 10 pt: read off one corner of Arc's pane, 7 pt on a lone page.
+        let shape = RoundedRectangle(cornerRadius: splitID == nil ? 6 : 10, style: .continuous)
         VStack(spacing: 0) {
-            ContentPanelTopBar(model: model, tabID: tabID, splitID: splitID, isFocused: focused, width: width)
-                .id(page?.id)
-                .zIndex(1)
-            if let placeholder = model.placeholder(for: tabID) {
-                PlaceholderView(image: placeholder)
-            } else if let page {
-                // A pane's host is made once its page is, after the window activated the page: the focused pane's
-                // page takes the keyboard when the host is in the window.
-                PageContentView(page: page) { model.activatePresented(page) }
-                    .toast(of: model, on: page).pageRootBackground(page)
-            } else {
-                Color.clear
+            // A lone page under a drop's preview has no bar yet.
+            if splitID != nil {
+                ContentPanelTopBar(model: model, tabID: tabID, splitID: splitID, isFocused: focused, width: width)
+                    .id(page?.id)
+                    .zIndex(1)
+            }
+            // An overlay, so a page that keeps its size under a drop's preview doesn't push its pane out.
+            Color.clear.overlay(alignment: .topLeading) {
+                Group {
+                    if let placeholder = model.placeholder(for: tabID) {
+                        PlaceholderView(image: placeholder)
+                    } else if let page {
+                        // A pane's host is made once its page is, after the window activated the page: the focused
+                        // pane's page takes the keyboard when the host is in the window.
+                        PageContentView(page: page) { model.activatePresented(page) }
+                            .toast(of: model, on: page).pageRootBackground(page)
+                    }
+                }
+                .frame(
+                    width: isVertical ? nil : restingLength,
+                    height: isVertical ? restingLength.map { $0 - (splitID == nil ? 0 : 32) } : nil)
             }
         }
         .background(dark ? Color.black : .white)
@@ -165,7 +205,12 @@ private struct SplitViewContentPane: View {
         .onChange(of: page?.id, initial: true) { _, _ in model.trackPaneToolbarPage(tabID, shown: true) }
         .onDisappear { model.trackPaneToolbarPage(tabID, shown: false) }
         .overlay {
-            if focused { shape.strokeBorder(focusColor(dark: dark), lineWidth: 2) }
+            // Arc's `defaultBorderWidth` and `dropTargetBorderWidth`.
+            if isDropTarget {
+                shape.strokeBorder(model.splitViewFocusColor(dark: dark), lineWidth: 3)
+            } else if focused {
+                shape.strokeBorder(model.splitViewFocusColor(dark: dark), lineWidth: 2)
+            }
         }
         // As measured on Arc's default theme: beside the focused pane the gap is lighter by white 18 % at the pane's
         // edge and 5 % at 9 pt in dark, and darker by black 7 % at the edge in light. An unfocused pane keeps the
@@ -178,11 +223,13 @@ private struct SplitViewContentPane: View {
                     radius: focused ? 9.5 : 4, y: focused ? 0 : 1)
         }
     }
+}
 
+extension WindowModel {
     /// As measured on Arc's default theme, #2F39FF in dark and #1F2AFF in light: its palette's shaded and darkest
     /// entries. LIKELY the same entries on other themes, which weren't measured.
-    private func focusColor(dark: Bool) -> Color {
-        let palette = (model.space.map(model.theme(of:)) ?? .default).primaryColorPalette
+    func splitViewFocusColor(dark: Bool) -> Color {
+        let palette = (space.map(theme(of:)) ?? .default).primaryColorPalette
         return (dark ? palette.shaded : palette.shadedDark).color
     }
 }
@@ -351,5 +398,18 @@ private struct SplitViewContentPlaceholderView: View {
         }
         .background(Color.white.opacity(dark ? 0.1 : 0.666))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// The pane a dragged tab would take, as seen in Arc: empty and outlined. LIKELY Arc's `dropTargetBorderWidth`.
+private struct SplitViewDropTargetView: View {
+    let model: WindowModel
+    @Environment(\.windowColorScheme) private var colorScheme
+
+    var body: some View {
+        let dark = colorScheme == .dark
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        shape.fill(Color.white.opacity(dark ? 0.1 : 0.666))
+            .overlay { shape.strokeBorder(model.splitViewFocusColor(dark: dark), lineWidth: 3) }
     }
 }

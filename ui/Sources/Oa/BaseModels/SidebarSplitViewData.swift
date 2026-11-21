@@ -53,6 +53,19 @@ extension SidebarSplitViewData: Codable {
 enum SplitViewPane: Hashable {
     case tab(UUID)
     case empty
+    /// Where a dragged tab would go.
+    case dropTarget
+}
+
+/// Arc's `ProposedDropTargetInfo`: what a tab dragged over the page would do, among the window's panes.
+struct SplitViewDropTarget: Equatable {
+    enum Target: Equatable {
+        case replaceContent(Int)
+        case insertContent(Int)
+    }
+
+    var target: Target
+    var layoutOrientation: SidebarSplitViewData.LayoutOrientation
 }
 
 /// Arc's `WindowSplitViewLayout`.
@@ -106,7 +119,11 @@ extension SidebarState {
     }
 
     func canOpenInSplitView(_ tabID: UUID, beside anchorID: UUID) -> Bool {
-        tabID != anchorID && canAddSplitViewPane(beside: anchorID) && !isPinned(tabID)
+        canAddSplitViewPane(beside: anchorID) && canJoinSplitView(tabID, of: anchorID)
+    }
+
+    func canJoinSplitView(_ tabID: UUID, of anchorID: UUID) -> Bool {
+        tabID != anchorID && !isPinned(tabID) && !isPinned(anchorID)
             && space(containing: tabID)?.id == space(containing: anchorID)?.id && splitViewID(containing: tabID) == nil
     }
 
@@ -125,6 +142,17 @@ extension SidebarState {
             tree.move(anchorID, into: splitID)
             tree.move(tabID, into: splitID, at: index)
         }
+    }
+
+    /// As seen in Arc: the tab takes the pane and its factor, and the pane's tab is a plain one again right after the
+    /// split.
+    mutating func replaceSplitViewPane(_ targetID: UUID, with tabID: UUID) {
+        guard canJoinSplitView(tabID, of: targetID), let splitID = splitViewID(containing: targetID),
+            let pane = tree.location(of: targetID), let place = tree.location(of: splitID)
+        else { return }
+        tree.move(tabID, into: splitID, at: pane.index)
+        tree.move(targetID, into: place.parentID, at: place.index + 1)
+        updateSplitView(splitID) { $0.itemWidthFactors[tabID] = $0.itemWidthFactors.removeValue(forKey: targetID) }
     }
 
     /// As Arc's `removeItemsFromSplitView`: each tab goes right after its split, without its factor.

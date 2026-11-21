@@ -62,6 +62,7 @@ struct BrowserWindowView: View {
             // As Arc's `DimState`: under a Peek the card shrinks 9 pt at every edge as it fades.
             let cardSize = CGSize(width: layout.size.width - lead - 10, height: layout.size.height - 20)
             content
+                .sidebarDragFrame { sidebarDrag.pageArea = $0 }
                 .scaleEffect(
                     x: fadesCard ? 1 - 18 / max(cardSize.width, 18) : 1,
                     y: fadesCard ? 1 - 18 / max(cardSize.height, 18) : 1
@@ -184,6 +185,13 @@ struct BrowserWindowView: View {
         // Faded, the fill would show through the page that covers it.
         .background(fadesCard ? .clear : fill)
         .clipShape(RoundedRectangle(cornerRadius: 6))
+        // As seen in Arc: a tab dragged over the page's middle outlines the page it would be shown in place of.
+        .overlay {
+            if model.proposedSplitViewDropTarget?.target == .replaceContent(0) {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(model.splitViewFocusColor(dark: colorScheme == .dark), lineWidth: 3)
+            }
+        }
         // What casts the shadow sits a point inside the card, so it never tints the card's edge, and is cut out
         // under it, as Arc's shadow is as strong under the see-through empty card as under a page.
         .background {
