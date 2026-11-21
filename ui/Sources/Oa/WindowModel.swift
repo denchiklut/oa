@@ -1067,7 +1067,7 @@ final class WindowModel {
         let closing = Set(tabIDs)
         let group = ClosedGroup(
             undoPrompt: UndoStrings.clearTabs(tabIDs.count),
-            focusedTabID: selectedTabID.flatMap { closing.contains($0) ? $0 : nil },
+            focusedTabID: selectedTabID.flatMap { closing.contains($0) ? $0 : nil }, completionToast: .clearedTabs,
             order: tabIDs, siblings: unpinnedTabs.map(\.id))
         if let selected = selectedTabID, closing.contains(selected) {
             let next = nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
@@ -1255,6 +1255,7 @@ final class WindowModel {
         closedGroups.append(group)
         if closedGroups.count > 10 { closedGroups.removeFirst() }
         undoManager?.registerUndos([.undoCloseItems(groupID: group.id)], group.undoPrompt, group.id.uuidString)
+        if group.completionToast == .clearedTabs { present(.undo("Cleared Tabs"), at: .window) }
     }
 
     /// A Favorite's page stays as it is, hidden, as Arc keeps it.
