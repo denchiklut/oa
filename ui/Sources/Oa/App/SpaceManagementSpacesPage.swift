@@ -227,6 +227,14 @@ private struct SpaceManagementCollectionViewItem: View {
         .environment(\.theme, theme)
         .background { WindowSurface(background: background).environment(\.colorScheme, windowColorScheme) }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        // As Arc's card, which is the Space's sidebar: the editor hangs from it as from the window's.
+        .background {
+            let presentation = model.spaceStyleEditor
+            SpaceStyleEditorAnchor(
+                isPresented: presentation?.spaceID == space.id && presentation?.origin == .library, atPointer: true,
+                onClose: { [model] in model.dismissSpaceStyleEditor() }
+            ) { WindowSpaceStyleEditorView(model: model) }
+        }
         // As Arc's: under the card, its `EaselBackground` casts the shadow.
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)

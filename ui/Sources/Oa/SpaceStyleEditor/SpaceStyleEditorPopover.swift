@@ -83,8 +83,11 @@ final class SpaceStyleEditorPopover: NSObject, NSPopoverDelegate {
     }
 }
 
+/// Hangs the editor from the view it backs: pointing at it, or, as from Arc's sidebar, off its right edge at the
+/// pointer's height with no arrow.
 struct SpaceStyleEditorAnchor<Content: View>: NSViewRepresentable {
     let isPresented: Bool
+    var atPointer = false
     let onClose: () -> Void
     @ViewBuilder let content: () -> Content
 
@@ -94,17 +97,22 @@ struct SpaceStyleEditorAnchor<Content: View>: NSViewRepresentable {
         let coordinator = context.coordinator
         if isPresented, coordinator.popover == nil, view.window != nil {
             let popover = SpaceStyleEditorPopover(
-                hidesArrow: false,
+                hidesArrow: atPointer,
                 onClose: { [weak coordinator] in
                     coordinator?.popover = nil
                     onClose()
                 }, content: content)
             coordinator.popover = popover
-            popover.show(relativeTo: view.bounds, of: view)
+            popover.show(relativeTo: atPointer ? pointerStrip(in: view) : view.bounds, of: view)
         } else if !isPresented, let popover = coordinator.popover {
             coordinator.popover = nil
             popover.close(notifying: false)
         }
+    }
+
+    private func pointerStrip(in view: NSView) -> NSRect {
+        let pointer = view.convert(view.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)
+        return NSRect(x: 0, y: min(max(pointer.y, 0), view.bounds.height - 1), width: view.bounds.width, height: 1)
     }
 
     static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
