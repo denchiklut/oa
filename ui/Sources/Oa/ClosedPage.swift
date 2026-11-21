@@ -21,6 +21,10 @@ struct ClosedPage {
 /// on the stack with its first step, so a close that every page refused leaves the stack as it was.
 struct ClosedGroup: Equatable {
     let id = UUID()
+    /// What Edit ▸ Undo calls the close, as Arc's `UndoGroup.undoPrompt`.
+    let undoPrompt: String
+    /// As Arc's `focusedTabItemID`: the tab the window was showing, which an undo shows again.
+    var focusedTabID: UUID?
     /// The tabs of a close of several, in the order their steps go on, whatever order their pages end in.
     var order: [UUID] = []
     /// Their list as it was before the close, so each goes back between its old neighbours in any order.

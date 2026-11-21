@@ -48,6 +48,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.delegate = self
         model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
         model.window = window
+        model.undoManager = ArcUndoManager(window.undoManager) { [weak model] in model?.perform($0) }
     }
 
     @available(*, unavailable)
