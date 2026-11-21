@@ -113,19 +113,28 @@ private struct SidebarSpacePage: View {
     @Environment(\.sidebarDrag) private var drag
     @Environment(\.sidebarRevealsControls) private var revealed
 
-    var body: some View {
-        let unpinned = model.state.entries(in: space.id, pinned: false).map { entry in
+    private static func items(_ entries: [SidebarEntry]) -> [Item] {
+        entries.map { entry in
             switch entry {
             case .tab(let tab): Item.tab(tab)
             case .splitView(let id, let tabs): Item.splitView(id: id, tabs: tabs)
             }
         }
+    }
+
+    var body: some View {
+        let unpinned = Self.items(model.state.entries(in: space.id, pinned: false))
         let collapsed = model.collapsedPinnedSpaces.contains(space.id)
-        // As Arc: a collapsed section still shows its selected tab.
-        let pinned = model.state.tabs(in: space.id, pinned: true).filter { !collapsed || $0.id == model.selectedTabID }
+        // As Arc: a collapsed section still shows its selected tab, or split.
+        let pinned = Self.items(
+            model.state.entries(in: space.id, pinned: true).filter { entry in
+                switch entry {
+                case .tab(let tab): !collapsed || tab.id == model.selectedTabID
+                case .splitView(_, let tabs): !collapsed || tabs.contains { $0.id == model.selectedTabID }
+                }
+            })
         let pinnedIDs = Set(pinned.map(\.id))
-        let items =
-            pinned.map(Item.tab) + (unpinned.isEmpty ? [] : [.divider]) + [.newTab] + unpinned
+        let items = pinned + (unpinned.isEmpty ? [] : [.divider]) + [.newTab] + unpinned
         ScrollView {
             // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
             VStack(spacing: 1) {

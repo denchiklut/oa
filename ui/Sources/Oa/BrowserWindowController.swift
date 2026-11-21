@@ -243,7 +243,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if model.peek != nil {
             model.closePeek()
         } else if let tabID = model.selectedTabID {
-            model.close(tabID)
+            // As seen in Arc: ⌘W on a pinned split's pane unloads the whole split.
+            if model.state.isPinned(tabID), let splitID = model.state.splitViewID(containing: tabID) {
+                model.closeSplitViewPages(splitID)
+            } else {
+                model.close(tabID)
+            }
         } else {
             window?.performClose(sender)
         }
@@ -278,8 +283,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if item.action == #selector(togglePin(_:)) {
             guard let tabID = model.selectedTabID, !model.state.isFavorite(tabID) else { return false }
             item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"
-            // Oa's own for now: Arc pins a split whole.
-            return model.state.splitViewID(containing: tabID) == nil
+            return true
         }
         if item.action == #selector(toggleFavorite(_:)) {
             guard let tabID = model.selectedTabID else { return false }
