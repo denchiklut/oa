@@ -48,6 +48,19 @@ extension SidebarSplitViewData: Codable {
     }
 }
 
+/// A pane of the split a window shows: a tab's, or the empty one Add Split View opens until the command bar fills it,
+/// as Arc's content with a placeholder blueprint.
+enum SplitViewPane: Hashable {
+    case tab(UUID)
+    case empty
+}
+
+/// Arc's `WindowSplitViewLayout`.
+struct WindowSplitViewLayout {
+    let splitID: UUID
+    var itemWidthFactors: [UUID: CGFloat]
+}
+
 /// A row of a Space's list.
 enum SidebarEntry: Identifiable {
     case tab(SidebarTab)
@@ -97,12 +110,12 @@ extension SidebarState {
             && space(containing: tabID)?.id == space(containing: anchorID)?.id && splitViewID(containing: tabID) == nil
     }
 
-    /// As Arc's Open in Split View: beside a lone tab, in a split made where that tab was, or as the last pane of
-    /// its split, whose panes are equal again as Arc resets them.
-    mutating func openInSplitView(_ tabID: UUID, beside anchorID: UUID) {
+    /// As Arc's `presentSplitViewWindowContent` with `newPane`: the tab becomes pane `index`, the last when nil, of the
+    /// anchor's split, whose panes are equal again as Arc resets them, or of a split made where a lone anchor was.
+    mutating func openInSplitView(_ tabID: UUID, beside anchorID: UUID, at index: Int? = nil) {
         guard canOpenInSplitView(tabID, beside: anchorID) else { return }
         if let splitID = splitViewID(containing: anchorID) {
-            tree.move(tabID, into: splitID)
+            tree.move(tabID, into: splitID, at: index)
             updateSplitView(splitID) { $0.itemWidthFactors = [:] }
         } else if let place = tree.location(of: anchorID) {
             let splitID = UUID()
@@ -110,7 +123,7 @@ extension SidebarState {
                 SidebarItem(id: splitID, kind: .splitView(SidebarSplitViewData())), into: place.parentID,
                 at: place.index)
             tree.move(anchorID, into: splitID)
-            tree.move(tabID, into: splitID)
+            tree.move(tabID, into: splitID, at: index)
         }
     }
 
@@ -128,6 +141,12 @@ extension SidebarState {
     /// Arc's Separate All Tabs: the tabs take the split's place in pane order.
     mutating func separateAllSplitViewChildren(_ splitID: UUID) {
         removeFromSplitView((tree[splitID]?.childIDs ?? []).reversed())
+    }
+
+    /// Arc's `movePanel`: a pane keeps its factor where it goes.
+    mutating func moveSplitViewPane(_ tabID: UUID, by offset: Int) {
+        guard let splitID = splitViewID(containing: tabID), let place = tree.location(of: tabID) else { return }
+        tree.move(tabID, into: splitID, at: place.index + offset + (offset > 0 ? 1 : 0))
     }
 
     /// Arc's `updateSplitView(_:modify:)`.

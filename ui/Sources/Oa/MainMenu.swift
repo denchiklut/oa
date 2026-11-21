@@ -98,6 +98,11 @@ final class MainMenu {
             item(
                 "Show/Hide Toolbar", #selector(ApplicationDelegate.toggleToolbar(_:)), key: "d",
                 modifiers: [.command, .shift], id: "toggleToolbar", priority: .promptAfterConsumedByWebView))
+        view.addItem(.separator())
+        view.addItem(
+            item(
+                "Add Split View", #selector(BrowserWindowController.addSplitView(_:)), key: "=",
+                modifiers: [.control, .shift], id: "addSplitView", priority: .promptAfterConsumedByWebView))
 
         let archive = submenu("Archive", in: menu)
         archive.addItem(

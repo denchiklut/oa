@@ -90,6 +90,11 @@ final class WindowModel {
     @ObservationIgnored private var previousTabID: UUID?
     @ObservationIgnored private var focusedPaneIDs: [UUID: UUID] = [:]
     @ObservationIgnored private var selectionCount = 0
+    /// As Arc's empty pane, which isn't stored: where Add Split View's command bar puts what it opens.
+    private(set) var emptySplitViewPaneIndex: Int?
+    /// Arc's `SplitViewLayoutCache` entry for the window, as seen: its own pane sizes for the split it shows, given
+    /// by a resize here; another window, and this one once it has shown something else, start from the stored ones.
+    private var splitViewLayout: WindowSplitViewLayout?
     @ObservationIgnored private var pendingURLs: [UUID: URL] = [:]
     @ObservationIgnored private var creating: [UUID: UUID] = [:]
     /// By profile: ArcCore keeps one omnibox per window.
@@ -412,6 +417,7 @@ final class WindowModel {
         guard let bar = commandBar else { return }
         bar.autocomplete.stop()
         commandBar = nil
+        emptySplitViewPaneIndex = nil
         if dialog == nil { frontPage?.activate() }
     }
 
@@ -454,16 +460,23 @@ final class WindowModel {
     }
 
     private func perform(_ action: CommandBar.Action, in destination: CommandBar.Destination) {
+        let paneIndex = emptySplitViewPaneIndex
         closeCommandBar()
         switch action {
-        case .switchTo(let tabID): show(tabID)
-        case .openInSplitView(let url):
+        case .switchTo(let tabID):
+            // As seen in Arc: Switch to Tab from the empty pane moves that tab into it. Oa's own: a tab that can't
+            // be in a split is switched to.
+            guard let anchorID = selectedTabID, paneIndex != nil, state.canOpenInSplitView(tabID, beside: anchorID)
+            else { return show(tabID) }
+            store.edit { $0.openInSplitView(tabID, beside: anchorID, at: paneIndex) }
+            select(tabID)
+        case .open(let url, background: false) where paneIndex != nil, .openInSplitView(let url):
             // Oa's own where the tab can't take a pane, as a pinned one for now: a new tab.
             guard let anchorID = selectedTabID, state.canAddSplitViewPane(beside: anchorID) else { return newTab(url) }
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
             store.edit {
                 $0.insertTab(tab, atTopOf: selectedSpaceID)
-                $0.openInSplitView(tab.id, beside: anchorID)
+                $0.openInSplitView(tab.id, beside: anchorID, at: paneIndex)
             }
             createdDates[tab.id] = .now
             select(tab.id)
@@ -497,6 +510,7 @@ final class WindowModel {
         library = nil
         let presented = state.presentedTabIDs(with: tabID)
         if let current = selectedTabID, !presented.contains(current) {
+            splitViewLayout = nil
             if pages[current] != nil { previousTabID = current }
             for leaving in presentedTabIDs {
                 placeholders[leaving] = nil
@@ -550,6 +564,50 @@ final class WindowModel {
     /// As seen in Arc: the focused tab stays selected.
     func separateAllSplitViewChildren(_ splitID: UUID) {
         store.edit { $0.separateAllSplitViewChildren(splitID) }
+    }
+
+    var splitViewPanes: [SplitViewPane] {
+        var panes = presentedTabIDs.map(SplitViewPane.tab)
+        if let index = emptySplitViewPaneIndex { panes.insert(.empty, at: min(index, panes.count)) }
+        return panes
+    }
+
+    var canAddSplitViewPane: Bool {
+        emptySplitViewPaneIndex == nil && selectedTabID.map(state.canAddSplitViewPane(beside:)) ?? false
+    }
+
+    /// Arc's `addPanel`: an empty pane, the last one unless a pane's menu placed it, and the command bar to fill it.
+    func addSplitViewPane(at index: Int? = nil) {
+        guard canAddSplitViewPane else { return }
+        emptySplitViewPaneIndex = index ?? presentedTabIDs.count
+        openCommandBar(.newTab)
+    }
+
+    func moveSplitViewPane(_ tabID: UUID, by offset: Int) {
+        store.edit { $0.moveSplitViewPane(tabID, by: offset) }
+    }
+
+    /// As seen in Arc: every pane turns, and the factors stay.
+    func flipSplitViewLayoutOrientation(_ splitID: UUID) {
+        store.edit {
+            $0.updateSplitView(splitID) {
+                $0.layoutOrientation = $0.layoutOrientation == .horizontal ? .vertical : .horizontal
+            }
+        }
+    }
+
+    /// The window's own shares for the split it shows, else the stored ones.
+    func paneShares(of splitID: UUID) -> [CGFloat] {
+        var data = state.splitView(splitID) ?? SidebarSplitViewData()
+        if let layout = splitViewLayout, layout.splitID == splitID { data.itemWidthFactors = layout.itemWidthFactors }
+        return data.shares(of: state.tree[splitID]?.childIDs ?? [])
+    }
+
+    /// As Arc's `handleSplitViewPanesResized`: the window keeps the layout, and the split's factors take it once
+    /// the resize ends.
+    func resizeSplitViewPanes(_ splitID: UUID, to factors: [UUID: CGFloat], ended: Bool) {
+        splitViewLayout = WindowSplitViewLayout(splitID: splitID, itemWidthFactors: factors)
+        if ended { store.edit { $0.updateSplitView(splitID) { $0.itemWidthFactors = factors } } }
     }
 
     func selectSplitView(_ splitID: UUID) {
@@ -1327,6 +1385,12 @@ final class WindowModel {
         if let previousTabID, state.tree.tab(previousTabID) == nil { self.previousTabID = nil }
         for splitID in Array(focusedPaneIDs.keys) where state.splitView(splitID) == nil {
             focusedPaneIDs[splitID] = nil
+        }
+        // Arc's `restorableSplitViewLayout` is for the panes it was made with.
+        if let layout = splitViewLayout,
+            Set(layout.itemWidthFactors.keys) != Set(state.tree[layout.splitID]?.childIDs ?? [])
+        {
+            splitViewLayout = nil
         }
     }
 

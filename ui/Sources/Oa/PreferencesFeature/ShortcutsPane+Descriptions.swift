@@ -26,6 +26,7 @@ extension ShortcutsPane {
         case "stopLoading": "Stops loading the current page."
         case "showSidebar": "Shows or hides your Sidebar from the left edge of your window."
         case "toggleToolbar": "Shows or hides the toolbar at the top of your window."
+        case "addSplitView": "Adds a new page to your current Split View."
         case "goBack": "Goes back to the last page you visited in this tab."
         case "goForward": "Goes forward to page you had previously visited in this tab."
         case "viewHistory": "Opens your History in a new Today tab."
