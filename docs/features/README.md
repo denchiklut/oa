@@ -40,6 +40,8 @@ that every online integration still works.
 - [Page context menu](context-menu/README.md)
 - [Command bar and history](command-bar/README.md)
 - [Shortcuts](key-bindings/README.md)
+- [Undo and redo](undo/README.md)
+- [Copy URL](copy-url/README.md)
 - [Extensions](extensions/README.md)
 - [Picture-in-picture](picture-in-picture/README.md)
 - [Recent-tab switcher](tab-switcher/README.md)
@@ -161,7 +163,7 @@ Sources: Arc [2022][arc22], [2023][arc23].
 | Prefer Arc versus website keyboard shortcuts | ✅ | ✅ |
 | Include/exclude Favorites in numbered navigation † | ✅ | ☐ |
 | Choose ninth-item versus last-item shortcut behavior † | ✅ | ☐ |
-| Copy the current URL with confirmation | ✅ | ☐ |
+| Copy the current URL with confirmation | ✅ | ✅ |
 | Copy current URL as Markdown | ✅ | ☐ |
 | Copy URL as Quote / share selected-text quote | ✅ | ☐ |
 

@@ -105,7 +105,8 @@ Archive, as Arc's does. Each window keeps the last ten closes the user made
 from it, in memory: ⌘W, a row's ✕, Remove Favorite and a closed Peek, whichever
 window held the page. The list goes with the window and at quit. A page that
 closes itself and a deleted Space's tabs are not in it, as in Arc; neither are
-auto-archived tabs, Oa's own choice, Arc's being unknown. The item is enabled
+auto-archived tabs, Oa's own choice, Arc's being unknown. Each close is also
+a step of [Undo](../undo/README.md). The item is enabled
 only while the window has something to bring back. A press takes the newest. A
 tab that is open again, restored from the Archive or expanded from a Peek, is
 selected, switching the window to its Space. One that is gone returns where it
