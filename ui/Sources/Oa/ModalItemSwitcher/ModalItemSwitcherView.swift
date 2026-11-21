@@ -50,29 +50,52 @@ private struct ModalItemSwitcherItemView: View {
 
     var body: some View {
         let peek = model.peeks[tab.id]
+        // As seen in Arc: a split's card has its panes' pictures in a white frame, as the split lays them out, and
+        // a favicon under each in place of a title.
+        let panes = model.state.presentedTabIDs(with: tab.id).compactMap { model.state.tree.tab($0) }
+        let vertical =
+            model.state.splitViewID(containing: tab.id).flatMap(model.state.splitView)?.layoutOrientation == .vertical
         VStack(spacing: 12) {
-            picture(model.snapshot(for: tab))
-                .overlay { if peek != nil { Color.black.opacity(0.5) } }
-                .frame(height: 105)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                // As Arc's card for a tab with a Peek: the Peek's page over the dimmed tab's.
-                .overlay {
-                    if peek != nil {
-                        picture(model.peekSnapshot(for: tab))
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                            .shadow(color: .black.opacity(0.3), radius: 2, y: 0.5)
-                            .padding(12)
+            Group {
+                if panes.count > 1 {
+                    let layout = vertical ? AnyLayout(VStackLayout(spacing: 2)) : AnyLayout(HStackLayout(spacing: 2))
+                    layout {
+                        ForEach(panes) { pane in
+                            picture(model.snapshot(for: pane))
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        }
                     }
+                    .padding(2)
+                    .background(scheme == .dark ? Color(white: 0.11) : .white)
+                } else {
+                    picture(model.snapshot(for: tab))
                 }
-                .shadow(color: .black.opacity(0.06), radius: 1, y: 2)
-                .shadow(color: .black.opacity(0.25), radius: 8, y: 2.5)
+            }
+            .overlay { if peek != nil { Color.black.opacity(0.5) } }
+            .frame(height: 105)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            // As Arc's card for a tab with a Peek: the Peek's page over the dimmed tab's.
+            .overlay {
+                if peek != nil {
+                    picture(model.peekSnapshot(for: tab))
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .shadow(color: .black.opacity(0.3), radius: 2, y: 0.5)
+                        .padding(12)
+                }
+            }
+            .shadow(color: .black.opacity(0.06), radius: 1, y: 2)
+            .shadow(color: .black.opacity(0.25), radius: 8, y: 2.5)
             HStack(spacing: 8) {
-                TabFavicon(model: model, tab: tab)
-                Text(model.title(for: tab))
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
-                    .foregroundStyle(scheme == .dark ? .white : focused ? .black : Color(white: 0.29))
-                Spacer(minLength: 0)
+                if panes.count > 1 {
+                    ForEach(panes) { TabFavicon(model: model, tab: $0).frame(maxWidth: .infinity) }
+                } else {
+                    TabFavicon(model: model, tab: tab)
+                    Text(model.title(for: tab))
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                        .foregroundStyle(scheme == .dark ? .white : focused ? .black : Color(white: 0.29))
+                    Spacer(minLength: 0)
+                }
                 if let icon = peek?.favicon {
                     Image(nsImage: icon)
                         .resizable()
