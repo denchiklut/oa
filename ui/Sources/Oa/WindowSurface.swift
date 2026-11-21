@@ -271,7 +271,7 @@ extension ThemeColor {
 }
 
 @MainActor
-private enum WindowTexture {
+enum WindowTexture {
     private static var images: [WindowTheme.Overlay: CGImage] = [:]
 
     static func image(_ overlay: WindowTheme.Overlay) -> CGImage {
