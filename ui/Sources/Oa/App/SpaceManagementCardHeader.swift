@@ -67,9 +67,10 @@ struct SpaceManagementCardHeader: View {
             ZStack {
                 well.fill(hoverInk.opacity(isIconHovered ? 0.1 : 0))
                 if let icon = space.icon {
+                    // As measured on Arc: in the card's `maxContrastColor`, like the sidebar's template icons.
                     SpaceIconGlyph(icon: icon)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(theme.foreground)
+                        .foregroundStyle(theme.maxContrast)
                 }
                 well.strokeBorder(hoverInk.opacity(highlighted ? 0.3 : 0), style: StrokeStyle(dash: [4, 2]))
             }
