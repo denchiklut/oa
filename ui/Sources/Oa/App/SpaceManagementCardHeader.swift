@@ -34,7 +34,9 @@ struct SpaceManagementCardHeader: View {
                 .padding(.leading, showsIcon ? 30.5 : 0)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: showsIcon)
                 .overlay(alignment: .leading) { iconButton(highlighted: highlighted) }
+            // As measured on Arc: the badge ends 191.5 pt from the card's left, well short of the brush.
             profileMenu
+                .padding(.trailing, 5.5)
             themeButton
         }
         .padding(.horizontal, 6)
