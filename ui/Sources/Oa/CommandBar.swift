@@ -360,13 +360,13 @@ final class CommandBar {
     }
 }
 
-/// Measured in Arc 1.172.2: a 766 pt card centred on the whole window, its top about 31% down, five 50 pt rows
-/// showing before the list scrolls.
+/// Measured in Arc: a 766 pt card centred on the whole window, its top 169.5 pt above the window's middle (270 pt down
+/// an 879 pt window, 256.5 down an 851 pt one), five 50 pt rows showing before the list scrolls.
 struct CommandBarView: View {
     static let width: CGFloat = 766
     static let rowHeight: CGFloat = 50
     static let visibleRows = 5
-    static let topFraction: CGFloat = 270 / 879
+    static let topAboveMiddle: CGFloat = 169.5
 
     let model: WindowModel
     let bar: CommandBar
@@ -388,7 +388,7 @@ struct CommandBarView: View {
                     .background { if let glow { SiteSearchGlow(color: glow.color).id(glow.id) } }
                     .modifier(CommandBarBounce(count: bounces))
                     .frame(width: min(Self.width, geometry.size.width - 32))
-                    .padding(.top, geometry.size.height * Self.topFraction)
+                    .padding(.top, max(geometry.size.height / 2 - Self.topAboveMiddle, 0))
             }
         }
         // As Arc: the bar bounces whenever it enters or leaves a Site Search.
@@ -418,8 +418,12 @@ struct CommandBarView: View {
         return WindowTheme.SemanticColorPalette(palette, colorScheme == .dark ? .dark : .light).focus.color
     }
 
+    /// As measured on Arc 1.174 over three themes, light and dark: the card and its inks go by the app's appearance,
+    /// not the theme's, and only the chosen row takes the theme, its `focus`.
     private func card(_ rows: [CommandBar.Row]) -> some View {
-        VStack(spacing: 0) {
+        let isDark = colorScheme == .dark
+        let shape = RoundedRectangle(cornerRadius: 10)
+        return VStack(spacing: 0) {
             HStack(spacing: 10) {
                 if let scope = bar.scope {
                     Image(systemName: "magnifyingglass")
@@ -430,32 +434,38 @@ struct CommandBarView: View {
                         .padding(.trailing, 1.5)
                 } else {
                     Image(
-                        systemName: icon(for: rows.indices.contains(bar.selectedIndex) ? rows[bar.selectedIndex] : nil)
+                        systemName: fieldIcon(rows.indices.contains(bar.selectedIndex) ? rows[bar.selectedIndex] : nil)
                     )
-                    .foregroundStyle(.secondary)
                     .frame(width: 18)
                 }
-                CommandBarField(bar: bar, model: model, isUnderDialog: model.dialog != nil)
-                    .frame(height: 23)
+                CommandBarField(bar: bar, model: model, isUnderDialog: model.dialog != nil, isDark: isDark)
+                    .frame(height: 24)
                 if let hint = bar.siteSearchHint {
                     SiteSearchHint(name: hint.name) { bar.enterScope(hint) }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(isDark ? Color.white : .black)
+            .padding(.leading, 23)
+            .padding(.trailing, 16)
+            .frame(height: 64)
             if !rows.isEmpty {
-                // As measured in Arc: a 1 pt line 12 pt in from the card's sides, 6 pt above the first row.
+                // A hairline 12 pt in from the card's sides, 6 pt above the first row's fill.
                 Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 1)
+                    .fill(CommandBarInk.color(isDark, 0.1, 0.1))
+                    .frame(height: 0.5)
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 4)
                 list(rows)
+                    .padding(.bottom, 9.5)
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
-        .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
+        .background {
+            // Nearly opaque, so the theme behind only tints it. Whether Arc blurs what is behind isn't known.
+            shape.fill(isDark ? Color(white: 0.1).opacity(0.875) : .white.opacity(0.9))
+        }
+        .overlay(shape.strokeBorder(CommandBarInk.color(isDark, 0.35, 0.2), lineWidth: 0.5))
+        .background { ShadowView(shape: shape, color: .black.opacity(0.25), radius: 24, y: 8) }
     }
 
     private func list(_ rows: [CommandBar.Row]) -> some View {
@@ -465,7 +475,7 @@ struct CommandBarView: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         CommandBarRow(
                             row: row, icon: icon(for: row), favicon: favicon(for: row),
-                            selected: index == bar.selectedIndex, tint: bar.scope == nil ? nil : scopeFocus
+                            selected: index == bar.selectedIndex, focus: scopeFocus
                         )
                         .id(index)
                         .onTapGesture {
@@ -474,7 +484,7 @@ struct CommandBarView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 10)
             }
             .frame(height: CGFloat(min(rows.count, Self.visibleRows)) * Self.rowHeight)
             .onChange(of: bar.selectedIndex) { _, index in proxy.scrollTo(index) }
@@ -483,6 +493,11 @@ struct CommandBarView: View {
 
     private func favicon(for row: CommandBar.Row) -> NSImage? {
         if case .tab(let tab) = row.source { model.favicon(for: tab.tab) } else { nil }
+    }
+
+    /// As measured on Arc: the magnifier stays while the chosen row is an open tab.
+    private func fieldIcon(_ row: CommandBar.Row?) -> String {
+        if case .tab? = row?.source { "magnifyingglass" } else { icon(for: row) }
     }
 
     private func icon(for row: CommandBar.Row?) -> String {
@@ -495,51 +510,68 @@ struct CommandBarView: View {
     }
 }
 
+/// Black over Arc's light card and white over its dark one, at the alphas measured there.
+private enum CommandBarInk {
+    static func color(_ isDark: Bool, _ light: Double, _ dark: Double) -> Color {
+        isDark ? .white.opacity(dark) : .black.opacity(light)
+    }
+}
+
 private struct CommandBarRow: View {
     let row: CommandBar.Row
     let icon: String
     let favicon: NSImage?
     let selected: Bool
-    /// As Arc in Site Search: the highlight in the pill's colour, with white text.
-    let tint: Color?
+    /// As Arc: the chosen row is filled with the theme's `focus`, or a Site Search's colour, under white text.
+    let focus: Color
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 10) {
+        let isDark = colorScheme == .dark
+        let faint = selected ? Color.white : CommandBarInk.color(isDark, 0.33, 0.33)
+        let box = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        HStack(spacing: 9) {
             Group {
                 if let favicon {
+                    // As Arc: the chosen row's favicon sits on a white tile.
                     Image(nsImage: favicon).resizable().scaledToFit()
+                        .frame(width: 16, height: 16)
+                        .frame(width: 24, height: 24)
+                        .background(selected ? Color.white : .clear, in: box)
                 } else {
-                    Image(systemName: icon).foregroundStyle(
-                        isTinted ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                    Image(systemName: icon)
+                        .foregroundStyle(selected ? Color.white : CommandBarInk.color(isDark, 0.5, 0.66))
+                        .frame(width: 24, height: 24)
                 }
             }
-            .frame(width: 18, height: 18)
             Text(row.title)
                 .lineLimit(1)
             if let address {
                 Text("— " + address)
                     .lineLimit(1)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(faint)
             }
             Spacer(minLength: 0)
             if case .tab(let tab) = row.source {
-                // As Arc: a tab of another Space names its Space; the arrow beside it is Oa's own.
+                // As Arc: a tab of another Space names its Space.
                 Text(tab.spaceName ?? "Switch to Tab")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(faint)
                 Image(systemName: "arrow.right")
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(selected ? focus : CommandBarInk.color(isDark, 0.5, 0.66))
+                    .frame(width: 24, height: 24)
+                    .background(selected ? Color.white : CommandBarInk.color(isDark, 0.05, 0.05), in: box)
             }
         }
-        .padding(.horizontal, 8)
+        .font(.system(size: 13, weight: .medium))
+        .padding(.leading, 10)
+        .padding(.trailing, 13)
+        .frame(height: 46)
+        .foregroundStyle(selected ? Color.white : CommandBarInk.color(isDark, 0.8, 0.8))
+        .background(selected ? focus : .clear, in: RoundedRectangle(cornerRadius: 8))
         .frame(height: CommandBarView.rowHeight)
-        .foregroundStyle(isTinted ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-        .background(
-            selected ? tint ?? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 8)
-        )
         .contentShape(Rectangle())
     }
-
-    private var isTinted: Bool { selected && tint != nil }
 
     private var address: String? {
         row.isHistory || row.kind == .navSuggest ? row.url.map(CommandBarRanking.readable) : nil
@@ -664,18 +696,33 @@ private struct CommandBarField: NSViewRepresentable {
     let model: WindowModel
     /// As Arc: a JavaScript dialog keeps the keys while the bar is open behind it.
     let isUnderDialog: Bool
+    let isDark: Bool
 
     func makeCoordinator() -> Coordinator { Coordinator(bar: bar, model: model) }
 
+    private static let font = NSFont.systemFont(ofSize: 18, weight: .medium)
+
     private var placeholder: String { bar.scope == nil ? "Search or Enter URL…" : "Search…" }
+
+    /// The card's light or dark is the app's, which the field's own colours must follow; the prompt as measured on
+    /// Arc.
+    private func style(_ field: NSTextField) {
+        field.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+        field.placeholderAttributedString = NSAttributedString(
+            string: placeholder,
+            attributes: [
+                .font: Self.font,
+                .foregroundColor: isDark ? NSColor.white.withAlphaComponent(0.55) : .black.withAlphaComponent(0.5),
+            ])
+    }
 
     func makeNSView(context: Context) -> NSTextField {
         let field = CommandBarTextField()
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 17)
-        field.placeholderString = placeholder
+        field.font = Self.font
+        style(field)
         field.cell?.usesSingleLineMode = true
         field.cell?.isScrollable = true
         field.delegate = context.coordinator
@@ -693,7 +740,7 @@ private struct CommandBarField: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         let coordinator = context.coordinator
         coordinator.bar = bar
-        field.placeholderString = placeholder
+        style(field)
         if isUnderDialog != coordinator.isUnderDialog {
             coordinator.isUnderDialog = isUnderDialog
             if !isUnderDialog { coordinator.focus() }

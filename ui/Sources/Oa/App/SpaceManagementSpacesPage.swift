@@ -239,18 +239,10 @@ private struct SpaceManagementCollectionViewItem: View {
                 onClose: { [model] in model.dismissSpaceStyleEditor() }
             ) { WindowSpaceStyleEditorView(model: model) }
         }
-        // As Arc's: under the card, its `EaselBackground`, whose `ShadowView` casts the shadow at full strength
-        // however translucent that fill is. SwiftUI would scale it by the fill's alpha, so it comes from an opaque
-        // shape shown only outside the card.
+        // As Arc's: under the card, a `ShadowView` filled with its `EaselBackground`.
         .background {
             let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-            shape
-                .shadow(color: .black.opacity(0.15), radius: 12, y: 1)
-                .mask {
-                    Rectangle().padding(-48)
-                        .overlay { shape.blendMode(.destinationOut) }
-                        .compositingGroup()
-                }
+            ShadowView(shape: shape, color: .black.opacity(0.15), radius: 12, y: 1)
                 .background {
                     shape.fill(appearance.colorScheme == .dark ? Color.black.opacity(0.5) : .white.opacity(0.85))
                 }
