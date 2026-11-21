@@ -439,15 +439,23 @@ final class WindowModel {
         let others = state.spaces.filter { $0.profileID == space.profileID && $0.id != space.id }
         let tabs: [(SidebarTab, String?)] =
             selectableTabs.map { ($0, nil) }
-            + others.flatMap { other in state.tabs(in: other.id).map { ($0, other.name) } }
+            + others.flatMap { other in
+                state.tabs(in: other.id).filter { tab in
+                    state.splitViewID(containing: tab.id).map { focusedTabID(of: $0) == tab.id } ?? true
+                }
+                .map { ($0, other.name) }
+            }
         return tabs.compactMap { tab, spaceName in
             guard !presentedTabIDs.contains(tab.id), let url = livePage(for: tab.id)?.url ?? tab.url else {
                 return nil
             }
-            return CommandBarRanking.Tab(
+            // As seen in Arc: a split is one row, Switch to Split View. Its title here is its focused pane's, Oa's own.
+            var row = CommandBarRanking.Tab(
                 tab: tab, url: url, spaceName: spaceName, activeAt: lastActiveDates[tab.id] ?? createdDates[tab.id],
                 isVisible: store.windows.contains { $0.presentedTabIDs.contains(tab.id) },
                 saveLevel: state.keepsAddress(tab.id) ? folderDepth(of: tab.id) : nil)
+            row.isSplitView = state.splitViewID(containing: tab.id) != nil
+            return row
         }
     }
 
@@ -468,6 +476,7 @@ final class WindowModel {
         case .switchTo(let tabID):
             // As seen in Arc: Switch to Tab from the empty pane moves that tab into it. Oa's own: a tab that can't
             // be in a split is switched to.
+            // Oa's own: a split's row switches to it, where Arc's rule from the empty pane wasn't made out.
             guard let anchorID = selectedTabID, paneIndex != nil, state.canOpenInSplitView(tabID, beside: anchorID)
             else { return show(tabID) }
             store.edit { $0.openInSplitView(tabID, beside: anchorID, at: paneIndex) }
