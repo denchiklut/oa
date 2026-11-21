@@ -26,6 +26,7 @@ final class StubPage: Page, MediaSession {
     private(set) var crash: PageCrash?
     private(set) var isCameraOn = false
     private(set) var isMicrophoneOn = false
+    private(set) var hasFocus = false
     var keepsAddress = false
     /// A video with sound, playing: what the engine's media session reports as active audio and video.
     var isPlayingVideo = false
@@ -61,6 +62,7 @@ final class StubPage: Page, MediaSession {
         view.movedToWindow = { [weak self] in self?.showPendingDialog() }
         view.leavingWindow = { [weak self] in self?.makeThumbnail() }
         view.contextMenu = { [weak self] in self?.contextMenu() }
+        view.focusChanged = { [weak self] in self?.hasFocus = $0 }
         view.consumesKey = { [weak self] event in
             guard let self, consumesShortcuts else { return false }
             continuation?.yield(.consumedKey(keyCode: event.keyCode, modifierFlags: event.modifierFlags))
@@ -137,6 +139,7 @@ final class StubPage: Page, MediaSession {
         if let previous = Self.activePages[windowID]?.page, previous !== self { previous.closePermissionRequest() }
         Self.activePages[windowID] = Arrival(self)
         showPermissionRequest()
+        if let window = hostingView.window, window.isKeyWindow { window.makeFirstResponder(hostingView) }
     }
 
     func move(toWindow windowID: UUID) {
@@ -568,8 +571,26 @@ private final class StubHostingView: NSHostingView<StubPageView> {
     var leavingWindow: () -> Void = {}
     var contextMenu: () -> NSMenu? = { nil }
     var consumesKey: (NSEvent) -> Bool = { _ in false }
+    var focusChanged: (Bool) -> Void = { _ in }
 
     override func menu(for event: NSEvent) -> NSMenu? { contextMenu() }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func becomeFirstResponder() -> Bool {
+        focusChanged(true)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        focusChanged(false)
+        return true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        super.mouseDown(with: event)
+    }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.type == .keyDown, window != nil, !isHiddenOrHasHiddenAncestor, consumesKey(event) { return true }

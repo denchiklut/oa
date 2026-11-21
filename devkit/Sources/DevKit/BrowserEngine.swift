@@ -545,6 +545,8 @@ public protocol Page: AnyObject, Observable {
     var isMicrophoneOn: Bool { get }
     /// While the page plays sound, as ADK's `isAudible`. Read when needed: it isn't observed.
     var isAudible: Bool { get }
+    /// While the page has the keyboard, as ADK's `hasFocus`: false again once its window isn't key.
+    var hasFocus: Bool { get }
     /// The page's media, as ADK's media session.
     var mediaSession: any MediaSession { get }
     /// Why the renderer is gone, nil once a new one is ready, as after a reload.
