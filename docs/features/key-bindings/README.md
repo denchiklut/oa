@@ -67,6 +67,9 @@ at that moment, with "Edit the shortcut" under it.
 
 - The same shortcut again while the toast is up runs the menu item. The page
   has had that key too.
+- The menu item is the first that has the shortcut, as Arc's lookup. An
+  action moved to a key an earlier item that is no binding holds, ⌘C and
+  Copy, asks for and runs that item.
 - The toast stays its 5 seconds whatever is pressed, and once it is gone the
   next press asks again.
 - Another prompting shortcut takes the toast's place and the wait with it.
