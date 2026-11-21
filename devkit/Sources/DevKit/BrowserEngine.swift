@@ -826,6 +826,8 @@ public enum OpenDisposition: Sendable, Equatable {
     case backgroundTab
     case newWindow
     case popup
+    /// As ADK's `splitView`: beside the page that opened it, in the app's split view.
+    case splitView
 }
 
 /// Why a page's renderer is gone.

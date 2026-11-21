@@ -428,6 +428,7 @@ extension OpenDisposition {
         case 1: self = .backgroundTab
         case 2: self = .newWindow
         case 3: self = .popup
+        case 4: self = .splitView
         default: self = .foregroundTab
         }
     }

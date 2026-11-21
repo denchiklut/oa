@@ -279,6 +279,8 @@ final class StubPage: Page, MediaSession {
         menu.addItem(StubMenuItem("Open Link in New Tab") { [weak self] in self?.open(.backgroundTab, byPage: false) })
         menu.addItem(
             StubMenuItem("Open Link in New Window") { [weak self] in self?.open(.newWindow, byPage: false) })
+        menu.addItem(
+            StubMenuItem("Open Link in Split View") { [weak self] in self?.open(.splitView, byPage: false) })
         return menu
     }
 
