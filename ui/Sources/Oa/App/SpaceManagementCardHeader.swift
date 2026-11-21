@@ -45,8 +45,7 @@ struct SpaceManagementCardHeader: View {
     }
 
     private var themeButton: some View {
-        let presentation = model.spaceStyleEditor
-        return Button {
+        Button {
             model.presentSpaceStyleEditor(for: space.id, from: .library)
         } label: {
             Image(systemName: "paintbrush.pointed")
@@ -57,11 +56,7 @@ struct SpaceManagementCardHeader: View {
         }
         .buttonStyle(.plain)
         .help("Edit Space theme")
-        .background(
-            SpaceStyleEditorAnchor(
-                isPresented: presentation?.spaceID == space.id && presentation?.origin == .library,
-                onClose: { [model] in model.dismissSpaceStyleEditor() }
-            ) { WindowSpaceStyleEditorView(model: model) })
+        .accessibilityLabel("Edit Space theme")
     }
 
     private func iconButton(highlighted: Bool) -> some View {
