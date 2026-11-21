@@ -14,6 +14,7 @@ with the window.
 | Archive a tab: ⌘W, a row's ✕, Remove Favorite | Archive Tab | The tab where it was. The one the window was showing is shown again, with its history; any other is a row without a page |
 | Clear, Archive Tabs Below | Clear Tab, Clear Tabs | Every tab the close took, at once |
 | Close a Peek | Close Peek | The Peek, over its tab |
+| A change in the [theme editor](../space-theme/README.md) | Update Theme | The Space's theme before it; an open editor starts over from it |
 
 The names are Arc's. Arc undoes more: a move (pin, unpin, a drag), a new,
 deleted or moved Space, a Space's icon and the app's appearance. Oa doesn't
