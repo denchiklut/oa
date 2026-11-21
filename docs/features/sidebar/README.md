@@ -239,6 +239,14 @@ is black over light content and white over dark, at fixed alphas: the Space's
 name 45%, the field's prompt 30% with its magnifier at 40%, New Tab 30% or 45%,
 the header's icons 57% or 59%.
 
+The dock's "+" opens Arc's menu above it, inside the sidebar: New Space, New
+Folder, New Easel, New Boost, New Split and New Tab, with what Oa lacks greyed.
+Like the command bar, it goes by the app's light or dark, not the theme's
+content, and takes that side of the window's palette: the card is
+`backgroundExtra`, the chosen row and the dividers `hover`, the shortcuts
+`subtitle`. It is an AppKit popover with its arrow hidden, so its rim and
+corners are the system's, where Arc's draws a small arrow of its own.
+
 A stand-in, waiting for its own slice: the sidebar's field opens the centred
 command bar, where Arc anchors a narrow one over the field.
 
