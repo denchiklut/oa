@@ -31,6 +31,7 @@ const sidebars = {
         { type: "doc", id: "features/context-menu/README", label: "Page context menu" },
         { type: "doc", id: "features/command-bar/README", label: "Command bar and history" },
         { type: "doc", id: "features/key-bindings/README", label: "Shortcuts over a page" },
+        { type: "doc", id: "features/space-theme/README", label: "Space theme editor" },
         { type: "doc", id: "features/undo/README", label: "Undo and redo" },
         { type: "doc", id: "features/copy-url/README", label: "Copy URL" },
         { type: "doc", id: "features/extensions/README", label: "Extensions" },

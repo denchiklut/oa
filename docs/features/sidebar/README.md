@@ -226,9 +226,9 @@ stores (`WindowTheme`): a gradient or a single colour with its intensity,
 texture and translucency style, the appearance of the chrome over it, and the
 palettes the chrome's colours come from. Each Space keeps its own, and a window
 shows its Space's. A Space without one shows Arc's default theme: a light and a
-dark gradient, chosen by the system's appearance. Oa has no theme editor yet,
-so a theme gets into a Space only through the saved sidebar. The four textures
-are Oa's own, generated to match Arc's.
+dark gradient, chosen by the system's appearance. A theme is made in the
+[theme editor](../space-theme/README.md). The four textures are Oa's own,
+generated to match Arc's.
 
 A stand-in, waiting for its own slice: the sidebar's field opens the centred
 command bar, where Arc anchors a narrow one over the field.

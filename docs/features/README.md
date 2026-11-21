@@ -40,6 +40,7 @@ that every online integration still works.
 - [Page context menu](context-menu/README.md)
 - [Command bar and history](command-bar/README.md)
 - [Shortcuts](key-bindings/README.md)
+- [Space theme editor](space-theme/README.md)
 - [Undo and redo](undo/README.md)
 - [Copy URL](copy-url/README.md)
 - [Extensions](extensions/README.md)
