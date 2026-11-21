@@ -230,6 +230,15 @@ dark gradient, chosen by the system's appearance. A theme is made in the
 [theme editor](../space-theme/README.md). The four textures are Oa's own,
 generated to match Arc's.
 
+What is drawn over the surface takes few colours from the theme, as in Arc. A
+theme carries a light and a dark palette, and the appearance of its content
+picks one. Row titles are the palette's title colour. A Space's icon, beside its
+name and when current in the dock, is the palette's strongest colour
+(`maxContrastColor`), as are the placeholder favicon and badges. Everything else
+is black over light content and white over dark, at fixed alphas: the Space's
+name 45%, the field's prompt 30% with its magnifier at 40%, New Tab 30% or 45%,
+the header's icons 57% or 59%.
+
 A stand-in, waiting for its own slice: the sidebar's field opens the centred
 command bar, where Arc anchors a narrow one over the field.
 
