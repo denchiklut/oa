@@ -1093,6 +1093,27 @@ final class WindowModel {
         select(tab.id)
     }
 
+    /// Oa's own for now: only where the tab under the Peek can take a pane, so not on a pinned tab or a Favorite.
+    var canAddPeekToSplitView: Bool {
+        peek != nil && !showingArchive && selectedTabID.map(state.canAddSplitViewPane(beside:)) ?? false
+    }
+
+    /// Arc's `addModalToSplit`: the Peek's page becomes a tab on the right of the one it was opened from, focused.
+    func addPeekToSplitView() {
+        guard canAddPeekToSplitView, let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else {
+            return
+        }
+        let tab = SidebarTab(id: UUID(), title: page.title, url: page.url, viewedAt: .now, openerID: ownerID)
+        store.edit {
+            $0.openTab(tab, from: ownerID, in: selectedSpaceID)
+            let index = $0.presentedTabIDs(with: ownerID).firstIndex(of: ownerID).map { $0 + 1 }
+            $0.openInSplitView(tab.id, beside: ownerID, at: index)
+        }
+        createdDates[tab.id] = .now
+        install(page, for: tab.id)
+        select(tab.id)
+    }
+
     /// Closes as the user would, so a `beforeunload` handler can keep the Peek, as Arc does.
     func closePeek() {
         guard let page = peek else { return }
@@ -1778,7 +1799,15 @@ final class WindowModel {
             return peek(page, from: openerID)
         }
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now, openerID: openerID)
-        store.edit { $0.openTab(tab, from: openerID, in: selectedSpaceID) }
+        store.edit {
+            $0.openTab(tab, from: openerID, in: selectedSpaceID)
+            // As seen in Arc: the link's page on the right of the one it came from, focused. Oa's own where that
+            // one can't take a pane: a tab.
+            if disposition == .splitView {
+                let index = $0.presentedTabIDs(with: openerID).firstIndex(of: openerID).map { $0 + 1 }
+                $0.openInSplitView(tab.id, beside: openerID, at: index)
+            }
+        }
         createdDates[tab.id] = .now
         install(page, for: tab.id)
         listen(to: page)
