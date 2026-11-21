@@ -15,6 +15,9 @@ enum class OpenDisposition {
   kBackgroundTab,
   kNewWindow,
   kPopup,
+  // The app's own split view, as ArcCore's split view disposition: from the
+  // page menu's Open Link in Split View.
+  kSplitView,
 };
 
 enum class SecurityLevel {

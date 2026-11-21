@@ -96,6 +96,9 @@ bool ToOpenDisposition(WindowOpenDisposition disposition,
     case WindowOpenDisposition::NEW_POPUP:
       *result = OpenDisposition::kPopup;
       return true;
+    case WindowOpenDisposition::NEW_SPLIT_VIEW:
+      *result = OpenDisposition::kSplitView;
+      return true;
     default:
       return false;
   }
