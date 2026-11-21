@@ -8,6 +8,9 @@ struct SiteControlsButton: View {
     let model: WindowModel
     let size: CGSize
     @Binding var showingSiteControls: Bool
+    /// One button of the window hangs the permission prompt: Arc's split has two, and its prompt goes with the
+    /// first one to close.
+    var hostsPermissionPrompt = true
 
     var body: some View {
         let page = model.page
@@ -32,9 +35,13 @@ struct SiteControlsButton: View {
             }
         }
         .background {
-            Color.clear.popover(isPresented: model.permissionPromptBinding(inPeekToolbar: false), arrowEdge: .bottom) {
-                if let request = model.promptedPermissionRequest {
-                    PermissionRequestView(model: model, request: request)
+            if hostsPermissionPrompt {
+                Color.clear.popover(
+                    isPresented: model.permissionPromptBinding(inPeekToolbar: false), arrowEdge: .bottom
+                ) {
+                    if let request = model.promptedPermissionRequest {
+                        PermissionRequestView(model: model, request: request)
+                    }
                 }
             }
         }
