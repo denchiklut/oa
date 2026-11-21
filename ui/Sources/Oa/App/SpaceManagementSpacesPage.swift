@@ -226,7 +226,10 @@ private struct SpaceManagementCollectionViewItem: View {
         }
         .environment(\.colorScheme, appearance.colorScheme)
         .environment(\.theme, theme)
-        .background { WindowSurface(background: background).environment(\.colorScheme, windowColorScheme) }
+        .background {
+            WindowSurface(background: background, renderer: .swiftUI)
+                .environment(\.colorScheme, appearance.colorScheme)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         // As Arc's card, which is the Space's sidebar: the editor hangs from it as from the window's.
         .background {
@@ -236,11 +239,21 @@ private struct SpaceManagementCollectionViewItem: View {
                 onClose: { [model] in model.dismissSpaceStyleEditor() }
             ) { WindowSpaceStyleEditorView(model: model) }
         }
-        // As Arc's: under the card, its `EaselBackground` casts the shadow.
+        // As Arc's: under the card, its `EaselBackground`, whose `ShadowView` casts the shadow at full strength
+        // however translucent that fill is. SwiftUI would scale it by the fill's alpha, so it comes from an opaque
+        // shape shown only outside the card.
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(appearance.colorScheme == .dark ? Color.black.opacity(0.5) : .white.opacity(0.85))
+            let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+            shape
                 .shadow(color: .black.opacity(0.15), radius: 12, y: 1)
+                .mask {
+                    Rectangle().padding(-48)
+                        .overlay { shape.blendMode(.destinationOut) }
+                        .compositingGroup()
+                }
+                .background {
+                    shape.fill(appearance.colorScheme == .dark ? Color.black.opacity(0.5) : .white.opacity(0.85))
+                }
         }
     }
 
