@@ -69,6 +69,10 @@ final class MainMenu {
         edit.addItem(.separator())
         edit.addItem(item("Cut", #selector(NSText.cut(_:)), key: "x"))
         edit.addItem(item("Copy", #selector(NSText.copy(_:)), key: "c"))
+        edit.addItem(
+            item(
+                "Copy URL", #selector(BrowserWindowController.copyCurrentURL(_:)), key: "c",
+                modifiers: [.command, .shift], id: "copyCurrentURL", priority: .overrideWebView))
         edit.addItem(item("Paste", #selector(NSText.paste(_:)), key: "v"))
         edit.addItem(item("Select All", #selector(NSText.selectAll(_:)), key: "a"))
 
