@@ -1,0 +1,314 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Fri, 20 Nov 2026 20:25:27 -0700
+Subject: [PATCH] oa: ask the page to undo before the window, as ArcCore does
+
+RenderWidgetHostViewCocoa's undo: and redo: send the command to the focused frame with a reply, ExecuteEditCommandWithResult on the view's host and on the frame's input handler, which says whether the frame ran it. When it did not, the first undo manager up the responder chain that can undo or redo does, which is the window's: a page's own typing is undone first, and a press the page has no use for undoes what the app registered. ArcCore's view does the same through a method it adds before ExecuteEditCommand on both interfaces.
+---
+ .../render_widget_host_view_cocoa.mm          | 35 +++++++++++++++++--
+ .../render_widget_host_delegate.cc            |  6 ++++
+ .../render_widget_host_delegate.h             |  5 +++
+ .../render_widget_host_view_mac.h             |  3 ++
+ .../render_widget_host_view_mac.mm            | 10 ++++++
+ .../browser/web_contents/web_contents_impl.cc | 16 +++++++++
+ .../browser/web_contents/web_contents_impl.h  |  3 ++
+ .../common/render_widget_host_ns_view.mojom   |  4 +++
+ .../public/mojom/input/input_handler.mojom    |  5 +++
+ .../core/frame/web_frame_widget_impl.cc       |  8 +++++
+ .../core/frame/web_frame_widget_impl.h        |  3 ++
+ .../input/frame_widget_input_handler_impl.cc  | 30 ++++++++++++++++
+ .../input/frame_widget_input_handler_impl.h   |  3 ++
+ 13 files changed, 129 insertions(+), 2 deletions(-)
+
+diff --git a/content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm b/content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm
+index b72b0edd65c823f5dd8933a1eaf6b1ca59a61e6b..c8ebb31f69c0b5d438c10e52afd31493709b6366 100644
+--- a/content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm
++++ b/content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm
+@@ -17,6 +17,7 @@
+ #import "base/apple/foundation_util.h"
+ #include "base/apple/owned_objc.h"
+ #include "base/debug/crash_logging.h"
++#include "base/functional/bind.h"
+ #import "base/mac/mac_util.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/numerics/safe_conversions.h"
+@@ -2943,12 +2944,42 @@ WebMouseEvent event(WebInputEvent::Type::kMouseUp,
+   }
+ }
+ 
++// As ArcCore: the page undoes first, and when it had nothing to undo, the
++// first undo manager up the responder chain that has, which is the window's.
+ - (void)undo:(id)sender {
+-  _host->Undo();
++  __weak RenderWidgetHostViewCocoa* weakSelf = self;
++  _host->ExecuteEditCommandWithResult(
++      "Undo", base::BindOnce(^(bool handled) {
++        if (handled) {
++          return;
++        }
++        for (NSResponder* responder = weakSelf.nextResponder; responder;
++             responder = responder.nextResponder) {
++          NSUndoManager* undoManager = responder.undoManager;
++          if (undoManager.canUndo) {
++            [undoManager undo];
++            return;
++          }
++        }
++      }));
+ }
+ 
+ - (void)redo:(id)sender {
+-  _host->Redo();
++  __weak RenderWidgetHostViewCocoa* weakSelf = self;
++  _host->ExecuteEditCommandWithResult(
++      "Redo", base::BindOnce(^(bool handled) {
++        if (handled) {
++          return;
++        }
++        for (NSResponder* responder = weakSelf.nextResponder; responder;
++             responder = responder.nextResponder) {
++          NSUndoManager* undoManager = responder.undoManager;
++          if (undoManager.canRedo) {
++            [undoManager redo];
++            return;
++          }
++        }
++      }));
+ }
+ 
+ - (void)cut:(id)sender {
+diff --git a/content/browser/renderer_host/render_widget_host_delegate.cc b/content/browser/renderer_host/render_widget_host_delegate.cc
+index 91854728b2e07cd6edd96d6494cd0cfbd74d5587..9c21e7f3a151bebb0c7cbc71a318fe4ae83c77ab 100644
+--- a/content/browser/renderer_host/render_widget_host_delegate.cc
++++ b/content/browser/renderer_host/render_widget_host_delegate.cc
+@@ -18,6 +18,12 @@ KeyboardEventProcessingResult RenderWidgetHostDelegate::PreHandleKeyboardEvent(
+   return KeyboardEventProcessingResult::NOT_HANDLED;
+ }
+ 
++void RenderWidgetHostDelegate::ExecuteEditCommandWithResult(
++    const std::string& command,
++    base::OnceCallback<void(bool)> callback) {
++  std::move(callback).Run(false);
++}
++
+ bool RenderWidgetHostDelegate::PreHandleMouseEvent(
+     const blink::WebMouseEvent& event) {
+   return false;
+diff --git a/content/browser/renderer_host/render_widget_host_delegate.h b/content/browser/renderer_host/render_widget_host_delegate.h
+index f8369e09e0a26970ef5d6290ca8a17d5af914d2e..f8e837e6cbc5b23ebb407268fb11278484b1de3e 100644
+--- a/content/browser/renderer_host/render_widget_host_delegate.h
++++ b/content/browser/renderer_host/render_widget_host_delegate.h
+@@ -162,6 +162,11 @@ class CONTENT_EXPORT RenderWidgetHostDelegate {
+   virtual void ExecuteEditCommand(
+       const std::string& command,
+       const std::optional<std::u16string>& value) = 0;
++  // Runs an edit command in the focused frame and reports whether the frame
++  // ran it.
++  virtual void ExecuteEditCommandWithResult(
++      const std::string& command,
++      base::OnceCallback<void(bool)> callback);
+   virtual void Undo() = 0;
+   virtual void Redo() = 0;
+   virtual void Cut() = 0;
+diff --git a/content/browser/renderer_host/render_widget_host_view_mac.h b/content/browser/renderer_host/render_widget_host_view_mac.h
+index 8b8c348cf1d421ecce701a0547c0693c0dd5ecc5..2bf8cd9323cff35cb728734fd6f5731e1b58818b 100644
+--- a/content/browser/renderer_host/render_widget_host_view_mac.h
++++ b/content/browser/renderer_host/render_widget_host_view_mac.h
+@@ -437,6 +437,9 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
+                                 gfx::Rect* out_rect,
+                                 gfx::Range* out_actual_range,
+                                 bool* out_success) override;
++  void ExecuteEditCommandWithResult(
++      const std::string& command,
++      ExecuteEditCommandWithResultCallback callback) override;
+   void ExecuteEditCommand(const std::string& command) override;
+   void Undo() override;
+   void Redo() override;
+diff --git a/content/browser/renderer_host/render_widget_host_view_mac.mm b/content/browser/renderer_host/render_widget_host_view_mac.mm
+index 1aedb1329a31b3fcef5896fbbfa7ab49afd44b91..d779c03bf07d2672d310be2d5d72ab5fc69b05ae 100644
+--- a/content/browser/renderer_host/render_widget_host_view_mac.mm
++++ b/content/browser/renderer_host/render_widget_host_view_mac.mm
+@@ -2475,6 +2475,16 @@ void CombineTextNodesAndMakeCallback(SpeechCallback callback,
+   std::move(callback).Run(out_rect, out_actual_range, success);
+ }
+ 
++void RenderWidgetHostViewMac::ExecuteEditCommandWithResult(
++    const std::string& command,
++    ExecuteEditCommandWithResultCallback callback) {
++  if (auto* delegate = GetFocusedRenderWidgetHostDelegate()) {
++    delegate->ExecuteEditCommandWithResult(command, std::move(callback));
++  } else {
++    std::move(callback).Run(false);
++  }
++}
++
+ void RenderWidgetHostViewMac::ExecuteEditCommand(const std::string& command) {
+   if (host()->delegate()) {
+     host()->delegate()->ExecuteEditCommand(command, std::nullopt);
+diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
+index a2704216f1c2ab5dd47fe347a310d37c4b927735..ab4e05e763314a6a88be5eb5814ad9a277c1a26c 100644
+--- a/content/browser/web_contents/web_contents_impl.cc
++++ b/content/browser/web_contents/web_contents_impl.cc
+@@ -190,6 +190,7 @@
+ #include "content/public/common/widget_type.h"
+ #include "ipc/constants.mojom.h"
+ #include "media/base/media_switches.h"
++#include "mojo/public/cpp/bindings/callback_helpers.h"
+ #include "net/base/url_util.h"
+ #include "net/http/http_util.h"
+ #include "net/traffic_annotation/network_traffic_annotation.h"
+@@ -6801,6 +6802,21 @@ WebContentsImpl::GetOrCreateRootBrowserAccessibilityManager() {
+   return rfh ? rfh->GetOrCreateBrowserAccessibilityManager() : nullptr;
+ }
+ 
++void WebContentsImpl::ExecuteEditCommandWithResult(
++    const std::string& command,
++    base::OnceCallback<void(bool)> callback) {
++  auto* input_handler = GetFocusedFrameWidgetInputHandler();
++  if (!input_handler) {
++    std::move(callback).Run(false);
++    return;
++  }
++
++  last_interaction_time_ = ui::EventTimeForNow();
++  input_handler->ExecuteEditCommandWithResult(
++      command, mojo::WrapCallbackWithDefaultInvokeIfNotRun(std::move(callback),
++                                                           false));
++}
++
+ void WebContentsImpl::ExecuteEditCommand(
+     const std::string& command,
+     const std::optional<std::u16string>& value) {
+diff --git a/content/browser/web_contents/web_contents_impl.h b/content/browser/web_contents/web_contents_impl.h
+index c8ebc2e414bf4a94e6ee46032bbab3f2405cb08f..cf38889ddd17af8a8c453cf3239a8f846b12caa7 100644
+--- a/content/browser/web_contents/web_contents_impl.h
++++ b/content/browser/web_contents/web_contents_impl.h
+@@ -1193,6 +1193,9 @@ class CONTENT_EXPORT WebContentsImpl
+   // void Copy() override;
+   // void Paste() override;
+   // void SelectAll() override;
++  void ExecuteEditCommandWithResult(
++      const std::string& command,
++      base::OnceCallback<void(bool)> callback) override;
+   void ExecuteEditCommand(const std::string& command,
+                           const std::optional<std::u16string>& value) override;
+   void MoveRangeSelectionExtent(const gfx::Point& extent) override;
+diff --git a/content/common/render_widget_host_ns_view.mojom b/content/common/render_widget_host_ns_view.mojom
+index 566af796471c23e20dcb5b36a67a48c2f4742f42..583281eaca04c5021cdee0092ebfcada2b171034 100644
+--- a/content/common/render_widget_host_ns_view.mojom
++++ b/content/common/render_widget_host_ns_view.mojom
+@@ -257,6 +257,10 @@ interface RenderWidgetHostNSViewHost {
+            gfx.mojom.Range out_actual_range,
+            bool success);
+ 
++  // Runs an edit command in the focused frame and reports whether the frame
++  // ran it.
++  ExecuteEditCommandWithResult(string command) => (bool handled);
++
+   // Forward the corresponding edit menu command to the RenderWidgetHost's
+   // delegate.
+   ExecuteEditCommand(string command);
+diff --git a/third_party/blink/public/mojom/input/input_handler.mojom b/third_party/blink/public/mojom/input/input_handler.mojom
+index 1ff83218d9bc4ec2990c59bd79cc06e5d5fd8e85..18bcd26a8d7a0ab2e84f459e249a3c0f57c834e8 100644
+--- a/third_party/blink/public/mojom/input/input_handler.mojom
++++ b/third_party/blink/public/mojom/input/input_handler.mojom
+@@ -368,6 +368,11 @@ interface FrameWidgetInputHandler {
+       blink.mojom.StylusWritingGestureData gesture_data)
+       => (HandwritingGestureResult result);
+ 
++  // Executes a WebCore edit command in the focused frame and reports whether
++  // the frame ran it, so the browser can hand an Undo or a Redo the page had
++  // no use for to the window.
++  ExecuteEditCommandWithResult(string command) => (bool handled);
++
+   // Message payload is the name/value of a WebCore edit command to execute.
+   ExecuteEditCommand(string command, mojo_base.mojom.String16? value);
+ 
+diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc b/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
+index 44e834ea715fa967d430fb2a785e077b9fcf4186..9c4513e406525d6580cb64de3b394ea116e85055 100644
+--- a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
++++ b/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
+@@ -4897,6 +4897,14 @@ void WebFrameWidgetImpl::SetEditableSelectionOffsets(int32_t start,
+   focused_frame->SetEditableSelectionOffsets(start, end);
+ }
+ 
++void WebFrameWidgetImpl::ExecuteEditCommandWithResult(
++    const String& command,
++    ExecuteEditCommandWithResultCallback callback) {
++  WebLocalFrame* focused_frame = FocusedWebLocalFrameInWidget();
++  std::move(callback).Run(focused_frame &&
++                          focused_frame->ExecuteCommand(command));
++}
++
+ void WebFrameWidgetImpl::ExecuteEditCommand(const String& command,
+                                             const String& value) {
+   scoped_refptr<WebPagePopupImpl> page_popup = View()->GetPagePopup();
+diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.h b/third_party/blink/renderer/core/frame/web_frame_widget_impl.h
+index 2e6f81363befb535913ecd6ace21c2d7d4368fcc..63247428e66238b11408277f3e8fea6233e6f447 100644
+--- a/third_party/blink/renderer/core/frame/web_frame_widget_impl.h
++++ b/third_party/blink/renderer/core/frame/web_frame_widget_impl.h
+@@ -1018,6 +1018,9 @@ class CORE_EXPORT WebFrameWidgetImpl
+   void DeleteSurroundingTextInCodePoints(int32_t before,
+                                          int32_t after) override;
+   void SetEditableSelectionOffsets(int32_t start, int32_t end) override;
++  void ExecuteEditCommandWithResult(
++      const String& command,
++      ExecuteEditCommandWithResultCallback callback) override;
+   void ExecuteEditCommand(const String& command, const String& value) override;
+   void Undo() override;
+   void Redo() override;
+diff --git a/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.cc b/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.cc
+index 7a5f7b4b77af4171d5ad662d3a41297a3aef8d11..106b2d552b0677550f0bf3c54219b7ead5a9eb2c 100644
+--- a/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.cc
++++ b/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.cc
+@@ -199,6 +199,36 @@ void FrameWidgetInputHandlerImpl::HandleStylusWritingGestureAction(
+       std::move(callback)));
+ }
+ 
++void FrameWidgetInputHandlerImpl::ExecuteEditCommandWithResult(
++    const String& command,
++    ExecuteEditCommandWithResultCallback callback) {
++  // As SelectAroundCaret: the reply runs on the thread the channel is bound to.
++  if (ThreadedCompositingEnabled()) {
++    callback = base::BindOnce(
++        [](scoped_refptr<base::SingleThreadTaskRunner> callback_task_runner,
++           ExecuteEditCommandWithResultCallback callback, bool handled) {
++          callback_task_runner->PostTask(
++              FROM_HERE, base::BindOnce(std::move(callback), handled));
++        },
++        base::SingleThreadTaskRunner::GetCurrentDefault(), std::move(callback));
++  }
++
++  RunOnMainThread(base::BindOnce(
++      [](base::WeakPtr<WidgetBase> widget,
++         base::WeakPtr<mojom::blink::FrameWidgetInputHandler> handler,
++         const String& command,
++         ExecuteEditCommandWithResultCallback callback) {
++        if (!widget || !handler) {
++          std::move(callback).Run(false);
++          return;
++        }
++        HandlingState handling_state(widget, UpdateState::kNone);
++        handler->ExecuteEditCommandWithResult(command, std::move(callback));
++      },
++      widget_, main_thread_frame_widget_input_handler_, command,
++      std::move(callback)));
++}
++
+ void FrameWidgetInputHandlerImpl::ExecuteEditCommand(const String& command,
+                                                      const String& value) {
+   RunOnMainThread(base::BindOnce(
+diff --git a/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.h b/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.h
+index 20b75898730d11a28ebe220b34ee4986b4733feb..b2a3b219d1b83c2058377b861982e510b1dc9e88 100644
+--- a/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.h
++++ b/third_party/blink/renderer/platform/widget/input/frame_widget_input_handler_impl.h
+@@ -74,6 +74,9 @@ class PLATFORM_EXPORT FrameWidgetInputHandlerImpl
+   void HandleStylusWritingGestureAction(
+       mojom::blink::StylusWritingGestureDataPtr gesture_data,
+       HandleStylusWritingGestureActionCallback callback) override;
++  void ExecuteEditCommandWithResult(
++      const String& command,
++      ExecuteEditCommandWithResultCallback callback) override;
+   void ExecuteEditCommand(const String& command, const String& value) override;
+   void Undo() override;
+   void Redo() override;
