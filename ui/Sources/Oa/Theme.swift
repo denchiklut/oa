@@ -62,6 +62,8 @@ struct Theme {
     /// Arc's `ForegroundSecondary`, which the dock's dots and resting icons are drawn in at `dockRestAlpha`.
     var dockInk: Color { (isDark ? Color.white : .black).opacity(0.5) }
     var dockRestAlpha: Double { isDark ? 0.35 : 0.5 }
+    /// As measured on Arc: the URL field's magnifier.
+    var promptGlyph: Color { (isDark ? Color.white : .black).opacity(0.4) }
     /// ARCUI `GrayA4`.
     var dockHoverFill: Color { (isDark ? Color.white : .black).opacity(isDark ? 0.077 : 0.071) }
 
