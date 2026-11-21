@@ -90,6 +90,7 @@ final class WindowModel {
     /// As Arc's `ClosedSidebarItemsCache`: what the user closed from this window, a group for each close with a step
     /// for each tab, the last ten, in memory and gone with the window.
     @ObservationIgnored private var closedGroups: [ClosedGroup] = []
+    @ObservationIgnored var undoManager: ArcUndoManager?
     private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
@@ -138,7 +139,7 @@ final class WindowModel {
     var pinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: true) }
     var unpinnedTabs: [SidebarTab] { state.tabs(in: selectedSpaceID, pinned: false) }
     var selectableTabs: [SidebarTab] { state.selectableTabs(in: selectedSpaceID) }
-    var canRestoreLastClosed: Bool { !closedGroups.isEmpty }
+    var canRestoreLastClosed: Bool { closedGroups.contains { !$0.steps.isEmpty } }
 
     var record: WindowRecord {
         WindowRecord(
@@ -913,8 +914,19 @@ final class WindowModel {
     /// As Arc's `reopenLastClosedTab`: the newest step of this window's newest close. A tab that is open again is
     /// selected; one that is gone returns where it was with its history. Restore and the Archive Peek load fresh.
     func restoreLastClosed() {
-        guard var group = closedGroups.popLast(), let closed = group.steps.popLast() else { return }
-        if !group.steps.isEmpty { closedGroups.append(group) }
+        guard let index = closedGroups.lastIndex(where: { !$0.steps.isEmpty }) else { return }
+        let closed = closedGroups[index].steps.removeLast()
+        let group = closedGroups[index]
+        // As Arc's `removeUndos` after the last step: ⌘Z has nothing left of this close to bring back.
+        if group.steps.isEmpty {
+            closedGroups.remove(at: index)
+            undoManager?.removeUndos(group.id.uuidString)
+        }
+        reopen(closed, of: group, selecting: true)
+    }
+
+    /// One step back where it was. Selected, a tab comes with its history; unselected, it is a row without a page.
+    private func reopen(_ closed: ClosedPage, of group: ClosedGroup, selecting: Bool) {
         guard case .tab(let parentID, let index) = closed.place else { return reopenPeek(closed) }
         var sessionID: PageSessionID?
         if state.tree.tab(closed.id) == nil {
@@ -925,9 +937,43 @@ final class WindowModel {
             createdDates[closed.id] = .now
             sessionID = closed.sessionID
         }
+        guard selecting else { return }
         if let spaceID = state.space(containing: closed.id)?.id { selectSpace(spaceID) }
         library = nil
         select(closed.id, restoring: sessionID)
+    }
+
+    /// As Arc replays what its undo manager sends back. An undone close returns whole, the tab the window was
+    /// showing shown again; a group that ⇧⌘T emptied or that fell off the ten kept brings nothing, as Arc's.
+    /// The redone close leaves nothing selected in its place, as Arc's does.
+    func perform(_ action: UndoAction) {
+        switch action {
+        case .undoCloseItems(let groupID):
+            guard let index = closedGroups.firstIndex(where: { $0.id == groupID }) else { return }
+            let group = closedGroups.remove(at: index)
+            for closed in group.steps.reversed() {
+                reopen(closed, of: group, selecting: closed.id == group.focusedTabID)
+            }
+            if case .peek(let ownerID)? = group.steps.first?.place {
+                undoManager?.registerUndos([.closePeek(ownerID: ownerID)], group.undoPrompt)
+            } else {
+                undoManager?.registerUndos(
+                    [.closeItems(group.steps.map(\.id), undoPrompt: group.undoPrompt)], group.undoPrompt)
+            }
+        case .closeItems(let tabIDs, let undoPrompt):
+            let tabIDs = tabIDs.filter { state.tree.tab($0) != nil }
+            guard let parentID = tabIDs.first.flatMap({ state.tree.location(of: $0)?.parentID }) else { return }
+            // Oa's own: on the stack before its pages have closed, so the step is filed while the redo runs.
+            // Arc files it when they have, and a redone close of a loaded tab leaves a second step that does nothing.
+            let group = ClosedGroup(
+                undoPrompt: undoPrompt, order: tabIDs, siblings: state.tree[parentID]?.childIDs ?? [])
+            push(group)
+            for tabID in tabIDs { close(tabID, group: group) }
+        case .closePeek(let ownerID):
+            guard let page = peeks[ownerID] else { return }
+            store.closing[page.id] = .window(id)
+            page.close()
+        }
     }
 
     /// As Arc: the Peek's tab is selected and the Peek returns over it with its history, its Archive entry gone.
@@ -1018,8 +1064,11 @@ final class WindowModel {
     /// One close of several tabs from this window, one entry on its stack, the steps going back from the last.
     private func closeTogether(_ tabIDs: [UUID]) {
         guard !tabIDs.isEmpty else { return }
-        let group = ClosedGroup(order: tabIDs, siblings: unpinnedTabs.map(\.id))
         let closing = Set(tabIDs)
+        let group = ClosedGroup(
+            undoPrompt: UndoStrings.clearTabs(tabIDs.count),
+            focusedTabID: selectedTabID.flatMap { closing.contains($0) ? $0 : nil },
+            order: tabIDs, siblings: unpinnedTabs.map(\.id))
         if let selected = selectedTabID, closing.contains(selected) {
             let next = nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
             selectedTabIDs[selectedSpaceID] = next
@@ -1182,20 +1231,30 @@ final class WindowModel {
                     sessionID: sessionID)
             }
         }
+        let requester = store.windows.first { $0.id == request?.windowID }
+        let focused = requester?.selectedTabID == tabID
         store.edit { $0.archiveTab(tabID, reason: reason) }
-        if let closed { store.windows.first { $0.id == request?.windowID }?.remember(closed, in: request?.group) }
+        if let closed {
+            requester?.remember(
+                closed,
+                in: request?.group
+                    ?? ClosedGroup(undoPrompt: UndoStrings.archiveTab, focusedTabID: focused ? tabID : nil))
+        }
     }
 
-    private func remember(_ closed: ClosedPage, in group: ClosedGroup? = nil) {
-        if let group, let index = closedGroups.firstIndex(of: group) { return closedGroups[index].add(closed) }
-        var group = group ?? ClosedGroup()
+    private func remember(_ closed: ClosedPage, in group: ClosedGroup) {
+        if let index = closedGroups.firstIndex(of: group) { return closedGroups[index].add(closed) }
+        var group = group
         group.add(closed)
         push(group)
     }
 
+    /// As Arc's close: the group goes on the window's ten and its undo step, under the group's ID, on the window's
+    /// undo manager. A group that falls off the ten leaves its step behind, as Arc's does.
     private func push(_ group: ClosedGroup) {
         closedGroups.append(group)
         if closedGroups.count > 10 { closedGroups.removeFirst() }
+        undoManager?.registerUndos([.undoCloseItems(groupID: group.id)], group.undoPrompt, group.id.uuidString)
     }
 
     /// A Favorite's page stays as it is, hidden, as Arc keeps it.
@@ -1463,7 +1522,7 @@ final class WindowModel {
             store.windows.first { $0.id == request.windowID }?.remember(
                 ClosedPage(
                     id: page.id, title: page.title, url: page.url, place: .peek(ownerID: ownerID),
-                    sessionID: sessionID))
+                    sessionID: sessionID), in: ClosedGroup(undoPrompt: UndoStrings.closePeek))
         }
         if ownerID == archivePeekID { archivePeekID = nil }
         self.page?.activate()
