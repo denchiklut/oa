@@ -23,6 +23,7 @@ extension URL {
             if let last = pathComponents.last, last.hasPrefix("ref=") {
                 var path = deletingLastPathComponent().path(percentEncoded: true)
                 if path.hasSuffix("/") { path.removeLast() }
+                // As Arc: the escaped path into `path`, which escapes it again.
                 components.path = path
                 removedPath = true
             }
