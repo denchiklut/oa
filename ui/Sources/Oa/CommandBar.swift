@@ -560,7 +560,7 @@ private struct CommandBarRow: View {
             Spacer(minLength: 0)
             if case .tab(let tab) = row.source {
                 // As Arc: a tab of another Space names its Space.
-                Text(tab.spaceName ?? "Switch to Tab")
+                Text(tab.spaceName ?? (tab.isSplitView ? "Switch to Split View" : "Switch to Tab"))
                     .foregroundStyle(faint)
                 Image(systemName: "arrow.right")
                     .font(.system(size: 14, weight: .medium))

@@ -16,6 +16,8 @@ enum CommandBarRanking {
         let isVisible: Bool
         /// Pinned tabs and Favorites: folders above them; nil for the rest, as ASE2 gives unsaved items its default.
         let saveLevel: Int?
+        /// A split's row, as the focused pane's tab.
+        var isSplitView = false
 
         var title: String { tab.title.isEmpty ? url.host() ?? readable(url) : tab.title }
     }
