@@ -1920,6 +1920,10 @@ final class WindowModel {
         _ page: any Page, url: URL?, disposition: OpenDisposition, byPage: Bool, from openerID: UUID,
         insidePeek: Bool
     ) {
+        // As seen in Arc: a background page opened while ⌥ alone is held, as an ⌥-clicked link, goes in a split; ⌥ with
+        // ⌘ is Arc's Little Arc, which Oa doesn't have, so a background page, Oa's own.
+        let held = NSEvent.modifierFlags.intersection([.option, .command, .shift, .control])
+        let disposition = disposition == .backgroundTab && held == .option ? .splitView : disposition
         let inWindow = disposition == .newWindow && !byPage
         guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
