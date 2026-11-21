@@ -77,7 +77,7 @@ struct SidebarAddressField: View {
             AddressFieldLabel(label: model.addressLabel(in: model.selectedSpaceID))
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
-                .foregroundStyle(theme.secondaryText)
+                .foregroundStyle(theme.tertiaryText)
                 .frame(height: Self.height)
                 .background(theme.fieldFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -127,6 +127,7 @@ struct AddressFieldLabel: View {
             } else {
                 HStack(spacing: 3) {
                     Image(systemName: "magnifyingglass")
+                        .foregroundStyle(theme.promptGlyph)
                         .frame(width: 24, height: 24)
                         .padding(.leading, 6)
                     Text("Search or Enter URL…")
