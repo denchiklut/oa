@@ -44,7 +44,12 @@ change:
 | Frame | the page's items, with View Frame Source · Reload Frame |
 | PDF | Back · Forward · Reload \| Save As… \| Rotate Clockwise · Rotate Counterclockwise |
 
-Removed until Oa has the feature behind them: Open Link in Split View, Open
+Open Link in Split View is Chrome's item with Arc's label and no icon. It
+reaches the app as an open with the split view disposition (patch 0019), and
+the link's page becomes a pane on the right of its page, focused, as in Arc;
+see [Split View](../split-view/README.md).
+
+Removed until Oa has the feature behind them: Open
 Link in Incognito Window, Inspect, Print…, Cast…, Translate and Picture in
 Picture. Arc also has Open Link in Little Arc and Capture Image…, which are its
 own additions to Chrome's model and aren't added. Removed as Arc removes them:

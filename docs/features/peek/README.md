@@ -82,8 +82,11 @@ brought the entry back, Expand selects that tab instead of adding a second row,
 Oa's own choice after Arc's ⇧⌘T, which selects a tab that is already open.
 Closing it, or leaving the Archive view, closes the page and keeps the entry;
 leaving the view is Oa's own choice. A page such a Peek opens has no tab to
-join, so it goes to the top of the shown Space, Oa's own choice. Arc's Split
-View button and copy-link icon don't exist in Oa yet.
+join, so it goes to the top of the shown Space, Oa's own choice. The third
+control, Arc's Create Split View or Add to Split View, makes the Peek's page a
+pane on the right of the tab it was opened from; Oa's own for now, it shows
+only where that tab can take a pane, so not on a pinned tab or a Favorite.
+Arc's copy-link icon doesn't exist in Oa yet.
 
 Related: [Sidebar state](../sidebar/README.md) · [Favorites](../favorites/README.md) · [Saved state and recovery](../saved-state/README.md).
 

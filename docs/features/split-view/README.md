@@ -11,6 +11,9 @@ order, and each pane is an ordinary tab with its own page.
   of the selected one, or adds it as the last pane of the selected split. ⌥Return
   in the ⌘T bar opens the address in a new tab on the right of the current one.
   The new pane takes the focus. A split holds four panes at most, Arc's limit.
+- **From a link.** The page menu's Open Link in Split View opens the link in a
+  pane on the right of its page, focused. A Peek's third control does the same
+  with the Peek's page.
 - **Add Split View.** View ▸ Add Split View ⌃⇧=, New Split in the dock's "+", Add
   Split View in the selected row's menu and Add Tab… in a split's open an empty
   pane at the end with the command bar. Return opens the row in a new tab in
@@ -78,11 +81,14 @@ Oa's own:
   measured.
 - Closing a split from its ✕ comes back with ⇧⌘T a tab at a time, as plain
   tabs. Arc's undo brings the split back.
+- Open Link in Split View from a pinned tab or a Favorite opens a Peek, and
+  their Peeks have no split control, until a split can be pinned. Arc builds the
+  split from a copy of the pinned page.
 
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: Arc's pane shortcuts, Share Split View…, Site Controls and the
-link and lock on a pane's bar, Open Link in Split View, the Peek's split button,
-dropping a tab on the page, pinned and Favorite splits, a split's title, its
-card in the tab switcher and its row in the command bar.
+Not there yet: Arc's pane shortcuts, ⌥-click on a link, Share Split View…, Site
+Controls and the link and lock on a pane's bar, dropping a tab on the page,
+pinned and Favorite splits, a split's title, its card in the tab switcher and
+its row in the command bar.
