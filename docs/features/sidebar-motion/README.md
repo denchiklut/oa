@@ -237,6 +237,8 @@ colours. The gradient runs from corner to corner, as in Arc's SwiftUI renderer,
 so across a tall card it changes mostly downward; the window's Metal renderer
 goes by x + y instead. Under the card lies a fill that casts a 15% shadow,
 12 pt soft and 1 pt down, at full strength whatever the fill's own alpha.
+The Space's icon in the header is the palette's strongest colour, as beside
+the name in the sidebar; the handle and ⋯ are black at 50% or white at 55%.
 
 A card shows the Space's name and its tabs, pinned over unpinned, with the
 window's selection in that Space marked. Arc's card holds the Space's live
