@@ -94,6 +94,9 @@ struct ToastView: View {
                 label("to undo.")
             }
             .padding(.horizontal, 12)
+        case .tabUnarchived(_, let location):
+            label("Tab restored to \(location). Click to view.")
+                .padding(.horizontal, 12)
         }
     }
 
@@ -176,6 +179,7 @@ private struct ToastSlot: View {
                 {
                     model.editShortcut(of: toast)
                 }
+                .onTapGesture { if case .tabUnarchived(let id, _) = toast.type { model.viewRestored(id) } }
                 .id(toast.id)
                 .transition(.scale(scale: 0.001, anchor: UnitPoint(x: 0.5, y: 0.1)).combined(with: .opacity))
             }

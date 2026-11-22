@@ -7,6 +7,8 @@ enum ToastType: Equatable {
     case copyTabURL(trackingRemoved: Bool, urls: [URL])
     /// What was done, for the toast that says ⌘Z takes it back.
     case undo(String)
+    /// The restored tab and the name of the Space it went back to.
+    case tabUnarchived(UUID, location: String)
 }
 
 /// Arc's `WindowToast`: on a page, or on the window.
