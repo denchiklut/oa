@@ -1301,14 +1301,24 @@ final class WindowModel {
         }
     }
 
+    /// Arc's Tabs menu names Expand by this Space.
+    var peekDestination: SidebarSpace? {
+        guard let ownerID = peekOwnerID, let page = peeks[ownerID] else { return nil }
+        return state.space(store.routedSpace(for: peekURL(page, of: ownerID), recent: selectedSpaceID))
+    }
+
+    private func peekURL(_ page: any Page, of ownerID: UUID) -> URL? {
+        page.url ?? (ownerID == archivePeekID ? state.archive.first { $0.id == ownerID }?.url : nil)
+    }
+
     func expandPeek() {
         guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
         let fromArchive = ownerID == archivePeekID
         let sourceProfile =
             fromArchive ? archivePeekProfiles.removeValue(forKey: page.id) : state.profile(containing: ownerID)?.id
+        let url = peekURL(page, of: ownerID)
         if fromArchive { archivePeekID = nil }
-        let url = page.url ?? (fromArchive ? state.archive.first { $0.id == ownerID }?.url : nil)
-        let destination = store.linkRouting.destination(for: url, recent: selectedSpaceID)
+        let destination = store.routedSpace(for: url, recent: selectedSpaceID)
         let restored = fromArchive ? state.space(containing: ownerID) : nil
         let existing = restored == nil ? url.flatMap { tab(at: $0, in: destination) } : ownerID
         if let existing {

@@ -273,6 +273,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// The window's commands wait while a dialog is up, as Arc swallows them; other windows and quit stay usable.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         // Arc takes Archive Tab out of the menu while a download's preview shows.
+        if item.action == #selector(expandPeek(_:)) {
+            item.title = model.peekDestination.map { "Open in \($0.name)" } ?? "Expand Peek"
+            return model.peek != nil
+        }
         if item.action == #selector(closeTab(_:)) {
             item.isHidden = model.previewedDownload != nil
             if item.isHidden { return false }
@@ -313,6 +317,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             item.title = model.showingArchive ? "Hide Archive" : "View Archive…"
             return true
         }
+        if item.action == #selector(expandPeek(_:)) {
+            item.title = model.peekDestination.map { "Open in \($0.name)" } ?? "Expand Peek"
+            return model.peek != nil
+        }
         if item.action == #selector(closeTab(_:)) {
             let archives = model.selectedTabID.map { !model.state.keepsAddress($0) } ?? false
             item.title = model.peek != nil ? "Close Peek" : archives ? "Archive Tab" : "Close Tab"
@@ -322,7 +330,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(goBack(_:)): model.frontPage?.canGoBack ?? false
         case #selector(goForward(_:)): model.frontPage?.canGoForward ?? false
         case #selector(stopLoading(_:)): model.frontPage?.isLoading ?? false
-        case #selector(expandPeek(_:)): model.peek != nil
         case #selector(addSplitView(_:)): model.canAddSplitViewPane
         case #selector(closeFocusedSplitViewPanel(_:)), #selector(separateTabFromSplitView(_:)),
             #selector(switchToNextSplitViewPane(_:)), #selector(switchToPreviousSplitViewPane(_:)):

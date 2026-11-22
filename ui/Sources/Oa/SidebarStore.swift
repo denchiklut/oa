@@ -9,14 +9,6 @@ import Observation
 @Observable
 final class SidebarStore {
     private(set) var state: SidebarState
-    var linkRouting: LinkRouting {
-        get { state.linkRouting }
-        set {
-            state.linkRouting = newValue
-            scheduleSave()
-        }
-    }
-
     private var removedFavicons = 0
     @ObservationIgnored private(set) var windows: [WindowModel] = []
     var peekOnShiftClick = !UserDefaults.standard.bool(forKey: "disableShiftClickToOpenLinksInModal") {
@@ -47,6 +39,7 @@ final class SidebarStore {
     @ObservationIgnored let contentSnapshots = ContentSnapshotClient()
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored let keyBindings: KeyBindingsClient
+    @ObservationIgnored let linkRouting: LinkRoutingClient
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
     /// Settings ▸ Shortcuts on a binding.
     @ObservationIgnored var showShortcut: (String) -> Void = { _ in }
@@ -57,6 +50,7 @@ final class SidebarStore {
         commandBarPicks = CommandBarPicks(directory: directory)
         home = StorableHome(directory: directory)
         keyBindings = KeyBindingsClient(directory: directory)
+        linkRouting = LinkRoutingClient(directory: directory)
         state = persistence.loadSidebar() ?? .initial()
         let windows = persistence.loadWindows()
         savedWindows = windows?.windows ?? []
@@ -110,6 +104,17 @@ final class SidebarStore {
         guard engine.deleteBrowserContext(id: id) else { return false }
         edit { $0.removeProfile(id) }
         return true
+    }
+
+    /// Where Air Traffic Control sends `url`, with `recent` as the Most Recent Space.
+    func routedSpace(for url: URL?, recent: UUID) -> UUID {
+        switch linkRouting.state.destination(for: url) {
+        case .space(let id): state.space(id) == nil ? recent : id
+        case .mostRecent: recent
+        case .profile(let profileID):
+            state.space(recent)?.profileID == profileID
+                ? recent : state.spaces.first { $0.profileID == profileID }?.id ?? recent
+        }
     }
 
     func setSavedPage(_ tabID: UUID, title: String, url: URL?) {

@@ -205,7 +205,6 @@ struct SidebarTree {
 struct SidebarState {
     var profiles: [SidebarProfile] = []
     var spaces: [SidebarSpace] = []
-    var linkRouting = LinkRouting()
     var tree = SidebarTree()
     /// Oldest first.
     var archive: [SidebarArchivedTab] = []
@@ -347,8 +346,6 @@ struct SidebarState {
     mutating func removeSpace(_ id: UUID, at date: Date = .now) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == id }) else { return }
         for tab in tabs(in: id) { archiveTab(tab.id, reason: .manual, at: date) }
-        linkRouting.routes.removeAll { $0.spaceID == id }
-        if linkRouting.defaultSpaceID == id { linkRouting.defaultSpaceID = nil }
         let space = spaces.remove(at: index)
         tree.removeRoot(space.pinnedRootID)
         tree.removeRoot(space.unpinnedRootID)
