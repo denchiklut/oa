@@ -98,9 +98,14 @@ order, and each pane is an ordinary tab with its own page.
   The copy isn't selected, and its pages load at once in the background.
 - **Move to.** The cell's and the tile's Move to ▸ list every Space in the
   dock's order, then New Space…. The split goes whole, with its pages, to the
-  top of that Space's list; a selected split takes the window to that Space,
-  one that isn't leaves the window where it is. New Space… opens Create a Space
-  and moves the split into the Space once it is made.
+  top of that Space's list, a pinned one to its pinned list; a selected split
+  takes the window to that Space, one that isn't leaves the window where it is.
+  New Space… opens Create a Space and moves the split into the Space once it is
+  made. A Space of another profile first asks "Move tabs to ‹Space›?", with
+  Don't ask again, Cancel and Move it; the split's pages then close and load
+  again in that profile from their saved addresses, at once if the window
+  follows and on selection otherwise, without the old profile's cookies,
+  storage or history.
 - **Dropping a link.** A link dragged from a page onto the list opens a tab at
   the line, loaded in the background; onto a split's cell it joins the split,
   loaded in the background, and the split isn't selected.
@@ -173,9 +178,13 @@ Oa's own:
   as a Space's is, a symbol's name or the emoji, not Arc's `iconType` shape.
   The icon's grey is the theme's secondary glyph, near Arc's measured #94939C,
   and a Favorite split's tile with an icon, selected, is a plain selected tile.
-- Move to ▸ greys out the Spaces of other profiles, as Oa's pages can't change
-  profile; Arc lists them, and its move there wasn't tried. Where New Space…
-  puts the Space, after the window's, wasn't seen in Arc.
+- Where New Space… puts the Space, after the window's, wasn't seen in Arc. When
+  its profile differs, Oa asks and reloads as for any other profile's Space;
+  Arc moves the split there without asking and keeps its pages in the old
+  profile, which looks like a bug. Where Arc keeps Don't ask again wasn't
+  found; Oa keeps it under Arc's setting name. A pinned split moved within a
+  profile stays pinned, as Arc's does across profiles. The sheet's mascot is a
+  symbol, as on Oa's other dialogs.
 - A link held on a plain row opens at the line. Arc's goes into that tab's
   item, out of sight, which looks like a bug. A link dropped on a pane isn't
   handled by the app; Arc's opens as a tab after the split.
