@@ -350,7 +350,6 @@ extension EnvironmentValues {
     @Entry var sidebarDrag: SidebarDrag?
 }
 
-/// A link dragged in from a page, over the sidebar.
 struct SidebarLinkDrop: DropDelegate {
     let model: WindowModel
     let drag: SidebarDrag

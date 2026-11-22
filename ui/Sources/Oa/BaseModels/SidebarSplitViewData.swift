@@ -81,7 +81,6 @@ struct WindowSplitViewLayout {
     var itemWidthFactors: [UUID: CGFloat]
 }
 
-/// A row of a Space's list.
 enum SidebarEntry: Identifiable, Hashable {
     case tab(SidebarTab)
     case splitView(id: UUID, tabs: [SidebarTab])
