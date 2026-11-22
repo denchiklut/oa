@@ -160,6 +160,7 @@ struct SplitViewCellView: View {
             }
             Divider()
             Button("Duplicate") { model.duplicateSplitView(splitID) }
+            SplitViewMoveMenu(model: model, splitID: splitID)
             Divider()
             Button("Archive Item") { model.closeSplitView(splitID) }
         }
@@ -233,5 +234,22 @@ struct SplitViewCombinePreview: View {
         }
         .padding(.horizontal, 1.5)
         .allowsHitTesting(false)
+    }
+}
+
+/// Arc's Move to ▸ on a split: every Space in the dock's order, then New Space….
+struct SplitViewMoveMenu: View {
+    let model: WindowModel
+    let splitID: UUID
+
+    var body: some View {
+        Menu("Move to") {
+            ForEach(model.state.spaces) { space in
+                Button(space.name) { model.moveSplitView(splitID, toSpace: space.id) }
+                    .disabled(!model.canMoveSplitView(splitID, toSpace: space.id))
+            }
+            Divider()
+            Button("New Space…") { model.beginSpaceCreation(after: model.selectedSpaceID, moving: splitID) }
+        }
     }
 }

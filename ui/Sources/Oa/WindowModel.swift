@@ -654,6 +654,24 @@ final class WindowModel {
         }
     }
 
+    /// As seen in Arc: Move to ▸ takes the split whole, with its pages, to the top of that Space's list. A selected split
+    /// takes the window to that Space with it; one that isn't leaves the window where it is. Oa's own: only the
+    /// Spaces of the split's profile take it, as Oa's pages can't change profile.
+    func moveSplitView(_ splitID: UUID, toSpace spaceID: UUID) {
+        guard canMoveSplitView(splitID, toSpace: spaceID) else { return }
+        let focused = presentedTabIDs.contains { state.splitViewID(containing: $0) == splitID } ? selectedTabID : nil
+        store.edit { $0.move(splitID, toSpace: spaceID) }
+        guard let focused else { return }
+        selectedTabIDs[selectedSpaceID] = nil
+        selectSpace(spaceID)
+        select(focused)
+    }
+
+    func canMoveSplitView(_ splitID: UUID, toSpace spaceID: UUID) -> Bool {
+        guard let tabID = state.tree[splitID]?.childIDs.first, let space = state.space(spaceID) else { return false }
+        return state.space(containing: tabID)?.id != spaceID && state.profile(containing: tabID)?.id == space.profileID
+    }
+
     /// As seen in Arc: the tab is selected, alone, right after the split it left.
     func separateFromSplitView(_ tabID: UUID) {
         store.edit { $0.removeFromSplitView([tabID]) }
@@ -916,11 +934,11 @@ final class WindowModel {
 
     /// Arc's Create a Space panel, on the window's Space's profile, after `spaceID` or, as Arc's `.absolute(-1)`, at
     /// the end. As Arc, it leaves the Library and changes neither the Space nor the selection.
-    func beginSpaceCreation(after spaceID: UUID? = nil) {
+    func beginSpaceCreation(after spaceID: UUID? = nil, moving itemID: UUID? = nil) {
         guard spaceCreation == nil, let space else { return }
         closeCommandBar()
         library = nil
-        spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID)
+        spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID, moving: itemID)
     }
 
     /// Where the panel's page and dock item sit among the Spaces: where the Space will go.
@@ -963,6 +981,7 @@ final class WindowModel {
                 name: name, profileID: profileID, icon: creation.icon, theme: creation.spaceStyleEditor.theme,
                 after: creation.insertAfter)
         }
+        if let created, let moving = creation.moving { moveSplitView(moving, toSpace: created.id) }
         if selecting, let created { selectSpace(created.id) }
     }
 

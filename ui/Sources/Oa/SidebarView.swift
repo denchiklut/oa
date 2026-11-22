@@ -565,6 +565,7 @@ private struct FavoriteSplitTile: View {
             Divider()
             // LIKELY as the cell's: the copy right after it, among the Favorites.
             Button("Duplicate") { model.duplicateSplitView(splitID) }
+            SplitViewMoveMenu(model: model, splitID: splitID)
             Divider()
             Button("Archive Item") { model.closeSplitView(splitID) }
         }
