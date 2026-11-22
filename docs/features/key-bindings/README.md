@@ -97,6 +97,8 @@ can be drawn over.
 
 Arc's pane at its measures, for the actions Oa has.
 
+- “Learn the Essential Shortcuts” opens Oa’s guide to six common actions. It
+  shows their current bindings, including conflicts and unassigned shortcuts.
 - The list is sorted by name under "Customized Shortcuts" and "Default
   Shortcuts". The search field matches names, and shortcuts written as words,
   symbols or joined by "+" ("cmd+t", "⌘T", "ctrl tab").
@@ -112,11 +114,11 @@ Arc's pane at its measures, for the actions Oa has.
 
 ## Not here
 
-- Arc's callout for its shortcuts tutorial, its note on a shortcut the system
-  also holds, a binding for each Space, and the switches of features Oa lacks
+- Arc's note on a shortcut the system also holds, a binding for each Space,
+  and the switches of features Oa lacks
   (Capture, Little Arc, the ninth sidebar item).
-- The pane's and the toast's dark colours as Arc has them: they were captured
-  in light only, and Oa's dark ones are its own.
+- Arc’s dark colours for the toast and the pane’s conflict and selection states.
+  The dark reference shows the pane with no action selected.
 - Arc's second lookup table for a key from a string, whose contents weren't
   read; a shifted symbol such as ⌘} is kept as written.
 - Arc's flag-gated Cycle Tab Forward and Backward. The flag is off in Arc as it
