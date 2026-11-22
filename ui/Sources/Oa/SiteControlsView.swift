@@ -51,11 +51,22 @@ struct SiteControlsView: View {
         }
         .padding(10)
         .frame(width: 236)
+        .background(SiteControlsHitTestAnchor(browserWindow: model.window))
     }
 
     private func openAllSiteSettings() {
         dismiss()
         model.openAllSiteSettings()
+    }
+}
+
+private struct SiteControlsHitTestAnchor: NSViewRepresentable {
+    let browserWindow: NSWindow?
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        (browserWindow?.contentView as? KeyboardShortcutInterceptionView)?.siteControlsContent = view
     }
 }
 

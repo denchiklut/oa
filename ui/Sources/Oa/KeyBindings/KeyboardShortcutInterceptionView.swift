@@ -5,6 +5,7 @@ import AppKit
 /// Which shortcuts those are follows the bindings, and is never one a user may not set.
 final class KeyboardShortcutInterceptionView: NSView {
     private let keyBindings: KeyBindingsClient
+    weak var siteControlsContent: NSView?
 
     init(keyBindings: KeyBindingsClient) {
         self.keyBindings = keyBindings
@@ -22,5 +23,16 @@ final class KeyboardShortcutInterceptionView: NSView {
             return false
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Chromium can receive tracking events under the popover and hit-tests this window before forwarding them.
+        if let window, let popover = siteControlsContent?.window,
+            popover !== window, popover.isVisible, frame.contains(point),
+            popover.frame.contains(window.convertPoint(toScreen: superview?.convert(point, to: nil) ?? point))
+        {
+            return self
+        }
+        return super.hitTest(point)
     }
 }
