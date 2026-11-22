@@ -94,7 +94,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let front = frontWindows.first ?? openWindow()
         let recent = front.selectedSpaceID
         for url in links {
-            let destination = store.linkRouting.destination(for: url, recent: recent)
+            let destination = store.routedSpace(for: url, recent: recent)
             let model = frontWindows.first { $0.selectedSpaceID == destination } ?? front
             model.openExternalLink(url, in: destination)
             model.bringToFront()
