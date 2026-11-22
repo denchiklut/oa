@@ -218,7 +218,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if model.showingDownloads { model.exitLibrary() } else { model.viewLibrary(.downloads) }
     }
     /// Not `toggleSidebar:`, which AppKit's own responders answer first, as Arc's `toggleArcSidebar:` isn't.
-    @objc func toggleSidebarMode(_ sender: Any?) { layout.toggleSidebar() }
+    @objc func toggleSidebarMode(_ sender: Any?) {
+        // Oa's own: Spaces takes over the sidebar's spot, so dismiss it to reveal the result of the toggle.
+        if model.library == .spaces { model.exitLibrary() }
+        layout.toggleSidebar()
+    }
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
     @objc func clearTabs(_ sender: Any?) { model.clearTabs() }
     @objc func copyCurrentURL(_ sender: Any?) { model.copyCurrentURLs() }

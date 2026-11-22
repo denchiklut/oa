@@ -111,7 +111,7 @@ private struct PeekToolbar: View {
                 Image(systemName: page.isLoading ? "xmark" : "arrow.clockwise")
             }
             Spacer()
-            address(theme)
+            ToolbarAddressLabel(url: page.url)
                 .popover(isPresented: model.permissionPromptBinding(inPeekToolbar: true), arrowEdge: .bottom) {
                     if let request = model.promptedPermissionRequest {
                         PermissionRequestView(model: model, request: request)
@@ -126,19 +126,6 @@ private struct PeekToolbar: View {
         .environment(\.theme, theme)
         .background(Color(nsColor: color))
         .animation(.easeInOut(duration: 0.18), value: color)
-    }
-
-    /// As Arc's toolbar builds its URL: the host in 13 pt medium, the rest in 13 pt regular at five sixths of the
-    /// host's alpha.
-    private func address(_ theme: Theme) -> Text {
-        guard let url = page.url else { return Text("") }
-        let host = url.host() ?? ""
-        var rest = url.absoluteString
-        if let scheme = url.scheme { rest = String(rest.dropFirst(scheme.count + 3)) }
-        if rest.hasPrefix(host) { rest = String(rest.dropFirst(host.count)) }
-        if rest == "/" { rest = "" }
-        return Text(host).font(.system(size: 13, weight: .medium)).foregroundStyle(theme.addressText)
-            + Text(rest).font(.system(size: 13)).foregroundStyle(theme.addressText.opacity(5.0 / 6))
     }
 }
 

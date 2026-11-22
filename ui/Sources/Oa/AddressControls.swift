@@ -66,6 +66,38 @@ struct CopyLinkButton: View {
     }
 }
 
+struct ToolbarAddressLabel: View {
+    static let fullURLPreferenceKey = "toolbarShowFullURLsEnabledPreference"
+
+    let url: URL?
+    var placeholder = ""
+    @AppStorage(ToolbarAddressLabel.fullURLPreferenceKey) private var showsFullURL = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let (host, remainder) = addressParts
+        let hostColor = url == nil ? theme.secondaryText : theme.addressText
+        // Arc gives the host more weight and the rest five sixths of its opacity.
+        let hostText = Text(host).font(.system(size: 13, weight: .medium)).foregroundStyle(hostColor)
+        let remainderText = Text(remainder).font(.system(size: 13)).foregroundStyle(theme.addressText.opacity(5.0 / 6))
+        Text("\(hostText)\(remainderText)").lineLimit(1)
+    }
+
+    private var addressParts: (String, String) {
+        guard let url else { return (placeholder, "") }
+        guard showsFullURL, let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
+            let host = components.encodedHost, !host.isEmpty
+        else { return (WindowModel.addressLabel(url), "") }
+
+        // Arc omits HTTPS and shows the HTTP scheme on local pages.
+        let scheme = components.scheme.map { $0.lowercased() == "https" ? "" : "\($0)://" } ?? ""
+        let port = components.port.map { ":\($0)" } ?? ""
+        let query = components.percentEncodedQuery.map { "?\($0)" } ?? ""
+        let fragment = components.percentEncodedFragment.map { "#\($0)" } ?? ""
+        return (scheme + host + port, components.percentEncodedPath + query + fragment)
+    }
+}
+
 extension WindowModel {
     /// As Arc's field: the host without a leading `www.`, and nothing else. Oa's own: the whole address of a page
     /// without a host.
@@ -84,7 +116,7 @@ extension WindowModel {
         return String(url.absoluteString.dropFirst(scheme.count + 3))
     }
 
-    private static func addressLabel(_ url: URL) -> String {
+    fileprivate static func addressLabel(_ url: URL) -> String {
         guard let host = url.host(), !host.isEmpty else { return url.absoluteString }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
