@@ -152,7 +152,7 @@ private struct SidebarSpacePage: View {
                                         insertion: .opacity.animation(.easeOut(duration: 0.08)), removal: .identity)
                                     : .opacity)
                     case .splitView(let id, let tabs):
-                        SplitViewCellView(model: model, splitID: id, tabs: tabs, spaceID: space.id)
+                        SplitViewCellView(model: model, layout: layout, splitID: id, tabs: tabs, spaceID: space.id)
                             .transition(.opacity)
                     case .divider:
                         ClearDivider(model: model, spaceID: space.id, showsClear: revealed)

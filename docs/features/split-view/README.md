@@ -67,12 +67,18 @@ order, and each pane is an ordinary tab with its own page.
   page has the keyboard, as ArcCore's `hasFocus`, and the window follows it. A
   click on a pane's bar focuses it too.
 - **Sidebar cell.** One card for the split with a small card for each tab. A
-  click selects the split with the pane the window focused in it last, and on
-  the selected split the tab clicked. Under the pointer the selected split
+  press selects the split with the pane the window focused in it last, and on
+  the selected split the tab pressed. Under the pointer the selected split
   shows a ✕ for each tab, and one that isn't selected a single ✕ that archives
   all its tabs; Edit ▸ Undo, "Undo Archive Tabs", brings the split back whole,
   with its ID, where it was. Its menu has Share Split View…, Separate All Tabs,
   Add Tab…, Convert, and for each tab Separate from Split View and Archive Item.
+- **Dragging a split.** A press anywhere on its cell, selected or not, drags
+  the whole split, which stays selected. The copy is the cell as it looks
+  selected and under the pointer, at 0.9. The list, the pinned section and the
+  Favorites grid take the split whole; over the grid the copy turns into its
+  tile, and a Favorite split's tile dragged out turns back into the cell. A
+  split is never dropped on the page: the one under the drag is itself.
 - **Pinned splits.** Pin Tab on a split's tab pins the whole split, Unpin Tab
   puts it back at the top of the list, children and sizes kept. A pinned split's
   tabs keep their pinned address, and its panes show no "/". On the selected
@@ -117,9 +123,8 @@ Oa's own:
 - After a split is selected again, the outline and the keyboard are both on the
   pane the window focused last. Arc draws the outline there and sends typing to
   the last pane.
-- Favorite Tab files a split under Favorites, where Arc's way is dragging it
-  onto the grid; Oa's split cell can't be dragged yet. Unfavorite Tab puts it
-  back at the top of the list. A tab dropped on the page of a pinned tab or a
+- Favorite Tab files a split under Favorites as well as a drag onto the grid,
+  Arc's way. Unfavorite Tab puts it back at the top of the list. A tab dropped on the page of a pinned tab or a
   Favorite follows the copy rule, LIKELY as Arc's other ways in; Arc's wasn't
   tried.
 - A titled split's badge is in the focus outline's colour, LIKELY Arc's (#2932E5
@@ -152,5 +157,5 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: dragging a split's cell, dropping a link or a tab on a sidebar
-row, and a split's Change Icon…, Duplicate and Move to.
+Not there yet: dropping a link or a tab on a sidebar row, and a split's Change
+Icon…, Duplicate and Move to.

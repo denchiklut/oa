@@ -2,16 +2,19 @@ import SwiftUI
 
 /// Arc's `SplitViewCellView` as measured: a tab row's card with a 28 pt card for each of the split's tabs, 4 pt in
 /// and 8.5 pt apart, a hairline between them while the split isn't selected. A split with a title shows a 16 pt
-/// badge with its count where a row's favicon is and the title where a row's is, in place of its tabs. A click selects the split with the pane
-/// the window focused in it last, and on the selected split the tab clicked.
+/// badge with its count where a row's favicon is and the title where a row's is, in place of its tabs. A press selects
+/// the split with the pane the window focused in it last, and on the selected split the tab pressed.
 struct SplitViewCellView: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     let splitID: UUID
     let tabs: [SidebarTab]
     let spaceID: UUID
     @State private var hovering = false
     @State private var renaming = false
     @State private var draft = ""
+    @State private var pressed = false
+    @State private var capsules: [UUID: CGRect] = [:]
     @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
     @Environment(\.windowColorScheme) private var colorScheme
@@ -64,7 +67,9 @@ struct SplitViewCellView: View {
                         theme.separator.frame(width: 0.5, height: 16).frame(width: 8.5).opacity(selected ? 0 : 1)
                     }
                     ChildItem(
-                        model: model, tab: tab, isSelected: selected, showsClose: selected && hovering && !pinned)
+                        model: model, tab: tab, isSelected: selected, showsClose: selected && hovering && !pinned
+                    )
+                    .sidebarDragFrame { capsules[tab.id] = $0 }
                 }
             }
         }
@@ -78,8 +83,31 @@ struct SplitViewCellView: View {
         .contentShape(card)
         // As measured on Arc: the split's card is 1.5 pt narrower at each side than a tab's.
         .padding(.horizontal, 1.5)
-        // A titled split has no tabs to click, so it selects itself.
-        .onTapGesture { if !selected || title != nil { model.selectSplitView(splitID) } }
+        // As seen in Arc: a press anywhere on the cell drags the split whole. It selects a split that isn't
+        // selected, and on the selected one focuses the tab pressed. The split stays selected through the drag, so
+        // it never drops on its own page.
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .named(SidebarDrag.space))
+                .onChanged { value in
+                    if !pressed {
+                        pressed = true
+                        if !selected {
+                            model.selectSplitView(splitID)
+                        } else if let tabID = capsules.first(where: { $0.value.contains(value.startLocation) })?.key {
+                            model.select(tabID)
+                        }
+                    }
+                    drag?.update(
+                        .splitView(id: splitID, tabs: tabs), from: pinned ? .pinned : .today,
+                        glyph: selected && pinned ? .minus : .close, at: value.location, start: value.startLocation,
+                        model: model, layout: layout)
+                }
+                .onEnded { _ in
+                    pressed = false
+                    drag?.finish(model: model, layout: layout)
+                },
+            including: renaming ? .subviews : .all
+        )
         .overlay(alignment: .trailing) {
             // As seen in Arc: the ✕ of a split that isn't selected closes all its tabs, and a selected pinned split
             // has one "—" that unloads its pages, as a pinned tab's.
@@ -91,6 +119,7 @@ struct SplitViewCellView: View {
                 .padding(.trailing, 7.5)
             }
         }
+        .opacity(drag?.entry?.id == splitID && drag?.settling == true ? 0 : 1)
         .frame(height: 40)
         .onHover { hovering = $0 }
         .sidebarDragFrame { drag?.rows[splitID] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) }
@@ -169,9 +198,6 @@ struct SplitViewCellView: View {
             // As measured on Arc: white 7 % over the selected card in dark, black 8 % in light.
             .background { if isSelected { card.fill(theme.isDark ? .white.opacity(0.07) : .black.opacity(0.08)) } }
             .contentShape(card)
-            .onTapGesture { if isSelected { model.select(tab.id) } else { model.selectSplitView(parentID) } }
         }
-
-        private var parentID: UUID { model.state.splitViewID(containing: tab.id) ?? tab.id }
     }
 }

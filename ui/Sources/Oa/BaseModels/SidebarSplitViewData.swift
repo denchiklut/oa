@@ -77,7 +77,7 @@ struct WindowSplitViewLayout {
 }
 
 /// A row of a Space's list.
-enum SidebarEntry: Identifiable {
+enum SidebarEntry: Identifiable, Hashable {
     case tab(SidebarTab)
     case splitView(id: UUID, tabs: [SidebarTab])
 
@@ -85,6 +85,13 @@ enum SidebarEntry: Identifiable {
         switch self {
         case .tab(let tab): tab.id
         case .splitView(let id, _): id
+        }
+    }
+
+    var tabs: [SidebarTab] {
+        switch self {
+        case .tab(let tab): [tab]
+        case .splitView(_, let tabs): tabs
         }
     }
 }

@@ -355,13 +355,15 @@ struct FavoritesGrid: View {
 
     /// The tiles as the drag leaves them: a dragged tile has left its place, and the slot opens where it would land.
     static func slots(_ favorites: [SidebarEntry], drag: SidebarDrag?) -> [Slot] {
-        guard let drag, let dragged = drag.tab else { return favorites.map(Slot.init) }
+        guard let drag, let dragged = drag.entry else { return favorites.map(Slot.init) }
         var slots = favorites.filter { $0.id != dragged.id }.map(Slot.init)
         if let target = drag.target, target.section == .favorites {
             slots.insert(Slot(id: Slot.gapID, tab: nil), at: min(target.index, slots.count))
         }
         if favorites.contains(where: { $0.id == dragged.id }) {
-            slots.append(Slot(id: dragged.id, tab: dragged, isLifted: true))
+            var lifted = Slot(dragged)
+            lifted.isLifted = true
+            slots.append(lifted)
         }
         return slots
     }
@@ -390,7 +392,8 @@ struct FavoritesGrid: View {
                     if let tab = slot.tab {
                         FavoriteTile(model: model, layout: layout, tab: tab, width: grid.tileWidth)
                     } else if let tabs = slot.splitTabs {
-                        FavoriteSplitTile(model: model, splitID: slot.id, tabs: tabs, width: grid.tileWidth)
+                        FavoriteSplitTile(
+                            model: model, layout: layout, splitID: slot.id, tabs: tabs, width: grid.tileWidth)
                     } else {
                         Color.clear.sidebarDragFrame { drag?.gap = $0 }
                     }
@@ -459,7 +462,7 @@ private struct FavoriteTile: View {
                         model.select(tab.id)
                     }
                     drag?.update(
-                        tab, from: .favorites, glyph: .close, at: value.location, start: value.startLocation,
+                        .tab(tab), from: .favorites, glyph: .close, at: value.location, start: value.startLocation,
                         model: model, layout: layout)
                 }
                 .onEnded { _ in
@@ -479,14 +482,17 @@ private struct FavoriteTile: View {
 
 /// A split Favorite as seen in Arc: one tile with a 12 pt favicon centred on each pane's part. Selected, one card with
 /// the panes' favicons' tint and ring, the ring also between the parts; not selected, a card for each part, 2 pt apart.
-/// A click selects the split with the pane the window focused in it last.
+/// A press selects the split with the pane the window focused in it last, and drags it whole as a tile's does.
 private struct FavoriteSplitTile: View {
     let model: WindowModel
+    let layout: WindowLayoutController
     let splitID: UUID
     let tabs: [SidebarTab]
     let width: CGFloat
     @State private var hovering = false
+    @State private var pressed = false
     @Environment(\.theme) private var theme
+    @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
         let selected = tabs.contains { $0.id == model.selectedTabID }
@@ -521,8 +527,24 @@ private struct FavoriteSplitTile: View {
         }
         .frame(width: width, height: 47)
         .contentShape(shape)
-        .onTapGesture { model.selectSplitView(splitID) }
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .named(SidebarDrag.space))
+                .onChanged { value in
+                    if !pressed {
+                        pressed = true
+                        model.selectSplitView(splitID)
+                    }
+                    drag?.update(
+                        .splitView(id: splitID, tabs: tabs), from: .favorites, glyph: .close, at: value.location,
+                        start: value.startLocation, model: model, layout: layout)
+                }
+                .onEnded { _ in
+                    pressed = false
+                    drag?.finish(model: model, layout: layout)
+                }
+        )
         .onHover { hovering = $0 }
+        .sidebarDragFrame { drag?.tiles[splitID] = $0 }
         .contextMenu {
             // As seen in Arc's tile menu: no Rename… and no Remove Favorite; Archive Item archives its tabs.
             Button("Share Split View…") {}.disabled(true)
@@ -641,7 +663,7 @@ struct TabRow: View {
         let glyph: SidebarCellButton.Glyph =
             pinned && !inCard && (current || model.leftAddress(tab) != nil) ? .minus : .close
         let peek = model.peeks[tab.id]
-        let dragged = !inCard && drag?.tab?.id == tab.id
+        let dragged = !inCard && drag?.entry?.id == tab.id
         let showsButton = hovering && !dragged
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
         HStack(spacing: 0) {
@@ -674,7 +696,7 @@ struct TabRow: View {
                     }
                     guard !inCard else { return }
                     drag?.update(
-                        tab, from: pinned ? .pinned : .today, glyph: glyph, at: value.location,
+                        .tab(tab), from: pinned ? .pinned : .today, glyph: glyph, at: value.location,
                         start: value.startLocation, previous: previousTabID, model: model, layout: layout)
                 }
                 .onEnded { value in

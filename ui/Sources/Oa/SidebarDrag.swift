@@ -43,7 +43,8 @@ final class SidebarDrag {
     /// Where the window's page or panes are.
     @ObservationIgnored var pageArea = CGRect.zero
 
-    private(set) var tab: SidebarTab?
+    /// A tab, or a split's cell or tile, which moves whole.
+    private(set) var entry: SidebarEntry?
     private(set) var source: Section?
     private(set) var target: Target?
     private(set) var location = CGPoint.zero
@@ -72,13 +73,13 @@ final class SidebarDrag {
     var lineRect: CGRect? { settling ? nil : target?.line }
 
     func update(
-        _ tab: SidebarTab, from section: Section, glyph: SidebarCellButton.Glyph, at location: CGPoint,
+        _ entry: SidebarEntry, from section: Section, glyph: SidebarCellButton.Glyph, at location: CGPoint,
         start: CGPoint, previous: UUID? = nil, model: WindowModel, layout: WindowLayoutController
     ) {
         guard !settling else { return }
-        if self.tab?.id != tab.id {
+        if self.entry?.id != entry.id {
             guard hypot(location.x - start.x, location.y - start.y) >= 4 else { return }
-            begin(tab, from: section, glyph: glyph, start: start, model: model, layout: layout)
+            begin(entry, from: section, glyph: glyph, start: start, model: model, layout: layout)
             previousTabID = previous
         }
         self.location = location
@@ -94,17 +95,19 @@ final class SidebarDrag {
 
     /// Over a place, the tab moves there at once and the copy glides onto it; elsewhere it glides back.
     func finish(model: WindowModel, layout: WindowLayoutController) {
-        guard let tab, !settling else { return }
+        guard let entry, let tab = entry.tabs.first, !settling else { return }
         heldEdge = nil
         if model.proposedSplitViewDropTarget != nil {
             model.acceptSplitViewDrop(of: tab.id)
-            self.tab = nil
+            self.entry = nil
             source = nil
             showsPrevious = false
             return layout.setHold(.drag, false)
         }
         // Oa's own: a tab dropped anywhere else is the selected one, as before it was dragged over the page.
-        if showsPrevious { model.select(tab.id) }
+        if showsPrevious {
+            if case .splitView(let id, _) = entry { model.selectSplitView(id) } else { model.select(tab.id) }
+        }
         showsPrevious = false
         settling = true
         let target = target
@@ -112,25 +115,26 @@ final class SidebarDrag {
             switch target.section {
             case .favorites:
                 let favorites = model.state.favoriteEntries(for: model.selectedSpaceID)
-                let from = source == .favorites ? favorites.firstIndex { $0.id == tab.id } : nil
-                // The grid's index leaves the tile out; the tree counts it where it was.
+                let from = source == .favorites ? favorites.firstIndex { $0.id == entry.id } : nil
+                // The grid's index leaves the tile out; the tree counts it where it was. A split's tab takes its
+                // split.
                 model.favorite(
                     tab.id, at: from.map { $0 < target.index ? target.index + 1 : target.index } ?? target.index)
             case .pinned, .today:
-                model.move(tab.id, pinned: target.section == .pinned, at: target.index)
+                model.move(entry.id, pinned: target.section == .pinned, at: target.index)
             }
         }
-        let before = rows[tab.id]?.rect
+        let before = rows[entry.id]?.rect
         Task {
             // The row's new frame comes with the layout after the move; a row that stays put reports none.
             for _ in 0..<(target.map { $0.section != .favorites } == true ? 8 : 1) {
                 try? await Task.sleep(for: .milliseconds(15))
-                if let rect = rows[tab.id]?.rect, rect != before { break }
+                if let rect = rows[entry.id]?.rect, rect != before { break }
             }
             let landing =
                 switch target?.section {
                 case .favorites: gap
-                case .pinned, .today: rows[tab.id]?.rect.insetBy(dx: 0, dy: 2) ?? origin
+                case .pinned, .today: rows[entry.id]?.rect.insetBy(dx: 0, dy: 2) ?? origin
                 case nil: origin
                 }
             let anchor = morph == 1 ? tileAnchor : rowAnchor
@@ -138,7 +142,7 @@ final class SidebarDrag {
                 location = CGPoint(x: landing.minX + anchor.x, y: landing.minY + anchor.y)
             }
             try? await Task.sleep(for: .milliseconds(280))
-            self.tab = nil
+            self.entry = nil
             source = nil
             self.target = nil
             settling = false
@@ -147,27 +151,28 @@ final class SidebarDrag {
     }
 
     private func begin(
-        _ tab: SidebarTab, from section: Section, glyph: SidebarCellButton.Glyph, start: CGPoint, model: WindowModel,
+        _ entry: SidebarEntry, from section: Section, glyph: SidebarCellButton.Glyph, start: CGPoint,
+        model: WindowModel,
         layout: WindowLayoutController
     ) {
-        let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != tab.id }.count
+        let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != entry.id }.count
         let slots = FavoritesGrid.Layout(count: others + 1, width: layout.sidebarWidth)
         rowSize = CGSize(width: layout.sidebarWidth - 16, height: 36)
         tileSize = CGSize(width: slots.tileWidth, height: 47)
-        if section == .favorites, let rect = tiles[tab.id] {
+        if section == .favorites, let rect = tiles[entry.id] {
             origin = rect
             tileAnchor = CGPoint(x: start.x - rect.minX, y: start.y - rect.minY)
             rowAnchor = CGPoint(x: 18 + tileAnchor.x - rect.width / 2, y: tileAnchor.y * 36 / 47)
             morph = 1
         } else {
-            let card = rows[tab.id]?.rect.insetBy(dx: 0, dy: 2) ?? CGRect(origin: start, size: rowSize)
+            let card = rows[entry.id]?.rect.insetBy(dx: 0, dy: 2) ?? CGRect(origin: start, size: rowSize)
             origin = card
             rowAnchor = CGPoint(x: start.x - card.minX, y: start.y - card.minY)
             tileAnchor = CGPoint(
                 x: min(max(tileSize.width / 2 + rowAnchor.x - 18, 6), tileSize.width - 6), y: rowAnchor.y * 47 / 36)
             morph = 0
         }
-        self.tab = tab
+        self.entry = entry
         source = section
         self.glyph = glyph
         layout.setHold(.drag, true)
@@ -180,16 +185,18 @@ final class SidebarDrag {
     /// LIKELY by Arc's other sizes, a third of the pane up to 80 pt at the sides and 50 pt at the ends, with no hold.
     /// A pinned tab or a Favorite goes in as itself and a copy keeps its place, LIKELY as by Arc's other ways in.
     private func splitViewDropTarget(at point: CGPoint, model: WindowModel) -> SplitViewDropTarget? {
-        guard let tab, pageArea.contains(point), model.library == nil, !model.coversWindow else {
+        guard let entry, pageArea.contains(point), model.library == nil, !model.coversWindow else {
             heldEdge = nil
             return nil
         }
-        if !showsPrevious, let previousTabID, previousTabID != tab.id, model.selectedTabID == tab.id {
+        if !showsPrevious, let previousTabID, !entry.tabs.contains(where: { $0.id == previousTabID }),
+            entry.tabs.contains(where: { $0.id == model.selectedTabID })
+        {
             model.select(previousTabID)
             showsPrevious = true
         }
         let tabIDs = model.presentedTabIDs
-        guard let anchorID = model.selectedTabID, !tabIDs.contains(tab.id),
+        guard case .tab(let tab) = entry, let anchorID = model.selectedTabID, !tabIDs.contains(tab.id),
             model.state.canJoinSplitView(tab.id, of: anchorID, in: model.selectedSpaceID)
         else { return nil }
         let splitID = model.state.splitViewID(containing: anchorID)
@@ -241,9 +248,9 @@ final class SidebarDrag {
     /// The pointer picks the place, as AppKit's drag destinations do: among the Favorites the slot under it, in the
     /// list the gap between the rows around it.
     private func target(at point: CGPoint, model: WindowModel) -> Target? {
-        guard let tab, let list = lists[model.selectedSpaceID] else { return nil }
+        guard let entry, let list = lists[model.selectedSpaceID] else { return nil }
         if grid.contains(point) {
-            let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != tab.id }.count
+            let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != entry.id }.count
             let slots = FavoritesGrid.Layout(count: others + 1, width: grid.width)
             let column = Int((point.x - grid.minX - 4) / (slots.tileWidth + 8))
             let row = Int((point.y - grid.minY - 4) / 55)
@@ -297,8 +304,8 @@ struct SidebarDragLayer: View {
                     .frame(width: line.width, height: line.height)
                     .offset(x: line.minX, y: line.minY)
             }
-            if let tab = drag.tab {
-                SidebarDragPreview(model: model, drag: drag, tab: tab, morph: drag.morph)
+            if let entry = drag.entry {
+                SidebarDragPreview(model: model, drag: drag, entry: entry, morph: drag.morph)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -319,13 +326,15 @@ private struct SidebarDropLine: View {
 }
 
 /// The lifted copy: the selected row's card or the selected tile, laid out from `morph` so SwiftUI animates the
-/// whole turn between them.
+/// whole turn between them. A split's copy carries its tabs' favicons, from their places in its cell to theirs in its
+/// tile.
 private struct SidebarDragPreview: View, Animatable {
     let model: WindowModel
     let drag: SidebarDrag
-    let tab: SidebarTab
+    let entry: SidebarEntry
     var morph: CGFloat
     @Environment(\.theme) private var theme
+    @Environment(\.windowColorScheme) private var colorScheme
 
     nonisolated var animatableData: CGFloat {
         get { morph }
@@ -340,30 +349,85 @@ private struct SidebarDragPreview: View, Animatable {
             x: drag.rowAnchor.x + (drag.tileAnchor.x - drag.rowAnchor.x) * t,
             y: drag.rowAnchor.y + (drag.tileAnchor.y - drag.rowAnchor.y) * t)
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        let favicon = model.favicon(for: tab)
         ZStack(alignment: .topLeading) {
             shape.fill(theme.selectedCard).opacity(1 - t)
             shape.fill(theme.selectedTile).opacity(t)
-            if let favicon { AppTrayRing(favicon: favicon, tileWidth: width).opacity(t) }
-            Text(model.title(for: tab))
-                .font(.system(size: 14))
-                .foregroundStyle(theme.foreground)
-                .lineLimit(1)
-                .frame(width: max(drag.rowSize.width - 36 - 40, 1), height: height, alignment: .leading)
-                .offset(x: 36)
-                .opacity(max(0, 1 - t * 4))
-            CellGlyph(glyph: drag.glyph)
-                .frame(width: 24, height: 24)
-                .offset(x: width - 30, y: (height - 24) / 2)
-                .opacity(max(0, 1 - t * 4))
-            TabFavicon(model: model, tab: tab)
-                .frame(width: 16, height: 16)
-                .offset(x: 10 + (width / 2 - 18) * t, y: (height - 16) / 2)
+            switch entry {
+            case .tab(let tab):
+                if let favicon = model.favicon(for: tab) {
+                    AppTrayRing(favicon: favicon, tileWidth: width).opacity(t)
+                }
+                title(model.title(for: tab), at: 36, height: height, t: t)
+                glyph(width: width, height: height, t: t)
+                TabFavicon(model: model, tab: tab)
+                    .frame(width: 16, height: 16)
+                    .offset(x: 10 + (width / 2 - 18) * t, y: (height - 16) / 2)
+            case .splitView(let id, let tabs):
+                SplitAppTrayRing(favicons: tabs.map(model.favicon(for:)), tileWidth: width).opacity(t)
+                if let name = model.state.splitView(id)?.title {
+                    Text("\(tabs.count)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 16, height: 16)
+                        .background(
+                            model.splitViewFocusColor(dark: colorScheme == .dark),
+                            in: RoundedRectangle(cornerRadius: 4)
+                        )
+                        .offset(x: 12.5, y: (height - 16) / 2)
+                        .opacity(max(0, 1 - t * 4))
+                    title(name, at: 39, height: height, t: t)
+                    glyph(width: width, height: height, t: t)
+                } else {
+                    // As measured on Arc: the cell as it is selected and under the pointer, each tab's card with its
+                    // ✕, 4 pt in and 8.5 pt apart; as the tile, its parts 2 pt apart.
+                    let count = CGFloat(tabs.count)
+                    let row = (drag.rowSize.width - 8 - 8.5 * (count - 1)) / count
+                    let tile = (drag.tileSize.width - 2 * (count - 1)) / count
+                    ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                        let i = CGFloat(index)
+                        let size = 16 - 4 * t
+                        let rowX = 4 + i * (row + 8.5)
+                        let tileX = i * (tile + 2) + (tile - size) / 2
+                        Group {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(theme.isDark ? .white.opacity(0.07) : .black.opacity(0.08))
+                                .frame(width: row, height: 28)
+                                .offset(x: rowX, y: (height - 28) / 2)
+                            CellGlyph(glyph: .close)
+                                .frame(width: 24, height: 24)
+                                .offset(x: rowX + row - 26, y: (height - 24) / 2)
+                        }
+                        .opacity(max(0, 1 - t * 4))
+                        TabFavicon(model: model, tab: tab)
+                            .scaleEffect(size / 16)
+                            .frame(width: size, height: size)
+                            .offset(x: rowX + 4.5 + (tileX - rowX - 4.5) * t, y: (height - size) / 2)
+                    }
+                }
+            }
         }
         .frame(width: width, height: height, alignment: .topLeading)
         .clipShape(shape)
         .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
-        .opacity(0.7)
+        // As measured on Arc: a split's copy at 0.9.
+        .opacity({ if case .splitView = entry { 0.9 } else { 0.7 } }())
         .offset(x: drag.location.x - anchor.x, y: drag.location.y - anchor.y)
+    }
+
+    private func title(_ text: String, at x: CGFloat, width: CGFloat? = nil, height: CGFloat, t: CGFloat) -> some View {
+        Text(text)
+            .font(.system(size: 14))
+            .foregroundStyle(theme.foreground)
+            .lineLimit(1)
+            .frame(width: max(width ?? (drag.rowSize.width - x - 40), 1), height: height, alignment: .leading)
+            .offset(x: x)
+            .opacity(max(0, 1 - t * 4))
+    }
+
+    private func glyph(width: CGFloat, height: CGFloat, t: CGFloat) -> some View {
+        CellGlyph(glyph: drag.glyph)
+            .frame(width: 24, height: 24)
+            .offset(x: width - 30, y: (height - 24) / 2)
+            .opacity(max(0, 1 - t * 4))
     }
 }
