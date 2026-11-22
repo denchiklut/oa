@@ -21,6 +21,10 @@ final class WindowModel {
     private(set) var selectedTabIDs: [UUID: UUID] = [:] {
         didSet {
             selectionCount += 1
+            // A close's replacement in a split is the pane the window comes back to, as one clicked is.
+            for tabID in selectedTabIDs.values {
+                if let splitID = state.splitViewID(containing: tabID) { focusedPaneIDs[splitID] = tabID }
+            }
             closeCommandBarIfSelectionChanged()
             presentationChanged()
         }
@@ -538,7 +542,6 @@ final class WindowModel {
             markViewed(shown)
             ensurePage(shown, restoring: shown == tabID ? sessionID : nil)
         }
-        if let splitID = state.splitViewID(containing: tabID) { focusedPaneIDs[splitID] = tabID }
     }
 
     /// As seen in Arc: a window comes back to the pane it focused in a split, and to the last pane of a split it
