@@ -401,11 +401,11 @@ struct SidebarState {
             SidebarArchivedTab(id: id, title: title, url: url, spaceID: spaceID, archivedAt: date, reason: .manual))
     }
 
-    /// To the top of its Space, as Arc's Restore; into `fallbackSpaceID` when its Space is gone.
-    mutating func restoreArchived(_ id: UUID, in fallbackSpaceID: UUID) {
+    /// To the top of the Space's unpinned tabs, as Arc's Restore.
+    mutating func restoreArchived(_ id: UUID, in spaceID: UUID) {
         guard let index = archive.firstIndex(where: { $0.id == id }) else { return }
         let entry = archive.remove(at: index)
-        guard let space = entry.spaceID.flatMap({ space($0) }) ?? space(fallbackSpaceID) else { return }
+        guard let space = space(spaceID) else { return }
         let tab = SidebarTab(id: entry.id, title: entry.title, url: entry.url, viewedAt: .now)
         tree.insert(SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID, at: 0)
     }

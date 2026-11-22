@@ -106,15 +106,15 @@ final class SidebarStore {
         return true
     }
 
-    /// Where Air Traffic Control sends `url`, with `recent` as the Most Recent Space.
-    func routedSpace(for url: URL?, recent: UUID) -> UUID {
-        switch linkRouting.state.destination(for: url) {
-        case .space(let id): state.space(id) == nil ? recent : id
-        case .mostRecent: recent
-        case .profile(let profileID):
-            state.space(recent)?.profileID == profileID
-                ? recent : state.spaces.first { $0.profileID == profileID }?.id ?? recent
-        }
+    /// Where Air Traffic Control sends `url`: the first matching route's Space, else `unmatched` or the Default.
+    /// As seen in Arc, a route or Default whose Space is gone goes to `recent`, the Most Recent Space.
+    func routedSpace(for url: URL?, recent: UUID, unmatched: UUID? = nil) -> UUID {
+        let rule = linkRouting.state.rule(for: url)
+        if rule == nil, let unmatched { return unmatched }
+        guard case .space(let id) = (rule?.destination ?? linkRouting.state.defaultDestination).target,
+            state.space(id) != nil
+        else { return recent }
+        return id
     }
 
     func setSavedPage(_ tabID: UUID, title: String, url: URL?) {

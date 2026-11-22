@@ -89,16 +89,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if isLaunching { pendingLinks.append(contentsOf: links) } else { openExternalLinks(links) }
     }
 
+    /// As seen in Arc: in the last key window, switched to the routed Space, Most Recent being the one it shows.
     private func openExternalLinks(_ links: [URL]) {
         guard !links.isEmpty else { return }
         let front = frontWindows.first ?? openWindow()
-        let recent = front.selectedSpaceID
         for url in links {
-            let destination = store.routedSpace(for: url, recent: recent)
-            let model = frontWindows.first { $0.selectedSpaceID == destination } ?? front
-            model.openExternalLink(url, in: destination)
-            model.bringToFront()
+            front.openRoutedLink(url, in: store.routedSpace(for: url, recent: front.selectedSpaceID))
         }
+        front.bringToFront()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {

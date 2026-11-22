@@ -274,7 +274,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         // Arc takes Archive Tab out of the menu while a download's preview shows.
         if item.action == #selector(expandPeek(_:)) {
-            item.title = model.peekDestination.map { "Open in \($0.name)" } ?? "Expand Peek"
+            // As seen in Arc: the shown Space's name, wherever Air Traffic Control sends it.
+            item.title = model.peek != nil ? "Open in \(model.space?.name ?? "")" : "Expand Peek"
             return model.peek != nil
         }
         if item.action == #selector(closeTab(_:)) {
@@ -318,7 +319,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             return true
         }
         if item.action == #selector(expandPeek(_:)) {
-            item.title = model.peekDestination.map { "Open in \($0.name)" } ?? "Expand Peek"
+            // As seen in Arc: the shown Space's name, wherever Air Traffic Control sends it.
+            item.title = model.peek != nil ? "Open in \(model.space?.name ?? "")" : "Expand Peek"
             return model.peek != nil
         }
         if item.action == #selector(closeTab(_:)) {

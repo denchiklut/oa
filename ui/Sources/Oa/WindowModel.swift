@@ -113,7 +113,6 @@ final class WindowModel {
     @ObservationIgnored private var closedGroups: [ClosedGroup] = []
     @ObservationIgnored var undoManager: ArcUndoManager?
     private var archivePeekID: UUID?
-    private var archivePeekProfiles: [UUID: UUID] = [:]
 
     var state: SidebarState { store.state }
     var adBlocker: AdBlocker { engine.adBlocker }
@@ -372,21 +371,11 @@ final class WindowModel {
         select(tab.id)
     }
 
-    func openExternalLink(_ url: URL, in spaceID: UUID) {
+    /// As seen in Arc: a new tab every time, even where one is at that URL.
+    func openRoutedLink(_ url: URL, in spaceID: UUID) {
         exitLibrary()
-        selectSpace(spaceID)
-        if let existing = tab(at: url, in: spaceID) {
-            select(existing)
-        } else {
-            newTab(url)
-        }
-    }
-
-    private func tab(at url: URL, in spaceID: UUID) -> UUID? {
-        state.selectableTabs(in: spaceID).first { tab in
-            if let current = livePage(for: tab.id)?.url { return current == url }
-            return tab.isAt(url)
-        }?.id
+        if spaceID != selectedSpaceID { selectSpace(spaceID) }
+        newTab(url)
     }
 
     /// As Arc: Chromium's History page in a new tab at the top of the Space, in the Space's profile.
@@ -1266,9 +1255,13 @@ final class WindowModel {
         previewedDownloadID = files[index + offset].id
     }
 
-    /// As Arc since 1.19.1: back to the Space it came from, not through Air Traffic Control, and not selected.
+    /// As seen in Arc: a matching route wins; else back to the Space it came from (1.19.1), else the shown one. The
+    /// Default doesn't apply, and the tab isn't selected.
     func restoreArchived(_ id: UUID) {
-        store.edit { $0.restoreArchived(id, in: selectedSpaceID) }
+        guard let entry = state.archive.first(where: { $0.id == id }) else { return }
+        let origin = entry.spaceID.flatMap { state.space($0)?.id } ?? selectedSpaceID
+        let spaceID = store.routedSpace(for: entry.url, recent: selectedSpaceID, unmatched: origin)
+        store.edit { $0.restoreArchived(id, in: spaceID) }
         guard let space = state.space(containing: id) else { return }
         createdDates[id] = .now
         present(.tabUnarchived(id, location: space.name), at: .window)
@@ -1294,62 +1287,51 @@ final class WindowModel {
             guard let page = await context.makePage(windowID: id, restoring: nil)?.page, let self else { return }
             guard showingArchive, archivePeekID == entryID else { return page.drop() }
             peeks[entryID] = page
-            archivePeekProfiles[page.id] = profileID
             listen(to: page)
             page.startObservingThumbnails()
             page.load(url)
         }
     }
 
-    /// Arc's Tabs menu names Expand by this Space.
-    var peekDestination: SidebarSpace? {
-        guard let ownerID = peekOwnerID, let page = peeks[ownerID] else { return nil }
-        return state.space(store.routedSpace(for: peekURL(page, of: ownerID), recent: selectedSpaceID))
-    }
-
-    private func peekURL(_ page: any Page, of ownerID: UUID) -> URL? {
-        page.url ?? (ownerID == archivePeekID ? state.archive.first { $0.id == ownerID }?.url : nil)
-    }
-
     func expandPeek() {
         guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
-        let fromArchive = ownerID == archivePeekID
-        let sourceProfile =
-            fromArchive ? archivePeekProfiles.removeValue(forKey: page.id) : state.profile(containing: ownerID)?.id
-        let url = peekURL(page, of: ownerID)
-        if fromArchive { archivePeekID = nil }
-        let destination = store.routedSpace(for: url, recent: selectedSpaceID)
-        let restored = fromArchive ? state.space(containing: ownerID) : nil
-        let existing = restored == nil ? url.flatMap { tab(at: $0, in: destination) } : ownerID
-        if let existing {
-            if fromArchive { store.edit { $0.removeArchived(ownerID) } }
+        guard ownerID != archivePeekID else { return expandArchivePeek(page, entryID: ownerID) }
+        // As seen in Arc: Expand follows Air Traffic Control and moves the live page, with a new tab even where one is
+        // at that URL. Across profiles Arc opens no Peek; a page that got there since loads afresh, Oa's own.
+        let spaceID = store.routedSpace(for: page.url, recent: selectedSpaceID)
+        guard state.space(spaceID)?.profileID == state.profile(containing: ownerID)?.id else {
             discardPeekPage(page)
-            exitLibrary()
-            selectSpace(restored?.id ?? destination)
-            select(existing)
+            if let url = page.url { openRoutedLink(url, in: spaceID) }
             return
         }
-        let besideOpener = !fromArchive && destination == selectedSpaceID
+        let besideOpener = spaceID == selectedSpaceID
         let tab = SidebarTab(
-            id: fromArchive ? ownerID : UUID(), title: page.title, url: url,
-            viewedAt: .now, openerID: besideOpener ? ownerID : nil)
+            id: UUID(), title: page.title, url: page.url, viewedAt: .now, openerID: besideOpener ? ownerID : nil)
         store.edit {
-            if fromArchive { $0.removeArchived(ownerID) }
-            if besideOpener {
-                $0.openTab(tab, from: ownerID, in: destination)
-            } else {
-                $0.insertTab(tab, atTopOf: destination)
-            }
+            if besideOpener { $0.openTab(tab, from: ownerID, in: spaceID) } else { $0.insertTab(tab, atTopOf: spaceID) }
         }
         createdDates[tab.id] = .now
-        // A live page belongs to its Chromium profile. Crossing profiles loads the URL in the destination context.
-        if sourceProfile == state.space(destination)?.profileID {
-            install(page, for: tab.id)
-        } else {
+        install(page, for: tab.id)
+        if !besideOpener { selectSpace(spaceID) }
+        select(tab.id)
+    }
+
+    /// As seen in Arc: into the shown Space, not through Air Traffic Control.
+    private func expandArchivePeek(_ page: any Page, entryID: UUID) {
+        archivePeekID = nil
+        // Another window brought the entry back; selecting its tab is Oa's own, after Arc's ⇧⌘T.
+        if let spaceID = state.space(containing: entryID)?.id {
             discardPeekPage(page)
+            selectSpace(spaceID)
+            return select(entryID)
         }
-        exitLibrary()
-        selectSpace(destination)
+        let tab = SidebarTab(id: entryID, title: page.title, url: page.url, viewedAt: .now)
+        store.edit {
+            $0.removeArchived(entryID)
+            $0.insertTab(tab, atTopOf: selectedSpaceID)
+        }
+        createdDates[tab.id] = .now
+        install(page, for: tab.id)
         select(tab.id)
     }
 
@@ -2083,7 +2065,6 @@ final class WindowModel {
     /// an Archive entry, leaves none.
     private func peekEnded(_ ownerID: UUID, sessionID: PageSessionID?) {
         guard let page = peeks.removeValue(forKey: ownerID) else { return }
-        archivePeekProfiles[page.id] = nil
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
         extensionRequests[page.id] = nil
@@ -2125,7 +2106,13 @@ final class WindowModel {
         let split = disposition == .splitView
         if !insidePeek, !inWindow, disposition == .newWindow || (!background && !split && peeksFromLinks(in: openerID))
         {
-            return peek(page, from: openerID)
+            // As seen in Arc: no Peek for a link routed to another profile's Space; it loads there afresh.
+            let spaceID = store.routedSpace(for: url, recent: selectedSpaceID)
+            guard let url, state.space(spaceID)?.profileID != state.profile(containing: openerID)?.id else {
+                return peek(page, from: openerID)
+            }
+            page.drop()
+            return openRoutedLink(url, in: spaceID)
         }
         let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now, openerID: openerID)
         let spaceID = selectedSpaceID

@@ -21,26 +21,25 @@ struct LinkSourceComponent: Identifiable, Codable, Hashable {
         case .contains:
             return url.absoluteString.localizedCaseInsensitiveContains(pattern)
         case .matches:
-            let address = pattern.contains("://") ? pattern : "\(url.scheme ?? "https")://\(pattern)"
-            guard let candidate = URLComponents(string: address),
-                let actual = URLComponents(url: url, resolvingAgainstBaseURL: true)
+            // As seen in Arc: host and path, ignoring case, scheme, port, query, fragment and a trailing slash. A
+            // pattern without a scheme is read as https, so "host:port" parses as a scheme and never matches.
+            let parsed = URLComponents(string: pattern)
+            guard let candidate = parsed?.scheme == nil ? URLComponents(string: "https://" + pattern) : parsed,
+                let host = candidate.host, let actual = URLComponents(url: url, resolvingAgainstBaseURL: true)
             else { return false }
-            return Self.normalized(candidate) == Self.normalized(actual)
+            return host.lowercased() == actual.host?.lowercased() && Self.path(of: candidate) == Self.path(of: actual)
         }
     }
 
-    private static func normalized(_ address: URLComponents) -> URLComponents {
-        var address = address
-        address.scheme = address.scheme?.lowercased()
-        address.host = address.host?.lowercased()
-        if address.path.isEmpty { address.path = "/" }
-        return address
+    private static func path(of address: URLComponents) -> String {
+        let path = address.path.lowercased()
+        return path.hasSuffix("/") ? String(path.dropLast()) : path
     }
 }
 
 enum LinkDestination: Codable, Hashable {
     enum ProfileDestination: Codable, Hashable {
-        /// Oa's profile ID where Arc stores its `Profile`.
+        /// Oa's profile ID where Arc stores its `Profile`. Arc's menu offers no profile, so neither does Oa's.
         case profile(UUID)
         case space(UUID)
         case mostRecent
@@ -49,7 +48,7 @@ enum LinkDestination: Codable, Hashable {
     case space(ProfileDestination)
     case littleArc(ProfileDestination)
 
-    /// Oa has no Little Arc, so a `littleArc` destination opens where its Space or profile would.
+    /// Arc opens Little Arc for `littleArc`; Oa has none, so it opens where the inner destination would.
     var target: ProfileDestination {
         switch self {
         case .space(let destination), .littleArc(let destination): destination
@@ -73,8 +72,9 @@ struct StorableLinkRoutingState: Codable, Hashable {
     var rules: [LinkMatchingRule] = []
     var defaultDestination = LinkDestination.space(.mostRecent)
 
-    func destination(for url: URL?) -> LinkDestination.ProfileDestination {
-        guard let url, ["http", "https"].contains(url.scheme?.lowercased()) else { return .mostRecent }
-        return (rules.first { $0.matches(url) }?.destination ?? defaultDestination).target
+    /// As seen in Arc: the first matching route in list order.
+    func rule(for url: URL?) -> LinkMatchingRule? {
+        guard let url, ["http", "https"].contains(url.scheme?.lowercased()) else { return nil }
+        return rules.first { $0.matches(url) }
     }
 }
