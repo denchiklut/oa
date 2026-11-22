@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// As Arc's `LinkRoutingEditor`: edits a copy of the routes and hands it to the client when the dialog closes.
+/// As Arc's `LinkRoutingEditor`: edits a copy of the routes, and ✕ or Escape hands it to the client with blank
+/// routes dropped. Arc shows one URL per route, though a route can hold several.
 struct AirTrafficControlSheet: View {
     let store: SidebarStore
     let profiles: [ProfileState]
     @State private var routing = StorableLinkRoutingState()
     @State private var hasLoadedInitialState = false
     @Environment(\.dismiss) private var dismiss
-    @FocusState private var focusedComponent: UUID?
+    @FocusState private var focusedRule: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,12 +16,20 @@ struct AirTrafficControlSheet: View {
                 Text("Air Traffic Control").font(.headline)
                 Spacer()
                 Button("New Route", action: addRule)
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .accessibilityLabel("Close")
+                .keyboardShortcut(.cancelAction)
             }
             .padding()
             Divider()
             ScrollViewReader { scroll in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
+                        // Arc's empty state wasn't seen; its dialog holds this text, so it is shown here with no routes.
                         if routing.rules.isEmpty {
                             Text(
                                 "Routes let you choose where specific sites open inside Oa. For example, you can route Spotify links to always open inside your Personal space."
@@ -36,8 +45,8 @@ struct AirTrafficControlSheet: View {
                     }
                     .padding(24)
                 }
-                .onChange(of: focusedComponent) { _, id in
-                    if let id { withAnimation { scroll.scrollTo(id) } }
+                .onChange(of: focusedRule) { _, id in
+                    if let id { scroll.scrollTo(id) }
                 }
             }
             Divider()
@@ -45,57 +54,49 @@ struct AirTrafficControlSheet: View {
                 Text("Default").bold()
                 destination($routing.defaultDestination)
                 Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
             }
             .padding()
         }
-        .frame(width: 506, height: 450)
+        .frame(width: 508, height: 500)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             guard !hasLoadedInitialState else { return }
             routing = store.linkRouting.state
             hasLoadedInitialState = true
         }
-        .onDisappear { store.linkRouting.updateState(routing) }
+        .onDisappear {
+            routing.rules.removeAll { rule in
+                rule.sourceComponents.allSatisfy {
+                    guard case .urlMatch(_, let pattern) = $0.componentType else { return true }
+                    return pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+            }
+            store.linkRouting.updateState(routing)
+        }
     }
 
     private func ruleView(_ rule: Binding<LinkMatchingRule>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(rule.sourceComponents) { $component in
+            if let component = rule.sourceComponents.first {
                 HStack {
                     Label("URL", systemImage: "link")
-                    Picker("Match", selection: style(of: $component)) {
+                    Picker("Match", selection: style(of: component)) {
                         Text("Is equal to").tag(LinkSourceTextMatchingStyle.matches)
                         Text("Contains").tag(LinkSourceTextMatchingStyle.contains)
                     }
                     .labelsHidden()
                     .fixedSize()
-                    TextField("example.com", text: pattern(of: $component))
+                    TextField("example.com", text: pattern(of: component))
                         .accessibilityLabel("URL pattern")
-                        .focused($focusedComponent, equals: component.id)
+                        .focused($focusedRule, equals: rule.wrappedValue.id)
                     Button {
-                        let id = component.id
-                        rule.wrappedValue.sourceComponents.removeAll { $0.id == id }
-                        if rule.wrappedValue.sourceComponents.isEmpty {
-                            routing.rules.removeAll { $0.id == rule.wrappedValue.id }
-                        }
+                        let id = rule.wrappedValue.id
+                        routing.rules.removeAll { $0.id == id }
                     } label: {
                         Image(systemName: "minus.circle.fill")
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Remove")
-                    if component.id == rule.wrappedValue.sourceComponents.last?.id {
-                        Button {
-                            let component = LinkSourceComponent()
-                            rule.wrappedValue.sourceComponents.append(component)
-                            focusedComponent = component.id
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Add URL")
-                    }
                 }
             }
             HStack {
@@ -108,7 +109,7 @@ struct AirTrafficControlSheet: View {
     private func addRule() {
         let rule = LinkMatchingRule()
         routing.rules.append(rule)
-        focusedComponent = rule.sourceComponents.first?.id
+        focusedRule = rule.id
     }
 
     private func style(of component: Binding<LinkSourceComponent>) -> Binding<LinkSourceTextMatchingStyle> {
@@ -131,6 +132,7 @@ struct AirTrafficControlSheet: View {
         }
     }
 
+    /// As Arc's: every Space in sidebar order as "Space (Profile)", then Most Recent Space and Little Arc.
     private func destination(_ selection: Binding<LinkDestination>) -> some View {
         let target = Binding {
             selection.wrappedValue.target
@@ -139,18 +141,13 @@ struct AirTrafficControlSheet: View {
         }
         return Menu {
             Picker("Destination", selection: target) {
-                Text("Most Recent Space").tag(LinkDestination.ProfileDestination.mostRecent)
                 ForEach(store.state.spaces) { space in
                     Text(title(of: space)).tag(LinkDestination.ProfileDestination.space(space.id))
                 }
-                if profiles.count > 1 {
-                    ForEach(profiles) { profile in
-                        Text(profile.name).tag(LinkDestination.ProfileDestination.profile(profile.id))
-                    }
-                }
+                Divider()
+                Text("Most Recent Space").tag(LinkDestination.ProfileDestination.mostRecent)
             }
             .pickerStyle(.inline)
-            Divider()
             Button("Little Oa") {}.disabled(true)
         } label: {
             Text(title(of: selection.wrappedValue.target))
@@ -158,18 +155,16 @@ struct AirTrafficControlSheet: View {
         .frame(width: 200)
     }
 
+    /// Blank for a Space that is gone, as Arc's.
     private func title(of destination: LinkDestination.ProfileDestination) -> String {
         switch destination {
-        case .mostRecent: "Most Recent Space"
-        case .space(let id): store.state.space(id).map(title(of:)) ?? "Most Recent Space"
-        case .profile(let id): profiles.first { $0.id == id }?.name ?? "Most Recent Space"
+        case .mostRecent, .profile: "Most Recent Space"
+        case .space(let id): store.state.space(id).map(title(of:)) ?? ""
         }
     }
 
     private func title(of space: SidebarSpace) -> String {
-        guard profiles.count > 1, let profile = profiles.first(where: { $0.id == space.profileID }) else {
-            return space.name
-        }
+        guard let profile = profiles.first(where: { $0.id == space.profileID }) else { return space.name }
         return "\(space.name) (\(profile.name))"
     }
 }
