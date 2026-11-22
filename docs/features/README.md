@@ -188,7 +188,7 @@ matching edge cases or rule-priority semantics.
 | Most Recent Space as an individual rule destination | ✅ | ✅ |
 | Default destination: chosen Space / Most Recent Space | ✅ | ✅ |
 | Default destination: Little Arc | ✅ | ☐ |
-| Apply routing when restoring archived tabs † | ✅ | ✅ |
+| Apply routing when restoring archived tabs (until 1.19.1, which restores to the tab's own Space) † | ☐ | ☐ |
 | Apply routing when opening Peek destinations † | ✅ | ✅ |
 | Reuse an already-open destination tab | ✅ | ✅ |
 

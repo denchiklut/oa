@@ -77,7 +77,10 @@ the entry, as Arc does; nothing shows when the tab already has a Peek, or when
 the tab is gone, which also keeps the entry. A Peek that closed itself, one
 replaced by a new request and one archived with its opener are not brought
 back. Restore in the Archive makes the entry a tab at the top of the unpinned
-section of its routed Space, or selects a tab already at that URL there.
+section of the Space it came from, not selected, as Arc has since 1.19.1, and
+not through Air Traffic Control. The current Space takes it when that Space is
+gone. A toast says "Tab restored to ‹Space›. Click to view.", and a click on it
+shows the tab.
 Nothing about a Peek is saved, so none survives a relaunch, as in Arc.
 
 Clicking an Archive row shows the entry's page in a Peek over the list, made

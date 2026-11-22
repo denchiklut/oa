@@ -1266,19 +1266,20 @@ final class WindowModel {
         previewedDownloadID = files[index + offset].id
     }
 
+    /// As Arc since 1.19.1: back to the Space it came from, not through Air Traffic Control, and not selected.
     func restoreArchived(_ id: UUID) {
-        guard let entry = state.archive.first(where: { $0.id == id }) else { return }
-        let destination = store.linkRouting.destination(
-            for: entry.url, recent: selectedSpaceID)
-        if let url = entry.url, let existing = tab(at: url, in: destination) {
-            store.edit { $0.removeArchived(id) }
-            exitLibrary()
-            selectSpace(destination)
-            select(existing)
-        } else {
-            store.edit { $0.restoreArchived(id, in: destination) }
-            createdDates[id] = .now
-        }
+        store.edit { $0.restoreArchived(id, in: selectedSpaceID) }
+        guard let space = state.space(containing: id) else { return }
+        createdDates[id] = .now
+        present(.tabUnarchived(id, location: space.name), at: .window)
+    }
+
+    func viewRestored(_ id: UUID) {
+        guard let spaceID = state.space(containing: id)?.id else { return }
+        dismissToast()
+        exitLibrary()
+        selectSpace(spaceID)
+        select(id)
     }
 
     /// As Arc: no history, and the entry stays.
