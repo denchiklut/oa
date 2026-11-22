@@ -21,7 +21,7 @@ struct GeneralPreferencePane: View {
                     }
                 }
                 PreferencesPaneSection {
-                    toggle("Oa’s Ad Blocker", isOn: Binding(get: { adBlocker.isEnabled }, set: adBlocker.setEnabled))
+                    toggle("Ad Blocker", isOn: Binding(get: { adBlocker.isEnabled }, set: adBlocker.setEnabled))
                     if adBlocker.isEnabled {
                         PreferenceRowDivider()
                         listToggle("Block Ads", list: "EasyList")
