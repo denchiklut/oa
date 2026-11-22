@@ -11,11 +11,7 @@ struct AirTrafficControlSheet: View {
             HStack {
                 Text("Air Traffic Control").font(.headline)
                 Spacer()
-                Button("New Route") {
-                    let route = LinkRouting.Route()
-                    store.linkRouting.routes.append(route)
-                    focusedRoute = route.id
-                }
+                Button("New Route", action: addRoute)
                 Button {
                     dismiss()
                 } label: {
@@ -29,14 +25,6 @@ struct AirTrafficControlSheet: View {
             ScrollViewReader { scroll in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        if store.linkRouting.routes.isEmpty {
-                            Text(
-                                "Routes let you choose where specific sites open inside Oa. For example, you can route Spotify links to always open inside your Personal space."
-                            )
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 80)
-                        }
                         ForEach($store.linkRouting.routes) { $route in
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
@@ -82,6 +70,15 @@ struct AirTrafficControlSheet: View {
         }
         .frame(width: 506, height: 450)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onChange(of: store.linkRouting.routes.isEmpty, initial: true) { _, isEmpty in
+            if isEmpty { addRoute() }
+        }
+    }
+
+    private func addRoute() {
+        let route = LinkRouting.Route()
+        store.linkRouting.routes.append(route)
+        focusedRoute = route.id
     }
 
     private func destination(_ selection: Binding<UUID?>) -> some View {
