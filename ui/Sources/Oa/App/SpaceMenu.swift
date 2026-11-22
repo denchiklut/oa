@@ -16,23 +16,23 @@ struct SpaceMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.items = [
-            SpaceMenuItem("Change Space Icon…", changeIcon),
-            SpaceMenuItem("Rename Space…", rename),
-            SpaceMenuItem("Edit Theme Color…", editTheme),
-            SpaceMenuItem("Set Profile", submenu: profiles()),
+            MenuActionItem("Change Space Icon…", changeIcon),
+            MenuActionItem("Rename Space…", rename),
+            MenuActionItem("Edit Theme Color…", editTheme),
+            MenuActionItem("Set Profile", submenu: profiles()),
             .separator(),
-            SpaceMenuItem("New Folder"),
-            SpaceMenuItem("Live Folders", submenu: NSMenu(), enabled: false),
+            MenuActionItem("New Folder"),
+            MenuActionItem("Live Folders", submenu: NSMenu(), enabled: false),
             .separator(),
-            SpaceMenuItem("Share Space…"),
-            SpaceMenuItem("Export “\(space.name)” into Folder", submenu: NSMenu(), enabled: false),
+            MenuActionItem("Share Space…"),
+            MenuActionItem("Export “\(space.name)” into Folder", submenu: NSMenu(), enabled: false),
             .separator(),
         ]
         if !inLibrary {
-            menu.addItem(SpaceMenuItem("Manage Spaces…") { [model] in model.viewLibrary(.spaces) })
+            menu.addItem(MenuActionItem("Manage Spaces…") { [model] in model.viewLibrary(.spaces) })
             menu.addItem(.separator())
         }
-        let delete = SpaceMenuItem("Delete Space") { [model, space] in SpaceDeletion.confirm(space, in: model) }
+        let delete = MenuActionItem("Delete Space") { [model, space] in SpaceDeletion.confirm(space, in: model) }
         delete.isEnabled = model.state.spaces.count > 1
         menu.addItem(delete)
         return menu
@@ -43,7 +43,7 @@ struct SpaceMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         for profile in model.profiles.sorted(by: { $0.name < $1.name }) {
-            let item = SpaceMenuItem(profile.name) { [model, space] in
+            let item = MenuActionItem(profile.name) { [model, space] in
                 _ = ProfileDialogUtils.confirmSwitch([space.id], to: profile.id, in: model)
             }
             item.state = profile.id == space.profileID ? .on : .off
@@ -51,7 +51,7 @@ struct SpaceMenu {
         }
         menu.addItem(.separator())
         menu.addItem(
-            SpaceMenuItem("New Profile…") { [model, space] in
+            MenuActionItem("New Profile…") { [model, space] in
                 ProfileDialogUtils.createProfile(checking: [space.id], in: model)
             })
         return menu
@@ -72,7 +72,7 @@ extension SpaceMenu {
     }
 }
 
-private final class SpaceMenuItem: NSMenuItem {
+final class MenuActionItem: NSMenuItem {
     private let handler: (() -> Void)?
 
     init(_ title: String, submenu: NSMenu? = nil, enabled: Bool = true, _ handler: (() -> Void)? = nil) {
@@ -88,16 +88,17 @@ private final class SpaceMenuItem: NSMenuItem {
     @objc private func choose() { handler?() }
 }
 
-/// Arc's "⋯": the Space menu at the pointer, as Arc pops it up with the click's event.
-struct SpaceMenuButton<Label: View>: View {
-    let menu: () -> SpaceMenu
+/// A menu at the pointer, as Arc pops up the Space menu's "⋯" and the toolbar's Split View menu with the click's
+/// event.
+struct PointerMenuButton<Label: View>: View {
+    let menu: () -> NSMenu
     @ViewBuilder let label: Label
     @State private var anchor = Anchor()
 
     var body: some View {
         Button {
             guard let view = anchor.view, let event = NSApp.currentEvent else { return }
-            let menu = menu().make()
+            let menu = menu()
             menu.appearance = view.window?.effectiveAppearance
             NSMenu.popUpContextMenu(menu, with: event, for: view)
         } label: {

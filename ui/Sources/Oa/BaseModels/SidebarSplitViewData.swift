@@ -161,16 +161,20 @@ extension SidebarState {
 
     /// As Arc's `presentSplitViewWindowContent` with `newPane`: the tab becomes pane `index`, the last when nil, of the
     /// anchor's split, whose panes are equal again as Arc resets them, or of a split made where a lone anchor was.
-    mutating func openInSplitView(_ tabID: UUID, beside anchorID: UUID, in spaceID: UUID, at index: Int? = nil) {
+    /// `orientation` is for a split this makes; one the anchor is in keeps its own.
+    mutating func openInSplitView(
+        _ tabID: UUID, beside anchorID: UUID, in spaceID: UUID, at index: Int? = nil,
+        orientation: SidebarSplitViewData.LayoutOrientation = .horizontal
+    ) {
         guard canOpenInSplitView(tabID, beside: anchorID, in: spaceID) else { return }
         if let splitID = splitViewID(containing: anchorID) {
             tree.move(tabID, into: splitID, at: index)
             updateSplitView(splitID) { $0.itemWidthFactors = [:] }
         } else if let place = tree.location(of: anchorID) {
             let splitID = UUID()
-            tree.insert(
-                SidebarItem(id: splitID, kind: .splitView(SidebarSplitViewData())), into: place.parentID,
-                at: place.index)
+            var data = SidebarSplitViewData()
+            data.layoutOrientation = orientation
+            tree.insert(SidebarItem(id: splitID, kind: .splitView(data)), into: place.parentID, at: place.index)
             tree.move(anchorID, into: splitID)
             tree.move(tabID, into: splitID, at: index)
         }

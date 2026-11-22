@@ -98,6 +98,8 @@ final class WindowModel {
     var proposedSplitViewDropTarget: SplitViewDropTarget?
     /// As Arc's empty pane, which isn't stored: where Add Split View's command bar puts what it opens.
     private(set) var emptySplitViewPaneIndex: Int?
+    /// As Arc's `addPanel(…, orientation:)`: the toolbar's Add Top and Add Bottom Split stack a lone page with it.
+    private var emptySplitViewPaneOrientation: SidebarSplitViewData.LayoutOrientation = .horizontal
     /// Arc's `SplitViewLayoutCache` entry for the window, as seen: its own pane sizes for the split it shows, given
     /// by a resize here; another window, and this one once it has shown something else, start from the stored ones.
     private var splitViewLayout: WindowSplitViewLayout?
@@ -425,6 +427,7 @@ final class WindowModel {
         bar.autocomplete.stop()
         commandBar = nil
         emptySplitViewPaneIndex = nil
+        emptySplitViewPaneOrientation = .horizontal
         if dialog == nil { frontPage?.activate() }
     }
 
@@ -476,6 +479,7 @@ final class WindowModel {
 
     private func perform(_ action: CommandBar.Action, in destination: CommandBar.Destination) {
         let paneIndex = emptySplitViewPaneIndex
+        let orientation = emptySplitViewPaneOrientation
         closeCommandBar()
         switch action {
         case .switchTo(let tabID):
@@ -485,7 +489,8 @@ final class WindowModel {
                 state.canOpenInSplitView(tabID, beside: anchorID, in: selectedSpaceID)
             else { return show(tabID) }
             editSplitView(taking: [anchorID, tabID]) {
-                $0.openInSplitView(tabID, beside: anchorID, in: self.selectedSpaceID, at: paneIndex)
+                $0.openInSplitView(
+                    tabID, beside: anchorID, in: self.selectedSpaceID, at: paneIndex, orientation: orientation)
             }
             select(tabID)
         case .open(let url, background: false) where paneIndex != nil, .openInSplitView(let url):
@@ -496,7 +501,7 @@ final class WindowModel {
             let spaceID = selectedSpaceID
             editSplitView(taking: [anchorID]) {
                 $0.insertTab(tab, atTopOf: spaceID)
-                $0.openInSplitView(tab.id, beside: anchorID, in: spaceID, at: paneIndex)
+                $0.openInSplitView(tab.id, beside: anchorID, in: spaceID, at: paneIndex, orientation: orientation)
             }
             createdDates[tab.id] = .now
             select(tab.id)
@@ -720,7 +725,7 @@ final class WindowModel {
     /// The shown split's, or the one a drop on a lone page proposes.
     var splitViewLayoutOrientation: SidebarSplitViewData.LayoutOrientation {
         selectedTabID.flatMap(state.splitViewID(containing:)).flatMap(state.splitView)?.layoutOrientation
-            ?? proposedSplitViewDropTarget?.layoutOrientation ?? .horizontal
+            ?? proposedSplitViewDropTarget?.layoutOrientation ?? emptySplitViewPaneOrientation
     }
 
     /// Arc's `handleSidebarItemDroppedOnSplitView`, as seen: at an edge the tab becomes a pane there, in a split made
@@ -753,9 +758,12 @@ final class WindowModel {
     }
 
     /// Arc's `addPanel`: an empty pane, the last one unless a pane's menu placed it, and the command bar to fill it.
-    func addSplitViewPane(at index: Int? = nil) {
+    func addSplitViewPane(
+        at index: Int? = nil, orientation: SidebarSplitViewData.LayoutOrientation = .horizontal
+    ) {
         guard canAddSplitViewPane else { return }
         emptySplitViewPaneIndex = index ?? presentedTabIDs.count
+        emptySplitViewPaneOrientation = orientation
         openCommandBar(.newTab)
     }
 

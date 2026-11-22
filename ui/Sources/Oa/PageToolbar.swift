@@ -2,7 +2,7 @@ import DevKit
 import SwiftUI
 
 /// Arc's toolbar along the top of the page, shown by View ▸ Show Toolbar: back, forward and reload at its start,
-/// the host in the middle behind copy link, Site Controls 41 pt from its end, where Arc's Split View button follows.
+/// the host in the middle behind copy link, then Site Controls and the Split View menu at its end.
 /// It takes the colour of its page's top right corner, as Arc's does, and one view is one page's toolbar.
 struct PageToolbar: View {
     /// Arc's key. LIKELY kept across launches as Arc's default is; one setting for every window, as seen in Arc.
@@ -36,9 +36,11 @@ struct PageToolbar: View {
                     Spacer()
                     SiteControlsButton(
                         model: model, size: CGSize(width: 32, height: 28), showingSiteControls: $showingSiteControls)
+                    SplitViewMenuButton(model: model)
+                        .padding(.leading, 4)
                 }
                 .padding(.leading, 5)
-                .padding(.trailing, 41)
+                .padding(.trailing, 5)
                 // The host is centred: Arc balances copy link with a second button after it.
                 HStack(spacing: 3) {
                     CopyLinkButton(model: model, size: 24)
@@ -74,5 +76,62 @@ extension TopBarColorClient {
     /// As Arc's toolbar when its page changes: the page's last colour, else its host's cached one, else white.
     func startingColor(for page: any Page) -> NSColor {
         appliedColor(for: page) ?? cachedColor(for: page) ?? .white
+    }
+}
+
+/// As seen in Arc: a menu at the pointer that opens an empty pane on a side of the page, as Add Split View does,
+/// and off while no tab is selected. Its ink and fills were measured over white and #111111.
+private struct SplitViewMenuButton: View {
+    let model: WindowModel
+
+    var body: some View {
+        PointerMenuButton {
+            let item = { (title: String, index: Int, orientation: SidebarSplitViewData.LayoutOrientation) in
+                MenuActionItem(title) { [model] in model.addSplitViewPane(at: index, orientation: orientation) }
+            }
+            let menu = NSMenu()
+            menu.items = [
+                item("Add Right Split", 1, .horizontal), item("Add Left Split", 0, .horizontal), .separator(),
+                item("Add Top Split", 0, .vertical), item("Add Bottom Split", 1, .vertical),
+            ]
+            return menu
+        } label: {
+            Image(systemName: "square.split.2x1")
+                .font(.system(size: 14))
+                .frame(width: 32, height: 24)
+        }
+        .buttonStyle(Style())
+        .disabled(!model.canAddSplitViewPane)
+        .help("Split View Options")
+        .accessibilityLabel("Split View Menu")
+    }
+
+    private struct Style: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View { Glyph(configuration: configuration) }
+
+        private struct Glyph: View {
+            let configuration: Configuration
+            @Environment(\.isEnabled) private var isEnabled
+            @Environment(\.theme) private var theme
+            @State private var hovering = false
+
+            var body: some View {
+                let ink: Color = theme.isDark ? .white : .black
+                configuration.label
+                    .foregroundStyle(isEnabled ? ink.opacity(theme.isDark ? 0.67 : 0.55) : theme.disabledIcon)
+                    .background(
+                        ink.opacity(fill), in: RoundedRectangle(cornerRadius: 6)
+                    )
+                    .contentShape(Rectangle())
+                    .onHover { hovering = $0 }
+                    .animation(.easeOut(duration: 0.14), value: hovering)
+            }
+
+            private var fill: Double {
+                guard isEnabled else { return 0 }
+                if configuration.isPressed { return theme.isDark ? 0.13 : 0.09 }
+                return hovering ? (theme.isDark ? 0.09 : 0.05) : 0
+            }
+        }
     }
 }
