@@ -5,14 +5,46 @@ struct GeneralPreferencePane: View {
     let adBlocker: AdBlocker
     let showProfiles: () -> Void
     @AppStorage(QuitWarning.key) private var warnsBeforeQuitting = QuitWarning.isOnByDefault
+    @State private var showsUpdateInfo = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 PreferencesPaneSection {
+                    PreferenceRow(height: 36) {
+                        HStack(spacing: 4) {
+                            Text("Automatically update my Oa")
+                            Button {
+                                showsUpdateInfo.toggle()
+                            } label: {
+                                Image(systemName: "info.circle")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("About automatic updates")
+                            .popover(isPresented: $showsUpdateInfo) {
+                                Text("Automatic updates are unavailable in this build of Oa.")
+                                    .padding()
+                            }
+                        }
+                    } control: {
+                        Toggle("Automatically update my Oa", isOn: .constant(false))
+                            .labelsHidden()
+                            .controlSize(.mini)
+                            .disabled(true)
+                    }
+                    PreferenceRowDivider()
                     toggle("Warn before quitting", isOn: $warnsBeforeQuitting)
                 }
                 PreferencesPaneSection {
+                    PreferenceRow {
+                        Text("Previews")
+                    } control: {
+                        Button("Previews Settings…") {}
+                            .disabled(true)
+                    }
+                    .help("Favorites previews are unavailable in this build of Oa.")
+                    PreferenceRowDivider()
                     PreferenceRow(height: 48) {
                         Text("Manage your default search engine, Auto-Archive, and downloads in Profile Settings.")
                             .frame(maxWidth: 334, alignment: .leading)
@@ -71,7 +103,7 @@ struct GeneralPreferencePane: View {
         Toggle(isOn: isOn) {
             Text(title).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .controlSize(.small)
+        .controlSize(.mini)
         .font(.body)
         .padding(.horizontal, 10)
         .frame(height: 36)
