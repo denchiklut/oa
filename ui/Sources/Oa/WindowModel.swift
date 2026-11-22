@@ -662,22 +662,36 @@ final class WindowModel {
         }
     }
 
-    /// As seen in Arc: Move to ▸ takes the split whole, with its pages, to the top of that Space's list. A selected split
-    /// takes the window to that Space with it; one that isn't leaves the window where it is. Oa's own: only the
-    /// Spaces of the split's profile take it, as Oa's pages can't change profile.
+    /// As seen in Arc: Move to ▸ takes the split whole to the top of that Space's list. A selected split takes the
+    /// window to that Space with it; one that isn't leaves the window where it is. A Space of another profile asks
+    /// first, and as a page can't change profile, the split's pages close and load again in that profile, at once when
+    /// the window follows and once selected otherwise, with nothing of the old profile's.
     func moveSplitView(_ splitID: UUID, toSpace spaceID: UUID) {
-        guard canMoveSplitView(splitID, toSpace: spaceID) else { return }
+        guard canMoveSplitView(splitID, toSpace: spaceID), let space = state.space(spaceID),
+            let tabIDs = state.tree[splitID]?.childIDs
+        else { return }
         let focused = presentedTabIDs.contains { state.splitViewID(containing: $0) == splitID } ? selectedTabID : nil
-        store.edit { $0.move(splitID, toSpace: spaceID) }
-        guard let focused else { return }
-        selectedTabIDs[selectedSpaceID] = nil
-        selectSpace(spaceID)
-        select(focused)
+        let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
+        let sourceSpaceID = selectedSpaceID
+        let move = { [weak self] in
+            guard let self, canMoveSplitView(splitID, toSpace: spaceID) else { return }
+            if crossesProfile { for window in store.windows { window.dropPages(of: tabIDs) } }
+            store.edit { $0.move(splitID, toSpace: spaceID) }
+            guard let focused else { return }
+            selectedTabIDs[sourceSpaceID] = nil
+            selectSpace(spaceID)
+            select(focused)
+        }
+        if crossesProfile {
+            ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space, in: self, proceed: move)
+        } else {
+            move()
+        }
     }
 
     func canMoveSplitView(_ splitID: UUID, toSpace spaceID: UUID) -> Bool {
-        guard let tabID = state.tree[splitID]?.childIDs.first, let space = state.space(spaceID) else { return false }
-        return state.space(containing: tabID)?.id != spaceID && state.profile(containing: tabID)?.id == space.profileID
+        guard let tabID = state.tree[splitID]?.childIDs.first, state.space(spaceID) != nil else { return false }
+        return state.space(containing: tabID)?.id != spaceID
     }
 
     /// As seen in Arc: the tab is selected, alone, right after the split it left.
