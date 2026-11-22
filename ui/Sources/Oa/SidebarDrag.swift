@@ -20,6 +20,10 @@ final class SidebarDrag {
         /// without it.
         var index: Int
         var line: CGRect?
+        /// The row whose middle the tab is held on, which it would make a split with or join, last when held on the
+        /// right half of a split's cell.
+        var combine: UUID?
+        var combinesLast = false
     }
 
     struct RowFrame {
@@ -45,6 +49,8 @@ final class SidebarDrag {
 
     /// A tab, or a split's cell or tile, which moves whole.
     private(set) var entry: SidebarEntry?
+    /// A link dragged in from a page.
+    @ObservationIgnored private var link = false
     private(set) var source: Section?
     private(set) var target: Target?
     private(set) var location = CGPoint.zero
@@ -62,6 +68,8 @@ final class SidebarDrag {
     @ObservationIgnored private var showsPrevious = false
     /// As measured on Arc: the edge of a pane the pointer entered, which holds until the pane's middle.
     @ObservationIgnored private var heldEdge: (pane: Int, edge: Edge)?
+    /// The row under the pointer's middle band, and since when.
+    @ObservationIgnored private var combineCandidate: (id: UUID, since: Date)?
 
     private enum Edge {
         case left
@@ -83,6 +91,28 @@ final class SidebarDrag {
             previousTabID = previous
         }
         self.location = location
+        retarget(model: model)
+    }
+
+    /// As seen in Arc: a link dragged from a page over the list shows the line, and over a split's cell joins it.
+    func updateLink(at point: CGPoint, model: WindowModel) {
+        link = true
+        location = point
+        retarget(model: model)
+    }
+
+    /// Where the link was let go.
+    @discardableResult
+    func endLink() -> Target? {
+        defer {
+            link = false
+            combineCandidate = nil
+            target = nil
+        }
+        return link ? target : nil
+    }
+
+    private func retarget(model: WindowModel) {
         let next = target(at: location, model: model)
         if next != target { target = next }
         let dropTarget = next == nil ? splitViewDropTarget(at: location, model: model) : nil
@@ -97,9 +127,15 @@ final class SidebarDrag {
     func finish(model: WindowModel, layout: WindowLayoutController) {
         guard let entry, let tab = entry.tabs.first, !settling else { return }
         heldEdge = nil
-        if model.proposedSplitViewDropTarget != nil {
-            model.acceptSplitViewDrop(of: tab.id)
+        combineCandidate = nil
+        if model.proposedSplitViewDropTarget != nil || target?.combine != nil {
+            if let combine = target?.combine {
+                model.combineIntoSplitView(tab.id, onto: combine, last: target?.combinesLast == true)
+            } else {
+                model.acceptSplitViewDrop(of: tab.id)
+            }
             self.entry = nil
+            target = nil
             source = nil
             showsPrevious = false
             return layout.setHold(.drag, false)
@@ -248,8 +284,10 @@ final class SidebarDrag {
     /// The pointer picks the place, as AppKit's drag destinations do: among the Favorites the slot under it, in the
     /// list the gap between the rows around it.
     private func target(at point: CGPoint, model: WindowModel) -> Target? {
-        guard let entry, let list = lists[model.selectedSpaceID] else { return nil }
+        guard entry != nil || link, let list = lists[model.selectedSpaceID] else { return nil }
         if grid.contains(point) {
+            // A link dropped on the Favorites wasn't tried in Arc; Oa's own: nothing.
+            guard let entry else { return nil }
             let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != entry.id }.count
             let slots = FavoritesGrid.Layout(count: others + 1, width: grid.width)
             let column = Int((point.x - grid.minX - 4) / (slots.tileWidth + 8))
@@ -273,13 +311,73 @@ final class SidebarDrag {
             } else {
                 pinned ? list.pinnedTop : list.newTab.maxY + 0.5
             }
+        let section = pinned ? Section.pinned : .today
+        if let combine = combineTarget(at: point, among: ids, model: model) {
+            let last = model.state.splitView(combine) != nil && point.x > rows[combine]?.rect.midX ?? .infinity
+            return Target(section: section, index: index, combine: combine, combinesLast: last)
+        }
         let line = CGRect(x: list.area.minX + 16, y: y - 3, width: list.area.width - 27.5, height: 6)
-        return Target(section: pinned ? .pinned : .today, index: index, line: line)
+        return Target(section: section, index: index, line: line)
+    }
+
+    /// As measured on Arc: a tab held on the middle half of another row for 0.2 s from entering it would make a split
+    /// with it, or join its split, and on a row's edges the line comes back. A split's cell takes a dragged split
+    /// nowhere, and a link only into a split: Arc's link held on a plain row goes into its tab's item, out of sight,
+    /// so Oa's opens at the line.
+    private func combineTarget(at point: CGPoint, among ids: [UUID], model: WindowModel) -> UUID? {
+        let held: UUID? = if case .tab(let tab) = entry { tab.id } else { nil }
+        let band = { (rect: CGRect) in rect.minY + 11 <= point.y && point.y <= rect.minY + 32 }
+        guard held != nil || link,
+            let id = ids.first(where: { rows[$0].map { $0.rect.contains(point) && band($0.rect) } == true }),
+            held.map({ model.canCombineIntoSplitView($0, onto: id) }) ?? model.canDropLink(inSplitView: id)
+        else {
+            combineCandidate = nil
+            return nil
+        }
+        guard let candidate = combineCandidate, candidate.id == id else {
+            combineCandidate = (id, .now)
+            Task {
+                try? await Task.sleep(for: .milliseconds(200))
+                if combineCandidate?.id == id { retarget(model: model) }
+            }
+            return target?.combine == id ? id : nil
+        }
+        return Date.now.timeIntervalSince(candidate.since) >= 0.19 ? id : nil
     }
 }
 
 extension EnvironmentValues {
     @Entry var sidebarDrag: SidebarDrag?
+}
+
+/// A link dragged in from a page, over the sidebar.
+struct SidebarLinkDrop: DropDelegate {
+    let model: WindowModel
+    let drag: SidebarDrag
+
+    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.url]) }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        drag.updateLink(at: info.location, model: model)
+        return DropProposal(operation: drag.target == nil ? .forbidden : .copy)
+    }
+
+    func dropExited(info: DropInfo) { drag.endLink() }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let target = drag.endLink(), let provider = info.itemProviders(for: [.url]).first else { return false }
+        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+            guard let url else { return }
+            Task { @MainActor in
+                if let splitID = target.combine {
+                    model.openDroppedLink(url, inSplitView: splitID, last: target.combinesLast)
+                } else {
+                    model.openDroppedLink(url, pinned: target.section == .pinned, at: target.index)
+                }
+            }
+        }
+        return true
+    }
 }
 
 extension View {
@@ -304,7 +402,8 @@ struct SidebarDragLayer: View {
                     .frame(width: line.width, height: line.height)
                     .offset(x: line.minX, y: line.minY)
             }
-            if let entry = drag.entry {
+            // As seen in Arc: held on a tab's row, the copy is gone into the row's preview of the split.
+            if let entry = drag.entry, drag.target?.combine.map({ model.state.splitView($0) != nil }) ?? true {
                 SidebarDragPreview(model: model, drag: drag, entry: entry, morph: drag.morph)
             }
         }

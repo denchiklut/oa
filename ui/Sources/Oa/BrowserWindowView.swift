@@ -85,6 +85,7 @@ struct BrowserWindowView: View {
                     .zIndex(4)
             }
         }
+        .onDrop(of: [.url], delegate: SidebarLinkDrop(model: model, drag: sidebarDrag))
         .coordinateSpace(.named(SidebarDrag.space))
         .overlay(alignment: .topLeading) {
             SidebarDragLayer(model: model, drag: sidebarDrag)

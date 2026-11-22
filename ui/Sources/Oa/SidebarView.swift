@@ -664,7 +664,8 @@ struct TabRow: View {
             pinned && !inCard && (current || model.leftAddress(tab) != nil) ? .minus : .close
         let peek = model.peeks[tab.id]
         let dragged = !inCard && drag?.entry?.id == tab.id
-        let showsButton = hovering && !dragged
+        let combining = !inCard && drag?.target?.combine == tab.id
+        let showsButton = hovering && !dragged && !combining
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
         HStack(spacing: 0) {
             if model.isRecording(tab) { RecordingDot().padding(.trailing, 2) }
@@ -684,6 +685,12 @@ struct TabRow: View {
         .background {
             card.fill(selected ? theme.selectedCard : hovering ? theme.itemFill : .clear)
                 .shadow(color: selected ? theme.selectedShadow : .clear, radius: 1, y: 1)
+        }
+        .opacity(combining ? 0 : 1)
+        .overlay {
+            if combining, let held = drag?.entry?.tabs.first {
+                SplitViewCombinePreview(model: model, tabs: [held, tab])
+            }
         }
         .contentShape(card)
         .gesture(

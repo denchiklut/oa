@@ -77,8 +77,13 @@ struct SplitViewCellView: View {
         .padding(.trailing, hovering && (!selected || pinned) ? 34 : 4)
         .frame(height: 36)
         .background {
-            card.fill(selected ? theme.selectedCard : hovering ? theme.itemFill : .clear)
-                .shadow(color: selected ? theme.selectedShadow : .clear, radius: 1, y: 1)
+            // As seen in Arc: a tab held on the cell to join the split lights it.
+            card.fill(
+                selected
+                    ? theme.selectedCard
+                    : drag?.target?.combine == splitID ? theme.itemHoveredFill : hovering ? theme.itemFill : .clear
+            )
+            .shadow(color: selected ? theme.selectedShadow : .clear, radius: 1, y: 1)
         }
         .contentShape(card)
         // As measured on Arc: the split's card is 1.5 pt narrower at each side than a tab's.
@@ -160,7 +165,7 @@ struct SplitViewCellView: View {
 
     /// Arc's `SplitViewItem.ChildItem`: 28 pt high, its title gone under Arc's 20 pt of room for it, and with the ✕
     /// of the selected split under the pointer.
-    private struct ChildItem: View {
+    fileprivate struct ChildItem: View {
         let model: WindowModel
         let tab: SidebarTab
         let isSelected: Bool
@@ -199,5 +204,32 @@ struct SplitViewCellView: View {
             .background { if isSelected { card.fill(theme.isDark ? .white.opacity(0.07) : .black.opacity(0.08)) } }
             .contentShape(card)
         }
+    }
+}
+
+/// As seen in Arc: the row a tab is held on, drawn as the split the drop would make, the held tab first and lit, with
+/// one ✕.
+struct SplitViewCombinePreview: View {
+    let model: WindowModel
+    let tabs: [SidebarTab]
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        HStack(spacing: 0) {
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                if index > 0 { Color.clear.frame(width: 8.5) }
+                SplitViewCellView.ChildItem(model: model, tab: tab, isSelected: index == 0, showsClose: false)
+            }
+        }
+        .padding(.leading, 4)
+        .padding(.trailing, 34)
+        .frame(height: 36)
+        .background(card.fill(theme.itemFill))
+        .overlay(alignment: .trailing) {
+            CellGlyph(glyph: .close).frame(width: 24, height: 24).padding(.trailing, 7.5)
+        }
+        .padding(.horizontal, 1.5)
+        .allowsHitTesting(false)
     }
 }
