@@ -215,6 +215,22 @@ extension SidebarState {
         }
     }
 
+    /// As seen in Arc: a copy right after the split, with new tabs at the same addresses, its title, layout and
+    /// sizes. Returns the new tabs' IDs.
+    mutating func duplicateSplitView(_ id: UUID) -> [UUID] {
+        guard var data = splitView(id), let place = tree.location(of: id) else { return [] }
+        let tabs = tree.tabs(under: id)
+        let copies = tabs.map { SidebarTab(id: UUID(), title: $0.title, url: $0.url, viewedAt: .now) }
+        data.itemWidthFactors = Dictionary(
+            uniqueKeysWithValues: zip(tabs, copies).compactMap { tab, copy in
+                data.itemWidthFactors[tab.id].map { (copy.id, $0) }
+            })
+        let copyID = UUID()
+        tree.insert(SidebarItem(id: copyID, kind: .splitView(data)), into: place.parentID, at: place.index + 1)
+        for copy in copies { tree.append(SidebarItem(id: copy.id, kind: .tab(copy)), to: copyID) }
+        return copies.map(\.id)
+    }
+
     /// Oa's own: an empty title clears it, and the cell shows the tabs again.
     mutating func renameSplitView(_ id: UUID, to title: String) {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)

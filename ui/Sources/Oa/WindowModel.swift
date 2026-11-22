@@ -644,6 +644,16 @@ final class WindowModel {
         }
     }
 
+    /// As seen in Arc: the copy isn't selected, and its pages load at once in the background.
+    func duplicateSplitView(_ splitID: UUID) {
+        var tabIDs: [UUID] = []
+        store.edit { tabIDs = $0.duplicateSplitView(splitID) }
+        for tabID in tabIDs {
+            createdDates[tabID] = .now
+            ensurePage(tabID)
+        }
+    }
+
     /// As seen in Arc: the tab is selected, alone, right after the split it left.
     func separateFromSplitView(_ tabID: UUID) {
         store.edit { $0.removeFromSplitView([tabID]) }
