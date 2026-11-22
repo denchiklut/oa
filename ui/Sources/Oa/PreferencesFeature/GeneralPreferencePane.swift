@@ -21,17 +21,13 @@ struct GeneralPreferencePane: View {
                     }
                 }
                 PreferencesPaneSection {
-                    PreferenceRow {
-                        Text("Oa’s Ad Blocker").fontWeight(.semibold)
-                    } control: {
-                        Button(adBlocker.isEnabled ? "Turn Off" : "Turn On") {
-                            adBlocker.setEnabled(!adBlocker.isEnabled)
-                        }
+                    toggle("Oa’s Ad Blocker", isOn: Binding(get: { adBlocker.isEnabled }, set: adBlocker.setEnabled))
+                    if adBlocker.isEnabled {
+                        PreferenceRowDivider()
+                        listToggle("Block Ads", list: "EasyList")
+                        PreferenceRowDivider()
+                        listToggle("Block Trackers", list: "EasyPrivacy")
                     }
-                    PreferenceRowDivider()
-                    listToggle("Block Ads", list: "EasyList")
-                    PreferenceRowDivider()
-                    listToggle("Block Trackers", list: "EasyPrivacy")
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Applies to all profiles.")
@@ -61,7 +57,6 @@ struct GeneralPreferencePane: View {
                 adBlocker.setList(list, enabled: $0)
             }
         )
-        .disabled(!adBlocker.isEnabled)
     }
 
     private func toggle(_ title: String, isOn: Binding<Bool>) -> some View {
