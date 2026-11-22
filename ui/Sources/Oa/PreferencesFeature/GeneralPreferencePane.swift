@@ -21,13 +21,21 @@ struct GeneralPreferencePane: View {
                     }
                 }
                 PreferencesPaneSection {
-                    toggle("Ad Blocker", isOn: Binding(get: { adBlocker.isEnabled }, set: adBlocker.setEnabled))
-                    if adBlocker.isEnabled {
-                        PreferenceRowDivider()
+                    PreferenceRow {
+                        Text("Ad Blocker").bold()
+                    } control: {
+                        Button(adBlocker.isEnabled ? "Turn Off" : "Turn On") {
+                            adBlocker.setEnabled(!adBlocker.isEnabled)
+                        }
+                    }
+                    PreferenceRowDivider()
+                    VStack(spacing: 0) {
                         listToggle("Block Ads", list: "EasyList")
                         PreferenceRowDivider()
                         listToggle("Block Trackers", list: "EasyPrivacy")
                     }
+                    .disabled(!adBlocker.isEnabled)
+                    .opacity(adBlocker.isEnabled ? 1 : 0.4)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Applies to all profiles.")
