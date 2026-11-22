@@ -17,6 +17,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private let spaceNamesWithMissingProfiles: [String]
     private var askingToQuit = false
     private var isLaunching = true
+    private var pendingLinks: [URL] = []
     private static var current: ApplicationDelegate?
 
     static func start(engine: any BrowserApplication) {
@@ -58,6 +59,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if windows.isEmpty {
             if saved.isEmpty { openWindow() } else { saved.forEach { openWindow(restoring: $0) } }
         }
+        openExternalLinks(pendingLinks)
+        pendingLinks.removeAll()
         store.startAutoArchive()
         NSApplication.shared.activate(ignoringOtherApps: true)
         // From the run loop, so the pages go on working under the alert: they run on the main queue.
@@ -79,6 +82,23 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             \(spaceNamesWithMissingProfiles.joined(separator: ", "))
             """
         alert.runModal()
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let links = urls.filter { ["http", "https"].contains($0.scheme?.lowercased()) && $0.host != nil }
+        if isLaunching { pendingLinks.append(contentsOf: links) } else { openExternalLinks(links) }
+    }
+
+    private func openExternalLinks(_ links: [URL]) {
+        guard !links.isEmpty else { return }
+        let front = frontWindows.first ?? openWindow()
+        let recent = front.selectedSpaceID
+        for url in links {
+            let destination = store.linkRouting.destination(for: url, recent: recent)
+            let model = frontWindows.first { $0.selectedSpaceID == destination } ?? front
+            model.openExternalLink(url, in: destination)
+            model.bringToFront()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {

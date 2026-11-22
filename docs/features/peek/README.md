@@ -60,8 +60,10 @@ Inside a Peek, plain links navigate the Peek. `target=_blank` and `window.open`
 make a selected tab after the opener's earlier children, which hides the Peek
 until the opener is reselected; a ⌘-click makes a background tab there and
 leaves the Peek up. A Shift-click inside a Peek makes a tab too, Oa's own
-choice. Expand makes the Peek's page a selected tab after the opener's earlier
-children, the same live page with no reload, and asks nothing. ✕, a click on
+choice. Expand follows Air Traffic Control. Within the opener’s Space, a new
+tab follows the opener’s earlier children. Within the same profile, the live
+page moves with its history. Across profiles, Oa loads the URL in the
+destination profile. ✕, a click on
 the backdrop and ⌘W close the page as the user would, so a `beforeunload`
 handler can keep the Peek with "Leave site?" over it, as Arc does, and archive
 it under the tab's Space once it is gone, as do archiving the opener, closing
@@ -75,14 +77,14 @@ the entry, as Arc does; nothing shows when the tab already has a Peek, or when
 the tab is gone, which also keeps the entry. A Peek that closed itself, one
 replaced by a new request and one archived with its opener are not brought
 back. Restore in the Archive makes the entry a tab at the top of the unpinned
-section.
+section of its routed Space, or selects a tab already at that URL there.
 Nothing about a Peek is saved, so none survives a relaunch, as in Arc.
 
 Clicking an Archive row shows the entry's page in a Peek over the list, made
 from the saved URL with no history, centered over the whole window as Arc does
 over its Library, with nothing dimmed behind it; the entry stays. Its Expand
 removes the entry and puts the tab, selected, at the top of the unpinned section
-of the Space the window shows, as Arc does. When another window has already
+of the routed Space when there is no existing destination tab. When another window has already
 brought the entry back, Expand selects that tab instead of adding a second row,
 Oa's own choice after Arc's ⇧⌘T, which selects a tab that is already open.
 Closing it, or leaving the Archive view, closes the page and keeps the entry;
@@ -92,6 +94,23 @@ control, Arc's Create Split View or Add to Split View, makes the Peek's page a
 pane on the right of the tab it was opened from; Oa's own for now, it shows
 only where that tab can take a pane, so not on a pinned tab or a Favorite.
 Arc's copy-link icon doesn't exist in Oa yet.
+
+## Air Traffic Control
+
+In Settings → Links, scroll below Peek and choose **Air Traffic Control…**.
+Use **New Route** to choose **Contains** or **Is equal to**, enter a URL pattern,
+and pick a Space. The **Default** menu handles unmatched links. Both menus
+offer **Most Recent Space**. Little Oa is disabled until its window is available.
+
+Oa tries rules in display order and skips blank patterns. Contains ignores
+case. Equality accepts a URL with or without a scheme, ignores host case and
+treats an empty path as `/`. Rules follow a Space through renames. Deleting
+a Space removes its rules and resets a default pointing to it.
+
+External HTTP and HTTPS links, Archive restores, and expanded Peeks use these
+destinations. Oa reuses a tab at the requested URL in the destination Space.
+For external links, Most Recent Space is the front browser window’s Space
+when the links arrive. Restore and Expand use the invoking window’s Space.
 
 Related: [UI architecture](../../architecture/ui/README.md) · [Sidebar state](../sidebar/README.md) · [Favorites](../favorites/README.md) · [Saved state and recovery](../saved-state/README.md).
 

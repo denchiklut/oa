@@ -19,10 +19,13 @@ struct SidebarSnapshot: Codable {
     var tree: Tree
     var archive: [SidebarArchivedTab]
 
-    private enum Key: String, CodingKey { case version, profiles, spaces, tree, archive }
+    var linkRouting: LinkRouting
+
+    private enum Key: String, CodingKey { case version, profiles, spaces, tree, archive, linkRouting }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: Key.self)
+        linkRouting = try values.decodeIfPresent(LinkRouting.self, forKey: .linkRouting) ?? LinkRouting()
         version = try values.decode(Int.self, forKey: .version)
         profiles = try values.decode([SidebarProfile].self, forKey: .profiles)
         spaces = try values.decode([SidebarSpace].self, forKey: .spaces)
@@ -108,6 +111,7 @@ struct SidebarSnapshot: Codable {
     }
 
     init(state: SidebarState) {
+        linkRouting = state.linkRouting
         profiles = state.profiles
         spaces = state.spaces
         let items = state.tree.rootIDs.flatMap { rootID in
@@ -119,7 +123,8 @@ struct SidebarSnapshot: Codable {
 
     func state() throws -> SidebarState {
         let state = SidebarState(
-            profiles: profiles, spaces: spaces, tree: SidebarTree(rootIDs: tree.rootIDs, items: tree.items.map(\.item)),
+            profiles: profiles, spaces: spaces, linkRouting: linkRouting,
+            tree: SidebarTree(rootIDs: tree.rootIDs, items: tree.items.map(\.item)),
             archive: archive)
         try state.validate()
         return state

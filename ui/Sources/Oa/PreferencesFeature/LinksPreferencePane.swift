@@ -2,6 +2,8 @@ import SwiftUI
 
 struct LinksPreferencePane: View {
     @Bindable var store: SidebarStore
+    let preferences: PreferencesState
+    @State private var showsRoutes = false
 
     var body: some View {
         ScrollView {
@@ -42,11 +44,19 @@ struct LinksPreferencePane: View {
                             "Open a Peek window when clicking on links to other sites",
                             note: "Note: This only affects Favorites and Pinned tabs", isOn: $store.peekFromPinnedTabs)
                     }
+                    PreferencesPaneSection {
+                        PreferenceRow {
+                            Text("Choose where links open inside Oa.")
+                        } control: {
+                            Button("Air Traffic Control…") { showsRoutes = true }
+                        }
+                    }
                 }
                 .padding(.horizontal, 64)
                 .padding(.vertical, 24)
             }
         }
+        .sheet(isPresented: $showsRoutes) { AirTrafficControlSheet(store: store, profiles: preferences.profiles) }
     }
 
     private func linkSwitch(_ title: String, note: String? = nil, isOn: Binding<Bool>) -> some View {
