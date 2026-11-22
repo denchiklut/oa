@@ -79,6 +79,16 @@ order, and each pane is an ordinary tab with its own page.
   Favorites grid take the split whole; over the grid the copy turns into its
   tile, and a Favorite split's tile dragged out turns back into the cell. A
   split is never dropped on the page: the one under the drag is itself.
+- **Dropping on a row.** A tab held on the middle half of another row for
+  0.2 s from entering it turns that row into the split it would make, the held
+  tab first and lit; the drop makes it there, a pinned row's in the pinned
+  section, and the held tab takes the focus. Held on a split's cell, the cell
+  lights up and the tab joins it first, or last from the cell's right half; a
+  full split lights up and takes nothing. On a row's edges the line comes back.
+  A split's cell and the Favorites never combine.
+- **Dropping a link.** A link dragged from a page onto the list opens a tab at
+  the line, loaded in the background; onto a split's cell it joins the split,
+  loaded in the background, and the split isn't selected.
 - **Pinned splits.** Pin Tab on a split's tab pins the whole split, Unpin Tab
   puts it back at the top of the list, children and sizes kept. A pinned split's
   tabs keep their pinned address, and its panes show no "/". On the selected
@@ -143,6 +153,9 @@ Oa's own:
   back into its split while the split is there, else as a plain tab. Arc's
   result for both wasn't seen.
 - Share Split View… is there but off: Oa has no sharing.
+- A link held on a plain row opens at the line. Arc's goes into that tab's
+  item, out of sight, which looks like a bug. A link dropped on a pane isn't
+  handled by the app; Arc's opens as a tab after the split.
 - ⌘⌥ on a link opens a background page; Arc opens Little Arc, which Oa doesn't
   have.
 - A split's row in the command bar takes its focused pane's title; Arc's row
@@ -157,5 +170,4 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: dropping a link or a tab on a sidebar row, and a split's Change
-Icon…, Duplicate and Move to.
+Not there yet: a split's Change Icon…, Duplicate and Move to.

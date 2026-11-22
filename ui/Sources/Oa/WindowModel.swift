@@ -573,6 +573,59 @@ final class WindowModel {
         select(tabID)
     }
 
+    /// A row's tab, or the first of a split's.
+    private func combineAnchor(_ rowID: UUID) -> UUID? {
+        state.splitView(rowID) != nil ? state.tree[rowID]?.childIDs.first : rowID
+    }
+
+    /// As seen in Arc: a full split still lights up under a held tab, and the drop does nothing.
+    func canCombineIntoSplitView(_ tabID: UUID, onto rowID: UUID) -> Bool {
+        combineAnchor(rowID).map { state.canJoinSplitView(tabID, of: $0, in: selectedSpaceID) } ?? false
+    }
+
+    /// As seen in Arc: a tab dropped on a row's middle makes a split with that row's tab where it is, a pinned one's
+    /// in the pinned section, or joins the row's split, first, or last from the cell's right half; it takes the
+    /// focus. Both tabs move as they are, with no copy left behind.
+    func combineIntoSplitView(_ tabID: UUID, onto rowID: UUID, last: Bool) {
+        guard let anchorID = combineAnchor(rowID),
+            state.canOpenInSplitView(tabID, beside: anchorID, in: selectedSpaceID)
+        else { return }
+        let spaceID = selectedSpaceID
+        store.edit { $0.openInSplitView(tabID, beside: anchorID, in: spaceID, at: last ? nil : 0) }
+        select(tabID)
+    }
+
+    /// As seen in Arc: a link dropped in the list is a tab at the line, its page loaded in the background.
+    func openDroppedLink(_ url: URL, pinned: Bool, at index: Int) {
+        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+        let spaceID = selectedSpaceID
+        store.edit {
+            $0.appendTab(tab, in: spaceID)
+            $0.moveTab(tab.id, in: spaceID, pinned: pinned, at: index)
+        }
+        createdDates[tab.id] = .now
+        ensurePage(tab.id)
+    }
+
+    func canDropLink(inSplitView splitID: UUID) -> Bool {
+        guard state.splitView(splitID) != nil, let anchorID = state.tree[splitID]?.childIDs.first else { return false }
+        return state.canAddSplitViewPane(beside: anchorID, in: selectedSpaceID)
+    }
+
+    /// As seen in Arc: a link dropped on a split's cell is its first pane, loaded in the background, and the split
+    /// isn't selected. From the cell's right half it is the last, LIKELY as a dropped tab.
+    func openDroppedLink(_ url: URL, inSplitView splitID: UUID, last: Bool) {
+        guard canDropLink(inSplitView: splitID), let anchorID = state.tree[splitID]?.childIDs.first else { return }
+        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+        let spaceID = selectedSpaceID
+        store.edit {
+            $0.appendTab(tab, in: spaceID)
+            $0.openInSplitView(tab.id, beside: anchorID, in: spaceID, at: last ? nil : 0)
+        }
+        createdDates[tab.id] = .now
+        ensurePage(tab.id)
+    }
+
     /// As seen in Arc: a lone pinned tab or Favorite among `tabIDs` goes into the split as its own item and page, and
     /// a copy keeps its place, its page loaded at once at the address the page was at.
     private func editSplitView(taking tabIDs: [UUID], _ change: (inout SidebarState) -> Void) {
