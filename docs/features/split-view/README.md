@@ -192,5 +192,3 @@ Oa's own:
 
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
-
-Every item of Arc's split view is in, as above.
