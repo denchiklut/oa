@@ -37,6 +37,11 @@ order, and each pane is an ordinary tab with its own page.
   takes the pane away. Nothing is stored until the pane is filled, and no pane is
   outlined meanwhile. The binding is Arc's `addSplitView`, which a page sees
   first; it can be changed in [Settings ▸ Shortcuts](../key-bindings/README.md).
+- **The toolbar's Split View menu.** With View ▸ Show Toolbar, the button after
+  Site Controls opens a menu at the pointer: Add Right Split, which is Add Split
+  View, Add Left Split, then Add Top Split and Add Bottom Split, which stack the
+  page with the empty pane and store the split stacked once it is filled. It is
+  off while no tab is selected, and a split has no toolbar.
 - **The pane's menu.** The focused pane's bar has Arc's Split View menu before
   its ✕: Move Left and Move Right, Add Right Split and Add Left Split, which
   open the empty pane beside this one, Separate Tab from Split, and Convert to
