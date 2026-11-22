@@ -2,8 +2,7 @@ import AppKit
 import DevKit
 import SwiftUI
 
-/// Arc's Settings, with the panes Oa has so far: General, Profiles and Shortcuts. As Arc's: toolbar tabs, one fixed size for
-/// every pane, and the title is the pane's name.
+/// As Arc's Settings: toolbar tabs, one fixed size for every pane, and the title is the pane's name.
 @MainActor
 final class SettingsWindowController: NSWindowController {
     private let tabs = NSTabViewController()
@@ -38,6 +37,7 @@ final class SettingsWindowController: NSWindowController {
                 openSettings(.extensionShortcuts, frontProfile() ?? SidebarProfile.defaultID)
             }
         }
+        add("Advanced", symbol: "slider.horizontal.3") { AdvancedPreferencePane() }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
         window.toolbarStyle = .preference
@@ -131,6 +131,18 @@ final class SettingsWindowController: NSWindowController {
         let item = NSTabViewItem(viewController: controller)
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         tabs.addTabViewItem(item)
+    }
+}
+
+private struct AdvancedPreferencePane: View {
+    @AppStorage(ToolbarAddressLabel.fullURLPreferenceKey) private var showsFullURL = false
+
+    var body: some View {
+        Form {
+            Toggle("Show full URL when Toolbar is enabled", isOn: $showsFullURL)
+                .toggleStyle(.switch)
+        }
+        .formStyle(.grouped)
     }
 }
 

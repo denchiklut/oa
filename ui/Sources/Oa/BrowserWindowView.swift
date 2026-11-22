@@ -166,7 +166,7 @@ struct BrowserWindowView: View {
             if showsToolbar {
                 // A toolbar for each page, so a tab switch shows the page's colour at once, as Arc's toolbar sets its
                 // colour without animation when its page changes.
-                PageToolbar(model: model)
+                PageToolbar(model: model, layout: layout)
                     .id(model.page?.id)
                     .transition(.identity)
                     .opacity(model.placeholder == nil ? 1 : 0)

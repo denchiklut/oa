@@ -1,9 +1,7 @@
 import DevKit
 import SwiftUI
 
-/// Arc's toolbar along the top of the page, shown by View ▸ Show Toolbar: back, forward and reload at its start,
-/// the host in the middle behind copy link, then Site Controls and the Split View menu at its end.
-/// It takes the colour of its page's top right corner, as Arc's does, and one view is one page's toolbar.
+/// As Arc: the toolbar takes its colour from the page's top right corner.
 struct PageToolbar: View {
     /// Arc's key. LIKELY kept across launches as Arc's default is; one setting for every window, as seen in Arc.
     static let key = "topBarURLEnabled"
@@ -13,14 +11,16 @@ struct PageToolbar: View {
     }
 
     let model: WindowModel
+    let layout: WindowLayoutController
     @State private var showingSiteControls = false
     /// As Arc's toolbar when its page changes: the page's last colour, else its host's cached one, else white, until
     /// the page's next sample.
     @State private var initialColor: NSColor?
     @Environment(\.theme) private var windowTheme
 
-    init(model: WindowModel) {
+    init(model: WindowModel, layout: WindowLayoutController) {
         self.model = model
+        self.layout = layout
         _initialColor = State(initialValue: model.page.map(model.topBarColors.startingColor))
     }
 
@@ -29,10 +29,26 @@ struct PageToolbar: View {
         // theme's inks.
         let color = model.page.flatMap { model.topBarColors.appliedColor(for: $0) } ?? initialColor
         let theme = color.map(Theme.init(toolbarOver:)) ?? windowTheme
+        let showsSidebarButton = model.sidebarMode == .noChrome
+        let navigationSize = CGSize(width: 32, height: 24)
+        let navigationSpacing: CGFloat = 5
         VStack(spacing: 0) {
             ZStack {
                 HStack(spacing: 0) {
-                    NavigationButtons(page: model.page, size: CGSize(width: 32, height: 24), spacing: 5)
+                    if showsSidebarButton {
+                        Button {
+                            layout.setSidebarMode(.anchored)
+                        } label: {
+                            Image(systemName: "sidebar.left")
+                                .font(.system(size: 16))
+                                .frame(width: navigationSize.width, height: navigationSize.height)
+                        }
+                        .buttonStyle(ChromeButtonStyle())
+                        .help("Show Sidebar")
+                        .accessibilityLabel("Show Sidebar")
+                        .padding(.trailing, navigationSpacing)
+                    }
+                    NavigationButtons(page: model.page, size: navigationSize, spacing: navigationSpacing)
                     Spacer()
                     SiteControlsButton(
                         model: model, size: CGSize(width: 32, height: 28), showingSiteControls: $showingSiteControls)
@@ -49,17 +65,14 @@ struct PageToolbar: View {
                     Button {
                         model.openCommandBar(.currentTab)
                     } label: {
-                        Text(model.addressLabel ?? "Search or Enter URL…")
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
-                            .foregroundStyle(model.address == nil ? theme.secondaryText : theme.addressText)
+                        ToolbarAddressLabel(url: model.address, placeholder: "Search or Enter URL…")
                             .frame(height: 24)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     Color.clear.frame(width: 24)
                 }
-                .padding(.horizontal, 130)
+                .padding(.horizontal, 130 + (showsSidebarButton ? navigationSize.width + navigationSpacing : 0))
             }
             .frame(height: 32)
             (theme.isDark ? Color.white : .black).opacity(0.05).frame(height: 1)
