@@ -32,7 +32,7 @@ final class SettingsWindowController: NSWindowController {
                 rename: { [weak self] in self?.rename($0) },
                 askAboutArchive: { [weak self] in self?.askAboutArchive($0, for: $1) })
         }
-        add("Links", symbol: "macwindow.on.rectangle") { LinksPreferencePane(store: store) }
+        add("Links", symbol: "macwindow.on.rectangle") { LinksPreferencePane(store: store, preferences: state) }
         add("Shortcuts", symbol: "keyboard") {
             ShortcutsPane(keyBindings: store.keyBindings, state: state) {
                 openSettings(.extensionShortcuts, frontProfile() ?? SidebarProfile.defaultID)

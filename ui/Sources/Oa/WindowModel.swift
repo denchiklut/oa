@@ -113,6 +113,7 @@ final class WindowModel {
     @ObservationIgnored private var closedGroups: [ClosedGroup] = []
     @ObservationIgnored var undoManager: ArcUndoManager?
     private var archivePeekID: UUID?
+    private var archivePeekProfiles: [UUID: UUID] = [:]
 
     var state: SidebarState { store.state }
     var adBlocker: AdBlocker { engine.adBlocker }
@@ -369,6 +370,23 @@ final class WindowModel {
         store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
         createdDates[tab.id] = .now
         select(tab.id)
+    }
+
+    func openExternalLink(_ url: URL, in spaceID: UUID) {
+        exitLibrary()
+        selectSpace(spaceID)
+        if let existing = tab(at: url, in: spaceID) {
+            select(existing)
+        } else {
+            newTab(url)
+        }
+    }
+
+    private func tab(at url: URL, in spaceID: UUID) -> UUID? {
+        state.selectableTabs(in: spaceID).first { tab in
+            if let current = livePage(for: tab.id)?.url { return current == url }
+            return tab.isAt(url)
+        }?.id
     }
 
     /// As Arc: Chromium's History page in a new tab at the top of the Space, in the Space's profile.
@@ -1249,8 +1267,18 @@ final class WindowModel {
     }
 
     func restoreArchived(_ id: UUID) {
-        store.edit { $0.restoreArchived(id, in: selectedSpaceID) }
-        createdDates[id] = .now
+        guard let entry = state.archive.first(where: { $0.id == id }) else { return }
+        let destination = store.linkRouting.destination(
+            for: entry.url, recent: selectedSpaceID)
+        if let url = entry.url, let existing = tab(at: url, in: destination) {
+            store.edit { $0.removeArchived(id) }
+            exitLibrary()
+            selectSpace(destination)
+            select(existing)
+        } else {
+            store.edit { $0.restoreArchived(id, in: destination) }
+            createdDates[id] = .now
+        }
     }
 
     /// As Arc: no history, and the entry stays.
@@ -1265,6 +1293,7 @@ final class WindowModel {
             guard let page = await context.makePage(windowID: id, restoring: nil)?.page, let self else { return }
             guard showingArchive, archivePeekID == entryID else { return page.drop() }
             peeks[entryID] = page
+            archivePeekProfiles[page.id] = profileID
             listen(to: page)
             page.startObservingThumbnails()
             page.load(url)
@@ -1273,29 +1302,51 @@ final class WindowModel {
 
     func expandPeek() {
         guard let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else { return }
-        let tabID = ownerID == archivePeekID ? ownerID : UUID()
-        var tab = SidebarTab(id: tabID, title: page.title, url: page.url, viewedAt: .now)
-        if ownerID == archivePeekID {
-            archivePeekID = nil
-            // Another window brought the entry back; selecting its tab is Oa's own, after Arc's ⇧⌘T.
-            if let spaceID = state.space(containing: ownerID)?.id {
-                dialogs[page.id] = nil
-                permissionRequests[page.id] = nil
-                page.drop()
-                selectSpace(spaceID)
-                return select(ownerID)
+        let fromArchive = ownerID == archivePeekID
+        let sourceProfile =
+            fromArchive ? archivePeekProfiles.removeValue(forKey: page.id) : state.profile(containing: ownerID)?.id
+        if fromArchive { archivePeekID = nil }
+        let url = page.url ?? (fromArchive ? state.archive.first { $0.id == ownerID }?.url : nil)
+        let destination = store.linkRouting.destination(for: url, recent: selectedSpaceID)
+        let restored = fromArchive ? state.space(containing: ownerID) : nil
+        let existing = restored == nil ? url.flatMap { tab(at: $0, in: destination) } : ownerID
+        if let existing {
+            if fromArchive { store.edit { $0.removeArchived(ownerID) } }
+            discardPeekPage(page)
+            exitLibrary()
+            selectSpace(restored?.id ?? destination)
+            select(existing)
+            return
+        }
+        let besideOpener = !fromArchive && destination == selectedSpaceID
+        let tab = SidebarTab(
+            id: fromArchive ? ownerID : UUID(), title: page.title, url: url,
+            viewedAt: .now, openerID: besideOpener ? ownerID : nil)
+        store.edit {
+            if fromArchive { $0.removeArchived(ownerID) }
+            if besideOpener {
+                $0.openTab(tab, from: ownerID, in: destination)
+            } else {
+                $0.insertTab(tab, atTopOf: destination)
             }
-            store.edit {
-                $0.removeArchived(ownerID)
-                $0.insertTab(tab, atTopOf: selectedSpaceID)
-            }
-        } else {
-            tab.openerID = ownerID
-            store.edit { $0.openTab(tab, from: ownerID, in: selectedSpaceID) }
         }
         createdDates[tab.id] = .now
-        install(page, for: tab.id)
+        // A live page belongs to its Chromium profile. Crossing profiles loads the URL in the destination context.
+        if sourceProfile == state.space(destination)?.profileID {
+            install(page, for: tab.id)
+        } else {
+            discardPeekPage(page)
+        }
+        exitLibrary()
+        selectSpace(destination)
         select(tab.id)
+    }
+
+    private func discardPeekPage(_ page: any Page) {
+        dialogs[page.id] = nil
+        permissionRequests[page.id] = nil
+        extensionRequests[page.id] = nil
+        page.drop()
     }
 
     var canAddPeekToSplitView: Bool {
@@ -2021,6 +2072,7 @@ final class WindowModel {
     /// an Archive entry, leaves none.
     private func peekEnded(_ ownerID: UUID, sessionID: PageSessionID?) {
         guard let page = peeks.removeValue(forKey: ownerID) else { return }
+        archivePeekProfiles[page.id] = nil
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
         extensionRequests[page.id] = nil

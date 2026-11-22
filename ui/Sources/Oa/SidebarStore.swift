@@ -9,6 +9,14 @@ import Observation
 @Observable
 final class SidebarStore {
     private(set) var state: SidebarState
+    var linkRouting: LinkRouting {
+        get { state.linkRouting }
+        set {
+            state.linkRouting = newValue
+            scheduleSave()
+        }
+    }
+
     private var removedFavicons = 0
     @ObservationIgnored private(set) var windows: [WindowModel] = []
     var peekOnShiftClick = !UserDefaults.standard.bool(forKey: "disableShiftClickToOpenLinksInModal") {

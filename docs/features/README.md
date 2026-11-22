@@ -179,18 +179,18 @@ matching edge cases or rule-priority semantics.
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Open links from other apps as the default browser | ✅ | ☐ |
-| Air Traffic Control / URL-routing rules | ✅ | ☐ |
-| Create, edit and remove routes | ✅ | ☐ |
-| URL matching: Is equal to / Contains | ✅ | ☐ |
-| Route matching links to a chosen Space | ✅ | ☐ |
+| Open links from other apps as the default browser | ✅ | ✅ |
+| Air Traffic Control / URL-routing rules | ✅ | ✅ |
+| Create, edit and remove routes | ✅ | ✅ |
+| URL matching: Is equal to / Contains | ✅ | ✅ |
+| Route matching links to a chosen Space | ✅ | ✅ |
 | Route matching links to Little Arc | ✅ | ☐ |
-| Most Recent Space as an individual rule destination | ✅ | ☐ |
-| Default destination: chosen Space / Most Recent Space | ✅ | ☐ |
+| Most Recent Space as an individual rule destination | ✅ | ✅ |
+| Default destination: chosen Space / Most Recent Space | ✅ | ✅ |
 | Default destination: Little Arc | ✅ | ☐ |
-| Apply routing when restoring archived tabs † | ✅ | ☐ |
-| Apply routing when opening Peek destinations † | ✅ | ☐ |
-| Reuse an already-open destination tab | ✅ | ☐ |
+| Apply routing when restoring archived tabs † | ✅ | ✅ |
+| Apply routing when opening Peek destinations † | ✅ | ✅ |
+| Reuse an already-open destination tab | ✅ | ✅ |
 
 Sources: Arc [2023][arc23], [2024–2026][arc24], [feature FAQ][arc-faq], and native
 Settings → Links → Air Traffic Control (including operator/destination menus).

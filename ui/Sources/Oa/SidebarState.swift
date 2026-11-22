@@ -205,6 +205,7 @@ struct SidebarTree {
 struct SidebarState {
     var profiles: [SidebarProfile] = []
     var spaces: [SidebarSpace] = []
+    var linkRouting = LinkRouting()
     var tree = SidebarTree()
     /// Oldest first.
     var archive: [SidebarArchivedTab] = []
@@ -346,6 +347,8 @@ struct SidebarState {
     mutating func removeSpace(_ id: UUID, at date: Date = .now) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == id }) else { return }
         for tab in tabs(in: id) { archiveTab(tab.id, reason: .manual, at: date) }
+        linkRouting.routes.removeAll { $0.spaceID == id }
+        if linkRouting.defaultSpaceID == id { linkRouting.defaultSpaceID = nil }
         let space = spaces.remove(at: index)
         tree.removeRoot(space.pinnedRootID)
         tree.removeRoot(space.unpinnedRootID)
@@ -401,11 +404,10 @@ struct SidebarState {
             SidebarArchivedTab(id: id, title: title, url: url, spaceID: spaceID, archivedAt: date, reason: .manual))
     }
 
-    /// To the top of its Space, as Arc's Restore; into `fallbackSpaceID` when its Space is gone.
-    mutating func restoreArchived(_ id: UUID, in fallbackSpaceID: UUID) {
+    mutating func restoreArchived(_ id: UUID, in spaceID: UUID) {
         guard let index = archive.firstIndex(where: { $0.id == id }) else { return }
         let entry = archive.remove(at: index)
-        guard let space = entry.spaceID.flatMap({ space($0) }) ?? space(fallbackSpaceID) else { return }
+        guard let space = space(spaceID) else { return }
         let tab = SidebarTab(id: entry.id, title: entry.title, url: entry.url, viewedAt: .now)
         tree.insert(SidebarItem(id: tab.id, kind: .tab(tab)), into: space.unpinnedRootID, at: 0)
     }
