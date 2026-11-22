@@ -21,6 +21,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
 
     private(set) var pages: [Page] = []
     private(set) var selectedPageID: PageID?
+    private(set) var animatedSelectionSource: PageID?
     private(set) var isTracking = false { didSet { if isTracking != oldValue { trackingStateUpdateHandler() } } }
     private(set) var isAnimating = false { didSet { if isAnimating != oldValue { trackingStateUpdateHandler() } } }
     /// What is shown: past the first or last page it gives like a rubber band.
@@ -68,6 +69,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
     ) {
         guard origin(of: id) != nil else { return }
         let changed = selectedPageID != id
+        let source = changed && !isTracking ? selectedPageID : nil
         selectedPageID = id
         if changed, notifying { pageSelectionHandler(id) }
         // Stopping tells the owner, which may lay the pages out again: the page's place is read after.
@@ -79,6 +81,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
             return presentationPosition = target
         }
         spring = (presentationPosition, target, velocity ?? 0, 0, nil, shape)
+        animatedSelectionSource = source
         isAnimating = true
         ticker.start(in: window) { [weak self] in self?.step() }
     }
@@ -182,6 +185,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
     private func stop() {
         ticker.stop()
         spring = nil
+        animatedSelectionSource = nil
         isAnimating = false
     }
 

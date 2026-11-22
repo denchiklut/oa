@@ -167,6 +167,19 @@ final class WindowLayoutController: NSViewController {
     /// Where the sidebar's pages are, in pages from the first.
     var sidebarPage: CGFloat { sidebarScrollOffset / sidebarWidth }
 
+    func dockSelectionTransition(in pages: [WindowLayoutPage]) -> (
+        current: WindowLayoutPage, selection: [WindowLayoutPage: CGFloat]
+    )? {
+        // Oa's own: a click cross-fades its two Spaces while a swipe follows the pages under the fingers.
+        guard pager.isAnimating, !pager.isTracking,
+            let source = pager.animatedSelectionSource, case .space = source,
+            let destination = pager.selectedPageID, case .space = destination,
+            let from = pages.firstIndex(of: source), let to = pages.firstIndex(of: destination), from != to
+        else { return nil }
+        let progress = min(max((sidebarPage - CGFloat(from)) / CGFloat(to - from), 0), 1)
+        return (progress < 0.5 ? source : destination, [source: 1 - progress, destination: progress])
+    }
+
     /// 0 among the Spaces and 1 on the Create a Space page.
     var spaceCreationProgress: CGFloat {
         guard let index = model.spaceCreationIndex else { return 0 }

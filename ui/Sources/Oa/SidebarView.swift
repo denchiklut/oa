@@ -131,7 +131,10 @@ private struct SidebarDock: View {
         // is closed, and grows with the dock's progress, the Spaces re-centring around it, where Arc's comes and goes
         // with the page.
         let items = self.items
-        let current = pages.isEmpty ? nil : pages[Int(min(max(page.rounded(), 0), CGFloat(pages.count - 1)))]
+        let transition = layout.dockSelectionTransition(in: pages)
+        let current =
+            transition?.current
+            ?? (pages.isEmpty ? nil : pages[Int(min(max(page.rounded(), 0), CGFloat(pages.count - 1)))])
         let wide = hovered == nil || hovered == current ? 1 : 2
         GeometryReader { geometry in
             let normal = Slots(width: geometry.size.width, count: items.count - 1, wide: wide)
@@ -144,7 +147,9 @@ private struct SidebarDock: View {
                     let isWide = item == current || isHovered
                     // As Arc: in the compact dock the hovered item is drawn as the current one. As open-arch, the
                     // Spaces dim as the Create a Space slot comes in, and its dot is the current one.
-                    let paged = pages.firstIndex(of: item).map { max(0, 1 - abs(page - CGFloat($0))) } ?? 0
+                    let paged =
+                        transition.map { $0.selection[item, default: 0] }
+                        ?? pages.firstIndex(of: item).map { max(0, 1 - abs(page - CGFloat($0))) } ?? 0
                     let selection = compact && isHovered || isCreation ? 1 : min(paged, 1 - creation)
                     let width =
                         isCreation
