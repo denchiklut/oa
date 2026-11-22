@@ -159,6 +159,8 @@ struct SplitViewCellView: View {
                 renaming = true
             }
             Divider()
+            Button("Duplicate") { model.duplicateSplitView(splitID) }
+            Divider()
             Button("Archive Item") { model.closeSplitView(splitID) }
         }
     }

@@ -86,6 +86,9 @@ order, and each pane is an ordinary tab with its own page.
   lights up and the tab joins it first, or last from the cell's right half; a
   full split lights up and takes nothing. On a row's edges the line comes back.
   A split's cell and the Favorites never combine.
+- **Duplicate.** The cell's and the tile's Duplicate put a copy right after the
+  split, with new tabs at the same addresses and its title, layout and sizes.
+  The copy isn't selected, and its pages load at once in the background.
 - **Dropping a link.** A link dragged from a page onto the list opens a tab at
   the line, loaded in the background; onto a split's cell it joins the split,
   loaded in the background, and the split isn't selected.
@@ -170,4 +173,4 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: a split's Change Icon…, Duplicate and Move to.
+Not there yet: a split's Change Icon… and Move to.
