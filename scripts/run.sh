@@ -39,7 +39,10 @@ if pgrep -f "^$bundle/Contents/MacOS/Oa" >/dev/null; then
   die "Oa is already running from $bundle; quit it first"
 fi
 log "building the app"
-swift build --package-path "$repo_root/ui" --scratch-path "$repo_root/.build/swift"
+# Without an explicit Darwin sysroot the linker records the deployment target as the SDK, selecting legacy AppKit controls.
+sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
+swift build --package-path "$repo_root/ui" --scratch-path "$repo_root/.build/swift" \
+  -Xswiftc -Xclang-linker -Xswiftc "-isysroot$sdk_path"
 executable="$repo_root/.build/swift/debug/Oa"
 [[ -x "$executable" ]] || executable="$(find "$repo_root/.build/swift" -type f -perm -u+x -name Oa -path '*Debug*' | head -1)"
 [[ -x "$executable" ]] || die "swift build produced no Oa executable"

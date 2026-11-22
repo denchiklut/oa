@@ -30,7 +30,6 @@ struct ShortcutsPane: View {
         .padding(.leading, 64)
         .padding(.top, 85.5)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .textBackgroundColor))
         .overlayPreferenceValue(BadgeAnchors.self) { anchors in
             GeometryReader { proxy in
                 if let id = hoveredBadge, let anchor = anchors[id], let binding = keyBindings.state.bindings[id] {

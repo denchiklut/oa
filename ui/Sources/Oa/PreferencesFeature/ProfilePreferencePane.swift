@@ -46,7 +46,6 @@ struct ProfilePreferencePane: View {
             .padding(.horizontal, 64)
             .padding(.vertical, 20)
         }
-        .background(Color(nsColor: .textBackgroundColor))
     }
 
     private func spaceCount(_ profileID: UUID) -> Int {
@@ -141,7 +140,7 @@ private struct ProfileList<Footer: View>: View {
             Divider()
             footer
         }
-        .background(PreferencesPaneSectionBackground(fill: .clear))
+        .background(PreferencesPaneSectionBackground(fill: PaneColor.list))
     }
 
     private func row(_ profile: ProfileState) -> some View {
@@ -255,30 +254,40 @@ struct PreferenceRowDivider: View {
     var body: some View { Divider().padding(.horizontal, 10) }
 }
 
-extension Color {
-    fileprivate init(hex: UInt32) {
+extension NSColor {
+    fileprivate convenience init(hex: UInt32) {
         self.init(
-            .sRGB, red: Double(hex >> 16 & 0xFF) / 255, green: Double(hex >> 8 & 0xFF) / 255,
-            blue: Double(hex & 0xFF) / 255)
+            srgbRed: Double(hex >> 16 & 0xFF) / 255, green: Double(hex >> 8 & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255, alpha: 1)
     }
 }
 
-/// Arc's colours as measured in light; the dark ones are Oa's own, Arc's dark pane wasn't captured.
 enum PaneColor {
+    private static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(
+            nsColor: NSColor(name: nil) { appearance in
+                NSColor(hex: appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light)
+            })
+    }
+
     static let section = Color.primary.opacity(0.01)
-    static let arrow = Color(hex: 0x63A1F9)
-    static let blue = Color(hex: 0x69AAFA)
-    static let green = Color(hex: 0x8BD38E)
-    static let yellow = Color(hex: 0xFADB74)
-    static let orange = Color(hex: 0xF6B171)
-    static let red = Color(hex: 0xF37D74)
+    static let list = Color(
+        nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .black.withAlphaComponent(0.05) : .white
+        })
+    static let arrow = adaptive(light: 0x63A1F9, dark: 0x1682EF)
+    static let blue = adaptive(light: 0x69AAFA, dark: 0x1782E0)
+    static let green = adaptive(light: 0x8BD38E, dark: 0x34B953)
+    static let yellow = adaptive(light: 0xFADB74, dark: 0xE1BD1B)
+    static let orange = adaptive(light: 0xF6B171, dark: 0xE18331)
+    static let red = adaptive(light: 0xF37D74, dark: 0xE04042)
     static let glyph = Color.primary.opacity(0.65)
     static let glyphPressed = Color.primary.opacity(0.47)
     static let glyphDisabled = Color.primary.opacity(0.3)
     static let selection = Color(
         nsColor: NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                ? .controlAccentColor.withAlphaComponent(0.3)
+                ? .controlAccentColor.withAlphaComponent(0.1)
                 : NSColor(srgbRed: 0xF1 / 255, green: 0xF6 / 255, blue: 0xFE / 255, alpha: 1)
         })
 }
