@@ -86,6 +86,27 @@ enum ProfileDialogUtils {
     }
 }
 
+extension ProfileDialogUtils {
+    /// Arc's `shouldBypassConfirmInterProfileMoveDialog`. Where Arc keeps it is unknown; this key is Oa's own.
+    static let bypassMoveKey = "shouldBypassConfirmInterProfileMoveDialog"
+
+    /// Arc's confirm before tabs move to a Space of another profile: the sheet on the window, then `proceed` on
+    /// "Move it" or at once while "Don't ask again" holds.
+    static func confirmMove(tabCount: Int, to space: SidebarSpace, in model: WindowModel, proceed: @escaping () -> Void)
+    {
+        guard !UserDefaults.standard.bool(forKey: bypassMoveKey) else { return proceed() }
+        guard let window = model.window else { return }
+        DialogSheet.present(on: window) { dismiss in
+            MoveTabsDialog(space: space.name, plural: tabCount != 1) { move, dontAsk in
+                dismiss()
+                guard move else { return }
+                if dontAsk { UserDefaults.standard.set(true, forKey: bypassMoveKey) }
+                proceed()
+            }
+        }
+    }
+}
+
 struct SpaceProfileMenuItems: View {
     let model: WindowModel
     let space: SidebarSpace
@@ -103,6 +124,51 @@ struct SpaceProfileMenuItems: View {
         }
         Divider()
         Button("New Profile…") { ProfileDialogUtils.createProfile(checking: [space.id], in: model) }
+    }
+}
+
+private struct MoveTabsDialog: View {
+    let space: String
+    let plural: Bool
+    let done: (_ move: Bool, _ dontAsk: Bool) -> Void
+    @State private var dontAsk = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            DialogIcon(systemName: "arrow.left.arrow.right.circle")
+            (Text(plural ? "Move tabs to " : "Move tab to ") + Text(space).fontWeight(.heavy) + Text("?"))
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(DialogColor.title)
+                .padding(.top, 17)
+            (Text(space).fontWeight(.bold)
+                + Text(
+                    """
+                     is using a different Profile, so you might get logged out or lose your progress in \
+                    \(plural ? "these tabs" : "this tab").
+
+                    This can’t be undone!
+                    """))
+                .font(.system(size: 14))
+                .foregroundStyle(DialogColor.body)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 16)
+                .padding(.trailing, 5)
+            HStack(spacing: 8) {
+                Toggle("Don’t ask again", isOn: $dontAsk)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 14))
+                    .foregroundStyle(DialogColor.body)
+                Spacer()
+                DialogButtonView(title: "Cancel", kind: .cancel) { done(false, false) }
+                DialogButtonView(title: "Move it", kind: .primary) { done(true, dontAsk) }
+            }
+            .padding(.top, 30)
+            .padding(.trailing, -10)
+        }
+        .padding(.horizontal, 38)
+        .padding(.top, 38)
+        .padding(.bottom, 27)
+        .frame(width: 455)
     }
 }
 

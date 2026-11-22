@@ -236,10 +236,11 @@ extension SidebarState {
         return copies.map(\.id)
     }
 
-    /// As seen in Arc: Move to ▸ puts the item at the top of the Space's list.
+    /// As seen in Arc: Move to ▸ puts the item at the top of the Space's list. A pinned one stays pinned, as seen
+    /// for a move to another profile's Space; the top of the pinned list is Oa's own.
     mutating func move(_ id: UUID, toSpace spaceID: UUID) {
-        guard let space = space(spaceID) else { return }
-        tree.move(id, into: space.unpinnedRootID, at: 0)
+        guard let space = space(spaceID), let tabID = tree[id]?.childIDs.first else { return }
+        tree.move(id, into: isPinned(tabID) ? space.pinnedRootID : space.unpinnedRootID, at: 0)
     }
 
     /// As seen in Arc: Reset Name and Icon clears both, and the cell shows the tabs again.
