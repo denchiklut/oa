@@ -1641,9 +1641,7 @@ final class WindowModel {
             selectedTabIDs.removeValue(forKey: spaceID)
         }
         for tabID in Array(pages.keys) where state.tree.tab(tabID) == nil { release(tabID)?.drop() }
-        for (tabID, page) in pages where page.keepsAddress != state.keepsAddress(tabID) {
-            page.keepsAddress = state.keepsAddress(tabID)
-        }
+        updateLinkRouting()
         for (ownerID, page) in peeks where ownerID != archivePeekID && state.tree.tab(ownerID) == nil {
             peeks[ownerID] = nil
             store.archivePage(page, in: spaceID(ofPeekOwner: ownerID))
@@ -1664,6 +1662,17 @@ final class WindowModel {
         {
             splitViewLayout = nil
         }
+    }
+
+    func updateLinkRouting() {
+        for (tabID, page) in pages {
+            let enabled = peeksFromLinks(in: tabID)
+            if page.keepsAddress != enabled { page.keepsAddress = enabled }
+        }
+    }
+
+    private func peeksFromLinks(in tabID: UUID) -> Bool {
+        store.peekFromPinnedTabs && state.keepsAddress(tabID)
     }
 
     private func shows(_ tabID: UUID) -> Bool {
@@ -1878,7 +1887,7 @@ final class WindowModel {
     private func install(_ page: any Page, for tabID: UUID) {
         pages[tabID] = page
         if let profile = state.profile(containing: tabID) { ensureBrowser(for: profile.id) }
-        page.keepsAddress = state.keepsAddress(tabID)
+        page.keepsAddress = peeksFromLinks(in: tabID)
         save(page, for: tabID)
         observe(page, for: tabID)
     }
@@ -2039,7 +2048,7 @@ final class WindowModel {
         // ⌘ is Arc's Little Arc, which Oa doesn't have, so a background page, Oa's own.
         let held = NSEvent.modifierFlags.intersection([.option, .command, .shift, .control])
         let disposition = disposition == .backgroundTab && held == .option ? .splitView : disposition
-        let inWindow = disposition == .newWindow && !byPage
+        let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick)
         guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
             let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
@@ -2051,7 +2060,7 @@ final class WindowModel {
         }
         let background = disposition == .backgroundTab
         let split = disposition == .splitView
-        if !insidePeek, !inWindow, disposition == .newWindow || (!background && !split && state.keepsAddress(openerID))
+        if !insidePeek, !inWindow, disposition == .newWindow || (!background && !split && peeksFromLinks(in: openerID))
         {
             return peek(page, from: openerID)
         }

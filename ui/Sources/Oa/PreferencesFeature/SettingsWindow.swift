@@ -32,6 +32,7 @@ final class SettingsWindowController: NSWindowController {
                 rename: { [weak self] in self?.rename($0) },
                 askAboutArchive: { [weak self] in self?.askAboutArchive($0, for: $1) })
         }
+        add("Links", symbol: "macwindow.on.rectangle") { LinksPreferencePane(store: store) }
         add("Shortcuts", symbol: "keyboard") {
             ShortcutsPane(keyBindings: store.keyBindings, state: state) {
                 openSettings(.extensionShortcuts, frontProfile() ?? SidebarProfile.defaultID)
@@ -63,7 +64,7 @@ final class SettingsWindowController: NSWindowController {
     /// binding on its detail side, and the list left where it is.
     func showShortcuts(selecting identifier: String) {
         showWindow(nil)
-        tabs.selectedTabViewItemIndex = 2
+        tabs.selectedTabViewItemIndex = 3
         state.selectedKeyBindableActionIdentifier = identifier
     }
 

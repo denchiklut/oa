@@ -11,6 +11,15 @@ final class SidebarStore {
     private(set) var state: SidebarState
     private var removedFavicons = 0
     @ObservationIgnored private(set) var windows: [WindowModel] = []
+    var peekOnShiftClick = !UserDefaults.standard.bool(forKey: "disableShiftClickToOpenLinksInModal") {
+        didSet { UserDefaults.standard.set(!peekOnShiftClick, forKey: "disableShiftClickToOpenLinksInModal") }
+    }
+    var peekFromPinnedTabs = UserDefaults.standard.object(forKey: "modalEnabled") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(peekFromPinnedTabs, forKey: "modalEnabled")
+            for window in windows { window.updateLinkRouting() }
+        }
+    }
     @ObservationIgnored let savedWindows: [WindowRecord]
     @ObservationIgnored var sidebarViewPreferences: SidebarViewPreferences {
         didSet { scheduleSave() }

@@ -1,13 +1,18 @@
 # Peek
 
-Oa implementation notes. The [UI architecture](../../architecture/ui/README.md)
-describes the broader intended responsibilities.
+Settings → Links has two independent switches, both on by default. With
+Shift-click Peek off, Oa honors Chromium’s request for a new browser window.
+That fallback is Oa’s choice.
+Turning off automatic Peek for Favorites and Pinned tabs lets ordinary links
+navigate those tabs in place and lets links requesting a new tab open one.
+Both switches apply across windows and profiles. The Little Oa controls in the
+same pane are disabled until Oa supports that window.
 
-A Peek shows a page over the window as part of the tab it was opened from, as
-Arc does: a pinned tab's cross-origin link clicks, `target=_blank` links,
-`window.open` calls and sized popups, and a Shift-click on a link in any tab,
-which Chromium reports as a new-window open. Same-host links navigate the
-pinned tab in place. The pinned tab's page is marked as keeping its address
+A Peek shows a page over the window as part of the tab it was opened from.
+By default, a pinned tab's cross-host link clicks, `target=_blank` links,
+`window.open` calls and sized popups open a Peek, as in Arc. A Shift-click on a
+link in any tab does too. Chromium reports it as a new-window open. Same-host
+links navigate the pinned tab in place. The pinned tab's page is marked as keeping its address
 through DevKit, and Core does what Arc does: every page has Chromium's renderer
 preference that hands every top-level navigation to the browser, so the
 navigation reaches the page's `OpenURLFromTab`, where for such a page one to another host
@@ -88,6 +93,6 @@ pane on the right of the tab it was opened from; Oa's own for now, it shows
 only where that tab can take a pane, so not on a pinned tab or a Favorite.
 Arc's copy-link icon doesn't exist in Oa yet.
 
-Related: [Sidebar state](../sidebar/README.md) · [Favorites](../favorites/README.md) · [Saved state and recovery](../saved-state/README.md).
+Related: [UI architecture](../../architecture/ui/README.md) · [Sidebar state](../sidebar/README.md) · [Favorites](../favorites/README.md) · [Saved state and recovery](../saved-state/README.md).
 
 Return to the [feature inventory](../README.md).
