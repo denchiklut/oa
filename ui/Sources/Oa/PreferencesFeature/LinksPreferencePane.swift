@@ -30,15 +30,17 @@ struct LinksPreferencePane: View {
                     }
                     .disabled(true)
                     Divider()
-                    Text("Peek lets you preview a link without opening a new tab.")
-                        .padding(.horizontal, 10)
+                    Text(
+                        "Peek is a way to preview a link without opening a new tab. It’s perfect for quickly looking at a link from an email, news article, or tweet."
+                    )
+                    .padding(.horizontal, 10)
                     PreferencesPaneSection {
                         linkSwitch(
                             "Open a Peek window when clicking on links with Shift held", isOn: $store.peekOnShiftClick)
                         PreferenceRowDivider()
                         linkSwitch(
                             "Open a Peek window when clicking on links to other sites",
-                            note: "Only affects Favorites and Pinned tabs", isOn: $store.peekFromPinnedTabs)
+                            note: "Note: This only affects Favorites and Pinned tabs", isOn: $store.peekFromPinnedTabs)
                     }
                 }
                 .padding(.horizontal, 64)
@@ -78,7 +80,7 @@ private struct LittleOaIllustration: View {
             .padding(.horizontal, 8)
             .frame(height: 28)
             .background(Color(white: 0.87))
-            Color(red: 0.94, green: 0.69, blue: 0.63)
+            Color(red: 0.85, green: 0.80, blue: 0.92)
                 .overlay {
                     Image(decorative: WindowTexture.image(.grain), scale: 2)
                         .resizable(resizingMode: .tile)
@@ -93,7 +95,7 @@ private struct LittleOaIllustration: View {
         .padding(.top, 47)
         .padding(.bottom, -6)
         .frame(height: 136)
-        .background(Color(red: 0.88, green: 0.51, blue: 0.53))
+        .background(Color(red: 0.73, green: 0.67, blue: 0.83))
         .clipShape(ScallopedEdge())
         .accessibilityHidden(true)
     }
