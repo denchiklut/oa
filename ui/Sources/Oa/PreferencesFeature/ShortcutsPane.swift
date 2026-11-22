@@ -1,10 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// Arc's Shortcuts pane at Arc's measures, for the actions Oa has: the bindings on the left, each row's key caps
-/// its recorder, and the selected one's caps, description and priority on the right. Arc's callout for its
-/// shortcuts tutorial, its note on a shortcut the system holds and its switches for features Oa lacks are left out.
-/// The colours are Arc's in light; in dark they are Oa's own, Arc's not having been captured.
 struct ShortcutsPane: View {
     let keyBindings: KeyBindingsClient
     @Bindable var state: PreferencesState
@@ -30,6 +26,9 @@ struct ShortcutsPane: View {
         .padding(.leading, 64)
         .padding(.top, 85.5)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .overlay(alignment: .top) {
+            EssentialShortcutsCallout(keyBindings: keyBindings).padding(.top, 20)
+        }
         .overlayPreferenceValue(BadgeAnchors.self) { anchors in
             GeometryReader { proxy in
                 if let id = hoveredBadge, let anchor = anchors[id], let binding = keyBindings.state.bindings[id] {
@@ -42,17 +41,17 @@ struct ShortcutsPane: View {
     // MARK: The list
 
     private var list: some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         let bindings = keyBindings.state.bindings.values.matching(searchQuery).sorted {
             $0.action.name < $1.action.name
         }
         let customized = bindings.filter { $0.source == .userDefined }
         return VStack(spacing: 0) {
             HStack(spacing: 4.5) {
-                Image(systemName: "magnifyingglass").font(.system(size: 13)).foregroundStyle(tone(0.56, 0.6))
+                Image(systemName: "magnifyingglass").font(.system(size: 13)).foregroundStyle(tone(0.56, 0.44))
                 TextField(
                     "", text: $searchQuery,
-                    prompt: Text("Type a feature name or shortcut (like “Command E”)").foregroundStyle(tone(0.5, 0.5))
+                    prompt: Text("Type a feature name or shortcut (like “Command E”)").foregroundStyle(tone(0.5, 0.65))
                 )
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
@@ -67,6 +66,7 @@ struct ShortcutsPane: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 40.5)
+            .background(scheme == .dark ? Color.white.opacity(0.10) : .clear)
             ScrollView {
                 VStack(spacing: 0) {
                     section("Customized Shortcuts", customized, isFirst: true)
@@ -75,9 +75,9 @@ struct ShortcutsPane: View {
                 }
             }
         }
-        .background(Color(nsColor: .textBackgroundColor), in: shape)
+        .background(scheme == .dark ? Color.white.opacity(0.01) : .white, in: shape)
         .clipShape(shape)
-        .overlay(shape.strokeBorder(tone(0.86, 0.26), lineWidth: 1))
+        .overlay(shape.strokeBorder(tone(0.86, 0.24), lineWidth: 1))
     }
 
     /// As measured in Arc: the title under the search field sits between two lines, a later one has none and
@@ -102,14 +102,21 @@ struct ShortcutsPane: View {
         }
     }
 
-    private var line: some View { tone(0.93, 0.2).frame(height: 1) }
+    private var line: some View { tone(0.93, 0.30).frame(height: 1) }
 
     private func row(_ binding: KeyBinding, isLast: Bool) -> some View {
         let isSelected = binding.id == state.selectedKeyBindableActionIdentifier
         let inConflict = !binding.conflictingActions.isEmpty
         return HStack(spacing: 10) {
-            Text(binding.action.name).font(.system(size: 13)).lineLimit(1)
-            Spacer(minLength: 0)
+            Button {
+                NSApplication.shared.keyWindow?.makeFirstResponder(nil)
+                state.selectedKeyBindableActionIdentifier = binding.id
+            } label: {
+                Text(binding.action.name).font(.system(size: 13)).lineLimit(1)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             if inConflict {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(.system(size: 13))
@@ -143,12 +150,7 @@ struct ShortcutsPane: View {
         .padding(.horizontal, 16)
         .frame(height: 48)
         .overlay(alignment: .bottom) {
-            if !isLast { tone(0.9, 0.22).frame(height: 1).padding(.leading, 24).padding(.trailing, 16) }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            NSApplication.shared.keyWindow?.makeFirstResponder(nil)
-            state.selectedKeyBindableActionIdentifier = binding.id
+            if !isLast { tone(0.9, 0.25).frame(height: 1).padding(.leading, 24).padding(.trailing, 16) }
         }
         .contextMenu {
             Button("Remove Shortcut") { keyBindings.setShortcut(nil, for: binding.id) }
@@ -281,7 +283,8 @@ struct ShortcutsPane: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .frame(width: 24, height: 24)
-                .overlay(Circle().strokeBorder(tone(0.86, 0.3), lineWidth: 1))
+                .background(tone(0.925, 0.25), in: Circle())
+                .accessibilityLabel("More shortcut options")
             }
         }
     }
@@ -294,7 +297,7 @@ struct ShortcutsPane: View {
     private func caption(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12))
-            .foregroundStyle(tone(0.56, 0.6))
+            .foregroundStyle(tone(0.56, 0.44))
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -340,9 +343,9 @@ private struct DetailButtonStyle: ButtonStyle {
             let dark = scheme == .dark
             configuration.label
                 .font(.system(size: 13))
-                .foregroundStyle(Color(white: dark ? (isEnabled ? 0.9 : 0.45) : (isEnabled ? 0.14 : 0.71)))
+                .foregroundStyle(Color(white: dark ? (isEnabled ? 0.9 : 0.40) : (isEnabled ? 0.14 : 0.71)))
                 .fixedSize()
-                .padding(.horizontal, 9.25)
+                .padding(.horizontal, 12)
                 .frame(height: 24)
                 .background(
                     Color(white: dark ? (isEnabled ? 0.28 : 0.2) : (isEnabled ? 0.925 : 0.96)),
@@ -368,17 +371,17 @@ private struct ShortcutKeyCaps: View {
     private static let paleBlue = Color(red: 0.78, green: 0.867, blue: 1)
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
         Text(shortcut?.symbols.joined() ?? "---")
             .font(.system(size: 13))
             .foregroundStyle(
                 isRecording
                     ? (shortcut == nil ? Color(red: 0.667, green: 0.8, blue: 1) : Self.blue)
-                    : Color(white: scheme == .dark ? 0.62 : 0.52)
+                    : Color(white: 0.5)
             )
             .padding(.horizontal, 9)
             .frame(minWidth: 64, minHeight: 25)
-            .background(Color(nsColor: .textBackgroundColor), in: shape)
+            .background(.white, in: shape)
             .overlay(
                 shape.strokeBorder(
                     isRecording ? Self.blue : isHovered ? Self.paleBlue : Color(white: scheme == .dark ? 0.26 : 0.93),
@@ -404,6 +407,7 @@ private struct LargeKeyCaps: View {
     /// Stands for the face Arc draws on the second cap while nothing is selected.
     static let smile = "smile"
 
+    @Environment(\.colorScheme) private var scheme
     let symbols: [String]
     let inConflict: Bool
 
@@ -419,12 +423,21 @@ private struct LargeKeyCaps: View {
     private func cap(_ symbol: String, _ side: CGFloat) -> some View {
         let scale = side / 65
         let border = inConflict ? Color(red: 0.945, green: 0.333, blue: 0.337) : Color(red: 0, green: 0.478, blue: 1)
-        let rim = inConflict ? Color(red: 0.96, green: 0.46, blue: 0.47) : Color(red: 0.239, green: 0.557, blue: 1)
-        let lip = inConflict ? Color(red: 0.88, green: 0.28, blue: 0.28) : Color(red: 0.216, green: 0.506, blue: 0.91)
-        let face =
-            inConflict
-            ? [Color(red: 1, green: 0.867, blue: 0.863), Color(red: 0.992, green: 0.816, blue: 0.816)]
-            : [Color(red: 0.843, green: 0.902, blue: 1), Color(red: 0.773, green: 0.855, blue: 0.98)]
+        let rim, lip: Color
+        let face: [Color]
+        if inConflict {
+            rim = Color(red: 0.96, green: 0.46, blue: 0.47)
+            lip = Color(red: 0.88, green: 0.28, blue: 0.28)
+            face = [Color(red: 1, green: 0.867, blue: 0.863), Color(red: 0.992, green: 0.816, blue: 0.816)]
+        } else if scheme == .dark {
+            rim = Color(red: 0.08, green: 0.43, blue: 0.88)
+            lip = Color(red: 0.07, green: 0.39, blue: 0.8)
+            face = [Color(red: 0.82, green: 0.88, blue: 0.98), Color(red: 0.74, green: 0.82, blue: 0.94)]
+        } else {
+            rim = Color(red: 0.239, green: 0.557, blue: 1)
+            lip = Color(red: 0.216, green: 0.506, blue: 0.91)
+            face = [Color(red: 0.843, green: 0.902, blue: 1), Color(red: 0.773, green: 0.855, blue: 0.98)]
+        }
         let shape = RoundedRectangle(cornerRadius: 12 * scale, style: .continuous)
         return ZStack(alignment: .top) {
             shape.fill(lip)
@@ -436,17 +449,18 @@ private struct LargeKeyCaps: View {
                         RoundedRectangle(cornerRadius: 9 * scale, style: .continuous)
                             .strokeBorder(.white.opacity(0.5), lineWidth: 1)
                     )
-                    .padding([.top, .horizontal], 3.5 * scale)
+                    .padding([.top, .horizontal], 4.5 * scale)
                     .padding(.bottom, 1.5 * scale)
                 if symbol == Self.smile {
-                    Smile().stroke(border, style: StrokeStyle(lineWidth: 4, lineCap: .round)).frame(
-                        width: 24, height: 22)
+                    Smile().stroke(border, style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round)).frame(
+                        width: 20 * scale, height: 22 * scale)
                 } else {
                     Text(symbol)
                         .font(.system(size: (symbol.count > 1 ? 22 : 32) * scale, weight: .semibold, design: .rounded))
                         .foregroundStyle(border)
                 }
             }
+            .offset(y: 1.5 * scale)
             .padding(.bottom, 8 * scale)
             shape.strokeBorder(border, lineWidth: 1)
         }
@@ -459,11 +473,12 @@ private struct Smile: Shape {
         var path = Path()
         for x in [0.27, 0.73] {
             path.move(to: CGPoint(x: rect.width * x, y: 0))
-            path.addLine(to: CGPoint(x: rect.width * x, y: rect.height * 0.36))
+            path.addLine(to: CGPoint(x: rect.width * x, y: rect.height * 0.40))
         }
-        path.move(to: CGPoint(x: 0, y: rect.height * 0.72))
+        path.move(to: CGPoint(x: 0, y: rect.height * 0.83))
         path.addQuadCurve(
-            to: CGPoint(x: rect.width, y: rect.height * 0.72), control: CGPoint(x: rect.width / 2, y: rect.height * 1.2)
+            to: CGPoint(x: rect.width, y: rect.height * 0.83),
+            control: CGPoint(x: rect.width / 2, y: rect.height * 1.09)
         )
         return path
     }
