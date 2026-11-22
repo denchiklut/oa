@@ -239,8 +239,8 @@ private struct SpaceNameRow: View {
             }
             Spacer(minLength: 0)
             if hovering, !renaming {
-                SpaceMenuButton {
-                    SpaceMenu(model: model, layout: layout, space: space)
+                PointerMenuButton {
+                    SpaceMenu(model: model, layout: layout, space: space).make()
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 13, weight: .semibold))

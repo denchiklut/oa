@@ -259,7 +259,7 @@ private struct SpaceManagementCollectionViewItem: View {
                         .onEnded { _ in dropped?() }
                 )
             Spacer(minLength: 0)
-            SpaceMenuButton {
+            PointerMenuButton {
                 SpaceMenu(model: model, space: space, inLibrary: true) {
                     // Oa's own: where Arc's card shows the picker is unknown, so the header's opens.
                     isPickingIcon = true
@@ -268,6 +268,7 @@ private struct SpaceManagementCollectionViewItem: View {
                 } editTheme: {
                     model.presentSpaceStyleEditor(for: space.id, from: .library)
                 }
+                .make()
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 12, weight: .bold))
