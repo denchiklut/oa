@@ -1,0 +1,119 @@
+import SwiftUI
+
+struct LinksPreferencePane: View {
+    @Bindable var store: SidebarStore
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                LittleOaIllustration()
+                VStack(alignment: .leading, spacing: 24) {
+                    Text(
+                        "Little Oa is a smaller window for quick lookups and reading links from other apps. It’s unavailable in this build."
+                    )
+                    .padding(.horizontal, 10)
+                    PreferencesPaneSection {
+                        linkSwitch("Open Little Oa when I press ⌥⌘N in any app", isOn: .constant(false))
+                        PreferenceRowDivider()
+                        linkSwitch("Open Little Oa when clicking on links with ⌥⌘ held", isOn: .constant(false))
+                        PreferenceRowDivider()
+                        linkSwitch("Links from other apps open in Little Oa", isOn: .constant(false))
+                        PreferenceRowDivider()
+                        PreferenceRow(height: 44) {
+                            Text("Archive Little Oas after:")
+                        } control: {
+                            Picker("Archive Little Oas after", selection: .constant(6)) {
+                                Text("6 hours (default)").tag(6)
+                            }
+                            .preferencePopup()
+                        }
+                    }
+                    .disabled(true)
+                    Divider()
+                    Text("Peek lets you preview a link without opening a new tab.")
+                        .padding(.horizontal, 10)
+                    PreferencesPaneSection {
+                        linkSwitch(
+                            "Open a Peek window when clicking on links with Shift held", isOn: $store.peekOnShiftClick)
+                        PreferenceRowDivider()
+                        linkSwitch(
+                            "Open a Peek window when clicking on links to other sites",
+                            note: "Only affects Favorites and Pinned tabs", isOn: $store.peekFromPinnedTabs)
+                    }
+                }
+                .padding(.horizontal, 64)
+                .padding(.vertical, 24)
+            }
+        }
+    }
+
+    private func linkSwitch(_ title: String, note: String? = nil, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                if let note { Text(note).italic().foregroundStyle(.secondary) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .font(.body)
+        .padding(.horizontal, 10)
+        .frame(minHeight: note == nil ? 36 : 54)
+    }
+}
+
+private struct LittleOaIllustration: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                HStack(spacing: 4) {
+                    ForEach(0..<3) { _ in Circle().fill(.black.opacity(0.15)).frame(width: 7, height: 7) }
+                    Text("Work").padding(.horizontal, 5).background(.black.opacity(0.06), in: Capsule())
+                    Spacer()
+                    Text("Open in Work  ⌘O")
+                }
+                Label("oa", systemImage: "lock.fill")
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(Color(white: 0.87))
+            Color(red: 0.94, green: 0.69, blue: 0.63)
+                .overlay {
+                    Image(decorative: WindowTexture.image(.grain), scale: 2)
+                        .resizable(resizingMode: .tile)
+                        .opacity(0.35)
+                }
+        }
+        .font(.system(size: 9, weight: .medium))
+        .foregroundStyle(Color(white: 0.28))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .shadow(color: .black.opacity(0.24), radius: 8, y: 3)
+        .padding(.horizontal, 60)
+        .padding(.top, 47)
+        .padding(.bottom, -6)
+        .frame(height: 136)
+        .background(Color(red: 0.88, green: 0.51, blue: 0.53))
+        .clipShape(ScallopedEdge())
+        .accessibilityHidden(true)
+    }
+
+    private struct ScallopedEdge: Shape {
+        func path(in rect: CGRect) -> Path {
+            Path { path in
+                path.move(to: .zero)
+                path.addLine(to: CGPoint(x: 0, y: rect.height - 2))
+                for x in stride(from: CGFloat.zero, to: rect.width, by: 17) {
+                    path.addQuadCurve(
+                        to: CGPoint(x: x + 8.5, y: rect.height - 2),
+                        control: CGPoint(x: x + 4.25, y: rect.height - 6))
+                    path.addQuadCurve(
+                        to: CGPoint(x: x + 17, y: rect.height - 2),
+                        control: CGPoint(x: x + 12.75, y: rect.height + 2))
+                }
+                path.addLine(to: CGPoint(x: rect.width, y: 0))
+                path.closeSubpath()
+            }
+        }
+    }
+}
