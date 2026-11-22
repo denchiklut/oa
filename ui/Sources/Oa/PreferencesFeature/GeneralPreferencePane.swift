@@ -7,39 +7,71 @@ struct GeneralPreferencePane: View {
     @AppStorage(QuitWarning.key) private var warnsBeforeQuitting = QuitWarning.isOnByDefault
 
     var body: some View {
-        Form {
-            Toggle("Warn before quitting", isOn: $warnsBeforeQuitting)
-            LabeledContent {
-                Button("Profile Settings…", action: showProfiles)
-            } label: {
-                Text("Manage your default search engine, Auto-Archive, and downloads in Profile Settings.")
-            }
-            Section("Oa’s Ad Blocker") {
-                Toggle("Block ads and trackers", isOn: Binding(get: { adBlocker.isEnabled }, set: adBlocker.setEnabled))
-                Toggle(
-                    "Block Ads",
-                    isOn: Binding(
-                        get: { adBlocker.selectedLists.contains("EasyList") },
-                        set: { adBlocker.setList("EasyList", enabled: $0) }
-                    )
-                ).disabled(!adBlocker.isEnabled)
-                Toggle(
-                    "Block Trackers",
-                    isOn: Binding(
-                        get: { adBlocker.selectedLists.contains("EasyPrivacy") },
-                        set: { adBlocker.setList("EasyPrivacy", enabled: $0) }
-                    )
-                ).disabled(!adBlocker.isEnabled)
-                Text("Applies to all profiles.").font(.caption).foregroundStyle(.secondary)
-                if adBlocker.isDownloading {
-                    Text("Downloading filters…").font(.caption).foregroundStyle(.secondary)
-                } else if adBlocker.isApplying {
-                    ProgressView().controlSize(.small)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                PreferencesPaneSection {
+                    toggle("Warn before quitting", isOn: $warnsBeforeQuitting)
                 }
-                if let error = adBlocker.error { Text(error).font(.caption).foregroundStyle(.secondary) }
+                PreferencesPaneSection {
+                    PreferenceRow(height: 48) {
+                        Text("Manage your default search engine, Auto-Archive, and downloads in Profile Settings.")
+                            .frame(maxWidth: 334, alignment: .leading)
+                    } control: {
+                        Button("Profile Settings…", action: showProfiles)
+                    }
+                }
+                PreferencesPaneSection {
+                    PreferenceRow {
+                        Text("Oa’s Ad Blocker").fontWeight(.semibold)
+                    } control: {
+                        Button(adBlocker.isEnabled ? "Turn Off" : "Turn On") {
+                            adBlocker.setEnabled(!adBlocker.isEnabled)
+                        }
+                    }
+                    PreferenceRowDivider()
+                    listToggle("Block Ads", list: "EasyList")
+                    PreferenceRowDivider()
+                    listToggle("Block Trackers", list: "EasyPrivacy")
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Applies to all profiles.")
+                    if adBlocker.isDownloading {
+                        Text("Downloading filters…")
+                    } else if adBlocker.isApplying {
+                        ProgressView().controlSize(.small)
+                    }
+                    if let error = adBlocker.error { Text(error) }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
             }
+            .toggleStyle(.switch)
+            .padding(.horizontal, 64)
+            .padding(.vertical, 20)
         }
-        .formStyle(.grouped)
+    }
+
+    private func listToggle(_ title: String, list: String) -> some View {
+        toggle(
+            title,
+            isOn: Binding {
+                adBlocker.selectedLists.contains(list)
+            } set: {
+                adBlocker.setList(list, enabled: $0)
+            }
+        )
+        .disabled(!adBlocker.isEnabled)
+    }
+
+    private func toggle(_ title: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .controlSize(.small)
+        .font(.body)
+        .padding(.horizontal, 10)
+        .frame(height: 36)
     }
 }
 

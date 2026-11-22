@@ -49,8 +49,10 @@ final class WindowStandardButtons: NSView {
                 width: Self.dimension, height: Self.dimension)
             let cover = covers[index]
             cover.frame = button.frame.insetBy(dx: 1, dy: 1)
-            // AppKit draws a 12 pt disc. Scale it behind the dimmed cover so its native color forms a 1 pt rim.
-            button.bounds.size = group.mouseInside ? button.frame.size : cover.frame.size
+            // Fit AppKit's native disc (14 pt, or 12 pt in the older appearance) around the 12 pt cover.
+            let nativeFrame = NSRect(origin: .zero, size: button.intrinsicContentSize)
+            button.bounds.size =
+                group.mouseInside ? button.frame.size : button.alignmentRect(forFrame: nativeFrame).size
         }
     }
 
