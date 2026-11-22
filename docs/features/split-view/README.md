@@ -86,6 +86,13 @@ order, and each pane is an ordinary tab with its own page.
   lights up and the tab joins it first, or last from the cell's right half; a
   full split lights up and takes nothing. On a row's edges the line comes back.
   A split's cell and the Favorites never combine.
+- **Change Icon….** The cell's and the tile's Change Icon… open the icon picker
+  below the cell; a pick applies at once and the picker stays. A split with an
+  icon is drawn as a row: the icon where a row's favicon is, then its title or
+  "N Tabs"; a titled one's icon takes the count badge's place, and a Favorite
+  split's tile shows only the icon. Reset Name and Icon, in the menu once
+  either is set, clears both and brings the tabs back. Stored as the split's
+  `customInfo` icon.
 - **Duplicate.** The cell's and the tile's Duplicate put a copy right after the
   split, with new tabs at the same addresses and its title, layout and sizes.
   The copy isn't selected, and its pages load at once in the background.
@@ -161,6 +168,11 @@ Oa's own:
   back into its split while the split is there, else as a plain tab. Arc's
   result for both wasn't seen.
 - Share Split View… is there but off: Oa has no sharing.
+- Change Icon… uses Oa's Space icon picker, SF Symbols and a short emoji list,
+  where Arc's has its Ionicons and every emoji with a search; the icon is kept
+  as a Space's is, a symbol's name or the emoji, not Arc's `iconType` shape.
+  The icon's grey is the theme's secondary glyph, near Arc's measured #94939C,
+  and a Favorite split's tile with an icon, selected, is a plain selected tile.
 - Move to ▸ greys out the Spaces of other profiles, as Oa's pages can't change
   profile; Arc lists them, and its move there wasn't tried. Where New Space…
   puts the Space, after the window's, wasn't seen in Arc.
@@ -181,4 +193,4 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: a split's Change Icon….
+Every item of Arc's split view is in, as above.
