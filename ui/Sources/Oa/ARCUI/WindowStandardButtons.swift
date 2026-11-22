@@ -47,7 +47,10 @@ final class WindowStandardButtons: NSView {
             button.frame = NSRect(
                 x: CGFloat(index) * (Self.dimension + Self.spacing), y: (bounds.height - Self.dimension) / 2,
                 width: Self.dimension, height: Self.dimension)
-            covers[index].frame = button.frame.insetBy(dx: 1, dy: 1)
+            let cover = covers[index]
+            cover.frame = button.frame.insetBy(dx: 1, dy: 1)
+            // AppKit draws a 12 pt disc. Scale it behind the dimmed cover so its native color forms a 1 pt rim.
+            button.bounds.size = group.mouseInside ? button.frame.size : cover.frame.size
         }
     }
 
@@ -74,6 +77,7 @@ final class WindowStandardButtons: NSView {
             cover.layer?.backgroundColor = dark ? CGColor(red: 0.953, green: 0.953, blue: 0.918, alpha: 1) : .black
         }
         // On macOS 26 the buttons redraw their state in layout, not on `needsDisplay`.
+        needsLayout = true
         group.subviews.forEach { $0.needsLayout = true }
     }
 
