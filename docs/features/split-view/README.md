@@ -89,6 +89,11 @@ order, and each pane is an ordinary tab with its own page.
 - **Duplicate.** The cell's and the tile's Duplicate put a copy right after the
   split, with new tabs at the same addresses and its title, layout and sizes.
   The copy isn't selected, and its pages load at once in the background.
+- **Move to.** The cell's and the tile's Move to ▸ list every Space in the
+  dock's order, then New Space…. The split goes whole, with its pages, to the
+  top of that Space's list; a selected split takes the window to that Space,
+  one that isn't leaves the window where it is. New Space… opens Create a Space
+  and moves the split into the Space once it is made.
 - **Dropping a link.** A link dragged from a page onto the list opens a tab at
   the line, loaded in the background; onto a split's cell it joins the split,
   loaded in the background, and the split isn't selected.
@@ -156,6 +161,9 @@ Oa's own:
   back into its split while the split is there, else as a plain tab. Arc's
   result for both wasn't seen.
 - Share Split View… is there but off: Oa has no sharing.
+- Move to ▸ greys out the Spaces of other profiles, as Oa's pages can't change
+  profile; Arc lists them, and its move there wasn't tried. Where New Space…
+  puts the Space, after the window's, wasn't seen in Arc.
 - A link held on a plain row opens at the line. Arc's goes into that tab's
   item, out of sight, which looks like a bug. A link dropped on a pane isn't
   handled by the app; Arc's opens as a tab after the split.
@@ -173,4 +181,4 @@ Oa's own:
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
 
-Not there yet: a split's Change Icon… and Move to.
+Not there yet: a split's Change Icon….

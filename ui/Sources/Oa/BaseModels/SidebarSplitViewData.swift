@@ -231,6 +231,12 @@ extension SidebarState {
         return copies.map(\.id)
     }
 
+    /// As seen in Arc: Move to ▸ puts the item at the top of the Space's list.
+    mutating func move(_ id: UUID, toSpace spaceID: UUID) {
+        guard let space = space(spaceID) else { return }
+        tree.move(id, into: space.unpinnedRootID, at: 0)
+    }
+
     /// Oa's own: an empty title clears it, and the cell shows the tabs again.
     mutating func renameSplitView(_ id: UUID, to title: String) {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
