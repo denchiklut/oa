@@ -29,7 +29,6 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         didSet { if presentationPosition != oldValue { positionUpdateHandler(presentationPosition) } }
     }
     private var position: CGFloat = 0
-    private var beginIndex = 0
     private var began: TimeInterval = 0
     private var samples: [(time: TimeInterval, position: CGFloat)] = []
     private var wheel: (sum: CGFloat, time: TimeInterval, flipped: TimeInterval) = (0, 0, 0)
@@ -105,7 +104,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         isTracking = true
         stop()
         position = unbanded(presentationPosition)
-        beginIndex = nearestIndex
+        let startPage = pages.isEmpty ? nil : pages[nearestIndex].id
         samples = []
         while isTracking,
             let next = window.nextEvent(matching: .any, until: .distantFuture, inMode: .eventTracking, dequeue: true)
@@ -114,13 +113,17 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
                 NSApplication.shared.sendEvent(next)
                 continue
             }
-            // As Arc's loop: a swipe that has begun keeps every movement, whichever way it leans, until the lift.
+            let beginIndex =
+                pages.firstIndex { $0.id == startPage } ?? pages.firstIndex { $0.id == selectedPageID } ?? 0
             if next.phase.contains(.changed) {
-                position -= 0.5 * next.scrollingDeltaX
+                // Only a swipe starting at an outer edge can pull past it.
+                let lower = beginIndex > 0 ? origin(at: beginIndex - 1) : -.infinity
+                let upper = beginIndex + 1 < pages.count ? origin(at: beginIndex + 1) : .infinity
+                position = min(max(position - 0.5 * next.scrollingDeltaX, lower), upper)
                 samples = samples.filter { next.timestamp - $0.time <= 0.1 } + [(next.timestamp, position)]
                 presentationPosition = banded(position)
             } else if next.phase.contains(.ended) || next.phase.contains(.cancelled) {
-                end(at: next.timestamp)
+                end(at: next.timestamp, from: beginIndex)
             }
         }
         return true
@@ -150,7 +153,7 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
     }
 
     /// Tracking ends once the settle has begun, so the owner never sees the pager at rest in between.
-    private func end(at time: TimeInterval) {
+    private func end(at time: TimeInterval, from beginIndex: Int) {
         defer { isTracking = false }
         guard !pages.isEmpty else { return }
         let recent = samples.filter { time - $0.time <= 0.1 }
