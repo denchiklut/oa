@@ -644,6 +644,14 @@ final class WindowModel {
         }
     }
 
+    func setSplitViewIcon(_ splitID: UUID, to icon: String?) {
+        store.edit { $0.updateSplitView(splitID) { $0.icon = icon } }
+    }
+
+    func resetSplitViewNameAndIcon(_ splitID: UUID) {
+        store.edit { $0.resetSplitViewNameAndIcon(splitID) }
+    }
+
     /// As seen in Arc: the copy isn't selected, and its pages load at once in the background.
     func duplicateSplitView(_ splitID: UUID) {
         var tabIDs: [UUID] = []

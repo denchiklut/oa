@@ -491,6 +491,7 @@ private struct FavoriteSplitTile: View {
     let width: CGFloat
     @State private var hovering = false
     @State private var pressed = false
+    @State private var pickingIcon = false
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
 
@@ -498,8 +499,17 @@ private struct FavoriteSplitTile: View {
         let selected = tabs.contains { $0.id == model.selectedTabID }
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         let favicons = tabs.map(model.favicon(for:))
+        let data = model.state.splitView(splitID)
         ZStack {
-            if selected {
+            // As seen in Arc: a split Favorite with an icon is one tile with only the icon. Its look selected, with
+            // no favicon to tint by, is Oa's own.
+            if let icon = data?.icon {
+                shape.fill(selected ? theme.selectedTile : hovering ? theme.itemHoveredFill : theme.itemFill)
+                    .shadow(color: .black.opacity(selected ? 0.1 : 0), radius: 2, y: 1)
+                SpaceIconGlyph(icon: icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(theme.secondaryGlyph)
+            } else if selected {
                 shape.fill(theme.selectedTile).shadow(color: .black.opacity(0.1), radius: 2, y: 1)
                 SplitAppTrayVisualEffect(favicons: favicons, tileWidth: width)
                     .opacity(theme.isDark ? (hovering ? 0.3 : 0.2) : (hovering ? 0.1 : 0))
@@ -511,7 +521,7 @@ private struct FavoriteSplitTile: View {
                 .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
             }
             HStack(spacing: 2) {
-                ForEach(tabs) { tab in
+                ForEach(data?.icon == nil ? tabs : []) { tab in
                     Group {
                         if let favicon = model.favicon(for: tab) {
                             Image(nsImage: favicon)
@@ -543,6 +553,9 @@ private struct FavoriteSplitTile: View {
                     drag?.finish(model: model, layout: layout)
                 }
         )
+        .popover(isPresented: $pickingIcon, arrowEdge: .bottom) {
+            SpaceIconPicker(selection: data?.icon) { model.setSplitViewIcon(splitID, to: $0) }
+        }
         .onHover { hovering = $0 }
         .sidebarDragFrame { drag?.tiles[splitID] = $0 }
         .contextMenu {
@@ -562,6 +575,11 @@ private struct FavoriteSplitTile: View {
                     }
                 }
             }
+            Divider()
+            if data?.title != nil || data?.icon != nil {
+                Button("Reset Name and Icon") { model.resetSplitViewNameAndIcon(splitID) }
+            }
+            Button("Change Icon…") { Task { pickingIcon = true } }
             Divider()
             // LIKELY as the cell's: the copy right after it, among the Favorites.
             Button("Duplicate") { model.duplicateSplitView(splitID) }

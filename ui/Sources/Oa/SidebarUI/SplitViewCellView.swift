@@ -15,27 +15,32 @@ struct SplitViewCellView: View {
     @State private var draft = ""
     @State private var pressed = false
     @State private var capsules: [UUID: CGRect] = [:]
+    @State private var pickingIcon = false
     @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
-    @Environment(\.windowColorScheme) private var colorScheme
     @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
         let selected = tabs.contains { $0.id == model.selectedTabIDs[spaceID] }
         let pinned = tabs.first.map { model.state.isPinned($0.id) } ?? false
-        let title = model.state.splitView(splitID)?.title
+        let data = model.state.splitView(splitID)
+        let title = data?.title
+        let icon = data?.icon
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
         HStack(spacing: 0) {
-            if renaming || title != nil {
-                Text("\(tabs.count)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 16, height: 16)
-                    // LIKELY the focus outline's colour: #2932E5 and #2229DD were measured on the default theme.
-                    .background(
-                        model.splitViewFocusColor(dark: colorScheme == .dark), in: RoundedRectangle(cornerRadius: 4)
-                    )
-                    .frame(width: 24, height: 24)
+            // As seen in Arc: a split with a title or an icon is drawn as a row, the icon or a count badge where a
+            // row's favicon is and the title, "N Tabs" without one, where a row's is.
+            if renaming || title != nil || icon != nil {
+                Group {
+                    if let icon {
+                        SpaceIconGlyph(icon: icon)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(theme.secondaryGlyph)
+                    } else {
+                        SplitViewCountBadge(model: model, count: tabs.count)
+                    }
+                }
+                .frame(width: 24, height: 24)
                 Group {
                     if renaming {
                         TextField("Title", text: $draft)
@@ -52,8 +57,8 @@ struct SplitViewCellView: View {
                                 renameFocused = true
                             }
                             .onChange(of: renameFocused) { _, focused in if !focused { renaming = false } }
-                    } else if let title {
-                        Text(title).lineLimit(1).truncationMode(.tail)
+                    } else {
+                        Text(title ?? "\(tabs.count) Tabs").lineLimit(1).truncationMode(.tail)
                     }
                 }
                 .font(.system(size: 14))
@@ -73,7 +78,7 @@ struct SplitViewCellView: View {
                 }
             }
         }
-        .padding(.leading, renaming || title != nil ? 4.5 : 4)
+        .padding(.leading, renaming || title != nil || icon != nil ? 4.5 : 4)
         .padding(.trailing, hovering && (!selected || pinned) ? 34 : 4)
         .frame(height: 36)
         .background {
@@ -125,6 +130,14 @@ struct SplitViewCellView: View {
             }
         }
         .opacity(drag?.entry?.id == splitID && drag?.settling == true ? 0 : 1)
+        .popover(
+            isPresented: $pickingIcon, attachmentAnchor: .rect(.rect(CGRect(x: 16, y: 2, width: 20, height: 36))),
+            arrowEdge: .bottom
+        ) {
+            // Oa's own: the Space icon picker. Arc's has its Ionicons and every emoji; a pick applies at once and the
+            // picker stays, as Arc's does.
+            SpaceIconPicker(selection: icon) { model.setSplitViewIcon(splitID, to: $0) }
+        }
         .frame(height: 40)
         .onHover { hovering = $0 }
         .sidebarDragFrame { drag?.rows[splitID] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) }
@@ -153,6 +166,11 @@ struct SplitViewCellView: View {
                 }
             }
             Divider()
+            if title != nil || icon != nil {
+                Button("Reset Name and Icon") { model.resetSplitViewNameAndIcon(splitID) }
+            }
+            // As seen in Arc: the picker hangs below the cell, its arrow at the first tab's favicon.
+            Button("Change Icon…") { Task { pickingIcon = true } }
             // As seen in Arc: the field starts with the split's count, all selected.
             Button("Rename…") {
                 draft = model.state.splitView(splitID)?.title ?? "\(tabs.count) Tabs"
@@ -251,5 +269,21 @@ struct SplitViewMoveMenu: View {
             Divider()
             Button("New Space…") { model.beginSpaceCreation(after: model.selectedSpaceID, moving: splitID) }
         }
+    }
+}
+
+/// A titled split's count where a row's favicon is, LIKELY in the focus outline's colour: #2932E5 and #2229DD were
+/// measured on the default theme.
+struct SplitViewCountBadge: View {
+    let model: WindowModel
+    let count: Int
+    @Environment(\.windowColorScheme) private var colorScheme
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 16, height: 16)
+            .background(model.splitViewFocusColor(dark: colorScheme == .dark), in: RoundedRectangle(cornerRadius: 4))
     }
 }

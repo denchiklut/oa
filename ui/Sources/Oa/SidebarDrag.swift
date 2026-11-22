@@ -433,7 +433,6 @@ private struct SidebarDragPreview: View, Animatable {
     let entry: SidebarEntry
     var morph: CGFloat
     @Environment(\.theme) private var theme
-    @Environment(\.windowColorScheme) private var colorScheme
 
     nonisolated var animatableData: CGFloat {
         get { morph }
@@ -463,18 +462,21 @@ private struct SidebarDragPreview: View, Animatable {
                     .offset(x: 10 + (width / 2 - 18) * t, y: (height - 16) / 2)
             case .splitView(let id, let tabs):
                 SplitAppTrayRing(favicons: tabs.map(model.favicon(for:)), tileWidth: width).opacity(t)
-                if let name = model.state.splitView(id)?.title {
-                    Text("\(tabs.count)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 16, height: 16)
-                        .background(
-                            model.splitViewFocusColor(dark: colorScheme == .dark),
-                            in: RoundedRectangle(cornerRadius: 4)
-                        )
-                        .offset(x: 12.5, y: (height - 16) / 2)
-                        .opacity(max(0, 1 - t * 4))
-                    title(name, at: 39, height: height, t: t)
+                let data = model.state.splitView(id)
+                if data?.title != nil || data?.icon != nil {
+                    Group {
+                        if let icon = data?.icon {
+                            SpaceIconGlyph(icon: icon)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(theme.secondaryGlyph)
+                        } else {
+                            SplitViewCountBadge(model: model, count: tabs.count)
+                        }
+                    }
+                    .frame(width: 24, height: 24)
+                    .offset(x: 8.5, y: (height - 24) / 2)
+                    .opacity(max(0, 1 - t * 4))
+                    title(data?.title ?? "\(tabs.count) Tabs", at: 39, height: height, t: t)
                     glyph(width: width, height: height, t: t)
                 } else {
                     // As measured on Arc: the cell as it is selected and under the pointer, each tab's card with its

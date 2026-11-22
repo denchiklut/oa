@@ -16,6 +16,8 @@ struct SidebarSplitViewData: Hashable {
     var layoutOrientation = LayoutOrientation.horizontal
     /// Arc keeps it as the split item's own `title`, not with this data.
     var title: String?
+    /// Arc's `customInfo.iconType`, kept as a Space's icon is: an SF Symbol's name or an emoji.
+    var icon: String?
 
     func shares(of tabIDs: [UUID]) -> [CGFloat] {
         let known = tabIDs.compactMap { itemWidthFactors[$0] }
@@ -27,13 +29,15 @@ struct SidebarSplitViewData: Hashable {
 }
 
 extension SidebarSplitViewData: Codable {
-    private enum Key: String, CodingKey { case itemWidthFactors, layoutOrientation }
+    private enum Key: String, CodingKey { case itemWidthFactors, layoutOrientation, customInfo }
+    private struct CustomInfo: Codable { var icon: String? }
 
     /// The factors as Arc writes them: a flat list of an item's ID and its factor in turn.
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: Key.self)
         layoutOrientation =
             try values.decodeIfPresent(LayoutOrientation.self, forKey: .layoutOrientation) ?? .horizontal
+        icon = try values.decodeIfPresent(CustomInfo.self, forKey: .customInfo)?.icon
         guard values.contains(.itemWidthFactors) else { return }
         var factors = try values.nestedUnkeyedContainer(forKey: .itemWidthFactors)
         while !factors.isAtEnd { itemWidthFactors[try factors.decode(UUID.self)] = try factors.decode(CGFloat.self) }
@@ -42,6 +46,7 @@ extension SidebarSplitViewData: Codable {
     func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: Key.self)
         try values.encode(layoutOrientation, forKey: .layoutOrientation)
+        if let icon { try values.encode(CustomInfo(icon: icon), forKey: .customInfo) }
         var factors = values.nestedUnkeyedContainer(forKey: .itemWidthFactors)
         for (id, factor) in itemWidthFactors.sorted(by: { $0.key.uuidString < $1.key.uuidString }) {
             try factors.encode(id)
@@ -235,6 +240,14 @@ extension SidebarState {
     mutating func move(_ id: UUID, toSpace spaceID: UUID) {
         guard let space = space(spaceID) else { return }
         tree.move(id, into: space.unpinnedRootID, at: 0)
+    }
+
+    /// As seen in Arc: Reset Name and Icon clears both, and the cell shows the tabs again.
+    mutating func resetSplitViewNameAndIcon(_ id: UUID) {
+        updateSplitView(id) {
+            $0.title = nil
+            $0.icon = nil
+        }
     }
 
     /// Oa's own: an empty title clears it, and the cell shows the tabs again.
