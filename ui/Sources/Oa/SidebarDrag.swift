@@ -68,8 +68,15 @@ final class SidebarDrag {
     @ObservationIgnored private var showsPrevious = false
     /// As measured on Arc: the edge of a pane the pointer entered, which holds until the pane's middle.
     @ObservationIgnored private var heldEdge: (pane: Int, edge: Edge)?
+    /// As Arc's `dropHapticSubject`s, one per Space's list and grid: the last slot each was sent, kept across drags.
+    @ObservationIgnored private var hapticSlots: [HapticSource: Int] = [:]
     /// The row under the pointer's middle band, and since when.
     @ObservationIgnored private var combineCandidate: (id: UUID, since: Date)?
+
+    private struct HapticSource: Hashable {
+        var spaceID: UUID
+        var grid: Bool
+    }
 
     private enum Edge {
         case left
@@ -115,12 +122,23 @@ final class SidebarDrag {
     private func retarget(model: WindowModel) {
         let next = target(at: location, model: model)
         if next != target { target = next }
+        if let next, next.combine == nil { tick(at: next, in: model.selectedSpaceID) }
         let dropTarget = next == nil ? splitViewDropTarget(at: location, model: model) : nil
         if dropTarget != model.proposedSplitViewDropTarget { model.proposedSplitViewDropTarget = dropTarget }
         let shape: CGFloat = next?.section == .favorites ? 1 : 0
         if next != nil, shape != morph {
             withAnimation(.easeInOut(duration: shape == 1 ? 0.28 : 0.2)) { morph = shape }
         }
+    }
+
+    /// As Arc: a tick when an insertion slot differs from the last one, which counts even with haptics off; a drop
+    /// onto a row sends nothing.
+    private func tick(at target: Target, in spaceID: UUID) {
+        let source = HapticSource(spaceID: spaceID, grid: target.section == .favorites)
+        guard hapticSlots.updateValue(target.index, forKey: source) != target.index,
+            !TabReorderingHaptics.isDisabled
+        else { return }
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
     }
 
     /// Over a place, the tab moves there at once and the copy glides onto it; elsewhere it glides back.
@@ -530,4 +548,11 @@ private struct SidebarDragPreview: View, Animatable {
             .offset(x: width - 30, y: (height - 24) / 2)
             .opacity(max(0, 1 - t * 4))
     }
+}
+
+/// Arc's key, stored as the PiP one is: absent means on.
+enum TabReorderingHaptics {
+    static let key = "tabReorderingHapticsDisabled"
+
+    static var isDisabled: Bool { UserDefaults.standard.bool(forKey: key) }
 }
