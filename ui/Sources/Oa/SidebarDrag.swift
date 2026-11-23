@@ -49,6 +49,10 @@ final class SidebarDrag {
 
     /// A tab, or a split's cell or tile, which moves whole.
     private(set) var entry: SidebarEntry?
+    /// The multi-selection the dragged row is in, in the sidebar's order, which moves with it.
+    private(set) var memberIDs: [UUID] = []
+    /// As seen in Arc's stack: the selected tab in front when it is a member, else the dragged row.
+    private(set) var stack: [SidebarTab] = []
     /// A link dragged in from a page.
     @ObservationIgnored private var link = false
     private(set) var source: Section?
@@ -89,12 +93,13 @@ final class SidebarDrag {
 
     func update(
         _ entry: SidebarEntry, from section: Section, glyph: SidebarCellButton.Glyph, at location: CGPoint,
-        start: CGPoint, previous: UUID? = nil, model: WindowModel, layout: WindowLayoutController
+        start: CGPoint, previous: UUID? = nil, members: [UUID] = [], model: WindowModel,
+        layout: WindowLayoutController
     ) {
         guard !settling else { return }
         if self.entry?.id != entry.id {
             guard hypot(location.x - start.x, location.y - start.y) >= 4 else { return }
-            begin(entry, from: section, glyph: glyph, start: start, model: model, layout: layout)
+            begin(entry, from: section, glyph: glyph, start: start, members: members, model: model, layout: layout)
             previousTabID = previous
         }
         self.location = location
@@ -146,13 +151,20 @@ final class SidebarDrag {
         guard let entry, let tab = entry.tabs.first, !settling else { return }
         heldEdge = nil
         combineCandidate = nil
+        // As seen in Arc: a drag ends the multi-selection however it ends.
+        model.clearMultiSelection()
+        let memberIDs = memberIDs
+        self.memberIDs = []
         if model.proposedSplitViewDropTarget != nil || target?.combine != nil {
-            if let combine = target?.combine {
+            if let combine = target?.combine, !memberIDs.isEmpty {
+                model.combineIntoSplitView(memberIDs, onto: combine, last: target?.combinesLast == true)
+            } else if let combine = target?.combine {
                 model.combineIntoSplitView(tab.id, onto: combine, last: target?.combinesLast == true)
             } else {
                 model.acceptSplitViewDrop(of: tab.id)
             }
             self.entry = nil
+            stack = []
             target = nil
             source = nil
             showsPrevious = false
@@ -167,6 +179,13 @@ final class SidebarDrag {
         let target = target
         if let target {
             switch target.section {
+            case .favorites where !memberIDs.isEmpty:
+                model.favorite(memberIDs, at: target.index)
+            case .pinned where !memberIDs.isEmpty, .today where !memberIDs.isEmpty:
+                let pinned = target.section == .pinned
+                let ids = model.state.entries(in: model.selectedSpaceID, pinned: pinned).map(\.id)
+                let anchorID = ids.prefix(target.index).last { !memberIDs.contains($0) }
+                model.moveTabs(memberIDs, pinned: pinned, after: anchorID)
             case .favorites:
                 let favorites = model.state.favoriteEntries(for: model.selectedSpaceID)
                 let from = source == .favorites ? favorites.firstIndex { $0.id == entry.id } : nil
@@ -178,17 +197,18 @@ final class SidebarDrag {
                 model.move(entry.id, pinned: target.section == .pinned, at: target.index)
             }
         }
-        let before = rows[entry.id]?.rect
+        let frontID = stack.first?.id ?? entry.id
+        let before = rows[frontID]?.rect
         Task {
             // The row's new frame comes with the layout after the move; a row that stays put reports none.
             for _ in 0..<(target.map { $0.section != .favorites } == true ? 8 : 1) {
                 try? await Task.sleep(for: .milliseconds(15))
-                if let rect = rows[entry.id]?.rect, rect != before { break }
+                if let rect = rows[frontID]?.rect, rect != before { break }
             }
             let landing =
                 switch target?.section {
                 case .favorites: gap
-                case .pinned, .today: rows[entry.id]?.rect.insetBy(dx: 0, dy: 2) ?? origin
+                case .pinned, .today: rows[frontID]?.rect.insetBy(dx: 0, dy: 2) ?? origin
                 case nil: origin
                 }
             let anchor = morph == 1 ? tileAnchor : rowAnchor
@@ -197,6 +217,7 @@ final class SidebarDrag {
             }
             try? await Task.sleep(for: .milliseconds(280))
             self.entry = nil
+            stack = []
             source = nil
             self.target = nil
             settling = false
@@ -206,8 +227,7 @@ final class SidebarDrag {
 
     private func begin(
         _ entry: SidebarEntry, from section: Section, glyph: SidebarCellButton.Glyph, start: CGPoint,
-        model: WindowModel,
-        layout: WindowLayoutController
+        members: [UUID], model: WindowModel, layout: WindowLayoutController
     ) {
         let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != entry.id }.count
         let slots = FavoritesGrid.Layout(count: others + 1, width: layout.sidebarWidth)
@@ -227,6 +247,10 @@ final class SidebarDrag {
             morph = 0
         }
         self.entry = entry
+        memberIDs = members
+        let frontID = model.selectedTabID.flatMap { members.contains($0) ? $0 : nil } ?? entry.id
+        let tabs = members.compactMap { model.state.tree.tab($0) }
+        stack = tabs.filter { $0.id == frontID } + tabs.filter { $0.id != frontID }
         source = section
         self.glyph = glyph
         layout.setHold(.drag, true)
@@ -239,7 +263,8 @@ final class SidebarDrag {
     /// LIKELY by Arc's other sizes, a third of the pane up to 80 pt at the sides and 50 pt at the ends, with no hold.
     /// A pinned tab or a Favorite goes in as itself and a copy keeps its place, LIKELY as by Arc's other ways in.
     private func splitViewDropTarget(at point: CGPoint, model: WindowModel) -> SplitViewDropTarget? {
-        guard let entry, pageArea.contains(point), model.library == nil, !model.coversWindow else {
+        // As seen in Arc: several rows over the page show no drop.
+        guard let entry, memberIDs.isEmpty, pageArea.contains(point), model.library == nil, !model.coversWindow else {
             heldEdge = nil
             return nil
         }
@@ -345,9 +370,13 @@ final class SidebarDrag {
     private func combineTarget(at point: CGPoint, among ids: [UUID], model: WindowModel) -> UUID? {
         let held: UUID? = if case .tab(let tab) = entry { tab.id } else { nil }
         let band = { (rect: CGRect) in rect.minY + 11 <= point.y && point.y <= rect.minY + 32 }
+        let canCombine = { (id: UUID) in
+            if !self.memberIDs.isEmpty { return !model.combinedTabIDs(self.memberIDs, onto: id).isEmpty }
+            return held.map { model.canCombineIntoSplitView($0, onto: id) } ?? model.canDropLink(inSplitView: id)
+        }
         guard held != nil || link,
             let id = ids.first(where: { rows[$0].map { $0.rect.contains(point) && band($0.rect) } == true }),
-            held.map({ model.canCombineIntoSplitView($0, onto: id) }) ?? model.canDropLink(inSplitView: id)
+            canCombine(id)
         else {
             combineCandidate = nil
             return nil
@@ -421,7 +450,18 @@ struct SidebarDragLayer: View {
             }
             // As seen in Arc: held on a tab's row, the copy is gone into the row's preview of the split.
             if let entry = drag.entry, drag.target?.combine.map({ model.state.splitView($0) != nil }) ?? true {
-                SidebarDragPreview(model: model, drag: drag, entry: entry, morph: drag.morph)
+                if drag.stack.isEmpty {
+                    SidebarDragPreview(model: model, drag: drag, entry: entry, morph: drag.morph)
+                } else {
+                    // As seen in Arc: AppKit's stack, up to three rows each 6 pt down and right, the count at its
+                    // corner.
+                    let shown = Array(drag.stack.prefix(3).enumerated())
+                    ForEach(shown.reversed(), id: \.element.id) { depth, tab in
+                        SidebarDragPreview(
+                            model: model, drag: drag, entry: .tab(tab), morph: drag.morph, depth: CGFloat(depth),
+                            count: depth == 0 ? drag.stack.count : nil)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -449,6 +489,8 @@ private struct SidebarDragPreview: View, Animatable {
     let drag: SidebarDrag
     let entry: SidebarEntry
     var morph: CGFloat
+    var depth: CGFloat = 0
+    var count: Int?
     @Environment(\.theme) private var theme
 
     nonisolated var animatableData: CGFloat {
@@ -529,7 +571,19 @@ private struct SidebarDragPreview: View, Animatable {
         .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
         // As measured on Arc: a split's copy at 0.9.
         .opacity({ if case .splitView = entry { 0.9 } else { 0.7 } }())
-        .offset(x: drag.location.x - anchor.x, y: drag.location.y - anchor.y)
+        .overlay(alignment: .topLeading) {
+            if let count {
+                // Arc's red 18 pt badge, on the stack's corner rather than left of it as Arc's, which the window
+                // would cut off: Oa's drag is drawn in the window, Arc's in a screen-wide one.
+                Text("\(count)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .background(Capsule().fill(Color(nsColor: .systemRed)))
+                    .offset(x: -6, y: -9)
+            }
+        }
+        .offset(x: drag.location.x - anchor.x + depth * 6, y: drag.location.y - anchor.y + depth * 6)
     }
 
     private func title(_ text: String, at x: CGFloat, width: CGFloat? = nil, height: CGFloat, t: CGFloat) -> some View {
