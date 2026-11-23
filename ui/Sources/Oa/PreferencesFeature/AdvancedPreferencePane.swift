@@ -4,6 +4,7 @@ import SwiftUI
 struct AdvancedPreferencePane: View {
     let openMoreSettings: () -> Void
     @AppStorage(TabReorderingHaptics.key) private var hapticsDisabled = false
+    @AppStorage(WindowContentGrabber.key) private var contentWindowDragging = true
     @AppStorage(ToolbarAddressLabel.fullURLPreferenceKey) private var showsFullURL = false
     @AppStorage(AutomaticPictureInPicture.key) private var autoPipDisabled = false
 
@@ -16,6 +17,10 @@ struct AdvancedPreferencePane: View {
                         isOn: inverted($hapticsDisabled))
                 }
                 section {
+                    row(
+                        "Allow window dragging from the top of webpages", symbol: "rectangle.topthird.inset.filled",
+                        tile: .green, isOn: $contentWindowDragging)
+                    Divider()
                     row(
                         "Show full URL when Toolbar is enabled", symbol: "ellipsis.rectangle", tile: .red,
                         isOn: $showsFullURL)

@@ -199,6 +199,9 @@ private struct SplitViewContentPane: View {
                     width: isVertical ? nil : restingLength,
                     height: isVertical ? restingLength.map { $0 - (splitID == nil ? 0 : 32) } : nil)
             }
+            .windowContentGrabber(
+                model: model, hasContent: page != nil || model.placeholder(for: tabID) != nil,
+                barHeight: splitID == nil ? 0 : 32)
         }
         .background(dark ? Color.black : .white)
         .clipShape(shape)
