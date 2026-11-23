@@ -497,6 +497,12 @@ struct SidebarState {
         tree.move(splitViewID(containing: tabID) ?? tabID, into: profile.favoritesRootID, at: index)
     }
 
+    /// As seen in Arc: last in the other profile's grid, with its ID.
+    mutating func moveFavorite(_ tabID: UUID, toProfile profileID: UUID) {
+        guard isFavorite(tabID), let profile = profile(profileID) else { return }
+        tree.move(tabID, into: profile.favoritesRootID)
+    }
+
     /// To the top of the Space's unpinned section. Arc moves it to that section; the position is Oa's own.
     mutating func unfavoriteTab(_ tabID: UUID, in spaceID: UUID) {
         guard isFavorite(tabID), let space = space(spaceID) else { return }

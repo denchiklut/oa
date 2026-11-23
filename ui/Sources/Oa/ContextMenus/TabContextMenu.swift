@@ -163,12 +163,25 @@ struct TabContextMenu {
         return MenuActionItem("Share", submenu: submenu)
     }
 
-    /// Every Space, the tab's own ticked, then New Space…. Arc lists profiles for a Favorite; moving one to another
-    /// profile isn't Oa's yet.
+    /// Every Space, the tab's own ticked, then New Space…; for a Favorite, as Arc's, a Profile submenu of every
+    /// profile with a Space, its own ticked.
     private func move(_ tabIDs: [UUID], favorite: Bool) -> NSMenuItem {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        guard !favorite else { return MenuActionItem("Move to", submenu: submenu, enabled: false) }
+        guard !favorite else {
+            let profiles = NSMenu()
+            profiles.autoenablesItems = false
+            let ownID = model.state.profile(containing: tab.id)?.id
+            for profile in model.profiles where model.state.spaces.contains(where: { $0.profileID == profile.id }) {
+                let item = MenuActionItem(profile.name) { [model, tab] in
+                    model.moveFavorite(tab.id, toProfile: profile.id)
+                }
+                item.state = profile.id == ownID ? .on : .off
+                profiles.addItem(item)
+            }
+            submenu.addItem(MenuActionItem("Profile", submenu: profiles))
+            return MenuActionItem("Move to", submenu: submenu)
+        }
         let spaceID = model.state.space(containing: tab.id)?.id
         for space in model.state.spaces {
             let item = MenuActionItem(space.name) { [model] in model.moveItems(tabIDs, toSpace: space.id) }

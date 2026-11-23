@@ -820,9 +820,30 @@ final class WindowModel {
             select(focused)
         }
         if crossesProfile {
-            ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space, in: self, proceed: move)
+            ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space.name, in: self, proceed: move)
         } else {
             move()
+        }
+    }
+
+    /// As seen in Arc: a Favorite moved to another profile keeps its ID, last in that profile's grid. Its page closes
+    /// and loads again there from its saved address, at once when shown, the window following, else once selected.
+    /// Oa's own: the sheet names the profile, and the window follows to the profile's first Space.
+    func moveFavorite(_ tabID: UUID, toProfile profileID: UUID) {
+        guard state.isFavorite(tabID), state.profile(containing: tabID)?.id != profileID,
+            let spaceID = state.spaces.first(where: { $0.profileID == profileID })?.id
+        else { return }
+        let shown = presentedTabIDs.contains(tabID)
+        ProfileDialogUtils.confirmMove(tabCount: 1, to: profileName(profileID), in: self) { [weak self] in
+            guard let self, state.isFavorite(tabID) else { return }
+            for window in store.windows { window.dropPages(of: [tabID]) }
+            store.edit { $0.moveFavorite(tabID, toProfile: profileID) }
+            for (otherSpaceID, selected) in selectedTabIDs where selected == tabID {
+                selectedTabIDs[otherSpaceID] = nil
+            }
+            guard shown else { return }
+            selectSpace(spaceID)
+            select(tabID)
         }
     }
 
