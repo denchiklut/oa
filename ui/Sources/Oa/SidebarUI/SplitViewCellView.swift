@@ -263,8 +263,8 @@ struct SplitViewMoveMenu: View {
     var body: some View {
         Menu("Move to") {
             ForEach(model.state.spaces) { space in
-                Button(space.name) { model.moveSplitView(splitID, toSpace: space.id) }
-                    .disabled(!model.canMoveSplitView(splitID, toSpace: space.id))
+                Button(space.name) { model.moveItem(splitID, toSpace: space.id) }
+                    .disabled(!model.canMoveItem(splitID, toSpace: space.id))
             }
             Divider()
             Button("New Space…") { model.beginSpaceCreation(after: model.selectedSpaceID, moving: splitID) }

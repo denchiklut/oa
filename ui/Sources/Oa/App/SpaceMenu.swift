@@ -130,7 +130,14 @@ extension View {
     /// `spaceMenuExclusion()`. After open-arch: SwiftUI's context menu can't hold an AppKit menu, and a view watching
     /// for it is laid out where it would be, clipped or not, so one off the sidebar is turned off.
     func spaceContextMenu(isEnabled: Bool = true, _ menu: @escaping () -> SpaceMenu) -> some View {
-        background(SpaceContextMenu(isEnabled: isEnabled, menu: menu))
+        background(PlatformContextMenu(isEnabled: isEnabled, yieldsToExclusions: true) { menu().make() })
+    }
+
+    /// An AppKit menu on a right-click or Control-click over this view, which keeps the Space menu shut, as Arc's
+    /// sidebar items have.
+    func platformContextMenu(isEnabled: Bool = true, _ menu: @escaping () -> NSMenu) -> some View {
+        background(PlatformContextMenu(isEnabled: isEnabled, yieldsToExclusions: false, menu: menu))
+            .spaceMenuExclusion()
     }
 
     /// Keeps the Space menu shut over this view, which has its own.
@@ -139,19 +146,24 @@ extension View {
     }
 }
 
-private struct SpaceContextMenu: NSViewRepresentable {
+private struct PlatformContextMenu: NSViewRepresentable {
     let isEnabled: Bool
-    let menu: () -> SpaceMenu
+    let yieldsToExclusions: Bool
+    let menu: () -> NSMenu
 
-    func makeNSView(context: Context) -> SpaceContextMenuView { SpaceContextMenuView() }
+    func makeNSView(context: Context) -> PlatformContextMenuView { PlatformContextMenuView() }
 
-    func updateNSView(_ view: SpaceContextMenuView, context: Context) { view.spaceMenu = isEnabled ? menu : nil }
+    func updateNSView(_ view: PlatformContextMenuView, context: Context) {
+        view.menuBuilder = isEnabled ? menu : nil
+        view.yieldsToExclusions = yieldsToExclusions
+    }
 
-    static func dismantleNSView(_ view: SpaceContextMenuView, coordinator: ()) { view.stopMonitoring() }
+    static func dismantleNSView(_ view: PlatformContextMenuView, coordinator: ()) { view.stopMonitoring() }
 }
 
-private final class SpaceContextMenuView: NSView {
-    var spaceMenu: (() -> SpaceMenu)?
+private final class PlatformContextMenuView: NSView {
+    var menuBuilder: (() -> NSMenu)?
+    var yieldsToExclusions = false
     private var monitor: Any?
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -174,9 +186,9 @@ private final class SpaceContextMenuView: NSView {
         guard event.window === window, !isHiddenOrHasHiddenAncestor,
             event.type == .rightMouseDown || event.modifierFlags.contains(.control),
             contains(convert(event.locationInWindow, from: nil)),
-            !SpaceMenuExclusionView.excludes(event), let spaceMenu
+            !yieldsToExclusions || !SpaceMenuExclusionView.excludes(event), let menuBuilder
         else { return false }
-        let built = spaceMenu().make()
+        let built = menuBuilder()
         built.appearance = window?.effectiveAppearance
         NSMenu.popUpContextMenu(built, with: event, for: self)
         return true
