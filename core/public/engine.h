@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "oa/public/page.h"
 
@@ -37,6 +38,24 @@ void CloseWindow(const std::string& window_id);
 // page. Every page stays.
 void AskToLeaveWindow(const std::string& window_id,
                       std::function<void(bool leave)> completion);
+
+// A page Chrome's session restore brought back, with the session ID its tab
+// had in the last session.
+struct RestoredPage {
+  int32_t last_session_id;
+  std::unique_ptr<Page> page;
+};
+
+// Loads the profile if needed and restores its last session, as ArcCore's
+// session restoration does: the pages wait in Browsers of no window until the
+// app moves each to its window. Once a launch; later calls get nothing.
+void RestoreLastSession(
+    const std::string& profile_id,
+    std::function<void(std::vector<RestoredPage>)> completion);
+
+// As Chrome's quit: each profile's session is saved and closed before its
+// pages go, so they stay in the last session.
+void SaveSessionsForQuit();
 
 void QuitEngine();
 

@@ -253,6 +253,9 @@ class Page {
   virtual std::string Title() const = 0;
   virtual bool IsLoading() const = 0;
   virtual double LoadProgress() const = 0;
+  // Chrome's session ID of the page's tab, as ArcCore's restoration data keeps
+  // it: kept while the page lives.
+  virtual int32_t GetTabSessionID() const = 0;
   virtual bool CanGoBack() const = 0;
   virtual bool CanGoForward() const = 0;
   // An NSImage, held by the tab while it keeps the icon; null until it has one.
