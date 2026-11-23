@@ -1458,6 +1458,20 @@ class BrowserObserverBridge : public oa::Browser::Observer {
     [opened setPage:std::move(page)];
     [browser.target browser:browser didOpenPage:opened active:is_active];
   }
+  void OnBrowserRestoredPages(std::vector<oa::RestoredPage> pages) override {
+    OABrowser* browser = browser_;
+    NSMutableArray<OAPage*>* restored = [NSMutableArray array];
+    NSMutableArray<NSNumber*>* ids = [NSMutableArray array];
+    for (oa::RestoredPage& entry : pages) {
+      OAPage* page = [[OAPage alloc] initWithDelegate:nil];
+      [page setPage:std::move(entry.page)];
+      [restored addObject:page];
+      [ids addObject:@(entry.last_session_id)];
+    }
+    [browser.target browser:browser
+            didRestorePages:restored
+             lastSessionIDs:ids];
+  }
 
  private:
   __weak OABrowser* browser_;
@@ -1564,24 +1578,6 @@ class BrowserObserverBridge : public oa::Browser::Observer {
         }
         [page setPage:std::move(created)];
         handler(page, restored);
-      });
-}
-
-- (void)restoreLastSessionWithCompletion:
-    (void (^)(NSArray<NSNumber*>*, NSArray<OAPage*>*))completion {
-  void (^handler)(NSArray<NSNumber*>*, NSArray<OAPage*>*) = [completion copy];
-  oa::RestoreLastSession(
-      _identifier.UTF8String ?: "",
-      [handler](std::vector<oa::RestoredPage> restored) {
-        NSMutableArray<NSNumber*>* ids = [NSMutableArray array];
-        NSMutableArray<OAPage*>* pages = [NSMutableArray array];
-        for (oa::RestoredPage& entry : restored) {
-          OAPage* page = [[OAPage alloc] initWithDelegate:nil];
-          [page setPage:std::move(entry.page)];
-          [ids addObject:@(entry.last_session_id)];
-          [pages addObject:page];
-        }
-        handler(ids, pages);
       });
 }
 
@@ -1710,6 +1706,14 @@ class BrowserObserverBridge : public oa::Browser::Observer {
   void (^handler)(BOOL) = [completion copy];
   oa::AskToLeaveWindow(identifier.UTF8String ?: "",
                        [handler](bool leave) { handler(leave); });
+}
+
+- (void)setRestoresLastSession:(BOOL)restores {
+  oa::SetRestoresLastSession(restores);
+}
+
+- (void)finishedRestoringWindows {
+  oa::FinishedRestoringWindows();
 }
 
 - (void)saveSessionsForQuit {

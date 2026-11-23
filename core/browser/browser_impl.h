@@ -16,6 +16,10 @@ namespace oa {
 Browser::Observer* FindBrowserObserver(const std::string& window_id,
                                        Profile* profile);
 
+// As ADK's handleRestorationDone: each of the app's Browsers gets the pages
+// parked in it, the restored ones in one batch.
+void HandOffRestoredPages();
+
 }  // namespace oa
 
 #endif  // OA_BROWSER_BROWSER_IMPL_H_

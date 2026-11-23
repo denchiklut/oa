@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
@@ -39,6 +40,8 @@ class WindowBrowser : public TabStripModelObserver {
   static void AskToLeave(const std::string& window_id,
                          std::function<void(bool leave)> completion);
   static void CloseAll();
+  // Closes each Browser Chrome restored for a window the app hasn't attached.
+  static void CloseUnclaimed();
   // The active page of the Browser the app's `window` has for `profile`; of
   // the key window's when `window` is null.
   static PageImpl* ActivePage(gfx::NativeWindow window, Profile* profile);
@@ -64,6 +67,12 @@ class WindowBrowser : public TabStripModelObserver {
   bool Close(content::WebContents* contents);
   void Remove(content::WebContents* contents);
   void OnWindowClosing();
+  // A Browser the app made before any page has no last tab to close it.
+  void CloseIfEmpty();
+  // Takes the tabs parked while a session restore was awaited. The restored
+  // ones come back as pages; any other goes to `observer` as a page Chrome
+  // opened.
+  std::vector<RestoredPage> AdoptParked(Browser::Observer* observer);
 
   base::WeakPtr<WindowBrowser> GetWeakPtr() {
     return weak_factory_.GetWeakPtr();
@@ -83,6 +92,7 @@ class WindowBrowser : public TabStripModelObserver {
   const raw_ptr<BrowserWindowInterface> browser_;
   std::unique_ptr<ExtensionsContainerImpl> extensions_container_;
   std::string window_id_;
+  std::vector<base::WeakPtr<content::WebContents>> parked_;
   bool closing_ = false;
   bool activating_ = false;
   base::WeakPtrFactory<WindowBrowser> weak_factory_{this};

@@ -4,6 +4,7 @@
 #ifndef OA_PUBLIC_BROWSER_H_
 #define OA_PUBLIC_BROWSER_H_
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,6 +27,13 @@ struct ExtensionToolbarAction {
   bool enabled = false;
   // Among Chrome's pinned extensions; -1 when it isn't pinned.
   int pinned_position = -1;
+};
+
+// A page Chrome's session restore brought back, with the session ID its tab
+// had in the last session.
+struct RestoredPage {
+  int32_t last_session_id;
+  std::unique_ptr<Page> page;
 };
 
 class Browser {
@@ -51,6 +59,11 @@ class Browser {
     // chrome.tabs.create does. The observer owns it; destroying it drops it.
     virtual void OnBrowserOpenedPage(std::unique_ptr<Page> page,
                                      bool is_active) = 0;
+    // As ADK's onReceivedRestoredWebContents: once the profiles the app asked
+    // Browsers of have restored their last session or had none to restore,
+    // the pages Chrome restored into this window's Browser, in one batch that
+    // may be empty. The observer owns them.
+    virtual void OnBrowserRestoredPages(std::vector<RestoredPage> pages) = 0;
 
    protected:
     virtual ~Observer() = default;
@@ -68,9 +81,10 @@ class Browser {
   virtual void CloseExtensionPopup() = 0;
 };
 
-// Loads the app profile `profile_id` if needed, then reports `window_id`'s
-// Browser for it to `observer` until the result is destroyed. The Browser
-// itself comes and goes with the window's pages in that profile.
+// Loads the app profile `profile_id` if needed, makes `window_id`'s Browser
+// for it, and reports that Browser to `observer` until the result is
+// destroyed. The Browser goes with the window's last page in that profile and
+// comes again with the next.
 std::unique_ptr<Browser> ObserveBrowser(const std::string& window_id,
                                         const std::string& profile_id,
                                         Browser::Observer* observer);

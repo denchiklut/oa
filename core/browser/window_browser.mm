@@ -2,6 +2,7 @@
 
 #import <AppKit/AppKit.h>
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -15,6 +16,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_removed_reason.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
@@ -22,9 +24,11 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/window_metadata/window_metadata_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "oa/browser/browser_impl.h"
 #include "oa/browser/page_impl.h"
+#include "oa/browser/session_restoration.h"
 #include "oa/browser/ui/browser_window_impl.h"
 #include "oa/browser/ui/extensions_container_impl.h"
 #include "ui/base/window_open_disposition.h"
@@ -79,6 +83,7 @@ void RemoveAllTabs(base::WeakPtr<WindowBrowser> window_browser) {
   while (window_browser) {
     TabStripModel* model = window_browser->browser()->GetTabStripModel();
     if (model->empty()) {
+      window_browser->CloseIfEmpty();
       return;
     }
     const int count = model->count();
@@ -117,12 +122,14 @@ WindowBrowser* WindowBrowser::GetOrCreate(const std::string& window_id,
     LOG(ERROR) << "oa: can't create a Browser for this profile now";
     return nullptr;
   }
-  BrowserWindowInterface* browser = CreateBrowserWindow(
-      BrowserWindowCreateParams(BrowserWindowInterface::TYPE_NORMAL, *profile,
-                                /*from_user_gesture=*/false));
+  BrowserWindowCreateParams params(BrowserWindowInterface::TYPE_NORMAL,
+                                   *profile, /*from_user_gesture=*/false);
+  // As ArcCore keeps an ArcBrowser's window identifier: Chrome saves the title
+  // with the session, and a restored window finds its Browser by it.
+  params.user_title = window_id;
+  BrowserWindowInterface* browser = CreateBrowserWindow(std::move(params));
   BrowserWindowImpl* window = BrowserWindowImpl::FromBrowser(browser);
   CHECK(window) << "BrowserWindowImpl::InstallFactory() wasn't called";
-  window->window_browser()->window_id_ = window_id;
   window->window_browser()->extensions_container_->ReportActions();
   return window->window_browser();
 }
@@ -171,6 +178,19 @@ void WindowBrowser::CloseAll() {
 }
 
 // static
+void WindowBrowser::CloseUnclaimed() {
+  for (base::WeakPtr<WindowBrowser>& window_browser :
+       OpenWindowBrowsers(nullptr)) {
+    // Only a Browser titled with a window's ID was made for a window.
+    if (window_browser && !window_browser->closing_ &&
+        !window_browser->window_id_.empty() &&
+        !window_browser->GetNativeWindow().GetNativeNSWindow()) {
+      RemoveAllTabs(window_browser);
+    }
+  }
+}
+
+// static
 PageImpl* WindowBrowser::ActivePage(gfx::NativeWindow window,
                                     Profile* profile) {
   NSWindow* ns_window = window ? window.GetNativeNSWindow() : NSApp.keyWindow;
@@ -189,12 +209,15 @@ PageImpl* WindowBrowser::ActivePage(gfx::NativeWindow window,
 
 WindowBrowser::WindowBrowser(BrowserWindowInterface* browser)
     : browser_(browser),
-      extensions_container_(std::make_unique<ExtensionsContainerImpl>(this)) {
+      extensions_container_(std::make_unique<ExtensionsContainerImpl>(this)),
+      window_id_(WindowMetadataController::From(browser)->user_title()) {
   browser_->GetTabStripModel()->AddObserver(this);
   AllWindowBrowsers().push_back(this);
 }
 
 WindowBrowser::~WindowBrowser() {
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&SessionRestoration::OnBrowserGone));
   extensions_container_.reset();
   std::erase(AllWindowBrowsers(), this);
   browser_->GetTabStripModel()->RemoveObserver(this);
@@ -295,6 +318,41 @@ void WindowBrowser::OnWindowClosing() {
   closing_ = true;
 }
 
+void WindowBrowser::CloseIfEmpty() {
+  if (!closing_ && browser_->GetTabStripModel()->empty()) {
+    BrowserWindow::FromBrowser(browser_)->Close();
+  }
+}
+
+std::vector<RestoredPage> WindowBrowser::AdoptParked(
+    Browser::Observer* observer) {
+  std::vector<RestoredPage> restored;
+  TabStripModel* model = browser_->GetTabStripModel();
+  for (base::WeakPtr<content::WebContents>& contents :
+       std::exchange(parked_, {})) {
+    // The app's own pages were adopted as they went in.
+    if (!contents || closing_ || PageImpl::FromWebContents(contents.get()) ||
+        model->GetIndexOfWebContents(contents.get()) == TabStripModel::kNoTab) {
+      continue;
+    }
+    std::optional<int32_t> last_session_id =
+        SessionRestoration::LastSessionID(contents.get());
+    // Oa's own: ADK hands every parked tab over as restored.
+    if (!last_session_id) {
+      observer->OnBrowserOpenedPage(
+          PageImpl::AdoptInserted(this, contents.get()),
+          model->GetActiveWebContents() == contents.get());
+      continue;
+    }
+    // Chrome restores a Browser's selected tab shown. Hidden until its view
+    // joins a window, as the app's own pages.
+    contents->WasHidden();
+    restored.push_back(
+        {*last_session_id, PageImpl::AdoptInserted(this, contents.get())});
+  }
+  return restored;
+}
+
 void WindowBrowser::OnTabStripModelChanged(
     TabStripModel* tab_strip_model,
     const TabStripModelChange& change,
@@ -323,6 +381,13 @@ void WindowBrowser::OnTabStripModelChanged(
       // From a task: the app's own page is adopted right after it goes in.
       for (const TabStripModelChange::ContentsWithIndex& inserted :
            change.GetInsert()->contents) {
+        // As ADK's restoration delegate: while a session restore is awaited
+        // a new tab is parked, not reported, and never in incognito.
+        if (SessionRestoration::IsWaiting() &&
+            !browser_->GetProfile()->IsOffTheRecord()) {
+          parked_.push_back(inserted.contents->GetWeakPtr());
+          continue;
+        }
         base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
             FROM_HERE, base::BindOnce(&WindowBrowser::AdoptInserted,
                                       weak_factory_.GetWeakPtr(),

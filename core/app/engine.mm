@@ -28,6 +28,7 @@
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
+#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
@@ -48,6 +49,7 @@
 #include "oa/browser/ad_blocker_service.h"
 #include "oa/browser/page_impl.h"
 #include "oa/browser/profile_services.h"
+#include "oa/browser/session_restoration.h"
 #include "oa/browser/ui/browser_window_impl.h"
 #include "oa/browser/ui/context_menu_impl.h"
 #include "oa/browser/ui/extension_dialogs_impl.h"
@@ -235,11 +237,12 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   EnableFeature(command_line, features::kTabHoverCardImages.name);
 
   ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder();
-  // The app restores the last session itself, when its switch is on. As
-  // ArcCore's, a profile defaults to continuing it, which keeps its session
-  // storage for that restore.
+  // The app's switch decides about the last session. As ArcCore's, a profile
+  // defaults to continuing it, which keeps its session storage for the
+  // restore.
   SessionService::SetLastSessionRestoreForEmbedder(false);
   SessionStartupPref::SetDefaultStartupTypeToLastForEmbedder();
+  SessionRestoration::Install();
   StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder();
   BrowserWindowImpl::InstallFactory();
   PermissionPromptImpl::InstallFactory();
@@ -311,6 +314,18 @@ void CloseWindow(const std::string& window_id) {
 void AskToLeaveWindow(const std::string& window_id,
                       std::function<void(bool leave)> completion) {
   WindowBrowser::AskToLeave(window_id, std::move(completion));
+}
+
+void SetRestoresLastSession(bool restores) {
+  SessionService::SetLastSessionRestoreForEmbedder(restores);
+}
+
+void FinishedRestoringWindows() {
+  SessionRestoration::FinishedRestoringWindows();
+}
+
+void SaveSessionsForQuit() {
+  ProfileManager::ShutdownSessionServices();
 }
 
 void QuitEngine() {

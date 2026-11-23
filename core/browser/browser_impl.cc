@@ -3,6 +3,7 @@
 
 #include "oa/browser/browser_impl.h"
 
+#include <utility>
 #include <vector>
 
 #include "base/functional/bind.h"
@@ -11,6 +12,7 @@
 #include "base/no_destructor.h"
 #include "chrome/browser/profiles/profile.h"
 #include "oa/browser/profile_services.h"
+#include "oa/browser/session_restoration.h"
 #include "oa/browser/ui/extensions_container_impl.h"
 #include "oa/browser/window_browser.h"
 
@@ -24,15 +26,20 @@ std::vector<BrowserImpl*>& AllBrowsers() {
   return *all;
 }
 
-// The app's handle on a window's Browser in one profile. The WindowBrowser
-// goes when its last page does and a new one comes with the next page, so it
-// is looked up for each call and it looks its observer up here.
+// The app's handle on a window's Browser in one profile. As ADK's
+// ensureBrowserCreated, the WindowBrowser is made with the handle, before any
+// page. It goes when its last page does and a new one comes with the next
+// page, so it is looked up for each call and it looks its observer up here.
 class BrowserImpl : public Browser {
  public:
   BrowserImpl(const std::string& window_id,
               const std::string& profile_id,
               Browser::Observer* observer)
-      : window_id_(window_id), observer_(observer) {
+      : window_id_(window_id), profile_id_(profile_id), observer_(observer) {
+    AllBrowsers().push_back(this);
+    // As ADK's: the profile is expected to restore before its Browser is
+    // asked for, so the first Browser's own restored tabs are parked too.
+    SessionRestoration::Expect(profile_id_);
     LoadBrowserProfile(profile_id, base::BindOnce(&BrowserImpl::Start,
                                                   weak_factory_.GetWeakPtr()));
   }
@@ -40,7 +47,28 @@ class BrowserImpl : public Browser {
   ~BrowserImpl() override {
     std::erase(AllBrowsers(), this);
     CloseExtensionPopup();
+    if (!started_) {
+      SessionRestoration::Resolve(profile_id_, nullptr);
+    } else if (WindowBrowser* window_browser = FindWindowBrowser()) {
+      window_browser->CloseIfEmpty();
+    }
   }
+
+  // The restored pages come once, even when there are none.
+  void HandOff() {
+    if (!started_) {
+      return;
+    }
+    WindowBrowser* window_browser = FindWindowBrowser();
+    std::vector<RestoredPage> restored =
+        window_browser ? window_browser->AdoptParked(observer_)
+                       : std::vector<RestoredPage>();
+    if (std::exchange(awaits_restored_pages_, false) || !restored.empty()) {
+      observer_->OnBrowserRestoredPages(std::move(restored));
+    }
+  }
+
+  base::WeakPtr<BrowserImpl> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
   const std::string& window_id() const { return window_id_; }
   Profile* profile() const { return profile_.get(); }
@@ -75,23 +103,31 @@ class BrowserImpl : public Browser {
 
  private:
   void Start(Profile* profile) {
-    if (!profile) {
-      return;
+    started_ = true;
+    if (profile) {
+      profile_ = profile->GetWeakPtr();
+      // The profile's first Browser starts Chrome's restore of its session.
+      WindowBrowser::GetOrCreate(window_id_, profile);
     }
-    profile_ = profile->GetWeakPtr();
-    AllBrowsers().push_back(this);
+    SessionRestoration::Resolve(profile_id_, profile);
     if (ExtensionsContainerImpl* container = Container()) {
       container->ReportActions();
     }
   }
 
+  WindowBrowser* FindWindowBrowser() {
+    return profile_ ? WindowBrowser::Find(window_id_, profile_.get()) : nullptr;
+  }
+
   ExtensionsContainerImpl* Container() {
-    WindowBrowser* window_browser =
-        profile_ ? WindowBrowser::Find(window_id_, profile_.get()) : nullptr;
+    WindowBrowser* window_browser = FindWindowBrowser();
     return window_browser ? window_browser->extensions_container() : nullptr;
   }
 
   const std::string window_id_;
+  const std::string profile_id_;
+  bool started_ = false;
+  bool awaits_restored_pages_ = true;
   const raw_ptr<Browser::Observer> observer_;
   base::WeakPtr<Profile> profile_;
   base::WeakPtrFactory<BrowserImpl> weak_factory_{this};
@@ -107,6 +143,18 @@ Browser::Observer* FindBrowserObserver(const std::string& window_id,
     }
   }
   return nullptr;
+}
+
+void HandOffRestoredPages() {
+  std::vector<base::WeakPtr<BrowserImpl>> browsers;
+  for (BrowserImpl* browser : AllBrowsers()) {
+    browsers.push_back(browser->GetWeakPtr());
+  }
+  for (base::WeakPtr<BrowserImpl>& browser : browsers) {
+    if (browser) {
+      browser->HandOff();
+    }
+  }
 }
 
 std::unique_ptr<Browser> ObserveBrowser(const std::string& window_id,

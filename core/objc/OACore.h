@@ -441,6 +441,13 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)browser:(OABrowser*)browser
     didOpenPage:(OAPage*)page
          active:(BOOL)active;
+// As ADK's onReceivedRestoredWebContents: once the session restore the window
+// waited for is over, the pages Chrome restored into its Browser, each beside
+// its tab's session ID in the last session. None is a batch too. They have no
+// delegate yet; releasing one drops it.
+- (void)browser:(OABrowser*)browser
+    didRestorePages:(NSArray<OAPage*>*)pages
+     lastSessionIDs:(NSArray<NSNumber*>*)lastSessionIDs;
 @end
 
 // One window's side in one profile, as ArcCore's ArcBrowser.
@@ -497,12 +504,6 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
                     (void (^)(OAPage* _Nullable page, BOOL restored))completion;
 // Chrome's local profile name, as ArcCore's setUserVisibleName:.
 - (void)setUserVisibleName:(NSString*)name;
-// Restores the profile's last session into Browsers of no window, loading the
-// profile first if needed. Each page comes with its tab's session ID in that
-// session, at the same index; nothing after the first call of a launch.
-- (void)restoreLastSessionWithCompletion:
-    (void (^)(NSArray<NSNumber*>* lastSessionIDs,
-              NSArray<OAPage*>* pages))completion;
 @end
 
 @interface OAEngine : NSObject
@@ -527,6 +528,12 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // Asks each page's beforeunload handler in tab strip order; every page stays.
 - (void)askToLeaveWindowWithIdentifier:(NSString*)identifier
                             completion:(void (^)(BOOL leave))completion;
+// Whether a profile's first Browser restores its last session, as ArcCore's
+// feature for Arc's restore switch. Off until set.
+- (void)setRestoresLastSession:(BOOL)restores;
+// The app's windows of the last launch are back: a Browser restored for a
+// window that isn't is closed.
+- (void)finishedRestoringWindows;
 // Saves and closes each profile's session before the app drops its pages, as
 // Chrome's quit does.
 - (void)saveSessionsForQuit;

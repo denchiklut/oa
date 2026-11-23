@@ -5,16 +5,16 @@ Subject: [PATCH] oa: let an embedder restore the last session into its own
  browsers, as ArcCore does
 
 ---
- chrome/browser/prefs/session_startup_pref.cc  | 14 ++++++++
- chrome/browser/prefs/session_startup_pref.h   |  5 +++
- chrome/browser/sessions/session_restore.cc    | 14 ++++++++
- chrome/browser/sessions/session_restore.h     |  7 ++++
- .../sessions/session_restore_delegate.cc      |  6 ++++
- chrome/browser/sessions/session_service.cc    | 32 +++++++++++++++++++
- chrome/browser/sessions/session_service.h     |  9 ++++++
- .../browser/sessions/session_service_base.cc  |  7 +++-
- .../browser/sessions/session_service_base.h   |  5 +++
- 9 files changed, 98 insertions(+), 1 deletion(-)
+ chrome/browser/prefs/session_startup_pref.cc  | 14 ++++++
+ chrome/browser/prefs/session_startup_pref.h   |  5 ++
+ chrome/browser/sessions/session_restore.cc    | 48 +++++++++++++++++--
+ chrome/browser/sessions/session_restore.h     |  7 +++
+ .../sessions/session_restore_delegate.cc      |  6 +++
+ chrome/browser/sessions/session_service.cc    | 36 ++++++++++++++
+ chrome/browser/sessions/session_service.h     | 13 +++++
+ .../browser/sessions/session_service_base.cc  |  7 ++-
+ .../browser/sessions/session_service_base.h   |  5 ++
+ 9 files changed, 137 insertions(+), 4 deletions(-)
 
 diff --git a/chrome/browser/prefs/session_startup_pref.cc b/chrome/browser/prefs/session_startup_pref.cc
 index 72fc94f5160a208d5507c22ad8fe5748cfcb39bb..2e8d410c3bd970a34de89dd628b7db619297c6f6 100644
@@ -67,7 +67,7 @@ index 666bd803fa9e9812805714f71d4c0dce88a638ca..4c6e99b4b3bff89a45bdb760c0e3a1e2
    static void SetStartupPref(Profile* profile, const SessionStartupPref& pref);
    static void SetStartupPref(PrefService* prefs,
 diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
-index 816c2a017bd41a12ff539f830657331c5c549039..2fcf2c36e5e7a0baf697bce6679600f88b11074a 100644
+index 816c2a017bd41a12ff539f830657331c5c549039..7a5714f8fd1b1682b9cd07ccb5d875d1b4f4080a 100644
 --- a/chrome/browser/sessions/session_restore.cc
 +++ b/chrome/browser/sessions/session_restore.cc
 @@ -147,6 +147,11 @@ using RestoredTab = SessionRestoreDelegate::RestoredTab;
@@ -82,7 +82,30 @@ index 816c2a017bd41a12ff539f830657331c5c549039..2fcf2c36e5e7a0baf697bce6679600f8
  bool HasSingleNewTabPage(BrowserWindowInterface* browser) {
    if (!browser || !browser->GetTabStripModel() ||
        browser->GetTabStripModel()->count() != 1) {
-@@ -1190,6 +1195,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -868,11 +873,19 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+         counts->app_windows++;
+       }
+ 
+-      if (is_first_window && is_normal_window &&
+-          ShouldRestoreToExistingBrowser()) {
++      if (SessionService::IsLastSessionRestoreForEmbedder()) {
++        // Oa: as ArcCore's, a window comes back in the Browser the embedder
++        // titled with the same ID, whichever window is first; without one it
++        // gets a new Browser, which keeps the title.
++        browser = is_normal_window
++                      ? NormalBrowserWithUserTitle(window->user_title)
++                      : nullptr;
++      } else if (is_first_window && is_normal_window &&
++                 ShouldRestoreToExistingBrowser()) {
+         // The first set of tabs is added to the existing browser.
+         browser = browser_;
+-      } else {
++      }
++      if (!browser) {
+ #if BUILDFLAG(IS_CHROMEOS)
+         ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
+             "SessionRestore-CreateRestoredBrowser-Start", false);
+@@ -1190,6 +1203,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
          session_storage_namespace.get(), tab.user_agent_override,
          tab.extra_data, true /* from_session_restore */, is_active_browser);
      DCHECK(web_contents);
@@ -92,7 +115,34 @@ index 816c2a017bd41a12ff539f830657331c5c549039..2fcf2c36e5e7a0baf697bce6679600f8
  
      RestoredTab restored_tab(web_contents, is_selected_tab,
                               tab.extension_app_id.empty(), tab.pinned,
-@@ -1749,6 +1757,12 @@ bool SessionRestore::IsRestoringSynchronously() {
+@@ -1496,6 +1512,26 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+     }
+   }
+ 
++  // Oa: the profile's open normal Browser titled `user_title`, if any.
++  BrowserWindowInterface* NormalBrowserWithUserTitle(
++      const std::string& user_title) const {
++    BrowserWindowInterface* found = nullptr;
++    if (user_title.empty()) {
++      return found;
++    }
++    ProfileBrowserCollection::GetForProfile(profile_)->ForEach(
++        [&](BrowserWindowInterface* browser) {
++          if (browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
++              !browser->IsDeleteScheduled() &&
++              WindowMetadataController::From(browser)->user_title() ==
++                  user_title) {
++            found = browser;
++          }
++          return !found;
++        });
++    return found;
++  }
++
+   // Returns true if the first set of tabs should be restored the Browser
+   // supplied to the constructor.
+   bool ShouldRestoreToExistingBrowser() const {
+@@ -1749,6 +1785,12 @@ bool SessionRestore::IsRestoringSynchronously() {
    return false;
  }
  
@@ -148,7 +198,7 @@ index cf92997e445e54ab302e44b3e15da1c40b7b24da..3b66f083cd36e8b880dd491766f51350
        std::move(web_contents_vector));
  }
 diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
-index de4c89419883674428e398c44c290efd16151d66..6fcf9f471ef937ea273833421daa41df38591383 100644
+index de4c89419883674428e398c44c290efd16151d66..2135e46f4fc34934255d6bd840be971d2355afa8 100644
 --- a/chrome/browser/sessions/session_service.cc
 +++ b/chrome/browser/sessions/session_service.cc
 @@ -7,6 +7,7 @@
@@ -200,36 +250,41 @@ index de4c89419883674428e398c44c290efd16151d66..6fcf9f471ef937ea273833421daa41df
  bool SessionService::ShouldRestoreWindowOfType(
      sessions::SessionWindow::WindowType window_type) const {
    // TYPE_APP and TYPE_APP_POPUP are handled by app_session_service.
-@@ -594,6 +622,10 @@ bool SessionService::ShouldRestoreWindowOfType(
+@@ -594,6 +622,14 @@ bool SessionService::ShouldRestoreWindowOfType(
  bool SessionService::RestoreIfNecessary(const StartupTabs& startup_tabs,
                                          BrowserWindowInterface* browser,
                                          bool restore_apps) {
-+  // Oa: the embedder restores the last session into Browsers of its own.
-+  if (LastSessionRestoreForEmbedder()) {
-+    return false;
++  // Oa: as ArcCore's switch. Only the profile's first Browser of a launch
++  // asks: an embedder's Browser goes with its last page, and the one after it
++  // must not bring the session back.
++  if (const std::optional<bool>& restores = LastSessionRestoreForEmbedder()) {
++    if (std::exchange(asked_to_restore_for_embedder_, true) || !*restores) {
++      return false;
++    }
 +  }
    if (ShouldRestore(browser)) {
      // We're going from no tabbed browsers to a tabbed browser (and not in
      // process startup), restore the last session.
 diff --git a/chrome/browser/sessions/session_service.h b/chrome/browser/sessions/session_service.h
-index 16c753c26e8b2e30116d6e94e390eea25f1835f3..da6e5ab7341c86c5c1c975e262711905b3e24990 100644
+index 16c753c26e8b2e30116d6e94e390eea25f1835f3..066533cf69c02b8dd03144c2459c42a0a73ec1db 100644
 --- a/chrome/browser/sessions/session_service.h
 +++ b/chrome/browser/sessions/session_service.h
-@@ -65,6 +65,13 @@ class SessionService : public SessionServiceBase {
+@@ -65,6 +65,14 @@ class SessionService : public SessionServiceBase {
  
    ~SessionService() override;
  
 +  // Oa: the embedder decides about the last session, as ArcCore's restore
-+  // switch does. Chrome then never restores it into a window it opens nor
-+  // loads restored background tabs by itself, and reading it back keeps its
-+  // normal windows, or none when `restores` is false.
++  // switch does. The profile's first Browser restores it when `restores` is
++  // true, each window into the Browser the embedder titled with its ID, and
++  // reading it back keeps its normal windows, or none when `restores` is false.
++  // Chrome never loads restored background tabs by itself.
 +  static void SetLastSessionRestoreForEmbedder(bool restores);
 +  static bool IsLastSessionRestoreForEmbedder();
 +
    // Returns true if `window_type` identifies a type tracked by SessionService.
    static bool IsRelevantWindowType(
        sessions::SessionWindow::WindowType window_type);
-@@ -191,6 +198,8 @@ class SessionService : public SessionServiceBase {
+@@ -191,6 +199,8 @@ class SessionService : public SessionServiceBase {
    // restored upon session restore.
    bool ShouldRestoreWindowOfType(
        sessions::SessionWindow::WindowType type) const override;
@@ -238,6 +293,16 @@ index 16c753c26e8b2e30116d6e94e390eea25f1835f3..da6e5ab7341c86c5c1c975e262711905
  
    // Implementation of RestoreIfNecessary. If |browser| is non-null and we
    // need to restore, the tabs are added to it, otherwise a new browser is
+@@ -282,6 +292,9 @@ class SessionService : public SessionServiceBase {
+   // on current/last session.
+   bool move_on_new_browser_ = false;
+ 
++  // Oa: RestoreIfNecessary() was asked once already under an embedder.
++  bool asked_to_restore_for_embedder_ = false;
++
+   // For browser_tests, since we want to simulate the browser shutting down
+   // without quitting.
+   bool force_browser_not_alive_with_no_windows_ = false;
 diff --git a/chrome/browser/sessions/session_service_base.cc b/chrome/browser/sessions/session_service_base.cc
 index ee887add6afbd32bbb227cb26b586afa9a7eb3f2..83511811096cf7d94b4be01f5cf57c4a4f2420a6 100644
 --- a/chrome/browser/sessions/session_service_base.cc
