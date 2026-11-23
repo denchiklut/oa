@@ -63,7 +63,7 @@ struct TabContextMenu {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
         submenu.addItem(
-            MenuActionItem("Replace Pinned URL with Current", enabled: model.leftAddress(tab) != nil) {
+            MenuActionItem("Replace Pinned URL with Current", enabled: model.liveLeftAddress(tab) != nil) {
                 [model, tab] in model.replacePinnedURLWithCurrent(tab.id)
             })
         submenu.addItem(
