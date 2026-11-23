@@ -27,6 +27,8 @@
 #include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
+#include "chrome/browser/prefs/session_startup_pref.h"
+#include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
@@ -233,6 +235,11 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   EnableFeature(command_line, features::kTabHoverCardImages.name);
 
   ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder();
+  // The app restores the last session itself, when its switch is on. As
+  // ArcCore's, a profile defaults to continuing it, which keeps its session
+  // storage for that restore.
+  SessionService::SetLastSessionRestoreForEmbedder(false);
+  SessionStartupPref::SetDefaultStartupTypeToLastForEmbedder();
   StartupBrowserCreator::SetLoadProfileWithoutWindowForEmbedder();
   BrowserWindowImpl::InstallFactory();
   PermissionPromptImpl::InstallFactory();

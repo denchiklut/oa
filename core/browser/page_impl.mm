@@ -29,6 +29,7 @@
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/security_state/core/security_state.h"
 #include "components/sessions/content/content_live_tab.h"
+#include "components/sessions/content/session_tab_helper.h"
 #include "components/sessions/core/tab_restore_service.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/frame_tree_node_id.h"
@@ -316,6 +317,12 @@ double PageImpl::LoadProgress() const {
   return load_progress_;
 }
 
+int32_t PageImpl::GetTabSessionID() const {
+  return web_contents()
+             ? sessions::SessionTabHelper::IdForTab(web_contents()).id()
+             : SessionID::InvalidValue().id();
+}
+
 bool PageImpl::CanGoBack() const {
   return web_contents() && web_contents()->GetController().CanGoBack();
 }
@@ -475,6 +482,8 @@ void PageImpl::Activate() {
     return;
   }
   window_browser_->Activate(web_contents());
+  // As Arc: a page restored from the last session loads when first shown.
+  web_contents()->GetController().LoadIfNecessary();
   NSWindow* window = window_browser_->GetNativeWindow().GetNativeNSWindow();
   if (window.isKeyWindow) {
     web_contents()->Focus();

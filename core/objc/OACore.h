@@ -169,6 +169,8 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 @property(nonatomic, readonly) NSString* title;
 @property(nonatomic, readonly, getter=isLoading) BOOL loading;
 @property(nonatomic, readonly) double loadProgress;
+// Chrome's session ID of the page's tab, kept while the page lives.
+@property(nonatomic, readonly) int32_t tabSessionID;
 @property(nonatomic, readonly) BOOL canGoBack;
 @property(nonatomic, readonly) BOOL canGoForward;
 // Nil until Chromium's favicon driver has an icon for the page.
@@ -495,6 +497,12 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
                     (void (^)(OAPage* _Nullable page, BOOL restored))completion;
 // Chrome's local profile name, as ArcCore's setUserVisibleName:.
 - (void)setUserVisibleName:(NSString*)name;
+// Restores the profile's last session into Browsers of no window, loading the
+// profile first if needed. Each page comes with its tab's session ID in that
+// session, at the same index; nothing after the first call of a launch.
+- (void)restoreLastSessionWithCompletion:
+    (void (^)(NSArray<NSNumber*>* lastSessionIDs,
+              NSArray<OAPage*>* pages))completion;
 @end
 
 @interface OAEngine : NSObject
@@ -519,6 +527,9 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // Asks each page's beforeunload handler in tab strip order; every page stays.
 - (void)askToLeaveWindowWithIdentifier:(NSString*)identifier
                             completion:(void (^)(BOOL leave))completion;
+// Saves and closes each profile's session before the app drops its pages, as
+// Chrome's quit does.
+- (void)saveSessionsForQuit;
 - (void)quit;
 @end
 

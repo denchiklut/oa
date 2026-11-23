@@ -93,6 +93,7 @@ class PageImpl : public Page,
   std::string Title() const override;
   bool IsLoading() const override;
   double LoadProgress() const override;
+  int32_t GetTabSessionID() const override;
   bool CanGoBack() const override;
   bool CanGoForward() const override;
   void* Favicon() const override;

@@ -481,6 +481,10 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   return _page ? _page->LoadProgress() : 0;
 }
 
+- (int32_t)tabSessionID {
+  return _page ? _page->GetTabSessionID() : -1;
+}
+
 - (BOOL)canGoBack {
   return _page && _page->CanGoBack();
 }
@@ -1563,6 +1567,24 @@ class BrowserObserverBridge : public oa::Browser::Observer {
       });
 }
 
+- (void)restoreLastSessionWithCompletion:
+    (void (^)(NSArray<NSNumber*>*, NSArray<OAPage*>*))completion {
+  void (^handler)(NSArray<NSNumber*>*, NSArray<OAPage*>*) = [completion copy];
+  oa::RestoreLastSession(
+      _identifier.UTF8String ?: "",
+      [handler](std::vector<oa::RestoredPage> restored) {
+        NSMutableArray<NSNumber*>* ids = [NSMutableArray array];
+        NSMutableArray<OAPage*>* pages = [NSMutableArray array];
+        for (oa::RestoredPage& entry : restored) {
+          OAPage* page = [[OAPage alloc] initWithDelegate:nil];
+          [page setPage:std::move(entry.page)];
+          [ids addObject:@(entry.last_session_id)];
+          [pages addObject:page];
+        }
+        handler(ids, pages);
+      });
+}
+
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url {
   std::optional<std::vector<oa::SiteSetting>> settings =
       oa::GetChangedSiteSettings(_identifier.UTF8String ?: "",
@@ -1688,6 +1710,10 @@ class BrowserObserverBridge : public oa::Browser::Observer {
   void (^handler)(BOOL) = [completion copy];
   oa::AskToLeaveWindow(identifier.UTF8String ?: "",
                        [handler](bool leave) { handler(leave); });
+}
+
+- (void)saveSessionsForQuit {
+  oa::SaveSessionsForQuit();
 }
 
 - (void)quit {
