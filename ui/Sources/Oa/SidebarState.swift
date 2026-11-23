@@ -490,6 +490,17 @@ struct SidebarState {
         tree.move(tabID, into: pinned ? space.pinnedRootID : space.unpinnedRootID, at: index)
     }
 
+    mutating func moveTabs(_ tabIDs: [UUID], in spaceID: UUID, pinned: Bool, after anchorID: UUID?) {
+        guard let space = space(spaceID) else { return }
+        let rootID = pinned ? space.pinnedRootID : space.unpinnedRootID
+        var previousID = anchorID
+        for tabID in tabIDs {
+            let index = previousID.flatMap { tree[rootID]?.childIDs.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
+            tree.move(tabID, into: rootID, at: index)
+            previousID = tabID
+        }
+    }
+
     /// Into the profile's grid at `index`, where a drop lands in Arc; appended when nil, as Arc's Favorite Tab does.
     /// As seen in Arc, a split's tab takes its split whole.
     mutating func favoriteTab(_ tabID: UUID, at index: Int? = nil) {

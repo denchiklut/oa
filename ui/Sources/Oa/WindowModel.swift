@@ -614,6 +614,10 @@ final class WindowModel {
         return ids.count > 1 ? ids : []
     }
 
+    func clearMultiSelection() {
+        multiSelection = SidebarMultiSelection()
+    }
+
     private func isMultiSelectable(_ tabID: UUID) -> Bool {
         state.space(containing: tabID)?.id == selectedSpaceID && state.splitViewID(containing: tabID) == nil
     }
@@ -718,6 +722,29 @@ final class WindowModel {
         let spaceID = selectedSpaceID
         store.edit { $0.openInSplitView(tabID, beside: anchorID, in: spaceID, at: last ? nil : 0) }
         select(tabID)
+    }
+
+    func combinedTabIDs(_ tabIDs: [UUID], onto rowID: UUID) -> [UUID] {
+        guard !tabIDs.contains(rowID), let anchorID = combineAnchor(rowID) else { return [] }
+        let panes = state.splitViewID(containing: anchorID).map { state.tree[$0]?.childIDs.count ?? 0 } ?? 1
+        return Array(
+            tabIDs.filter { state.canJoinSplitView($0, of: anchorID, in: selectedSpaceID) }
+                .prefix(max(SidebarSplitViewData.maxNumberSplit - panes, 0)))
+    }
+
+    /// As seen in Arc: dragged rows dropped on a row's middle make one split with it, the row last, and the leftmost
+    /// pane is shown. Oa's own: the rows in the sidebar's order, where Arc reverses them, and those past four panes
+    /// stay rows, where Arc leaves out one it picks.
+    func combineIntoSplitView(_ tabIDs: [UUID], onto rowID: UUID, last: Bool) {
+        let tabIDs = combinedTabIDs(tabIDs, onto: rowID)
+        guard let anchorID = combineAnchor(rowID), let first = tabIDs.first else { return }
+        let spaceID = selectedSpaceID
+        store.edit { state in
+            for (index, tabID) in tabIDs.enumerated() {
+                state.openInSplitView(tabID, beside: anchorID, in: spaceID, at: last ? nil : index)
+            }
+        }
+        select(first)
     }
 
     /// As seen in Arc: a link dropped in the list is a tab at the line, its page loaded in the background.
@@ -1330,6 +1357,19 @@ final class WindowModel {
 
     func move(_ tabID: UUID, pinned: Bool, at index: Int) {
         store.edit { $0.moveTab(tabID, in: selectedSpaceID, pinned: pinned, at: index) }
+    }
+
+    /// As seen in Arc: dragged rows land together at the gap, pinning or unpinning there. Oa's own: in the sidebar's
+    /// order, where Arc reverses the rows that came from above the gap and drops nothing next to a selected row.
+    func moveTabs(_ tabIDs: [UUID], pinned: Bool, after anchorID: UUID?) {
+        store.edit { $0.moveTabs(tabIDs, in: selectedSpaceID, pinned: pinned, after: anchorID) }
+    }
+
+    /// As seen in Arc: dragged rows all become Favorites from the slot. Oa's own: in the sidebar's order.
+    func favorite(_ tabIDs: [UUID], at index: Int) {
+        store.edit { state in
+            for (offset, tabID) in tabIDs.enumerated() { state.favoriteTab(tabID, at: index + offset) }
+        }
     }
 
     /// A drop on the grid: a row joins it at the index, a tile moves there.

@@ -710,6 +710,9 @@ struct TabRow: View {
     @State private var pickingIcon = false
     /// A ⌘- or ⇧-click, which changes the multi-selection and drags nothing.
     @State private var picking = false
+    /// As AppKit's outline view: a press on a multi-selected row, which drags the selection or, let go, selects the
+    /// row alone.
+    @State private var heldMembers: [UUID] = []
     @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
@@ -765,8 +768,9 @@ struct TabRow: View {
         }
         .opacity(combining ? 0 : 1)
         .overlay {
-            if combining, let held = drag?.entry?.tabs.first {
-                SplitViewCombinePreview(model: model, tabs: [held, tab])
+            if combining, let drag, let held = drag.entry?.tabs.first {
+                let members = model.combinedTabIDs(drag.memberIDs, onto: tab.id).compactMap { model.state.tree.tab($0) }
+                SplitViewCombinePreview(model: model, tabs: (drag.memberIDs.isEmpty ? [held] : members) + [tab])
             }
         }
         .contentShape(card)
@@ -781,16 +785,21 @@ struct TabRow: View {
                     guard !inCard, !picking else { return }
                     drag?.update(
                         .tab(tab), from: pinned ? .pinned : .today, glyph: glyph, at: value.location,
-                        start: value.startLocation, previous: previousTabID, model: model, layout: layout)
+                        start: value.startLocation, previous: previousTabID, members: heldMembers, model: model,
+                        layout: layout)
                 }
                 .onEnded { value in
                     pressed = false
+                    let members = heldMembers
+                    heldMembers = []
                     guard !picking else {
                         picking = false
                         return
                     }
                     guard inCard else {
+                        let dragging = drag?.entry?.id == tab.id
                         drag?.finish(model: model, layout: layout)
+                        if !members.isEmpty, !dragging { model.select(tab.id) }
                         return
                     }
                     guard CGRect(origin: .zero, size: size).contains(value.location) else { return }
@@ -830,7 +839,7 @@ struct TabRow: View {
         .scaleEffect(pressed ? 0.99 : 1)
         .animation(.easeOut(duration: 0.1), value: pressed)
         // As Arc's drop: the row is in its new place at once, under the copy settling onto it.
-        .opacity(dragged && drag?.settling == true ? 0 : 1)
+        .opacity(!inCard && drag?.settling == true && (drag?.stack.first?.id ?? drag?.entry?.id) == tab.id ? 0 : 1)
         // As measured on Arc's −: the row drops to 0.89 and springs back.
         .keyframeAnimator(initialValue: 1.0, trigger: bounces) { content, scale in
             content.scaleEffect(scale)
@@ -864,7 +873,11 @@ struct TabRow: View {
         let event = NSApp.currentEvent
         let flags = event?.type == .leftMouseDown ? event?.modifierFlags ?? [] : NSEvent.modifierFlags
         picking = !flags.contains(.option) && (flags.contains(.command) || flags.contains(.shift))
-        guard picking else { return model.select(tab.id) }
+        guard picking else {
+            let members = model.multiSelectedTabIDs
+            if members.contains(tab.id) { return heldMembers = members }
+            return model.select(tab.id)
+        }
         if flags.contains(.command) {
             model.toggleMultiSelection(tab.id)
         } else {
