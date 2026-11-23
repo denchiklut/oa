@@ -252,10 +252,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if model.peek != nil {
             model.closePeek()
         } else if let tabID = model.selectedTabID {
-            // As seen in Arc: ⌘W on a pinned split's pane unloads the whole split.
-            if model.state.splitViewID(containing: tabID) != nil, model.state.isFavorite(tabID) {
+            if model.multiSelectedTabIDs.contains(tabID) {
+                model.archiveTabs(model.multiSelectedTabIDs)
+            } else if model.state.splitViewID(containing: tabID) != nil, model.state.isFavorite(tabID) {
                 model.deselectSplitView()
             } else if model.state.isPinned(tabID), let splitID = model.state.splitViewID(containing: tabID) {
+                // As seen in Arc: ⌘W on a pinned split's pane unloads the whole split.
                 model.closeSplitViewPages(splitID)
             } else {
                 model.close(tabID)

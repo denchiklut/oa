@@ -708,6 +708,8 @@ struct TabRow: View {
     @State private var renaming = false
     @State private var draft = ""
     @State private var pickingIcon = false
+    /// A ⌘- or ⇧-click, which changes the multi-selection and drags nothing.
+    @State private var picking = false
     @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
@@ -718,6 +720,9 @@ struct TabRow: View {
         let current = !inCard && model.selectedTabIDs[spaceID] == tab.id
         // As Arc: the New Tab row takes the selected look while the bar makes a tab.
         let selected = current && (spaceID != model.selectedSpaceID || model.commandBar?.destination != .newTab)
+        // As seen in Arc: the selected tab keeps its card, and under the ⌘T bar it is drawn as the others.
+        let multiSelected =
+            !inCard && !selected && spaceID == model.selectedSpaceID && model.multiSelectedTabIDs.contains(tab.id)
         // As Arc's `closeButtonAction`: a pinned tab that is shown, or has left its address, keeps its pin.
         let glyph: SidebarCellButton.Glyph =
             pinned && !inCard && (current || model.leftAddress(tab) != nil) ? .minus : .close
@@ -752,8 +757,11 @@ struct TabRow: View {
         .padding(.trailing, showsButton || peek != nil ? 31 : 10)
         .frame(height: 36)
         .background {
-            card.fill(selected ? theme.selectedCard : hovering ? theme.itemFill : .clear)
-                .shadow(color: selected ? theme.selectedShadow : .clear, radius: 1, y: 1)
+            card.fill(
+                selected
+                    ? theme.selectedCard : multiSelected ? theme.multiSelectedCard : hovering ? theme.itemFill : .clear
+            )
+            .shadow(color: selected ? theme.selectedShadow : .clear, radius: 1, y: 1)
         }
         .opacity(combining ? 0 : 1)
         .overlay {
@@ -768,15 +776,19 @@ struct TabRow: View {
                     if !pressed {
                         pressed = true
                         previousTabID = model.selectedTabIDs[spaceID]
-                        if !inCard { model.select(tab.id) }
+                        if !inCard { press() }
                     }
-                    guard !inCard else { return }
+                    guard !inCard, !picking else { return }
                     drag?.update(
                         .tab(tab), from: pinned ? .pinned : .today, glyph: glyph, at: value.location,
                         start: value.startLocation, previous: previousTabID, model: model, layout: layout)
                 }
                 .onEnded { value in
                     pressed = false
+                    guard !picking else {
+                        picking = false
+                        return
+                    }
                     guard inCard else {
                         drag?.finish(model: model, layout: layout)
                         return
@@ -843,6 +855,20 @@ struct TabRow: View {
         ) {
             TabContextMenu(model: model, tab: tab, changeIcon: { Task { pickingIcon = true } }, rename: beginRename)
                 .make()
+        }
+    }
+
+    /// As Arc's outline view: ⌘ toggles the row in the multi-selection and ⇧ selects the range to it. Oa's own: with
+    /// ⌥ held it is a plain press, which selects the row alone.
+    private func press() {
+        let event = NSApp.currentEvent
+        let flags = event?.type == .leftMouseDown ? event?.modifierFlags ?? [] : NSEvent.modifierFlags
+        picking = !flags.contains(.option) && (flags.contains(.command) || flags.contains(.shift))
+        guard picking else { return model.select(tab.id) }
+        if flags.contains(.command) {
+            model.toggleMultiSelection(tab.id)
+        } else {
+            model.extendMultiSelection(to: tab.id)
         }
     }
 
