@@ -154,10 +154,12 @@ extension NSColor {
 }
 
 extension View {
-    /// As Arc's toast on a page: 8 pt in from the page's top and right, coming and going on one spring, growing
+    /// As Arc's toast on a page: 8 pt in from the card's top and right, coming and going on one spring, growing
     /// from a point a tenth of the way down its middle.
-    func toast(of model: WindowModel, on page: any Page) -> some View {
-        overlay(alignment: .topTrailing) { ToastSlot(model: model, location: .windowContent(page.id), inset: 8) }
+    func toast(of model: WindowModel, on page: (any Page)?) -> some View {
+        overlay(alignment: .topTrailing) {
+            if let page { ToastSlot(model: model, location: .windowContent(page.id), inset: 8) }
+        }
     }
 
     /// As Arc's toast on the window: 4 pt in from its top and right.
