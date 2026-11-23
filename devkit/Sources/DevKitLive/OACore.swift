@@ -15,6 +15,7 @@ import AppKit
     @objc(closeWindowWithIdentifier:) func closeWindow(identifier: String)
     @objc(askToLeaveWindowWithIdentifier:completion:) func askToLeaveWindow(
         identifier: String, completion: @escaping (Bool) -> Void)
+    func saveSessionsForQuit()
     func quit()
 }
 
@@ -192,6 +193,9 @@ import AppKit
         inWindow windowIdentifier: String, restoringSessionID sessionID: Int32, delegate: CorePageDelegate?,
         completion: @escaping (CorePage?, Bool) -> Void)
     func setUserVisibleName(_ name: String)
+    /// `OAPage`s, which Swift can't check against `CorePage`, beside their last session IDs.
+    @objc(restoreLastSessionWithCompletion:)
+    func restoreLastSession(completion: @escaping ([NSNumber], [NSObject]) -> Void)
 }
 
 @MainActor @objc protocol CorePage: NSObjectProtocol {
@@ -201,6 +205,7 @@ import AppKit
     var title: String { get }
     var isLoading: Bool { get }
     var loadProgress: Double { get }
+    var tabSessionID: Int32 { get }
     var canGoBack: Bool { get }
     var canGoForward: Bool { get }
     var favicon: NSImage? { get }

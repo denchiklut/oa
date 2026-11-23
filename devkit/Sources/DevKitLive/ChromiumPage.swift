@@ -38,6 +38,7 @@ final class ChromiumPage: Page, MediaSession {
 
     var view: NSView { hostingView }
     var isAudible: Bool { page?.isAudible ?? false }
+    var tabSessionID: Int32 { page?.tabSessionID ?? -1 }
     var mediaSession: any MediaSession { self }
 
     var state: MediaSessionState? {
