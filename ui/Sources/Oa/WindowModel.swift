@@ -94,7 +94,21 @@ final class WindowModel {
     @ObservationIgnored private var presentedPage: (any Page)?
     @ObservationIgnored private let engine: any BrowserApplication
     @ObservationIgnored private let store: SidebarStore
-    @ObservationIgnored private var previousTabID: UUID?
+    /// Arc's `previouslySelectedItem`, which its `recentTabDidExpire` clears five minutes after it was last set.
+    @ObservationIgnored private var previousTabID: UUID? {
+        didSet {
+            guard previousTabID != oldValue else { return }
+            previousExpiry?.cancel()
+            guard previousTabID != nil else { return }
+            previousExpiry = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(300))
+                if !Task.isCancelled { self?.previousTabID = nil }
+            }
+        }
+    }
+    @ObservationIgnored private var previousExpiry: Task<Void, Never>?
+    /// Arc's `deselectedItemIDs`: pinned tabs closed and Favorites deselected here, until selected again.
+    @ObservationIgnored private var deselectedTabIDs: Set<UUID> = []
     @ObservationIgnored private var focusedPaneIDs: [UUID: UUID] = [:]
     @ObservationIgnored private var selectionCount = 0
     /// Arc's `interactionState.proposedWindowContentDropTarget`, while a tab is dragged over the page.
@@ -589,9 +603,9 @@ final class WindowModel {
         guard selectedTabID != tabID else { return }
         library = nil
         let presented = state.presentedTabIDs(with: tabID)
+        noteSelection(of: tabID, after: selectedTabID)
         if let current = selectedTabID, !presented.contains(current) {
             splitViewLayout = nil
-            if pages[current] != nil { previousTabID = current }
             for leaving in presentedTabIDs {
                 placeholders[leaving] = nil
                 handOff(leaving)
@@ -602,6 +616,25 @@ final class WindowModel {
             markViewed(shown)
             ensurePage(shown, restoring: shown == tabID ? sessionID : nil)
         }
+    }
+
+    /// As Arc's `selectItem(params:)`, whatever made the selection: the item shown before becomes the previous one,
+    /// or none when nothing was, and the new one is no longer deselected.
+    private func noteSelection(of tabID: UUID, after current: UUID?) {
+        let presented = state.presentedTabIDs(with: tabID)
+        deselectedTabIDs.subtract(presented)
+        if current.map({ !presented.contains($0) }) ?? true { previousTabID = current }
+    }
+
+    /// As Arc's selection after a close, an ordinary one.
+    /// Arc's close clears a closed item as the previous one; a deselected item stays it.
+    private func show(_ next: UUID?, after previous: UUID?, in spaceID: UUID) {
+        selectedTabIDs[spaceID] = next
+        guard spaceID == selectedSpaceID else { return }
+        if let next {
+            noteSelection(of: next, after: previous)
+        }
+        ensurePresentedPages()
     }
 
     /// Arc's multi-selection as the menu and ⌘W take it: the shown Space's selected rows in row order, the selected
@@ -1131,7 +1164,9 @@ final class WindowModel {
         guard spaceID != selectedSpaceID else { return }
         // As seen in Arc: a Space switch ends the multi-selection.
         multiSelection = SidebarMultiSelection()
+        let current = selectedTabID
         selectedSpaceID = spaceID
+        if let shown = selectedTabID { noteSelection(of: shown, after: current) }
         ensurePresentedPages()
         presentedTabIDs.forEach(markViewed)
         store.windowStateChanged()
@@ -1871,8 +1906,7 @@ final class WindowModel {
             let next =
                 keptID.flatMap { state.isSelectable($0, in: selectedSpaceID) ? $0 : nil }
                 ?? nextSelection(closing: selected, deselecting: false, in: selectedSpaceID, alsoClosing: closing)
-            selectedTabIDs[selectedSpaceID] = next
-            ensurePresentedPages()
+            show(next, after: nil, in: selectedSpaceID)
         }
         for tabID in tabIDs {
             if state.isPinned(tabID) { archivePinned(tabID, group: group) } else { close(tabID, group: group) }
@@ -1944,7 +1978,6 @@ final class WindowModel {
     func release(_ tabID: UUID) -> (any Page)? {
         creating.removeValue(forKey: tabID)
         pendingURLs.removeValue(forKey: tabID)
-        if previousTabID == tabID { previousTabID = nil }
         return pages.removeValue(forKey: tabID)
     }
 
@@ -2033,10 +2066,8 @@ final class WindowModel {
             archive(tabID, reason: reason, closedBy: request, sessionID: sessionID)
         }
         if let page { finish(page, pinned) }
-        if wasSelected {
-            selectedTabIDs[spaceID] = next
-            if spaceID == selectedSpaceID { ensurePresentedPages() }
-        }
+        if deselecting { deselectedTabIDs.insert(tabID) }
+        if wasSelected { show(next, after: deselecting ? tabID : nil, in: spaceID) }
         for window in store.windows { window.updateModalItemSwitcher(closing: tabID) }
     }
 
@@ -2083,13 +2114,13 @@ final class WindowModel {
     /// A Favorite's page stays as it is, hidden, as Arc keeps it.
     private func deselect(_ tabID: UUID) {
         guard selectedTabID == tabID else { return }
-        selectedTabIDs[selectedSpaceID] = nextSelection(closing: tabID, deselecting: true, in: selectedSpaceID)
-        ensurePresentedPages()
+        deselectedTabIDs.insert(tabID)
+        show(nextSelection(closing: tabID, deselecting: true, in: selectedSpaceID), after: tabID, in: selectedSpaceID)
     }
 
-    /// The opener's group first, as in Arc; else the tab shown before, if its page is still live; a deselect stops
-    /// there, as Arc's does. Else, as Arc: a Today tab's row above, else below, never crossing into pinned; else the
-    /// window's most recently active tab that still has its page here.
+    /// The opener's group first, as in Arc; else the tab shown before; a deselect stops there, as Arc's does. Else,
+    /// as Arc: a Today tab's row above, else below, never crossing into pinned; else the window's most recently
+    /// active tab that still has its page here.
     private func nextSelection(
         closing tabID: UUID, deselecting: Bool, in spaceID: UUID, alsoClosing others: Set<UUID> = []
     ) -> UUID? {
@@ -2099,13 +2130,15 @@ final class WindowModel {
             return panes[index + 1 < panes.count ? index + 1 : index - 1]
         }
         if let successor = state.openerSuccessor(of: tabID), !others.contains(successor) { return successor }
-        if let previousTabID, previousTabID != tabID, !others.contains(previousTabID), pages[previousTabID] != nil,
+        // As Arc: a deselected item is passed over, also by a deselect.
+        let excluded = others.union(deselectedTabIDs)
+        if let previousTabID, previousTabID != tabID, !excluded.contains(previousTabID),
             state.isSelectable(previousTabID, in: spaceID)
         {
             return previousTabID
         }
         guard !deselecting else { return nil }
-        let staying = { (tab: SidebarTab) in tab.id != tabID && !others.contains(tab.id) }
+        let staying = { (tab: SidebarTab) in tab.id != tabID && !excluded.contains(tab.id) }
         let today = state.tabs(in: spaceID, pinned: false)
         if let index = today.firstIndex(where: { $0.id == tabID }),
             let neighbour = today[..<index].last(where: staying) ?? today[(index + 1)...].first(where: staying)
