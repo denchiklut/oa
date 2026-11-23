@@ -2,7 +2,7 @@ import AppKit
 import DevKit
 
 @MainActor
-final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSWindowRestoration {
     private let engine: any BrowserApplication
     private let store: SidebarStore
     private let downloads: DownloadsStore
@@ -18,7 +18,12 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private var askingToQuit = false
     private var isLaunching = true
     private var pendingLinks: [URL] = []
+    /// The windows AppKit asked back before the app was ready for them.
+    private var pendingRestorations: [(id: UUID, completion: (NSWindow?, (any Error)?) -> Void)] = []
     private static var current: ApplicationDelegate?
+    /// Oa's own: the first launch with AppKit's restoration has no saved state yet, so `windows.json`'s windows open
+    /// once the way they did before.
+    private static let restoresWindowsThroughAppKitKey = "restoresWindowsThroughAppKit"
 
     static func start(engine: any BrowserApplication) {
         let delegate = ApplicationDelegate(engine: engine)
@@ -43,7 +48,21 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         store.showShortcut = { [weak self] in self?.settings.showShortcuts(selecting: $0) }
     }
 
-    func applicationWillFinishLaunching(_ notification: Notification) { AppAppearance.restore() }
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        AppAppearance.restore()
+        RestoreWindowsPreference.registerAtLaunch()
+    }
+
+    /// As Arc's `AppDelegate`: AppKit hands back each window it kept, and the window comes back from its record in
+    /// `windows.json` once the app is ready. A window with no record isn't restored.
+    static func restoreWindow(
+        withIdentifier identifier: NSUserInterfaceItemIdentifier, state: NSCoder,
+        completionHandler: @escaping (NSWindow?, (any Error)?) -> Void
+    ) {
+        guard let current, let id = UUID(uuidString: identifier.rawValue) else { return completionHandler(nil, nil) }
+        NSApplication.shared.extendStateRestoration()
+        current.pendingRestorations.append((id, completionHandler))
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
@@ -56,9 +75,22 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         isLaunching = false
         SiteSearchMigrations.seedOnce(in: engine)
         let saved = store.savedWindows
-        if windows.isEmpty {
-            if saved.isEmpty { openWindow() } else { saved.forEach { openWindow(restoring: $0) } }
+        let restoring = pendingRestorations
+        pendingRestorations.removeAll()
+        for (id, completion) in restoring {
+            let window = saved.first { $0.id == id }.flatMap { openWindow(restoring: $0).window }
+            completion(window, nil)
+            NSApplication.shared.completeStateRestoration()
         }
+        let defaults = UserDefaults.standard
+        if windows.isEmpty {
+            if defaults.bool(forKey: Self.restoresWindowsThroughAppKitKey) || saved.isEmpty {
+                openWindow()
+            } else {
+                saved.forEach { openWindow(restoring: $0) }
+            }
+        }
+        defaults.set(true, forKey: Self.restoresWindowsThroughAppKitKey)
         openExternalLinks(pendingLinks)
         pendingLinks.removeAll()
         store.startAutoArchive()

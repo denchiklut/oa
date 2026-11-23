@@ -40,6 +40,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.contentMinSize = NSSize(width: 640, height: 320)
+        // As Arc's browser windows: AppKit keeps them across a quit and hands them back by the window's ID.
+        window.identifier = NSUserInterfaceItemIdentifier(id.uuidString)
+        window.restorationClass = ApplicationDelegate.self
+        window.isRestorable = true
         windowButtons = [.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
         windowButtons.forEach { $0.isHidden = true }
         super.init(window: window)
