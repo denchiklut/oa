@@ -90,14 +90,13 @@ extension ProfileDialogUtils {
     /// Arc's `shouldBypassConfirmInterProfileMoveDialog`. Where Arc keeps it is unknown; this key is Oa's own.
     static let bypassMoveKey = "shouldBypassConfirmInterProfileMoveDialog"
 
-    /// Arc's confirm before tabs move to a Space of another profile: the sheet on the window, then `proceed` on
-    /// "Move it" or at once while "Don't ask again" holds.
-    static func confirmMove(tabCount: Int, to space: SidebarSpace, in model: WindowModel, proceed: @escaping () -> Void)
-    {
+    /// Arc's confirm before tabs move to a Space of another profile, named in it, or a Favorite to another profile:
+    /// the sheet on the window, then `proceed` on "Move it" or at once while "Don't ask again" holds.
+    static func confirmMove(tabCount: Int, to name: String, in model: WindowModel, proceed: @escaping () -> Void) {
         guard !UserDefaults.standard.bool(forKey: bypassMoveKey) else { return proceed() }
         guard let window = model.window else { return }
         DialogSheet.present(on: window) { dismiss in
-            MoveTabsDialog(space: space.name, plural: tabCount != 1) { move, dontAsk in
+            MoveTabsDialog(space: name, plural: tabCount != 1) { move, dontAsk in
                 dismiss()
                 guard move else { return }
                 if dontAsk { UserDefaults.standard.set(true, forKey: bypassMoveKey) }
