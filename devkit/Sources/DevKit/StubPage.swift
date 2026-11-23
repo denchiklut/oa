@@ -342,6 +342,15 @@ final class StubPage: Page, MediaSession {
         drop()
     }
 
+    func duplicate() -> (any Page)? {
+        guard history.indices.contains(position) else { return nil }
+        let page = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
+        page.history = history
+        page.position = position
+        page.show(history[position])
+        return page
+    }
+
     static func restore(
         _ sessionID: PageSessionID, id: UUID, windowID: UUID, downloads: StubDownloads, extensions: StubExtensions
     ) -> StubPage? {

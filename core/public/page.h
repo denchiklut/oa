@@ -288,6 +288,9 @@ class Page {
   virtual void SetKeepsAddress(bool keeps_address) = 0;
   // As ADK's setWebContentsMuted: the page stays muted across navigations.
   virtual void SetMuted(bool muted) = 0;
+  // A new background page in this page's window with a copy of its history,
+  // loading its current entry, as ADK's cloneWebContent. Null without a page.
+  virtual std::unique_ptr<Page> Clone() = 0;
   // The same tab, WebContents and history move; nothing happens if it is there.
   virtual void MoveToWindow(const std::string& window_id) = 0;
   // Fails while the page has nothing drawn, for example when no window shows

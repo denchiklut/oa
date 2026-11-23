@@ -524,6 +524,17 @@ bool PageImpl::KeepsAddressAgainst(const content::OpenURLParams& params) const {
   return current.SchemeIsHTTPOrHTTPS() && current.host() != params.url.host();
 }
 
+std::unique_ptr<Page> PageImpl::Clone() {
+  if (!web_contents()) {
+    return nullptr;
+  }
+  std::unique_ptr<PageImpl> page = Wrap(web_contents()->Clone());
+  if (page) {
+    page->web_contents()->GetController().LoadIfNecessary();
+  }
+  return page;
+}
+
 void PageImpl::MoveToWindow(const std::string& window_id) {
   content::WebContents* contents = web_contents();
   if (!contents || !window_browser_) {

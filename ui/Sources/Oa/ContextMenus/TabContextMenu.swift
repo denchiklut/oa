@@ -52,6 +52,7 @@ struct TabContextMenu {
                     model.openInSplitView(tab.id)
                 })
         }
+        menu.addItem(MenuActionItem("Duplicate") { [model, tab] in model.duplicate(tab.id) })
         menu.addItem(move(favorite: favorite))
         menu.addItem(.separator())
         for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
