@@ -33,6 +33,12 @@ struct SidebarSpace: Identifiable, Hashable, Codable {
 }
 
 struct SidebarTab: Identifiable, Hashable {
+    /// Arc's `MuteStatus`, written once the tab was muted or unmuted.
+    enum MuteStatus: String, Codable {
+        case mute
+        case allowAudio
+    }
+
     let id: UUID
     var title = ""
     var url: URL?
@@ -45,6 +51,8 @@ struct SidebarTab: Identifiable, Hashable {
     /// Arc's `customInfo.iconType`, drawn in place of the favicon and kept as a Space's icon is: an SF Symbol's name
     /// or an emoji.
     var icon: String?
+    /// Arc's `savedMuteStatus`, given to the tab's next page.
+    var muteStatus: MuteStatus?
 
     var displayTitle: String { customTitle ?? (title.isEmpty ? url?.host() ?? "Untitled" : title) }
 
@@ -511,6 +519,14 @@ struct SidebarState {
         tree.update(tabID) { item in
             guard var tab = item.tab else { return }
             tab.customTitle = title.isEmpty ? nil : title
+            item.kind = .tab(tab)
+        }
+    }
+
+    mutating func setMuteStatus(_ tabID: UUID, to status: SidebarTab.MuteStatus) {
+        tree.update(tabID) { item in
+            guard var tab = item.tab else { return }
+            tab.muteStatus = status
             item.kind = .tab(tab)
         }
     }

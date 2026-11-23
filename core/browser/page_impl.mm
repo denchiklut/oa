@@ -24,7 +24,9 @@
 #include "chrome/browser/tab_contents/tab_util.h"
 #include "chrome/browser/ui/browser_live_tab_context.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
+#include "chrome/browser/ui/tabs/tab_muted_utils.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_tab_helper.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/security_state/core/security_state.h"
@@ -384,6 +386,19 @@ bool PageImpl::IsMicrophoneOn() const {
 
 bool PageImpl::IsAudible() const {
   return web_contents() && web_contents()->IsCurrentlyAudible();
+}
+
+bool PageImpl::IsMuted() const {
+  return web_contents() && web_contents()->IsAudioMuted();
+}
+
+// As the user's own mute, which Chrome's sound setting leaves alone when the
+// page changes.
+void PageImpl::SetMuted(bool muted) {
+  if (web_contents()) {
+    SetTabAudioMuted(web_contents(), muted, TabMutedReason::kAudioIndicator,
+                     std::string());
+  }
 }
 
 bool PageImpl::HasFocus() const {
@@ -970,6 +985,14 @@ void PageImpl::OnFaviconUpdated(favicon::FaviconDriver* favicon_driver,
                                 const GURL& icon_url,
                                 bool icon_url_changed,
                                 const gfx::Image& image) {
+  NotifyStateChanged();
+}
+
+void PageImpl::OnAudioStateChanged(bool audible) {
+  NotifyStateChanged();
+}
+
+void PageImpl::DidUpdateAudioMutingState(bool muted) {
   NotifyStateChanged();
 }
 

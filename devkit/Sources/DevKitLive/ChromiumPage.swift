@@ -19,6 +19,8 @@ final class ChromiumPage: Page, MediaSession {
     private(set) var navigationResult: NavigationResult?
     private(set) var isCameraOn = false
     private(set) var isMicrophoneOn = false
+    private(set) var isAudible = false
+    private var muted = false
     private(set) var hasFocus = false
     private(set) var crash: PageCrash?
     var keepsAddress = false {
@@ -37,9 +39,16 @@ final class ChromiumPage: Page, MediaSession {
     @ObservationIgnored private var isObservingThumbnails = false
 
     var view: NSView { hostingView }
-    var isAudible: Bool { page?.isAudible ?? false }
     var tabSessionID: Int32 { page?.tabSessionID ?? -1 }
     var mediaSession: any MediaSession { self }
+
+    var isMuted: Bool {
+        get { muted }
+        set {
+            page?.muted = newValue
+            muted = newValue
+        }
+    }
 
     var state: MediaSessionState? {
         guard let page, let status = MediaSessionState.Status(core: page.mediaSessionStatus) else { return nil }
@@ -117,6 +126,8 @@ final class ChromiumPage: Page, MediaSession {
         if result != navigationResult { navigationResult = result }
         if page.isCameraOn != isCameraOn { isCameraOn = page.isCameraOn }
         if page.isMicrophoneOn != isMicrophoneOn { isMicrophoneOn = page.isMicrophoneOn }
+        if page.isAudible != isAudible { isAudible = page.isAudible }
+        if page.muted != muted { muted = page.muted }
         if page.hasFocus != hasFocus { hasFocus = page.hasFocus }
         updateHostedView()
     }

@@ -665,6 +665,26 @@ struct TabFavicon: View {
     }
 }
 
+/// Arc's `sidebarTabCellMuteButton`: 26 pt after the favicon while the page plays sound, the speaker struck through
+/// while muted.
+private struct TabMuteButton: View {
+    let isMuted: Bool
+    let toggle: () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button(action: toggle) {
+            Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.secondaryGlyph)
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isMuted ? "Unmute" : "Mute")
+    }
+}
+
 /// Arc's tab cell: a 40 pt row with a 36 pt card, selected on mouse-down, its button only under the pointer.
 /// Reads the model itself, so a change to its tab's page, Peek or selection re-renders the row alone.
 struct TabRow: View {
@@ -710,6 +730,10 @@ struct TabRow: View {
             if model.isRecording(tab) { RecordingDot().padding(.trailing, 2) }
             TabFavicon(model: model, tab: tab)
                 .frame(width: 24, height: 24)
+            let audio = model.audio(of: tab.id)
+            if let audio, audio.isAudible {
+                TabMuteButton(isMuted: audio.isMuted) { model.toggleMuted(tab.id) }.padding(.leading, 4)
+            }
             Group {
                 if renaming {
                     renameField
@@ -721,7 +745,7 @@ struct TabRow: View {
             }
             .font(.system(size: 14))
             .foregroundStyle(theme.foreground)
-            .padding(.leading, 6)
+            .padding(.leading, audio?.isAudible == true ? 2 : 6)
             Spacer(minLength: 0)
         }
         .padding(.leading, 6)

@@ -572,8 +572,10 @@ public protocol Page: AnyObject, Observable {
     /// While the page captures from them, as ADK's media session state reports.
     var isCameraOn: Bool { get }
     var isMicrophoneOn: Bool { get }
-    /// While the page plays sound, as ADK's `isAudible`. Read when needed: it isn't observed.
+    /// While the page plays sound, as ADK's `isAudible`, muted or not.
     var isAudible: Bool { get }
+    /// As ADK's `setWebContentsMuted`; kept across navigations.
+    var isMuted: Bool { get set }
     /// While the page has the keyboard, as ADK's `hasFocus`: false again once its window isn't key.
     var hasFocus: Bool { get }
     /// The page's media, as ADK's media session.

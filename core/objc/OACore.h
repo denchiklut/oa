@@ -182,6 +182,8 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 @property(nonatomic, readonly, getter=isCameraOn) BOOL cameraOn;
 @property(nonatomic, readonly, getter=isMicrophoneOn) BOOL microphoneOn;
 @property(nonatomic, readonly, getter=isAudible) BOOL audible;
+// Kept until the page is set, as ADK's initiallyMuted.
+@property(nonatomic, getter=isMuted) BOOL muted;
 @property(nonatomic, readonly) BOOL hasFocus;
 // None while the page has no media session.
 @property(nonatomic, readonly) OAPageMediaSessionStatus mediaSessionStatus;
