@@ -6,6 +6,7 @@ import AppKit
 struct TabContextMenu {
     let model: WindowModel
     let tab: SidebarTab
+    let changeIcon: () -> Void
     /// A row's inline field; a Favorite's tile has the dialog instead.
     var rename: () -> Void = {}
 
@@ -20,6 +21,7 @@ struct TabContextMenu {
         menu.addItem(copy)
         if let url = model.liveURL(of: tab.id) { menu.addItem(share(url)) }
         menu.addItem(.separator())
+        menu.addItem(MenuActionItem("Change Icon…", changeIcon))
         menu.addItem(
             MenuActionItem("Rename…") { [model, tab, rename] in
                 guard favorite else { return rename() }

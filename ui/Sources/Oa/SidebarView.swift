@@ -424,13 +424,15 @@ private struct FavoriteTile: View {
     let width: CGFloat
     @State private var hovering = false
     @State private var pressed = false
+    @State private var pickingIcon = false
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
         let selected = model.selectedTabID == tab.id
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        let favicon = model.favicon(for: tab)
+        // As seen in Arc: the icon takes the favicon's place, and the selected tile's tint and ring follow its colour.
+        let favicon = tab.icon.map(TabIconImage.image(for:)) ?? model.favicon(for: tab)
         ZStack {
             shape.fill(selected ? theme.selectedTile : .clear)
                 .shadow(color: .black.opacity(selected ? 0.1 : 0), radius: 2, y: 1)
@@ -475,10 +477,13 @@ private struct FavoriteTile: View {
                     drag?.finish(model: model, layout: layout)
                 }
         )
+        .popover(isPresented: $pickingIcon, arrowEdge: .bottom) {
+            SpaceIconPicker(selection: tab.icon) { model.setTabIcon(tab.id, to: $0) }
+        }
         .onHover { hovering = $0 }
         .sidebarDragFrame { drag?.tiles[tab.id] = $0 }
         .platformContextMenu(isEnabled: model.library == nil && !model.coversWindow) {
-            TabContextMenu(model: model, tab: tab).make()
+            TabContextMenu(model: model, tab: tab) { Task { pickingIcon = true } }.make()
         }
     }
 }
@@ -642,7 +647,11 @@ struct TabFavicon: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        if let icon = model.favicon(for: tab) {
+        if let icon = tab.icon {
+            SpaceIconGlyph(icon: icon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(theme.secondaryGlyph)
+        } else if let icon = model.favicon(for: tab) {
             Image(nsImage: icon)
                 .resizable()
                 .interpolation(.high)
@@ -678,6 +687,7 @@ struct TabRow: View {
     @State private var bounces = 0
     @State private var renaming = false
     @State private var draft = ""
+    @State private var pickingIcon = false
     @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
@@ -792,6 +802,13 @@ struct TabRow: View {
             MoveKeyframe(0.89)
             SpringKeyframe(1, duration: 0.24, spring: Spring(response: 0.24, dampingRatio: 1))
         }
+        // As seen in Arc: the picker hangs below the row, its arrow at the favicon.
+        .popover(
+            isPresented: $pickingIcon, attachmentAnchor: .rect(.rect(CGRect(x: 6, y: 2, width: 24, height: 36))),
+            arrowEdge: .bottom
+        ) {
+            SpaceIconPicker(selection: tab.icon) { model.setTabIcon(tab.id, to: $0) }
+        }
         .frame(height: 40)
         .onHover { hovering = $0 }
         .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
@@ -800,7 +817,8 @@ struct TabRow: View {
                 ? model.library != nil
                 : spaceID == model.selectedSpaceID && model.library == nil && !model.coversWindow
         ) {
-            TabContextMenu(model: model, tab: tab, rename: beginRename).make()
+            TabContextMenu(model: model, tab: tab, changeIcon: { Task { pickingIcon = true } }, rename: beginRename)
+                .make()
         }
     }
 

@@ -42,6 +42,9 @@ struct SidebarTab: Identifiable, Hashable {
     /// Arc's item `title`: the user's name for the tab, which wins over the page's, `title` here being Arc's
     /// `savedTitle`.
     var customTitle: String?
+    /// Arc's `customInfo.iconType`, drawn in place of the favicon and kept as a Space's icon is: an SF Symbol's name
+    /// or an emoji.
+    var icon: String?
 
     var displayTitle: String { customTitle ?? (title.isEmpty ? url?.host() ?? "Untitled" : title) }
 
@@ -508,6 +511,14 @@ struct SidebarState {
         tree.update(tabID) { item in
             guard var tab = item.tab else { return }
             tab.customTitle = title.isEmpty ? nil : title
+            item.kind = .tab(tab)
+        }
+    }
+
+    mutating func setTabIcon(_ tabID: UUID, to icon: String?) {
+        tree.update(tabID) { item in
+            guard var tab = item.tab else { return }
+            tab.icon = icon
             item.kind = .tab(tab)
         }
     }
