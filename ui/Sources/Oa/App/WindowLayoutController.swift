@@ -20,16 +20,13 @@ final class WindowLayoutController: NSViewController {
     private static let spaceCreationCloseSpring = (response: 0.175, damping: 1.0)
     /// Lock and unlock, the sidebar and the page changing frames together. Oa's own, by the author's decision:
     /// open-arch's 0.18 s ease in and out, not Arc's measured 0.08 s on (0.25, 0.46, 0.45, 0.94).
-    private static let lockAnimation = Animation.easeInOut(duration: 0.18)
+    static let lockAnimation = Animation.easeInOut(duration: 0.18)
     /// The floating panel's slide as measured in Arc: its code reads a period of 0.18 s at the same damping.
     private static let hoverAnimation = Animation.spring(response: 0.17, dampingFraction: 0.8)
 
     @ObservationIgnored let model: WindowModel
     private(set) var size = CGSize.zero
     private(set) var sidebarPresentation: SidebarPresentation
-    /// Whether the sidebar is drawn as the floating panel, over the page: from the start of undocking to the end of
-    /// docking, as open-arch's `isPanel`.
-    private(set) var sidebarIsPanel: Bool
     /// The width a drag on the sidebar's edge is at, the layout's own until the drag ends, as in Arc.
     private var resizingWidth: CGFloat?
     /// As Arc's: a docked sidebar dragged below its collapse width shows as hidden, and hides if let go there.
@@ -83,7 +80,6 @@ final class WindowLayoutController: NSViewController {
     init(model: WindowModel) {
         self.model = model
         sidebarPresentation = model.sidebarMode == .anchored ? .locked : .hidden
-        sidebarIsPanel = model.sidebarMode != .anchored
         super.init(nibName: nil, bundle: nil)
         hover.needsUpdate = { [weak self] in self?.updatePresentation() }
         pager.windowProvider = { [weak self] in self?.viewIfLoaded?.window }
@@ -666,20 +662,12 @@ final class WindowLayoutController: NSViewController {
         let (old, new) = (sidebarPresentation, derivedPresentation)
         guard new != old else { return }
         if new == .hidden { iconPickerSpaceID = nil }
-        if old == .locked { sidebarIsPanel = true }
         if old == .locked || new == .locked {
+            // Animated where the window draws it: set in `withAnimation`, a repeated ⌘S at times drew the new layout
+            // outside the animation, and the sidebar jumped open.
             sidebarPresentation = new
         } else {
             withAnimation(Self.hoverAnimation) { sidebarPresentation = new }
-        }
-    }
-
-    func animateSidebarLock(_ transaction: inout Transaction) {
-        transaction.animation = Self.lockAnimation
-        guard sidebarPresentation == .locked, sidebarIsPanel else { return }
-        // The window owns the completion so the panel stays over the page until its slide finishes.
-        transaction.addAnimationCompletion(criteria: .removed) { [weak self] in
-            if self?.sidebarPresentation == .locked { self?.sidebarIsPanel = false }
         }
     }
 }
