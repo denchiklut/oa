@@ -67,7 +67,12 @@ class WindowBrowser : public TabStripModelObserver {
   bool Close(content::WebContents* contents);
   void Remove(content::WebContents* contents);
   void OnWindowClosing();
-  // A Browser the app made before any page has no last tab to close it.
+  bool closing() const { return closing_; }
+  // As ArcCore's Browser, which stays with no tabs until its window goes:
+  // while the app holds the window's handle, an emptied strip doesn't close
+  // it.
+  bool StaysOpenEmpty() const;
+  // Closes it once the app let go of it, if it has no tabs.
   void CloseIfEmpty();
   // Takes the tabs parked while a session restore was awaited. The restored
   // ones come back as pages; any other goes to `observer` as a page Chrome
@@ -94,6 +99,7 @@ class WindowBrowser : public TabStripModelObserver {
   std::string window_id_;
   std::vector<base::WeakPtr<content::WebContents>> parked_;
   bool closing_ = false;
+  bool close_requested_ = false;
   bool activating_ = false;
   base::WeakPtrFactory<WindowBrowser> weak_factory_{this};
 };
