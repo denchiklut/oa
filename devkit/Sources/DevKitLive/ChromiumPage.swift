@@ -76,6 +76,10 @@ final class ChromiumPage: Page, MediaSession {
     func activate() { page?.activate() }
     func move(toWindow windowID: UUID) { page?.move(toWindowIdentifier: windowID.uuidString) }
 
+    func duplicate() -> (any Page)? {
+        page?.clonePage().map { ChromiumPage(id: UUID(), page: $0, delegate: PageDelegate()) }
+    }
+
     /// Core answers on the main thread.
     func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void) {
         guard let page else { return completion(nil) }

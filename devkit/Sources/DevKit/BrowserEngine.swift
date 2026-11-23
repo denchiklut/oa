@@ -595,6 +595,9 @@ public protocol Page: AnyObject, Observable {
     func reload()
     func stopLoading()
     func activate()
+    /// A new page with this one's history, as ADK's `cloneWebContent`: in the same window, hidden, loading its entry at
+    /// once. Nil once the page is gone.
+    func duplicate() -> (any Page)?
     /// Moves the live page into another of the app's windows. History and the engine's tab identity stay.
     func move(toWindow windowID: UUID)
     /// Asks now for the page's last frame, for a window it leaves, as Arc's ADK does with a completion so a move need

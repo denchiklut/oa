@@ -1599,6 +1599,22 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    /// As seen in Arc: the copy isn't selected, and its page loads at once in the background, a clone of the tab's
+    /// live page with its history.
+    func duplicate(_ tabID: UUID) {
+        let page = livePage(for: tabID)
+        let left = state.tree.tab(tabID).flatMap(leftAddress).map { ($0, page?.title ?? "") }
+        let spaceID = selectedSpaceID
+        var copyID: UUID?
+        store.edit { copyID = $0.duplicateTab(tabID, in: spaceID, leftAddress: left) }
+        guard let copyID else { return }
+        createdDates[copyID] = .now
+        guard let clone = page?.duplicate() else { return ensurePage(copyID) }
+        clone.move(toWindow: id)
+        install(clone, for: copyID)
+        listen(to: clone)
+    }
+
     /// As Arc's Replace Pinned URL with Current: the page's address, title and favicon become the tab's, with no
     /// reload.
     func replacePinnedURLWithCurrent(_ tabID: UUID) {

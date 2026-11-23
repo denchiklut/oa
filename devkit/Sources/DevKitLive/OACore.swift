@@ -229,6 +229,7 @@ import AppKit
     func stopLoading()
     func activate()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
+    func clonePage() -> CorePage?
     @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
     func startObservingThumbnails()
     func stopObservingThumbnails()

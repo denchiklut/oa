@@ -198,6 +198,7 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)stopLoading;
 - (void)activate;
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
+- (nullable OAPage*)clonePage;
 // Nil while the page has nothing drawn, for example when no window shows it.
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable image))completion;
 // As adding and removing an observer of ArcCore's thumbnails generator: while

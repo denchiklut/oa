@@ -523,6 +523,25 @@ struct SidebarState {
         }
     }
 
+    /// As seen in Arc: the copy right below, with the tab's name and icon, or at the top of the shown Space's Today
+    /// for a Favorite's. A pin that left its address gives a pin at the page's, without the name.
+    mutating func duplicateTab(_ tabID: UUID, in shownSpaceID: UUID, leftAddress: (url: URL, title: String)?) -> UUID? {
+        guard let tab = tree.tab(tabID) else { return nil }
+        var copy = SidebarTab(
+            id: UUID(), title: tab.title, url: tab.url, viewedAt: .now, customTitle: tab.customTitle, icon: tab.icon)
+        if let leftAddress {
+            copy.url = leftAddress.url
+            copy.title = leftAddress.title
+            copy.customTitle = nil
+        }
+        if isFavorite(tabID) {
+            insertTab(copy, atTopOf: shownSpaceID)
+        } else if let place = tree.location(of: tabID) {
+            tree.insert(SidebarItem(id: copy.id, kind: .tab(copy)), into: place.parentID, at: place.index + 1)
+        }
+        return copy.id
+    }
+
     /// Arc's `updateSavedTabURL`: the address a pinned tab or Favorite opens at, whatever its page shows.
     mutating func setPinnedURL(_ tabID: UUID, to url: URL, title: String) {
         tree.update(tabID) { item in

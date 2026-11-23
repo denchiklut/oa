@@ -681,6 +681,16 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   }
 }
 
+- (nullable OAPage*)clonePage {
+  std::unique_ptr<oa::Page> clone = _page ? _page->Clone() : nullptr;
+  if (!clone) {
+    return nil;
+  }
+  OAPage* page = [[OAPage alloc] initWithDelegate:nil];
+  [page setPage:std::move(clone)];
+  return page;
+}
+
 - (void)pageStateChanged {
   [self.delegate pageDidChangeState:self];
 }

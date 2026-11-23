@@ -114,6 +114,7 @@ class PageImpl : public Page,
   void Activate() override;
   void SetKeepsAddress(bool keeps_address) override;
   void SetMuted(bool muted) override;
+  std::unique_ptr<Page> Clone() override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
   void StartObservingThumbnails() override;
