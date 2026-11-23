@@ -149,7 +149,7 @@ final class PictureInPicture {
     }
 }
 
-/// Arc's key, stored the same way: absent means on. Arc's switch is in Settings ▸ Advanced; Oa has none yet.
+/// Arc's key, stored the same way: absent means on.
 enum AutomaticPictureInPicture {
     static let key = "autoPipGloballyDisabled"
 
