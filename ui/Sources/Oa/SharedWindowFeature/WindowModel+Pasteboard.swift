@@ -13,6 +13,14 @@ extension WindowModel {
         copy(liveURL(of: tabID), toastOn: shown ? pages[tabID]?.id : nil, toast: shown)
     }
 
+    /// As seen in Arc's Copy Links: one line each in row order, as plain text, with no toast.
+    func copyURLs(of tabIDs: [UUID]) {
+        let urls = tabIDs.compactMap { liveURL(of: $0)?.withTrackingRemoved.url.absoluteString }
+        guard !urls.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(urls.joined(separator: "\n"), forType: .string)
+    }
+
     private func copy(_ url: URL?, toastOn pageID: UUID?, toast: Bool = true) {
         guard let result = url?.withTrackingRemoved else { return }
         NSPasteboard.general.clearContents()

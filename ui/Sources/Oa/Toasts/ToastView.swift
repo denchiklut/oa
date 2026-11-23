@@ -97,6 +97,10 @@ struct ToastView: View {
         case .tabUnarchived(_, let location):
             label("Tab restored to \(location). Click to view.")
                 .padding(.horizontal, 12)
+        // As seen in Arc: the singular, for several tabs too.
+        case .itemsMoved:
+            label("Tab moved! Click to go there.")
+                .padding(.horizontal, 12)
         }
     }
 
@@ -181,7 +185,12 @@ private struct ToastSlot: View {
                 {
                     model.editShortcut(of: toast)
                 }
-                .onTapGesture { if case .tabUnarchived(let id, _) = toast.type { model.viewRestored(id) } }
+                .onTapGesture {
+                    switch toast.type {
+                    case .tabUnarchived(let id, _), .itemsMoved(let id): model.viewRestored(id)
+                    default: break
+                    }
+                }
                 .id(toast.id)
                 .transition(.scale(scale: 0.001, anchor: UnitPoint(x: 0.5, y: 0.1)).combined(with: .opacity))
             }
