@@ -17,6 +17,8 @@ struct Theme {
     let secondaryGlyph: Color
     let sectionHeaderText: Color
     let selectedCard: Color
+    /// Arc's `TabCellBackgroundMutiselected`.
+    let multiSelectedCard: Color
     let selectedShadow: Color
     let selectedTile: Color
     /// Arc's modal buttons (`ModalButtonStyle`): the palette's `backgroundExtra` under its `foregroundPrimary`, which
@@ -48,6 +50,7 @@ struct Theme {
         secondaryGlyph = ink(0.5, 0.5)
         sectionHeaderText = ink(0.45, 0.45)
         selectedCard = .white.opacity(appearance == .dark ? 0.2 : 0.85)
+        multiSelectedCard = ink(0.1, 0.1)
         selectedShadow = .black.opacity(appearance == .dark ? 0 : 0.2)
         selectedTile = .white.opacity(appearance == .dark ? 0.45 : 0.8)
         modalButtonFill = palette.backgroundExtra.color
@@ -83,6 +86,7 @@ struct Theme {
         secondaryGlyph = Color(nsColor: .secondaryLabelColor)
         sectionHeaderText = Color(nsColor: .secondaryLabelColor)
         selectedCard = Color(nsColor: .controlBackgroundColor)
+        multiSelectedCard = .primary.opacity(0.1)
         selectedShadow = .black.opacity(0.2)
         selectedTile = Color(nsColor: .controlBackgroundColor)
         modalButtonFill = Color(nsColor: .controlBackgroundColor)
@@ -121,6 +125,7 @@ struct Theme {
         secondaryGlyph = ink.opacity(0.6)
         sectionHeaderText = ink.opacity(0.6)
         selectedCard = fill.opacity(0.09)
+        multiSelectedCard = fill.opacity(0.1)
         selectedShadow = .clear
         selectedTile = fill.opacity(0.09)
         modalButtonFill = fill.opacity(0.09)

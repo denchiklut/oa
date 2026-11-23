@@ -50,6 +50,7 @@ final class WindowModel {
     var spaceStyleEditorPresetPage = 0
     /// As Arc's per-window `spacesWithCollapsedPinnedSections`: the Spaces whose pinned tabs this window folds away.
     private(set) var collapsedPinnedSpaces: Set<UUID> = []
+    private(set) var multiSelection = SidebarMultiSelection()
     private(set) var library: LibrarySection? {
         didSet {
             if let library { store.home.lastSelectedHomePage = library }
@@ -578,8 +579,10 @@ final class WindowModel {
         }
     }
 
-    func select(_ tabID: UUID, restoring sessionID: PageSessionID? = nil) {
+    func select(_ tabID: UUID, restoring sessionID: PageSessionID? = nil, keepingMultiSelection: Bool = false) {
         guard state.isSelectable(tabID, in: selectedSpaceID) else { return }
+        // As Arc's `selectItem(params:)`: any selection ends the multi-selection, even of a row already in it.
+        if !keepingMultiSelection { multiSelection = SidebarMultiSelection() }
         // Oa's own, as for a Space: a tab chosen with the Create a Space panel open closes it. Arc keeps the panel
         // under the ⌘T bar; what it does once a tab is chosen wasn't seen.
         cancelSpaceCreation()
@@ -599,6 +602,52 @@ final class WindowModel {
             markViewed(shown)
             ensurePage(shown, restoring: shown == tabID ? sessionID : nil)
         }
+    }
+
+    /// Arc's multi-selection as the menu and ⌘W take it: the shown Space's selected rows in row order, the selected
+    /// tab among them when it is a row; none until there are two. Oa's own: a split and its panes don't join.
+    var multiSelectedTabIDs: [UUID] {
+        guard multiSelection != SidebarMultiSelection() else { return [] }
+        let ids = state.tabs(in: selectedSpaceID).map(\.id).filter {
+            state.splitViewID(containing: $0) == nil && ($0 == selectedTabID || multiSelection.contains($0))
+        }
+        return ids.count > 1 ? ids : []
+    }
+
+    private func isMultiSelectable(_ tabID: UUID) -> Bool {
+        state.space(containing: tabID)?.id == selectedSpaceID && state.splitViewID(containing: tabID) == nil
+    }
+
+    /// As seen in Arc's ⌘-click: a row joins the selection or leaves it, and the page stays. The selected tab leaves
+    /// for another member, which is shown; alone, it stays. Oa's own: the first member in row order is shown.
+    func toggleMultiSelection(_ tabID: UUID) {
+        guard isMultiSelectable(tabID) else { return }
+        guard tabID == selectedTabID else { return multiSelection.toggle(tabID) }
+        guard let next = multiSelectedTabIDs.first(where: { $0 != tabID }) else { return }
+        multiSelection.remove(next)
+        select(next, keepingMultiSelection: true)
+    }
+
+    /// As seen in Arc's ⇧-click: the rows from the anchor to this one in its list, in place of the last range. Oa's
+    /// own: a range across the pinned and Today lists does nothing, as Arc's first click across does.
+    func extendMultiSelection(to tabID: UUID) {
+        let anchor = multiSelection.anchorID.flatMap { isMultiSelectable($0) ? $0 : nil } ?? selectedTabID
+        guard let anchor, isMultiSelectable(anchor), isMultiSelectable(tabID),
+            state.isPinned(anchor) == state.isPinned(tabID)
+        else { return }
+        let rows = state.tabs(in: selectedSpaceID, pinned: state.isPinned(anchor)).map(\.id).filter(isMultiSelectable)
+        guard let from = rows.firstIndex(of: anchor), let to = rows.firstIndex(of: tabID) else { return }
+        multiSelection.select(range: Array(rows[min(from, to)...max(from, to)]))
+    }
+
+    /// As seen in Arc: ⌘W or Archive Tabs takes every tab at once, pins too, in one step, and ⇧⌘T brings the selected
+    /// tab back first, then the rest from the bottom.
+    func archiveTabs(_ tabIDs: [UUID]) {
+        multiSelection = SidebarMultiSelection()
+        let selected = selectedTabID.flatMap { tabIDs.contains($0) ? $0 : nil }
+        closeTogether(
+            tabIDs.filter { $0 != selected } + (selected.map { [$0] } ?? []),
+            undoPrompt: tabIDs.count == 1 ? UndoStrings.archiveTab : UndoStrings.archiveTabs, completionToast: nil)
     }
 
     /// As seen in Arc: a window comes back to the pane it focused in a split, and to the last pane of a split it
@@ -737,6 +786,7 @@ final class WindowModel {
         let sourceSpaceID = selectedSpaceID
         let move = { [weak self] in
             guard let self, canMoveItem(itemID, toSpace: spaceID) else { return }
+            multiSelection = SidebarMultiSelection()
             if crossesProfile { for window in store.windows { window.dropPages(of: tabIDs) } }
             store.edit { $0.move(itemID, toSpace: spaceID) }
             guard let focused else { return }
@@ -1603,6 +1653,7 @@ final class WindowModel {
     /// As seen in Arc: the copy isn't selected, and its page loads at once in the background, a clone of the tab's
     /// live page with its history.
     func duplicate(_ tabID: UUID) {
+        multiSelection = SidebarMultiSelection()
         let page = livePage(for: tabID)
         let left = state.tree.tab(tabID).flatMap { leftAddress($0, page: page) }.map { ($0, page?.title ?? "") }
         let spaceID = selectedSpaceID
@@ -1684,14 +1735,18 @@ final class WindowModel {
     }
 
     /// One close of several tabs from this window, one entry on its stack, the steps going back from the last.
-    private func closeTogether(_ tabIDs: [UUID], splitView: ClosedSplitView? = nil) {
+    private func closeTogether(
+        _ tabIDs: [UUID], undoPrompt: String? = nil, completionToast: CloseItemsCompletionToast? = .clearedTabs,
+        splitView: ClosedSplitView? = nil
+    ) {
         guard !tabIDs.isEmpty else { return }
         let asSplitView = splitView != nil
         let closing = Set(tabIDs)
         var group = ClosedGroup(
-            undoPrompt: asSplitView ? UndoStrings.archiveTabs : UndoStrings.clearTabs(tabIDs.count),
+            undoPrompt: undoPrompt ?? (asSplitView ? UndoStrings.archiveTabs : UndoStrings.clearTabs(tabIDs.count)),
             focusedTabID: selectedTabID.flatMap { closing.contains($0) ? $0 : nil },
-            completionToast: asSplitView ? nil : .clearedTabs, order: tabIDs, siblings: unpinnedTabs.map(\.id))
+            completionToast: asSplitView ? nil : completionToast, order: tabIDs,
+            siblings: state.tabs(in: selectedSpaceID).map(\.id))
         group.splitView = splitView
         if let selected = selectedTabID, closing.contains(selected) {
             let next = nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
@@ -2282,7 +2337,9 @@ final class WindowModel {
                 save(page, for: tabID)
                 // As Arc's `onDidFocus`: the pane whose page takes the keyboard is the focused one. A page the window
                 // gave the keyboard itself, before it selected another, isn't followed.
-                if page.hasFocus, presentedTabIDs.contains(tabID), selections == selectionCount { select(tabID) }
+                if page.hasFocus, presentedTabIDs.contains(tabID), selections == selectionCount {
+                    select(tabID, keepingMultiSelection: true)
+                }
                 observe(page, for: tabID)
             }
         }
