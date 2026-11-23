@@ -213,10 +213,11 @@ struct EditProfilesFooterView: View {
 }
 
 struct PreferencesPaneSection<Content: View>: View {
+    var fill = PaneColor.section
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(spacing: 0) { content }.background(PreferencesPaneSectionBackground())
+        VStack(spacing: 0) { content }.background(PreferencesPaneSectionBackground(fill: fill))
     }
 }
 

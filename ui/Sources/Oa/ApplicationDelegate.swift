@@ -206,11 +206,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         model.newTab(url)
     }
 
-    /// As Arc: Settings closes, then the page opens as a new tab at the top of a Space of the profile, in a window
+    /// As Arc: Settings closes, except for Advanced's More Settings…, then the page opens as a new tab at the top of a Space of the profile, in a window
     /// showing one, else in the frontmost window, which moves to one. A profile without a Space gets no page. Which
     /// of its Spaces, and a new window when none is open, are Oa's own.
     private func openSettings(_ page: ChromiumSettings, in profileID: UUID) {
-        settings.close()
+        if page != .settings { settings.close() }
         guard let space = store.state.spaces.first(where: { $0.profileID == profileID }) else { return }
         let model =
             frontWindows.first { $0.space?.profileID == profileID } ?? frontWindows.first ?? openWindow(on: space.id)
