@@ -109,6 +109,8 @@ final class WindowModel {
     @ObservationIgnored private var previousExpiry: Task<Void, Never>?
     /// Arc's `deselectedItemIDs`: pinned tabs closed and Favorites deselected here, until selected again.
     @ObservationIgnored private var deselectedTabIDs: Set<UUID> = []
+    /// Arc's `referrerPool`: the tabs of the opener group being worked through here.
+    @ObservationIgnored private var openerPool: Set<UUID> = []
     @ObservationIgnored private var focusedPaneIDs: [UUID: UUID] = [:]
     @ObservationIgnored private var selectionCount = 0
     /// Arc's `interactionState.proposedWindowContentDropTarget`, while a tab is dragged over the page.
@@ -415,7 +417,7 @@ final class WindowModel {
         guard let spaceID = shown ?? state.spaces.first(where: { $0.profileID == profileID })?.id else {
             return page.drop()
         }
-        let tab = SidebarTab(id: UUID(), url: page.url, viewedAt: .now)
+        let tab = makeTab(url: page.url)
         store.edit { $0.insertTab(tab, atTopOf: spaceID) }
         createdDates[tab.id] = .now
         install(page, for: tab.id)
@@ -425,7 +427,7 @@ final class WindowModel {
 
     /// As Arc: at the top of the Space's unpinned tabs.
     func newTab(_ url: URL) {
-        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+        let tab = makeTab(url: url)
         store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
         createdDates[tab.id] = .now
         select(tab.id)
@@ -564,7 +566,7 @@ final class WindowModel {
             // Oa's own where the tab can't take a pane, as a full split: a new tab.
             guard let anchorID = selectedTabID, state.canAddSplitViewPane(beside: anchorID, in: selectedSpaceID)
             else { return newTab(url) }
-            let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+            let tab = makeTab(url: url)
             let spaceID = selectedSpaceID
             editSplitView(taking: [anchorID]) {
                 $0.insertTab(tab, atTopOf: spaceID)
@@ -573,7 +575,7 @@ final class WindowModel {
             createdDates[tab.id] = .now
             select(tab.id)
         case .open(let url, background: true):
-            let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+            let tab = makeTab(url: url)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
             createdDates[tab.id] = .now
             ensurePage(tab.id)
@@ -619,11 +621,35 @@ final class WindowModel {
     }
 
     /// As Arc's `selectItem(params:)`, whatever made the selection: the item shown before becomes the previous one,
-    /// or none when nothing was, and the new one is no longer deselected.
+    /// or none when nothing was; the new one is no longer deselected; the opener pool lets go of the group when the
+    /// selection leaves it, and narrows to a pinned tab or Favorite of it.
     private func noteSelection(of tabID: UUID, after current: UUID?) {
         let presented = state.presentedTabIDs(with: tabID)
         deselectedTabIDs.subtract(presented)
+        if !openerPool.contains(tabID) {
+            openerPool = []
+        } else if state.isPinned(tabID) || state.isFavorite(tabID) {
+            openerPool = [tabID]
+        }
         if current.map({ !presented.contains($0) }) ?? true { previousTabID = current }
+    }
+
+    /// As Arc's `createTab`: the opener's group gains the tab, a tab with no opener starts one with the tab shown,
+    /// and a Peek's page starts one with the Peek's owner.
+    private func makeTab(url: URL?, title: String = "", opener openerID: UUID? = nil, peekOwner: UUID? = nil)
+        -> SidebarTab
+    {
+        let before = peekOwner ?? openerID ?? selectedTabID
+        let tab = SidebarTab(
+            id: UUID(), title: title, url: url, viewedAt: .now, openerID: openerID, activeTabBeforeCreationID: before)
+        if let peekOwner {
+            openerPool = [peekOwner, tab.id]
+        } else if let openerID {
+            openerPool.formUnion([openerID, tab.id])
+        } else {
+            openerPool = Set([before, tab.id].compactMap { $0 })
+        }
+        return tab
     }
 
     /// As Arc's selection after a close, an ordinary one: recorded and stamped.
@@ -783,7 +809,7 @@ final class WindowModel {
 
     /// As seen in Arc: a link dropped in the list is a tab at the line, its page loaded in the background.
     func openDroppedLink(_ url: URL, pinned: Bool, at index: Int) {
-        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+        let tab = makeTab(url: url)
         let spaceID = selectedSpaceID
         store.edit {
             $0.appendTab(tab, in: spaceID)
@@ -802,7 +828,7 @@ final class WindowModel {
     /// isn't selected. From the cell's right half it is the last, LIKELY as a dropped tab.
     func openDroppedLink(_ url: URL, inSplitView splitID: UUID, last: Bool) {
         guard canDropLink(inSplitView: splitID), let anchorID = state.tree[splitID]?.childIDs.first else { return }
-        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+        let tab = makeTab(url: url)
         let spaceID = selectedSpaceID
         store.edit {
             $0.appendTab(tab, in: spaceID)
@@ -1528,8 +1554,7 @@ final class WindowModel {
             return
         }
         let besideOpener = spaceID == selectedSpaceID
-        let tab = SidebarTab(
-            id: UUID(), title: page.title, url: page.url, viewedAt: .now, openerID: besideOpener ? ownerID : nil)
+        let tab = makeTab(url: page.url, title: page.title, opener: besideOpener ? ownerID : nil, peekOwner: ownerID)
         store.edit {
             if besideOpener { $0.openTab(tab, from: ownerID, in: spaceID) } else { $0.insertTab(tab, atTopOf: spaceID) }
         }
@@ -1575,7 +1600,7 @@ final class WindowModel {
         guard canAddPeekToSplitView, let ownerID = peekOwnerID, let page = peeks.removeValue(forKey: ownerID) else {
             return
         }
-        let tab = SidebarTab(id: UUID(), title: page.title, url: page.url, viewedAt: .now, openerID: ownerID)
+        let tab = makeTab(url: page.url, title: page.title, opener: ownerID, peekOwner: ownerID)
         let spaceID = selectedSpaceID
         editSplitView(taking: [ownerID]) {
             $0.openTab(tab, from: ownerID, in: spaceID)
@@ -2118,9 +2143,9 @@ final class WindowModel {
         show(nextSelection(closing: tabID, deselecting: true, in: selectedSpaceID), after: tabID, in: selectedSpaceID)
     }
 
-    /// The opener's group first, as in Arc; else the tab shown before; a deselect stops there, as Arc's does. Else,
-    /// as Arc: a Today tab's row above, else below, never crossing into pinned; else the window's most recently
-    /// active tab that still has its page here.
+    /// As Arc: the opener's group first; else the tab shown before, where a deselect stops; else a Today tab's row
+    /// above, else below, never crossing into pinned; else the window's most recently active tab that still has its
+    /// page here.
     private func nextSelection(
         closing tabID: UUID, deselecting: Bool, in spaceID: UUID, alsoClosing others: Set<UUID> = []
     ) -> UUID? {
@@ -2129,9 +2154,11 @@ final class WindowModel {
         if panes.count > 1, let index = panes.firstIndex(of: tabID) {
             return panes[index + 1 < panes.count ? index + 1 : index - 1]
         }
-        if let successor = state.openerSuccessor(of: tabID), !others.contains(successor) { return successor }
-        // As Arc: a deselected item is passed over, also by a deselect.
+        // As Arc: a deselected item is passed over, and a deselect only looks back.
         let excluded = others.union(deselectedTabIDs)
+        if !deselecting, let opened = openerSelection(closing: tabID, in: spaceID, excluding: excluded) {
+            return opened
+        }
         if let previousTabID, previousTabID != tabID, !excluded.contains(previousTabID),
             state.isSelectable(previousTabID, in: spaceID)
         {
@@ -2149,6 +2176,28 @@ final class WindowModel {
             lastActiveDates[tab.id].flatMap { staying(tab) && pages[tab.id] != nil ? (tab.id, $0) : nil }
         }
         return active.max { $0.1 < $1.1 }?.0
+    }
+
+    /// As Arc's: a tab it opened right above or below it in Today; then, while the window's opener pool holds it, the
+    /// next tab below from the same opener; then the tab shown when it was made, if still in the pool.
+    private func openerSelection(closing tabID: UUID, in spaceID: UUID, excluding excluded: Set<UUID>) -> UUID? {
+        guard let tab = state.tree.tab(tabID) else { return nil }
+        let today = state.tabs(in: spaceID, pinned: false).filter { $0.id == tabID || !excluded.contains($0.id) }
+        let index = today.firstIndex { $0.id == tabID }
+        if let index {
+            let neighbours = [index - 1, index + 1].filter(today.indices.contains).map { today[$0] }
+            if let child = neighbours.first(where: { $0.openerID == tabID }) { return child.id }
+        }
+        if openerPool.contains(tabID), let index, let openerID = tab.openerID,
+            let sibling = today[(index + 1)...].first(where: { $0.openerID == openerID && openerPool.contains($0.id) })
+        {
+            return sibling.id
+        }
+        guard let before = tab.activeTabBeforeCreationID, !excluded.contains(before), openerPool.contains(before),
+            state.isSelectable(before, in: spaceID),
+            state.isFavorite(before) || state.space(containing: before)?.id == selectedSpaceID
+        else { return nil }
+        return before
     }
 
     /// As Arc's ingest, in one step: the last window to select a tab takes its page from the window that holds it, or
@@ -2412,7 +2461,7 @@ final class WindowModel {
         let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick)
         guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
-            let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now)
+            let tab = makeTab(url: url)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
             createdDates[tab.id] = .now
             install(page, for: tab.id)
@@ -2431,7 +2480,7 @@ final class WindowModel {
             page.drop()
             return openRoutedLink(url, in: spaceID)
         }
-        let tab = SidebarTab(id: UUID(), url: url, viewedAt: .now, openerID: openerID)
+        let tab = makeTab(url: url, opener: openerID)
         let spaceID = selectedSpaceID
         // As seen in Arc: the link's page on the right of the one it came from, focused, a pinned tab or Favorite
         // going in as itself. Oa's own where that one can't take a pane: a tab.

@@ -45,6 +45,8 @@ struct SidebarTab: Identifiable, Hashable {
     var viewedAt: Date?
     /// Kept after the opener is gone, as Arc keeps its grouping.
     var openerID: UUID?
+    /// As Arc's: the opener, else the tab shown when this one was made.
+    var activeTabBeforeCreationID: UUID?
     /// Arc's item `title`: the user's name for the tab, which wins over the page's, `title` here being Arc's
     /// `savedTitle`.
     var customTitle: String?
@@ -391,15 +393,6 @@ struct SidebarState {
     }
 
     /// As Arc: the next tab below with the same opener, else the nearest above, else the opener.
-    func openerSuccessor(of tabID: UUID) -> UUID? {
-        guard let openerID = tree.tab(tabID)?.openerID, let space = space(containing: tabID) else { return nil }
-        let tabs = selectableTabs(in: space.id)
-        guard let index = tabs.firstIndex(where: { $0.id == tabID }) else { return nil }
-        if let below = tabs[(index + 1)...].first(where: { $0.openerID == openerID }) { return below.id }
-        if let above = tabs[..<index].last(where: { $0.openerID == openerID }) { return above.id }
-        return tabs.contains { $0.id == openerID } ? openerID : nil
-    }
-
     mutating func archiveTab(_ id: UUID, reason: SidebarArchivedTab.Reason, at date: Date = .now) {
         guard let tab = tree.tab(id) else { return }
         let space = space(containing: id)
