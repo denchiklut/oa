@@ -28,8 +28,9 @@ std::vector<BrowserImpl*>& AllBrowsers() {
 
 // The app's handle on a window's Browser in one profile. As ADK's
 // ensureBrowserCreated, the WindowBrowser is made with the handle, before any
-// page. It goes when its last page does and a new one comes with the next
-// page, so it is looked up for each call and it looks its observer up here.
+// page, and as Arc's it stays with no pages until the handle goes. Chrome can
+// still close it, so it is looked up for each call and it looks its observer
+// up here.
 class BrowserImpl : public Browser {
  public:
   BrowserImpl(const std::string& window_id,

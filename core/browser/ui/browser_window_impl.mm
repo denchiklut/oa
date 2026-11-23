@@ -212,7 +212,27 @@ bool BrowserWindowImpl::IsVisible() const {
 void BrowserWindowImpl::SetBounds(const gfx::Rect& bounds) {}
 
 void BrowserWindowImpl::Close() {
-  // Called when the strip empties, or when Chrome closes the Browser itself.
+  // Called when the strip empties, when the app lets go of the window's
+  // handle, or when Chrome closes the Browser itself.
+  if (window_browser_->closing()) {
+    return;
+  }
+  if (window_browser_->StaysOpenEmpty()) {
+    // The unload controller marks an emptied Browser as closing right after
+    // this. As when the user cancels Chrome's close, it is usable again.
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<BrowserWindowInterface> browser) {
+              BrowserWindowImpl* window =
+                  browser ? FromBrowser(browser.get()) : nullptr;
+              if (window && !window->window_browser_->closing()) {
+                UnloadController::From(browser.get())->CancelWindowClose();
+              }
+            },
+            browser_->GetWeakPtr()));
+    return;
+  }
   // New pages for this window go to a new Browser from now on.
   window_browser_->OnWindowClosing();
   // Out of the strip's notification, as a Views window closes. The unload

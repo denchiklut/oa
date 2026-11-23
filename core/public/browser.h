@@ -83,8 +83,8 @@ class Browser {
 
 // Loads the app profile `profile_id` if needed, makes `window_id`'s Browser
 // for it, and reports that Browser to `observer` until the result is
-// destroyed. The Browser goes with the window's last page in that profile and
-// comes again with the next.
+// destroyed. As Arc's, the Browser stays while the result does, with pages or
+// without.
 std::unique_ptr<Browser> ObserveBrowser(const std::string& window_id,
                                         const std::string& profile_id,
                                         Browser::Observer* observer);

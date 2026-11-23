@@ -14,6 +14,7 @@
 #include "base/no_destructor.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
+#include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_removed_reason.h"
 #include "chrome/browser/ui/browser_init_state.h"
@@ -322,8 +323,14 @@ void WindowBrowser::OnWindowClosing() {
   closing_ = true;
 }
 
+bool WindowBrowser::StaysOpenEmpty() const {
+  return !close_requested_ && browser_->GetTabStripModel()->empty() &&
+         observer() && !browser_shutdown::IsTryingToQuit();
+}
+
 void WindowBrowser::CloseIfEmpty() {
   if (!closing_ && browser_->GetTabStripModel()->empty()) {
+    close_requested_ = true;
     BrowserWindow::FromBrowser(browser_)->Close();
   }
 }
