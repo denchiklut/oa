@@ -413,6 +413,7 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   NSMutableDictionary<NSNumber*, OAPagePermissionRequest*>* _permissionRequests;
   NSMapTable<NSNumber*, OAPageExtensionRequest*>* _extensionRequests;
   BOOL _keepsAddress;
+  BOOL _muted;
 }
 
 @synthesize delegate = _delegate;
@@ -443,6 +444,9 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   PagesByCore()[_page.get()] = self;
   _page->SetObserver(_observer.get());
   _page->SetKeepsAddress(_keepsAddress);
+  if (_muted) {
+    _page->SetMuted(true);
+  }
 }
 
 - (BOOL)keepsAddress {
@@ -530,6 +534,17 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (BOOL)isAudible {
   return _page && _page->IsAudible();
+}
+
+- (BOOL)isMuted {
+  return _page ? _page->IsMuted() : _muted;
+}
+
+- (void)setMuted:(BOOL)muted {
+  _muted = muted;
+  if (_page) {
+    _page->SetMuted(muted);
+  }
 }
 
 - (BOOL)hasFocus {

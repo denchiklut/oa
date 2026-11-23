@@ -217,6 +217,7 @@ import AppKit
     var isCameraOn: Bool { get }
     var isMicrophoneOn: Bool { get }
     var isAudible: Bool { get }
+    var muted: Bool { @objc(isMuted) get set }
     var hasFocus: Bool { get }
     var mediaSessionStatus: Int { get }
     var mediaContentType: Int { get }

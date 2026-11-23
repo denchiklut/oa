@@ -1599,6 +1599,19 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    /// Whether the tab's page plays sound and is muted; nil while it has no page.
+    func audio(of tabID: UUID) -> (isAudible: Bool, isMuted: Bool)? {
+        livePage(for: tabID).map { ($0.isAudible, $0.isMuted) }
+    }
+
+    /// As Arc's `toggleMuted`: the live page's sound, and the tab's saved status for its next page.
+    func toggleMuted(_ tabID: UUID) {
+        guard let page = livePage(for: tabID) else { return }
+        page.isMuted.toggle()
+        let status: SidebarTab.MuteStatus = page.isMuted ? .mute : .allowAudio
+        store.edit { $0.setMuteStatus(tabID, to: status) }
+    }
+
     func setTabIcon(_ tabID: UUID, to icon: String?) {
         store.edit { $0.setTabIcon(tabID, to: icon) }
     }
@@ -1913,6 +1926,7 @@ final class WindowModel {
             guard let page = made?.page else { return }
             guard let owner, let tab = store.state.tree.tab(tabID) else { return page.drop() }
             if owner.id != id { page.move(toWindow: owner.id) }
+            if tab.muteStatus == .mute { page.isMuted = true }
             owner.install(page, for: tabID)
             owner.listen(to: page)
             if let url = owner.pendingURLs.removeValue(forKey: tabID) ?? (made?.restored == true ? nil : tab.url) {

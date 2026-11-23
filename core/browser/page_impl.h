@@ -103,6 +103,7 @@ class PageImpl : public Page,
   bool IsCameraOn() const override;
   bool IsMicrophoneOn() const override;
   bool IsAudible() const override;
+  bool IsMuted() const override;
   bool HasFocus() const override;
   std::optional<MediaSessionState> GetMediaSessionState() const override;
   void Load(const std::string& url) override;
@@ -112,6 +113,7 @@ class PageImpl : public Page,
   void Stop() override;
   void Activate() override;
   void SetKeepsAddress(bool keeps_address) override;
+  void SetMuted(bool muted) override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
   void StartObservingThumbnails() override;
@@ -172,6 +174,8 @@ class PageImpl : public Page,
   void OnWebContentsLostFocus(
       content::RenderWidgetHost* render_widget_host) override;
   void WebContentsDestroyed() override;
+  void OnAudioStateChanged(bool audible) override;
+  void DidUpdateAudioMutingState(bool muted) override;
 
   // content::RenderWidgetHost::InputEventObserver:
   void OnInputEventAck(const content::RenderWidgetHost& widget_host,

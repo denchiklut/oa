@@ -29,6 +29,12 @@ struct TabContextMenu {
                 model.select(tab.id)
                 presentRenameDialog(for: tab, in: model)
             })
+        // As Arc's: on while the page plays sound or is muted, never without a page.
+        let audio = model.audio(of: tab.id)
+        menu.addItem(
+            MenuActionItem(
+                audio?.isMuted == true ? "Unmute" : "Mute", enabled: audio.map { $0.isAudible || $0.isMuted } ?? false
+            ) { [model, tab] in model.toggleMuted(tab.id) })
         // Arc's opens Boosts, which Oa doesn't have.
         if let scheme = model.pages[tab.id]?.url?.scheme, scheme == "http" || scheme == "https" {
             menu.addItem(MenuActionItem("Customize Page…"))

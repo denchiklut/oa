@@ -270,6 +270,7 @@ class Page {
   virtual bool IsCameraOn() const = 0;
   virtual bool IsMicrophoneOn() const = 0;
   virtual bool IsAudible() const = 0;
+  virtual bool IsMuted() const = 0;
   // While the page's main widget has the keyboard, as ArcCore's hasFocus: its
   // view is the window's first responder and the window is key.
   virtual bool HasFocus() const = 0;
@@ -285,6 +286,8 @@ class Page {
   // As a pinned tab: a link to another host opens a new page, reported
   // through the observer, instead of navigating this one.
   virtual void SetKeepsAddress(bool keeps_address) = 0;
+  // As ADK's setWebContentsMuted: the page stays muted across navigations.
+  virtual void SetMuted(bool muted) = 0;
   // The same tab, WebContents and history move; nothing happens if it is there.
   virtual void MoveToWindow(const std::string& window_id) = 0;
   // Fails while the page has nothing drawn, for example when no window shows

@@ -32,6 +32,7 @@ final class StubPage: Page, MediaSession {
     /// A video with sound, playing: what the engine's media session reports as active audio and video.
     var isPlayingVideo = false
     var isAudible: Bool { isPlayingVideo }
+    var isMuted = false
     var mediaSession: any MediaSession { self }
     var state: MediaSessionState? {
         hasPlayedVideo
