@@ -9,6 +9,13 @@ public protocol BrowserApplication: AnyObject {
     /// Runs the app until it quits and returns the exit code. `ready` runs once, after the engine has started and
     /// before the event loop; the app sets its delegate and opens its windows there.
     func run(ready: @escaping @MainActor () -> Void) -> Int32
+    /// As ADK's engine feature for Arc's restore switch: whether a profile's first browser brings its last session's
+    /// pages back. Off until set; set it before the first window opens, and again when the switch changes, as Arc
+    /// does.
+    func setRestoresLastSession(_ restores: Bool)
+    /// As ADK's `onFinishedRestoringWindows`: the windows of the last launch are back, and what the engine restored for
+    /// a window that isn't goes.
+    func finishedRestoringWindows()
     /// As Chrome's quit: each profile's session is saved and closed, so the pages the app drops next stay in the last
     /// session. Call it once the quit is certain.
     func saveSessionsForQuit()
@@ -50,9 +57,6 @@ public protocol BrowserContext: AnyObject {
     /// A page with an `id` of its own in the app's window `windowID`, in the background; nil if the engine can't.
     /// A closed page's `sessionID` brings its history back where it can (`restored`); else the app issues the `load`.
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)?
-    /// As Arc's session restoration: the pages of the profile's last session, each with the session ID its tab had
-    /// there, waiting in the engine until the app moves each to its window or drops it. Once a launch.
-    func restoreLastSession() async -> [RestoredPage]
     /// The settings of `url`'s site that differ from the engine's defaults, in page info's order, as ArcCore's
     /// `getChangedContentSettingsForOrigin:`. Nil until the profile has loaded.
     func changedSiteSettings(for url: URL) -> [SiteSetting]?
@@ -72,7 +76,8 @@ public protocol BrowserContext: AnyObject {
     /// As ArcCore's `ArcBrowserContextExtensions`: one per profile, kept current by the engine.
     var extensions: any Extensions { get }
     /// The app window's side in this profile, as ADK's `Browser`: one per window and profile, alive while the app
-    /// holds it.
+    /// holds it. As ADK's `ensureBrowserCreated`, a window asks for one in each profile as it appears: the engine's
+    /// browser is made then, and a profile's first starts the restore of its last session.
     func browser(windowID: UUID) -> any Browser
 }
 
@@ -152,6 +157,10 @@ public enum BrowserEvent {
     /// The engine put a page in the window itself, as an extension's `chrome.tabs.create` does. The app installs it
     /// under a tab, or drops it.
     case opened(any Page, isActive: Bool)
+    /// As ADK's `onReceivedRestoredWebContents`: once, when the session restore the browser waited for is over, the
+    /// pages the engine restored into the window in this profile. None is a batch too. The app binds each to its tab,
+    /// or drops it.
+    case restoredPages([RestoredPage])
 }
 
 /// As ADK's `BrowserExtensionToolbarActionDetails` with its toolbar position.
@@ -527,7 +536,7 @@ public struct PageSessionID: RawRepresentable, Hashable, Sendable {
     public init(rawValue: Int32) { self.rawValue = rawValue }
 }
 
-/// A page the engine brought back from the last session.
+/// A page the engine brought back from the last session, live in the window whose browser reports it.
 public struct RestoredPage {
     /// The session ID of its tab in the last session, as Arc's restoration data keeps it.
     public let lastSessionID: Int32

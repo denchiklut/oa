@@ -65,6 +65,8 @@ public final class ChromiumBrowserApplication: BrowserApplication {
         }
     }
 
+    public func setRestoresLastSession(_ restores: Bool) { engine?.setRestoresLastSession(restores) }
+    public func finishedRestoringWindows() { engine?.finishedRestoringWindows() }
     public func saveSessionsForQuit() { engine?.saveSessionsForQuit() }
 
     public func terminate() {
@@ -179,25 +181,6 @@ final class ChromiumBrowserContext: BrowserContext {
         return (ChromiumPage(id: UUID(), page: page, delegate: delegate), created.restored)
     }
 
-    func restoreLastSession() async -> [RestoredPage] {
-        guard let profile = profile() else { return [] }
-        let restored = RestoredPages()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            profile.restoreLastSession { ids, pages in
-                MainActor.assumeIsolated {
-                    restored.pages = zip(ids, pages).map { id, page in
-                        RestoredPage(
-                            lastSessionID: id.int32Value,
-                            page: ChromiumPage(
-                                id: UUID(), page: unsafeBitCast(page, to: CorePage.self), delegate: PageDelegate()))
-                    }
-                }
-                continuation.resume()
-            }
-        }
-        return restored.pages
-    }
-
     func makeAutocomplete() -> any Autocomplete {
         ChromiumAutocomplete(core: profile()?.makeAutocomplete())
     }
@@ -265,9 +248,4 @@ private final class FoundIcon {
 private final class CreatedPage {
     var page: CorePage?
     var restored = false
-}
-
-@MainActor
-private final class RestoredPages {
-    var pages: [RestoredPage] = []
 }

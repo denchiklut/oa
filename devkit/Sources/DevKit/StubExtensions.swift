@@ -77,6 +77,8 @@ final class StubBrowser: Browser {
         self.extensions = extensions
         self.downloads = downloads
         (events, continuation) = AsyncStream<BrowserEvent>.makeStream()
+        // The stub keeps no session.
+        continuation.yield(.restoredPages([]))
     }
 
     func runExtensionAction(_ id: ExtensionAction.ID) {

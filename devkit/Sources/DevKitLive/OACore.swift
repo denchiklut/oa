@@ -15,6 +15,8 @@ import AppKit
     @objc(closeWindowWithIdentifier:) func closeWindow(identifier: String)
     @objc(askToLeaveWindowWithIdentifier:completion:) func askToLeaveWindow(
         identifier: String, completion: @escaping (Bool) -> Void)
+    @objc(setRestoresLastSession:) func setRestoresLastSession(_ restores: Bool)
+    func finishedRestoringWindows()
     func saveSessionsForQuit()
     func quit()
 }
@@ -163,6 +165,9 @@ import AppKit
     @objc(browser:didResizeExtensionPopup:) func browser(_ browser: CoreBrowser, didResizeExtensionPopup size: NSSize)
     @objc(browserDidCloseExtensionPopup:) func browserDidCloseExtensionPopup(_ browser: CoreBrowser)
     @objc(browser:didOpenPage:active:) func browser(_ browser: CoreBrowser, didOpen page: CorePage, active: Bool)
+    /// `OAPage`s, which Swift can't check against `CorePage`.
+    @objc(browser:didRestorePages:lastSessionIDs:)
+    func browser(_ browser: CoreBrowser, didRestore pages: [NSObject], lastSessionIDs: [NSNumber])
 }
 
 @MainActor @objc protocol CoreBrowser: NSObjectProtocol {
@@ -193,9 +198,6 @@ import AppKit
         inWindow windowIdentifier: String, restoringSessionID sessionID: Int32, delegate: CorePageDelegate?,
         completion: @escaping (CorePage?, Bool) -> Void)
     func setUserVisibleName(_ name: String)
-    /// `OAPage`s, which Swift can't check against `CorePage`, beside their last session IDs.
-    @objc(restoreLastSessionWithCompletion:)
-    func restoreLastSession(completion: @escaping ([NSNumber], [NSObject]) -> Void)
 }
 
 @MainActor @objc protocol CorePage: NSObjectProtocol {

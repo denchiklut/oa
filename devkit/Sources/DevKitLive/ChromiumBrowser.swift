@@ -41,6 +41,16 @@ final class ChromiumBrowser: Browser {
     fileprivate func opened(_ page: CorePage, active: Bool) {
         continuation.yield(.opened(ChromiumPage(id: UUID(), page: page, delegate: PageDelegate()), isActive: active))
     }
+
+    fileprivate func restored(_ pages: [CorePage], lastSessionIDs: [NSNumber]) {
+        var restored: [RestoredPage] = []
+        for (id, page) in zip(lastSessionIDs, pages) {
+            restored.append(
+                RestoredPage(
+                    lastSessionID: id.int32Value, page: ChromiumPage(id: UUID(), page: page, delegate: PageDelegate())))
+        }
+        continuation.yield(.restoredPages(restored))
+    }
 }
 
 @MainActor
@@ -67,5 +77,9 @@ private final class BrowserDelegate: NSObject, CoreBrowserDelegate {
     func browserDidCloseExtensionPopup(_ browser: CoreBrowser) { self.browser?.popupClosed() }
     func browser(_ browser: CoreBrowser, didOpen page: CorePage, active: Bool) {
         self.browser?.opened(page, active: active)
+    }
+
+    func browser(_ browser: CoreBrowser, didRestore pages: [NSObject], lastSessionIDs: [NSNumber]) {
+        self.browser?.restored(pages.map { unsafeBitCast($0, to: CorePage.self) }, lastSessionIDs: lastSessionIDs)
     }
 }
