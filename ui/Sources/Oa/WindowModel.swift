@@ -624,6 +624,7 @@ final class WindowModel {
         guard isMultiSelectable(tabID) else { return }
         guard tabID == selectedTabID else { return multiSelection.toggle(tabID) }
         guard let next = multiSelectedTabIDs.first(where: { $0 != tabID }) else { return }
+        multiSelection.remove(tabID)
         multiSelection.remove(next)
         select(next, keepingMultiSelection: true)
     }
