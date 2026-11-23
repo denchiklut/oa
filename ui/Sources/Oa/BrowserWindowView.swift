@@ -139,6 +139,7 @@ struct BrowserWindowView: View {
         .environment(\.windowColorScheme, colorScheme)
         .environment(\.sidebarDrag, sidebarDrag)
         .ignoresSafeArea()
+        .transaction(value: presentation == .locked, layout.animateSidebarLock)
     }
 
     /// As measured in Arc: under a Peek over the page, the opener's card shows at 30% over the window's theme.
