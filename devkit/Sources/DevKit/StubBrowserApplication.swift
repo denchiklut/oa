@@ -30,6 +30,8 @@ public final class StubBrowserApplication: BrowserApplication {
         return 0
     }
 
+    public func saveSessionsForQuit() {}
+
     public func terminate() {
         NSApplication.shared.reply(toApplicationShouldTerminate: true)
     }
@@ -98,6 +100,9 @@ final class StubBrowserContext: BrowserContext {
     }
 
     func setUserVisibleName(_ name: String) { self.name(name) }
+
+    /// The stub keeps no session.
+    func restoreLastSession() async -> [RestoredPage] { [] }
 
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
         if let sessionID,

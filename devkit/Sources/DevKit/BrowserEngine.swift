@@ -9,6 +9,9 @@ public protocol BrowserApplication: AnyObject {
     /// Runs the app until it quits and returns the exit code. `ready` runs once, after the engine has started and
     /// before the event loop; the app sets its delegate and opens its windows there.
     func run(ready: @escaping @MainActor () -> Void) -> Int32
+    /// As Chrome's quit: each profile's session is saved and closed, so the pages the app drops next stay in the last
+    /// session. Call it once the quit is certain.
+    func saveSessionsForQuit()
     /// Finishes quitting after the app answered `applicationShouldTerminate` with `.terminateLater`.
     func terminate()
     func browserContext(id: UUID) -> any BrowserContext
@@ -47,6 +50,9 @@ public protocol BrowserContext: AnyObject {
     /// A page with an `id` of its own in the app's window `windowID`, in the background; nil if the engine can't.
     /// A closed page's `sessionID` brings its history back where it can (`restored`); else the app issues the `load`.
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)?
+    /// As Arc's session restoration: the pages of the profile's last session, each with the session ID its tab had
+    /// there, waiting in the engine until the app moves each to its window or drops it. Once a launch.
+    func restoreLastSession() async -> [RestoredPage]
     /// The settings of `url`'s site that differ from the engine's defaults, in page info's order, as ArcCore's
     /// `getChangedContentSettingsForOrigin:`. Nil until the profile has loaded.
     func changedSiteSettings(for url: URL) -> [SiteSetting]?
@@ -521,6 +527,18 @@ public struct PageSessionID: RawRepresentable, Hashable, Sendable {
     public init(rawValue: Int32) { self.rawValue = rawValue }
 }
 
+/// A page the engine brought back from the last session.
+public struct RestoredPage {
+    /// The session ID of its tab in the last session, as Arc's restoration data keeps it.
+    public let lastSessionID: Int32
+    public let page: any Page
+
+    public init(lastSessionID: Int32, page: any Page) {
+        self.lastSessionID = lastSessionID
+        self.page = page
+    }
+}
+
 /// One page and its history. Observable, so views that read it update as it loads.
 @MainActor
 public protocol Page: AnyObject, Observable {
@@ -532,6 +550,8 @@ public protocol Page: AnyObject, Observable {
     var loadProgress: Double { get }
     var canGoBack: Bool { get }
     var canGoForward: Bool { get }
+    /// The engine's session ID of the page's tab, kept while the page lives, as Arc's restoration data stores it.
+    var tabSessionID: Int32 { get }
     /// The icon the engine's favicon driver chose for the page, nil until it has one.
     var favicon: NSImage? { get }
     var securityLevel: SecurityLevel { get }

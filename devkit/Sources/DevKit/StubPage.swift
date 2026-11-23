@@ -13,6 +13,7 @@ final class StubPage: Page, MediaSession {
     private(set) var loadProgress = 1.0
     var canGoBack: Bool { position > 0 }
     var canGoForward: Bool { position < history.count - 1 }
+    let tabSessionID = StubPage.nextTabSessionID()
     private(set) var favicon: NSImage?
     private(set) var rootBackgroundColor: NSColor?
     private(set) var navigationResult: NavigationResult?
@@ -321,6 +322,12 @@ final class StubPage: Page, MediaSession {
         load?.cancel()
         isLoading = false
         crash = .crashed
+    }
+
+    private static var lastTabSessionID: Int32 = 0
+    private static func nextTabSessionID() -> Int32 {
+        lastTabSessionID += 1
+        return lastTabSessionID
     }
 
     private static var records: [PageSessionID: (history: [URL], position: Int)] = [:]
