@@ -666,25 +666,20 @@ final class WindowLayoutController: NSViewController {
         let (old, new) = (sidebarPresentation, derivedPresentation)
         guard new != old else { return }
         if new == .hidden { iconPickerSpaceID = nil }
-        // One transaction each: SwiftUI flushed a separate unanimated change while the presentation was being set,
-        // drew the old value and missed the new one, so ⌘S sometimes left the sidebar hidden.
-        switch (old, new) {
-        case (.locked, _):
-            // As open-arch: undocking makes it the panel at once, over the page, and the shape follows.
-            withAnimation(Self.lockAnimation) {
-                sidebarIsPanel = true
-                sidebarPresentation = new
-            }
-        case (_, .locked):
-            // As open-arch: the panel stays over the page, which is see-through when empty, until the page has
-            // slid out from under it.
-            withAnimation(Self.lockAnimation) {
-                sidebarPresentation = new
-            } completion: { [weak self] in
-                if self?.sidebarPresentation == .locked { self?.sidebarIsPanel = false }
-            }
-        default:
+        if old == .locked { sidebarIsPanel = true }
+        if old == .locked || new == .locked {
+            sidebarPresentation = new
+        } else {
             withAnimation(Self.hoverAnimation) { sidebarPresentation = new }
+        }
+    }
+
+    func animateSidebarLock(_ transaction: inout Transaction) {
+        transaction.animation = Self.lockAnimation
+        guard sidebarPresentation == .locked, sidebarIsPanel else { return }
+        // The window owns the completion so the panel stays over the page until its slide finishes.
+        transaction.addAnimationCompletion(criteria: .removed) { [weak self] in
+            if self?.sidebarPresentation == .locked { self?.sidebarIsPanel = false }
         }
     }
 }
