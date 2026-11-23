@@ -192,7 +192,7 @@ private struct SplitViewContentPane: View {
                         // A pane's host is made once its page is, after the window activated the page: the focused
                         // pane's page takes the keyboard when the host is in the window.
                         PageContentView(page: page) { model.activatePresented(page) }
-                            .toast(of: model, on: page).pageRootBackground(page)
+                            .pageRootBackground(page)
                     }
                 }
                 .frame(
@@ -203,6 +203,7 @@ private struct SplitViewContentPane: View {
                 model: model, hasContent: page != nil || model.placeholder(for: tabID) != nil,
                 barHeight: splitID == nil ? 0 : 32)
         }
+        .toast(of: model, on: page)
         .background(dark ? Color.black : .white)
         .clipShape(shape)
         .onChange(of: page?.id, initial: true) { _, _ in model.trackPaneToolbarPage(tabID, shown: true) }

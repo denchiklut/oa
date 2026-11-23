@@ -174,7 +174,7 @@ struct BrowserWindowView: View {
                 if let placeholder = model.placeholder {
                     PlaceholderView(image: placeholder)
                 } else if let page = model.page {
-                    PageContentView(page: page).toast(of: model, on: page).pageRootBackground(page)
+                    PageContentView(page: page).pageRootBackground(page)
                 } else {
                     Color.clear
                 }
@@ -185,6 +185,7 @@ struct BrowserWindowView: View {
                 model: model, hasContent: model.placeholder != nil || model.page != nil,
                 barHeight: showsToolbar ? 32 : 0)
         }
+        .toast(of: model, on: model.page)
         .onChange(of: showsToolbar ? model.page?.id : nil, initial: true) { _, _ in
             model.trackToolbarPage(showsToolbar)
         }

@@ -46,9 +46,10 @@ struct PeekView: View {
                     .id(page.id)
                     .transition(.identity)
             }
-            PageContentView(page: page).toast(of: model, on: page)
+            PageContentView(page: page)
         }
         .pageRootBackground(page)
+        .toast(of: model, on: page)
         .background(ARCUIColor.gray1)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
