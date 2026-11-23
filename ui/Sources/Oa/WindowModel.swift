@@ -1870,7 +1870,7 @@ final class WindowModel {
         if let selected = selectedTabID, closing.contains(selected) {
             let next =
                 keptID.flatMap { state.isSelectable($0, in: selectedSpaceID) ? $0 : nil }
-                ?? nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
+                ?? nextSelection(closing: selected, deselecting: false, in: selectedSpaceID, alsoClosing: closing)
             selectedTabIDs[selectedSpaceID] = next
             ensurePresentedPages()
         }
@@ -2019,8 +2019,10 @@ final class WindowModel {
         let wasSelected = selectedTabIDs[spaceID] == tabID
         // As Arc: a close of several picks the next selection up front, so a tab of it shown later by its "Leave
         // site?" leaves none.
+        let deselecting = pinned && !store.archivingPins.contains(tabID)
         let next =
-            wasSelected && request?.group == nil ? nextSelection(closing: tabID, pinned: pinned, in: spaceID) : nil
+            wasSelected && request?.group == nil
+            ? nextSelection(closing: tabID, deselecting: deselecting, in: spaceID) : nil
         let page = store.windows.compactMap { $0.release(tabID) }.first
         for window in store.windows {
             window.placeholders[tabID] = nil
@@ -2081,15 +2083,15 @@ final class WindowModel {
     /// A Favorite's page stays as it is, hidden, as Arc keeps it.
     private func deselect(_ tabID: UUID) {
         guard selectedTabID == tabID else { return }
-        selectedTabIDs[selectedSpaceID] = nextSelection(closing: tabID, pinned: true, in: selectedSpaceID)
+        selectedTabIDs[selectedSpaceID] = nextSelection(closing: tabID, deselecting: true, in: selectedSpaceID)
         ensurePresentedPages()
     }
 
-    /// The opener's group first, as in Arc; else the tab shown before, if its page is still live; an unpinned close
-    /// then falls back to the tab above, Favorites counted first, else below; Arc's choice for a Space with no
-    /// earlier selection is unknown.
+    /// The opener's group first, as in Arc; else the tab shown before, if its page is still live; a deselect stops
+    /// there, as Arc's does. Else, as Arc: a Today tab's row above, else below, never crossing into pinned; else the
+    /// window's most recently active tab that still has its page here.
     private func nextSelection(
-        closing tabID: UUID, pinned: Bool, in spaceID: UUID, alsoClosing others: Set<UUID> = []
+        closing tabID: UUID, deselecting: Bool, in spaceID: UUID, alsoClosing others: Set<UUID> = []
     ) -> UUID? {
         // As seen in Arc: closing a pane focuses the next one, or the one before the last.
         let panes = state.presentedTabIDs(with: tabID).filter { $0 == tabID || !others.contains($0) }
@@ -2102,11 +2104,18 @@ final class WindowModel {
         {
             return previousTabID
         }
-        guard !pinned else { return nil }
-        let tabs = state.selectableTabs(in: spaceID)
-        guard let index = tabs.firstIndex(where: { $0.id == tabID }) else { return nil }
-        let staying = { (tab: SidebarTab) in !others.contains(tab.id) }
-        return (tabs[..<index].last(where: staying) ?? tabs[(index + 1)...].first(where: staying))?.id
+        guard !deselecting else { return nil }
+        let staying = { (tab: SidebarTab) in tab.id != tabID && !others.contains(tab.id) }
+        let today = state.tabs(in: spaceID, pinned: false)
+        if let index = today.firstIndex(where: { $0.id == tabID }),
+            let neighbour = today[..<index].last(where: staying) ?? today[(index + 1)...].first(where: staying)
+        {
+            return neighbour.id
+        }
+        let active = state.selectableTabs(in: spaceID).compactMap { tab in
+            lastActiveDates[tab.id].flatMap { staying(tab) && pages[tab.id] != nil ? (tab.id, $0) : nil }
+        }
+        return active.max { $0.1 < $1.1 }?.0
     }
 
     /// As Arc's ingest, in one step: the last window to select a tab takes its page from the window that holds it, or
