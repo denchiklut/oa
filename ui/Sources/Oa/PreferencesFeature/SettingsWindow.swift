@@ -39,7 +39,9 @@ final class SettingsWindowController: NSWindowController {
             }
         }
         add("Advanced", symbol: "slider.horizontal.3") {
-            AdvancedPreferencePane { openSettings(.settings, frontProfile() ?? SidebarProfile.defaultID) }
+            AdvancedPreferencePane(setRestoresLastSession: engine.setRestoresLastSession) {
+                openSettings(.settings, frontProfile() ?? SidebarProfile.defaultID)
+            }
         }
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
