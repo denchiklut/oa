@@ -15,6 +15,14 @@ struct ClosedPage {
     let url: URL?
     let place: Place
     let sessionID: PageSessionID?
+    /// The tab whole, with its name, icon and sound, as Arc's step keeps the item; nil for a Peek.
+    var tab: SidebarTab?
+
+    var reopenedTab: SidebarTab {
+        var tab = tab ?? SidebarTab(id: id, title: title, url: url)
+        tab.viewedAt = .now
+        return tab
+    }
 }
 
 struct ClosedSplitView {

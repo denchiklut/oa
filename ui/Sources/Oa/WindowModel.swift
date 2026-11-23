@@ -1437,8 +1437,7 @@ final class WindowModel {
         if state.tree.tab(closed.id) == nil {
             let present = state.tree[parentID]?.childIDs ?? []
             let index = group.index(of: closed.id, among: present) ?? index
-            let tab = SidebarTab(id: closed.id, title: closed.title, url: closed.url, viewedAt: .now)
-            store.edit { $0.reopenTab(tab, in: parentID, at: index, else: selectedSpaceID) }
+            store.edit { $0.reopenTab(closed.reopenedTab, in: parentID, at: index, else: selectedSpaceID) }
             createdDates[closed.id] = .now
             sessionID = closed.sessionID
         }
@@ -1467,9 +1466,7 @@ final class WindowModel {
             if let split = group.splitView, state.tree[split.id] == nil {
                 // As seen in Arc: the split comes back whole, with its ID, where it was.
                 let steps = Dictionary(group.steps.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-                let tabs = split.tabIDs.compactMap { id in
-                    steps[id].map { SidebarTab(id: id, title: $0.title, url: $0.url, viewedAt: .now) }
-                }
+                let tabs = split.tabIDs.compactMap { steps[$0]?.reopenedTab }
                 store.edit { $0.restoreSplitView(split, tabs: tabs) }
                 for tab in tabs { createdDates[tab.id] = .now }
                 if let focused = group.focusedTabID, state.tree.tab(focused) != nil {
@@ -1871,7 +1868,7 @@ final class WindowModel {
             state.tree.location(of: tabID).map {
                 ClosedPage(
                     id: tabID, title: tab.title, url: tab.url, place: .tab(parentID: $0.parentID, index: $0.index),
-                    sessionID: sessionID)
+                    sessionID: sessionID, tab: tab)
             }
         }
         let requester = store.windows.first { $0.id == request?.windowID }
