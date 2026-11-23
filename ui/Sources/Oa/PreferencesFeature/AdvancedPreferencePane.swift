@@ -4,6 +4,7 @@ import SwiftUI
 struct AdvancedPreferencePane: View {
     let openMoreSettings: () -> Void
     @AppStorage(TabReorderingHaptics.key) private var hapticsDisabled = false
+    @AppStorage(RestoreWindowsPreference.key) private var restoresWindows = true
     @AppStorage(WindowContentGrabber.key) private var contentWindowDragging = true
     @AppStorage(ToolbarAddressLabel.fullURLPreferenceKey) private var showsFullURL = false
     @AppStorage(AutomaticPictureInPicture.key) private var autoPipDisabled = false
@@ -17,6 +18,12 @@ struct AdvancedPreferencePane: View {
                         isOn: inverted($hapticsDisabled))
                 }
                 section {
+                    row(
+                        "When opening Oa, restore windows from previous session", symbol: "macwindow", tile: .green,
+                        isOn: $restoresWindows
+                    )
+                    .accessibilityIdentifier("restoreWindowsPreference")
+                    Divider()
                     row(
                         "Allow window dragging from the top of webpages", symbol: "rectangle.topthird.inset.filled",
                         tile: .green, isOn: $contentWindowDragging)

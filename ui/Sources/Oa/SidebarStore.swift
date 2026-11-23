@@ -40,6 +40,7 @@ final class SidebarStore {
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored let keyBindings: KeyBindingsClient
     @ObservationIgnored let linkRouting: LinkRoutingClient
+    @ObservationIgnored let sessionRestoration: SessionRestorationClient
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
     /// Settings ▸ Shortcuts on a binding.
     @ObservationIgnored var showShortcut: (String) -> Void = { _ in }
@@ -51,6 +52,7 @@ final class SidebarStore {
         home = StorableHome(directory: directory)
         keyBindings = KeyBindingsClient(directory: directory)
         linkRouting = LinkRoutingClient(directory: directory)
+        sessionRestoration = SessionRestorationClient(directory: directory)
         state = persistence.loadSidebar() ?? .initial()
         let windows = persistence.loadWindows()
         savedWindows = windows?.windows ?? []
@@ -217,10 +219,28 @@ final class SidebarStore {
         }
     }
 
+    /// As Arc's, written before quitting drops the pages; nothing is written after it.
+    func saveSessionRestorationAndFreeze() {
+        sessionRestoration.saveAndFreeze(sessionRestorationMapping)
+    }
+
+    private var sessionRestorationMapping: [SessionRestorationClient.Key: Int32] {
+        var mapping: [SessionRestorationClient.Key: Int32] = [:]
+        for window in windows {
+            for (tabID, page) in window.pages where page.tabSessionID >= 0 {
+                guard let profile = state.profile(containing: tabID) else { continue }
+                mapping[.init(itemId: tabID, browser: .init(windowID: window.id, contextID: profile.id))] =
+                    page.tabSessionID
+            }
+        }
+        return mapping
+    }
+
     private func save() {
         persistence.save(
             state,
             windows: WindowsSnapshot(sidebarViewPreferences: sidebarViewPreferences, windows: windows.map(\.record)))
+        sessionRestoration.save(sessionRestorationMapping)
         favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
     }
 }
