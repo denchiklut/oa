@@ -1675,6 +1675,28 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    /// As Arc's `archiveItemsAbove`: the unpinned tabs above this one, which stays and is shown in place of the
+    /// selected one when that goes.
+    func archiveTabs(above tabID: UUID) {
+        guard let space = state.space(containing: tabID) else { return }
+        let tabIDs = state.tabs(in: space.id, pinned: false).map(\.id)
+        guard let index = tabIDs.firstIndex(of: tabID) else { return }
+        closeTogether(tabIDs[..<index].reversed(), selectingInstead: tabID)
+    }
+
+    /// As Arc's `archiveUnpinnedTabs(in:excluding:)`: the Space's unpinned tabs but these, as Clear does; pinned
+    /// tabs and Favorites stay, and so does the multi-selection.
+    func archiveOtherTabs(keeping tabIDs: [UUID]) {
+        guard let first = tabIDs.first, let space = state.space(containing: first) else { return }
+        let others = state.tabs(in: space.id, pinned: false).map(\.id).filter { !tabIDs.contains($0) }
+        closeTogether(others.reversed(), selectingInstead: first)
+    }
+
+    func hasOtherTabs(than tabIDs: [UUID]) -> Bool {
+        guard let first = tabIDs.first, let space = state.space(containing: first) else { return false }
+        return state.tabs(in: space.id, pinned: false).contains { !tabIDs.contains($0.id) }
+    }
+
     /// As seen in Arc: the copy isn't selected, and its page loads at once in the background, a clone of the tab's
     /// live page with its history.
     func duplicate(_ tabID: UUID) {
@@ -1770,7 +1792,7 @@ final class WindowModel {
     /// One close of several tabs from this window, one entry on its stack, the steps going back from the last.
     private func closeTogether(
         _ tabIDs: [UUID], undoPrompt: String? = nil, completionToast: CloseItemsCompletionToast? = .clearedTabs,
-        splitView: ClosedSplitView? = nil
+        splitView: ClosedSplitView? = nil, selectingInstead keptID: UUID? = nil
     ) {
         guard !tabIDs.isEmpty else { return }
         let asSplitView = splitView != nil
@@ -1782,7 +1804,9 @@ final class WindowModel {
             siblings: state.tabs(in: selectedSpaceID).map(\.id))
         group.splitView = splitView
         if let selected = selectedTabID, closing.contains(selected) {
-            let next = nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
+            let next =
+                keptID.flatMap { state.isSelectable($0, in: selectedSpaceID) ? $0 : nil }
+                ?? nextSelection(closing: selected, pinned: false, in: selectedSpaceID, alsoClosing: closing)
             selectedTabIDs[selectedSpaceID] = next
             ensurePresentedPages()
         }

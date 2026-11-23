@@ -91,7 +91,11 @@ struct TabContextMenu {
         } else {
             menu.addItem(MenuActionItem("Archive Tabs") { [model] in model.archiveTabs(tabIDs) })
             // As Arc's: below and above are for one tab.
-            if pinned.isEmpty { menu.addItem(MenuActionItem("Archive Tabs Below", enabled: false)) }
+            if pinned.isEmpty {
+                menu.addItem(archiveOtherTabs(keeping: tabIDs))
+                menu.addItem(MenuActionItem("Archive Tabs Below", enabled: false))
+                menu.addItem(.alternate(MenuActionItem("Archive Tabs Above", enabled: false)))
+            }
         }
         return menu
     }
@@ -192,13 +196,26 @@ struct TabContextMenu {
         if model.state.isPinned(tab.id) {
             return [MenuActionItem("Remove Pin") { [model, tab] in model.archivePinned(tab.id) }]
         }
-        let last = model.state.space(containing: tab.id).flatMap { model.state.tabs(in: $0.id, pinned: false).last }
+        let tabs = model.state.space(containing: tab.id).map { model.state.tabs(in: $0.id, pinned: false) } ?? []
         return [
             MenuActionItem("Archive Tab") { [model, tab] in model.close(tab.id) },
-            MenuActionItem("Archive Tabs Below", enabled: last?.id != tab.id) { [model, tab] in
+            archiveOtherTabs(keeping: [tab.id]),
+            MenuActionItem("Archive Tabs Below", enabled: tabs.last?.id != tab.id) { [model, tab] in
                 model.archiveTabs(below: tab.id)
             },
+            .alternate(
+                MenuActionItem("Archive Tabs Above", enabled: tabs.first?.id != tab.id) { [model, tab] in
+                    model.archiveTabs(above: tab.id)
+                }),
         ]
+    }
+
+    /// Arc's ⌥ alternate of Archive Tab(s), for Today tabs only.
+    private func archiveOtherTabs(keeping tabIDs: [UUID]) -> NSMenuItem {
+        .alternate(
+            MenuActionItem("Archive Other Tabs", enabled: model.hasOtherTabs(than: tabIDs)) { [model] in
+                model.archiveOtherTabs(keeping: tabIDs)
+            })
     }
 }
 
@@ -213,5 +230,12 @@ extension NSMenuItem {
     func shortcut(_ key: String, _ modifiers: NSEvent.ModifierFlags) {
         keyEquivalent = key
         keyEquivalentModifierMask = modifiers
+    }
+
+    /// As Arc's generator: shown in place of the item before it while ⌥ is held.
+    static func alternate(_ item: NSMenuItem) -> NSMenuItem {
+        item.keyEquivalentModifierMask = .option
+        item.isAlternate = true
+        return item
     }
 }
