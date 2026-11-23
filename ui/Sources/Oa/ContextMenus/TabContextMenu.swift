@@ -39,6 +39,7 @@ struct TabContextMenu {
         if let scheme = model.pages[tab.id]?.url?.scheme, scheme == "http" || scheme == "https" {
             menu.addItem(MenuActionItem("Customize Page…"))
         }
+        if favorite || state.isPinned(tab.id), let url = tab.url { menu.addItem(editPinnedPage(url)) }
         menu.addItem(.separator())
         if current {
             menu.addItem(
@@ -55,6 +56,41 @@ struct TabContextMenu {
         menu.addItem(.separator())
         for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
         return menu
+    }
+
+    private func editPinnedPage(_ url: URL) -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        submenu.addItem(
+            MenuActionItem("Replace Pinned URL with Current", enabled: model.leftAddress(tab) != nil) {
+                [model, tab] in model.replacePinnedURLWithCurrent(tab.id)
+            })
+        submenu.addItem(
+            MenuActionItem("Edit…") { [model, tab] in
+                guard let window = model.window else { return }
+                DialogSheet.present(on: window) { dismiss in
+                    TextInputDialog(
+                        title: "Edit Pinned URL",
+                        message: "This is what opens first when you click this tab or its favicon.",
+                        icon: model.favicon(for: tab), text: url.absoluteString, placeholder: "Enter a URL…",
+                        confirmTitle: "Save", width: 393
+                    ) { text in
+                        dismiss()
+                        if let url = Self.typedURL(text) { model.editPinnedURL(tab.id, to: url) }
+                    } onCancel: {
+                        dismiss()
+                    }
+                }
+            })
+        return MenuActionItem("Edit Pinned Page", submenu: submenu)
+    }
+
+    /// Oa's own: an address typed without a scheme is taken as https.
+    private static func typedURL(_ text: String) -> URL? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !text.contains(" ") else { return nil }
+        let url = URL(string: text)
+        return url?.scheme != nil && url?.host() != nil || url?.scheme == "about" ? url : URL(string: "https://" + text)
     }
 
     private func presentRenameDialog(for tab: SidebarTab, in model: WindowModel) {
