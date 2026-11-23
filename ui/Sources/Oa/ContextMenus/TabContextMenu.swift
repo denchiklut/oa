@@ -1,7 +1,8 @@
 import AppKit
 
 /// Arc's tab menu (`SidebarMenu+TabContextMenu`) for one tab: a row, pinned or not, in a folder or not, or a
-/// Favorite's tile. AppKit's, as Arc's is: a SwiftUI menu can't show a submenu disabled.
+/// Favorite's tile; or, as Arc's `menu(clickedItem:)`, for every selected row when the row clicked is one of them.
+/// AppKit's, as Arc's is: a SwiftUI menu can't show a submenu disabled.
 @MainActor
 struct TabContextMenu {
     let model: WindowModel
@@ -11,6 +12,8 @@ struct TabContextMenu {
     var rename: () -> Void = {}
 
     func make() -> NSMenu {
+        let selected = model.multiSelectedTabIDs
+        if selected.contains(tab.id) { return make(several: selected) }
         let state = model.state
         let favorite = state.isFavorite(tab.id)
         let current = model.selectedTabID == tab.id
@@ -53,9 +56,43 @@ struct TabContextMenu {
                 })
         }
         menu.addItem(MenuActionItem("Duplicate") { [model, tab] in model.duplicate(tab.id) })
-        menu.addItem(move(favorite: favorite))
+        menu.addItem(move([tab.id], favorite: favorite))
         menu.addItem(.separator())
         for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
+        return menu
+    }
+
+    /// As seen in Arc for several rows: no one-item entries, Change Icon… off, and the last group by kind. Share N
+    /// Items… (Arc's sharing service) and New Folder with N Items are left out, as Oa's own.
+    private func make(several tabIDs: [UUID]) -> NSMenu {
+        let state = model.state
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(MenuActionItem("Copy Links") { [model] in model.copyURLs(of: tabIDs) })
+        menu.addItem(.separator())
+        menu.addItem(MenuActionItem("Change Icon…", enabled: false))
+        let audio = tabIDs.map(model.audio(of:))
+        let muted = audio.allSatisfy { $0?.isMuted == true }
+        menu.addItem(
+            MenuActionItem(muted ? "Unmute" : "Mute", enabled: muted || audio.contains { $0?.isAudible == true }) {
+                [model] in model.toggleMuted(tabIDs)
+            })
+        menu.addItem(.separator())
+        menu.addItem(
+            MenuActionItem("Open in Split View", enabled: model.canOpenInSplitView(tabIDs)) { [model] in
+                model.openInSplitView(tabIDs)
+            })
+        menu.addItem(MenuActionItem("Duplicate") { [model] in for tabID in tabIDs { model.duplicate(tabID) } })
+        menu.addItem(move(tabIDs, favorite: false))
+        menu.addItem(.separator())
+        let pinned = tabIDs.filter(state.isPinned)
+        if pinned.count == tabIDs.count {
+            menu.addItem(MenuActionItem("Remove Pins") { [model] in model.archiveTabs(tabIDs) })
+        } else {
+            menu.addItem(MenuActionItem("Archive Tabs") { [model] in model.archiveTabs(tabIDs) })
+            // As Arc's: below and above are for one tab.
+            if pinned.isEmpty { menu.addItem(MenuActionItem("Archive Tabs Below", enabled: false)) }
+        }
         return menu
     }
 
@@ -124,20 +161,20 @@ struct TabContextMenu {
 
     /// Every Space, the tab's own ticked, then New Space…. Arc lists profiles for a Favorite; moving one to another
     /// profile isn't Oa's yet.
-    private func move(favorite: Bool) -> NSMenuItem {
+    private func move(_ tabIDs: [UUID], favorite: Bool) -> NSMenuItem {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
         guard !favorite else { return MenuActionItem("Move to", submenu: submenu, enabled: false) }
         let spaceID = model.state.space(containing: tab.id)?.id
         for space in model.state.spaces {
-            let item = MenuActionItem(space.name) { [model, tab] in model.moveItem(tab.id, toSpace: space.id) }
+            let item = MenuActionItem(space.name) { [model] in model.moveItems(tabIDs, toSpace: space.id) }
             item.state = space.id == spaceID ? .on : .off
             submenu.addItem(item)
         }
         submenu.addItem(.separator())
         submenu.addItem(
-            MenuActionItem("New Space…") { [model, tab] in
-                model.beginSpaceCreation(after: model.selectedSpaceID, moving: tab.id)
+            MenuActionItem("New Space…") { [model] in
+                model.beginSpaceCreation(after: model.selectedSpaceID, moving: tabIDs)
             })
         return MenuActionItem("Move to", submenu: submenu)
     }

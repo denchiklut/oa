@@ -9,6 +9,8 @@ enum ToastType: Equatable {
     case undo(String)
     /// The restored tab and the name of the Space it went back to.
     case tabUnarchived(UUID, location: String)
+    /// Arc's `MoveItemsToastType.navigateToMovedTab`: the first tab moved to a Space the window doesn't show.
+    case itemsMoved(UUID)
 }
 
 /// Arc's `WindowToast`: on a page, or on the window.

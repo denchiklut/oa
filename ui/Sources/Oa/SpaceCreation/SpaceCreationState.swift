@@ -13,8 +13,8 @@ struct SpaceCreationState: Equatable {
     /// As Arc's `spaceStyleEditor`: the theme the Space will be made with, which the window shows meanwhile.
     var spaceStyleEditor = SpaceStyleEditor()
     var phase = Phase.editing
-    /// The sidebar item Move to ▸ New Space… takes into the Space once it is made.
-    var moving: UUID?
+    /// The sidebar items Move to ▸ New Space… takes into the Space once it is made.
+    var moving: [UUID] = []
 
     var canCreate: Bool { !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 }

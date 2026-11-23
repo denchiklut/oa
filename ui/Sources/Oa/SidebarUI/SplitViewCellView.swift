@@ -267,7 +267,7 @@ struct SplitViewMoveMenu: View {
                     .disabled(!model.canMoveItem(splitID, toSpace: space.id))
             }
             Divider()
-            Button("New Space…") { model.beginSpaceCreation(after: model.selectedSpaceID, moving: splitID) }
+            Button("New Space…") { model.beginSpaceCreation(after: model.selectedSpaceID, moving: [splitID]) }
         }
     }
 }

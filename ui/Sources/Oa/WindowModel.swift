@@ -682,6 +682,21 @@ final class WindowModel {
         select(tabID)
     }
 
+    func canOpenInSplitView(_ tabIDs: [UUID]) -> Bool {
+        guard let anchorID = tabIDs.first, tabIDs.count <= SidebarSplitViewData.maxNumberSplit else { return false }
+        return tabIDs.dropFirst().allSatisfy { state.canJoinSplitView($0, of: anchorID, in: selectedSpaceID) }
+    }
+
+    /// As seen in Arc: several tabs make one split in row order where the first was, the last one focused.
+    func openInSplitView(_ tabIDs: [UUID]) {
+        guard let anchorID = tabIDs.first, let last = tabIDs.last, canOpenInSplitView(tabIDs) else { return }
+        let spaceID = selectedSpaceID
+        editSplitView(taking: tabIDs) { state in
+            for tabID in tabIDs.dropFirst() { state.openInSplitView(tabID, beside: anchorID, in: spaceID) }
+        }
+        select(last)
+    }
+
     /// A row's tab, or the first of a split's.
     private func combineAnchor(_ rowID: UUID) -> UUID? {
         state.splitView(rowID) != nil ? state.tree[rowID]?.childIDs.first : rowID
@@ -777,19 +792,29 @@ final class WindowModel {
     /// and load again in that profile, at once when the window follows and once selected otherwise, with nothing of
     /// the old profile's.
     func moveItem(_ itemID: UUID, toSpace spaceID: UUID) {
-        guard canMoveItem(itemID, toSpace: spaceID), let space = state.space(spaceID) else { return }
-        let tabIDs = state.splitView(itemID) != nil ? state.tree[itemID]?.childIDs ?? [] : [itemID]
-        let focused =
-            presentedTabIDs.contains { $0 == itemID || state.splitViewID(containing: $0) == itemID }
-            ? selectedTabID : nil
+        moveItems([itemID], toSpace: spaceID)
+    }
+
+    /// As seen in Arc: several items land at the top of the list in their order, and without the shown tab among
+    /// them the window stays and says where they went.
+    func moveItems(_ itemIDs: [UUID], toSpace spaceID: UUID) {
+        let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
+        guard !itemIDs.isEmpty, let space = state.space(spaceID) else { return }
+        let tabIDs = itemIDs.flatMap { state.splitView($0) != nil ? state.tree[$0]?.childIDs ?? [] : [$0] }
+        let focused = presentedTabIDs.contains(where: tabIDs.contains) ? selectedTabID : nil
         let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
         let sourceSpaceID = selectedSpaceID
         let move = { [weak self] in
-            guard let self, canMoveItem(itemID, toSpace: spaceID) else { return }
+            guard let self else { return }
+            let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
+            guard !itemIDs.isEmpty else { return }
             multiSelection = SidebarMultiSelection()
             if crossesProfile { for window in store.windows { window.dropPages(of: tabIDs) } }
-            store.edit { $0.move(itemID, toSpace: spaceID) }
-            guard let focused else { return }
+            store.edit { state in for itemID in itemIDs.reversed() { state.move(itemID, toSpace: spaceID) } }
+            guard let focused else {
+                if itemIDs.count > 1, let first = tabIDs.first { present(.itemsMoved(first), at: .window) }
+                return
+            }
             selectedTabIDs[sourceSpaceID] = nil
             selectSpace(spaceID)
             select(focused)
@@ -1073,11 +1098,11 @@ final class WindowModel {
 
     /// Arc's Create a Space panel, on the window's Space's profile, after `spaceID` or, as Arc's `.absolute(-1)`, at
     /// the end. As Arc, it leaves the Library and changes neither the Space nor the selection.
-    func beginSpaceCreation(after spaceID: UUID? = nil, moving itemID: UUID? = nil) {
+    func beginSpaceCreation(after spaceID: UUID? = nil, moving itemIDs: [UUID] = []) {
         guard spaceCreation == nil, let space else { return }
         closeCommandBar()
         library = nil
-        spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID, moving: itemID)
+        spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID, moving: itemIDs)
     }
 
     /// Where the panel's page and dock item sit among the Spaces: where the Space will go.
@@ -1120,7 +1145,7 @@ final class WindowModel {
                 name: name, profileID: profileID, icon: creation.icon, theme: creation.spaceStyleEditor.theme,
                 after: creation.insertAfter)
         }
-        if let created, let moving = creation.moving { moveItem(moving, toSpace: created.id) }
+        if let created { moveItems(creation.moving, toSpace: created.id) }
         if selecting, let created { selectSpace(created.id) }
     }
 
@@ -1693,6 +1718,14 @@ final class WindowModel {
         page.isMuted.toggle()
         let status: SidebarTab.MuteStatus = page.isMuted ? .mute : .allowAudio
         store.edit { $0.setMuteStatus(tabID, to: status) }
+    }
+
+    /// As Arc's `toggleMuted` for several: all muted when any page isn't, else all unmuted, each saved.
+    func toggleMuted(_ tabIDs: [UUID]) {
+        let pages = tabIDs.compactMap(livePage(for:))
+        let muted = pages.isEmpty || pages.contains { !$0.isMuted }
+        for page in pages { page.isMuted = muted }
+        store.edit { state in for tabID in tabIDs { state.setMuteStatus(tabID, to: muted ? .mute : .allowAudio) } }
     }
 
     func setTabIcon(_ tabID: UUID, to icon: String?) {
