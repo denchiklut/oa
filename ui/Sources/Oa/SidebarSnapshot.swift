@@ -43,7 +43,10 @@ struct SidebarSnapshot: Codable {
 
         private enum Key: String, CodingKey {
             case id, parentID, childIDs, type, title, savedTitle, url, viewedAt, openerID, container, splitView
+            case customInfo
         }
+
+        private struct CustomInfo: Codable { var icon: String? }
 
         init(_ item: SidebarItem) {
             id = item.id
@@ -71,7 +74,8 @@ struct SidebarSnapshot: Codable {
                         id: id, title: savedTitle ?? title, url: try values.decodeIfPresent(URL.self, forKey: .url),
                         viewedAt: try values.decodeIfPresent(Date.self, forKey: .viewedAt),
                         openerID: try values.decodeIfPresent(UUID.self, forKey: .openerID),
-                        customTitle: savedTitle == nil || title.isEmpty ? nil : title))
+                        customTitle: savedTitle == nil || title.isEmpty ? nil : title,
+                        icon: try values.decodeIfPresent(CustomInfo.self, forKey: .customInfo)?.icon))
             case "folder": kind = .folder(title: title)
             case "splitView":
                 var data =
@@ -101,6 +105,7 @@ struct SidebarSnapshot: Codable {
                 try values.encodeIfPresent(tab.url, forKey: .url)
                 try values.encodeIfPresent(tab.viewedAt, forKey: .viewedAt)
                 try values.encodeIfPresent(tab.openerID, forKey: .openerID)
+                if let icon = tab.icon { try values.encode(CustomInfo(icon: icon), forKey: .customInfo) }
             case .folder(let title):
                 try values.encode("folder", forKey: .type)
                 try values.encode(title, forKey: .title)

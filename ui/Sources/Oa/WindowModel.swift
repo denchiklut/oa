@@ -1599,6 +1599,10 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    func setTabIcon(_ tabID: UUID, to icon: String?) {
+        store.edit { $0.setTabIcon(tabID, to: icon) }
+    }
+
     func renameTab(_ tabID: UUID, to title: String) {
         store.edit { $0.renameTab(tabID, to: title) }
     }
