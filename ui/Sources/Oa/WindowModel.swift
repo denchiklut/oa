@@ -218,8 +218,10 @@ final class WindowModel {
         return state.isFavorite(tab.id) || state.splitViewID(containing: tab.id) != nil ? live : "/ " + live
     }
 
-    func leftAddress(_ tab: SidebarTab) -> URL? {
-        guard state.keepsAddress(tab.id), let url = pages[tab.id]?.url, !tab.isAt(url) else { return nil }
+    func leftAddress(_ tab: SidebarTab) -> URL? { leftAddress(tab, page: pages[tab.id]) }
+
+    private func leftAddress(_ tab: SidebarTab, page: (any Page)?) -> URL? {
+        guard state.keepsAddress(tab.id), let url = page?.url, !tab.isAt(url) else { return nil }
         return url
     }
 
@@ -1600,7 +1602,7 @@ final class WindowModel {
     /// live page with its history.
     func duplicate(_ tabID: UUID) {
         let page = livePage(for: tabID)
-        let left = state.tree.tab(tabID).flatMap(leftAddress).map { ($0, page?.title ?? "") }
+        let left = state.tree.tab(tabID).flatMap { leftAddress($0, page: page) }.map { ($0, page?.title ?? "") }
         let spaceID = selectedSpaceID
         var copyID: UUID?
         store.edit { copyID = $0.duplicateTab(tabID, in: spaceID, leftAddress: left) }
