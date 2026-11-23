@@ -20,28 +20,26 @@ struct BrowserWindowView: View {
         // progress, the card starts where it ends, keeping its width, and what the progress does to the sidebar is
         // `SidebarHomeTransition`.
         let presentation = layout.sidebarPresentation
-        let floats = layout.sidebarIsPanel
-        let floatingShape = floats && presentation != .locked
+        let locked = presentation == .locked
         let progress = layout.libraryProgress
         let section = model.library ?? model.lastLibrarySection
         let libraryWidth = layout.libraryWidth(for: section)
-        let lead = presentation == .locked ? layout.sidebarWidth : 10
-        let sidebarOffset =
-            presentation == .hidden
-            ? -(layout.sidebarWidth + 10) : floats ? -(layout.sidebarWidth + 10) * min(progress, 1) : 0
+        let lead = locked ? layout.sidebarWidth : 10
+        let hiddenOffset = -(layout.sidebarWidth + 10)
         ZStack(alignment: .topLeading) {
             WindowDragRegion()
-            FloatingSidebarBackgroundView(
-                background: background, next: next, windowSize: layout.size, isFloating: floatingShape,
-                isPanel: floats
-            ) {
-                SidebarView(model: model, layout: layout)
-                    .environment(\.colorScheme, appearance.colorScheme)
+            SidebarDocking(locked: locked) { floats in
+                FloatingSidebarBackgroundView(
+                    background: background, next: next, windowSize: layout.size, isFloating: !locked, isPanel: floats
+                ) {
+                    SidebarView(model: model, layout: layout)
+                        .environment(\.colorScheme, appearance.colorScheme)
+                }
+                .modifier(SidebarHomeTransition(progress: floats ? 0 : min(progress, 1)))
+                .offset(x: presentation == .hidden ? hiddenOffset : floats ? hiddenOffset * min(progress, 1) : 0)
+                .allowsHitTesting(progress == 0)
+                .zIndex(floats ? 3 : 0)
             }
-            .modifier(SidebarHomeTransition(progress: floats ? 0 : min(progress, 1)))
-            .offset(x: sidebarOffset)
-            .allowsHitTesting(progress == 0)
-            .zIndex(floats ? 3 : 0)
             if progress > 0 {
                 let libraryAppearance = layout.libraryTheme.background[colorScheme].contentOverBackgroundAppearance
                 LibraryView(
@@ -79,8 +77,8 @@ struct BrowserWindowView: View {
                     .frame(width: 8)
                     .padding(.vertical, 11)
                     .offset(
-                        x: sidebarOffset + layout.sidebarWidth
-                            + (floatingShape ? WindowLayoutController.floatingInset : 0) - 4
+                        x: (presentation == .hidden ? hiddenOffset : 0) + layout.sidebarWidth
+                            + (locked ? 0 : WindowLayoutController.floatingInset) - 4
                     )
                     .zIndex(4)
             }
@@ -99,7 +97,7 @@ struct BrowserWindowView: View {
                 let overPage = !model.showingArchive
                 PeekView(
                     model: model, page: peek,
-                    sidebarWidth: overPage && presentation == .locked ? layout.sidebarWidth : 0
+                    sidebarWidth: overPage && locked ? layout.sidebarWidth : 0
                 )
                 .offset(x: overPage ? (libraryWidth - lead) * progress : 0)
             }
@@ -139,7 +137,7 @@ struct BrowserWindowView: View {
         .environment(\.windowColorScheme, colorScheme)
         .environment(\.sidebarDrag, sidebarDrag)
         .ignoresSafeArea()
-        .transaction(value: presentation == .locked, layout.animateSidebarLock)
+        .animation(WindowLayoutController.lockAnimation, value: locked)
     }
 
     /// As measured in Arc: under a Peek over the page, the opener's card shows at 30% over the window's theme.
@@ -219,6 +217,24 @@ struct BrowserWindowView: View {
             LoadingIndicator(isLoading: model.page?.isLoading == true).offset(y: -7)
         }
     }
+}
+
+/// Whether the sidebar is drawn as the floating panel, over the page: from the start of undocking to the end of
+/// docking, as open-arch's `isPanel`. Read off the lock animation's own progress, so the panel stays over the page,
+/// which is see-through when empty, until the page has slid out from under it, and a lock no animation ran for
+/// still ends docked.
+private struct SidebarDocking<Content: View>: View, Animatable {
+    private let locked: Bool
+    private let content: (_ isPanel: Bool) -> Content
+    var animatableData: CGFloat
+
+    init(locked: Bool, @ViewBuilder content: @escaping (_ isPanel: Bool) -> Content) {
+        self.locked = locked
+        self.content = content
+        animatableData = locked ? 1 : 0
+    }
+
+    var body: some View { content(!locked || animatableData < 1) }
 }
 
 /// Arc's docked sidebar while the Library comes over it: it stays where it is, shrinking by a tenth toward a point
