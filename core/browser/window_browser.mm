@@ -16,6 +16,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_removed_reason.h"
+#include "chrome/browser/ui/browser_init_state.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
@@ -181,9 +182,12 @@ void WindowBrowser::CloseAll() {
 void WindowBrowser::CloseUnclaimed() {
   for (base::WeakPtr<WindowBrowser>& window_browser :
        OpenWindowBrowsers(nullptr)) {
-    // Only a Browser titled with a window's ID was made for a window.
+    // Only one Chrome's restore made is waiting for a window.
     if (window_browser && !window_browser->closing_ &&
-        !window_browser->window_id_.empty() &&
+        BrowserInitState::From(window_browser->browser_)
+                ->create_params()
+                .creation_source ==
+            BrowserWindowCreateParams::CreationSource::kSessionRestore &&
         !window_browser->GetNativeWindow().GetNativeNSWindow()) {
       RemoveAllTabs(window_browser);
     }
