@@ -626,13 +626,14 @@ final class WindowModel {
         if current.map({ !presented.contains($0) }) ?? true { previousTabID = current }
     }
 
-    /// As Arc's selection after a close, an ordinary one.
+    /// As Arc's selection after a close, an ordinary one: recorded and stamped.
     /// Arc's close clears a closed item as the previous one; a deselected item stays it.
     private func show(_ next: UUID?, after previous: UUID?, in spaceID: UUID) {
         selectedTabIDs[spaceID] = next
         guard spaceID == selectedSpaceID else { return }
         if let next {
             noteSelection(of: next, after: previous)
+            state.presentedTabIDs(with: next).forEach(markViewed)
         }
         ensurePresentedPages()
     }
@@ -1024,8 +1025,7 @@ final class WindowModel {
         if let tabID = focusedTabID(of: splitID) { select(tabID) }
     }
 
-    /// As Arc's `selectItem`: a tab the window shows by a selection is stamped for the window and for itself. The
-    /// tab that takes a closed one's place isn't: Arc's code reads as if it were, and Arc's bar showed it wasn't.
+    /// As Arc's `selectItem`: a tab the window shows by a selection is stamped for the window and for itself.
     private func markViewed(_ tabID: UUID) {
         lastActiveDates[tabID] = .now
         store.markViewed(tabID)
