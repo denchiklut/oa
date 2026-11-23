@@ -523,6 +523,16 @@ struct SidebarState {
         }
     }
 
+    /// Arc's `updateSavedTabURL`: the address a pinned tab or Favorite opens at, whatever its page shows.
+    mutating func setPinnedURL(_ tabID: UUID, to url: URL, title: String) {
+        tree.update(tabID) { item in
+            guard var tab = item.tab else { return }
+            tab.url = url
+            tab.title = title
+            item.kind = .tab(tab)
+        }
+    }
+
     mutating func setMuteStatus(_ tabID: UUID, to status: SidebarTab.MuteStatus) {
         tree.update(tabID) { item in
             guard var tab = item.tab else { return }

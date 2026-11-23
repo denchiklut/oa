@@ -1599,6 +1599,21 @@ final class WindowModel {
         closeTogether(tabIDs[(index + 1)...].reversed())
     }
 
+    /// As Arc's Replace Pinned URL with Current: the page's address, title and favicon become the tab's, with no
+    /// reload.
+    func replacePinnedURLWithCurrent(_ tabID: UUID) {
+        guard let page = livePage(for: tabID), let url = page.url else { return }
+        store.edit { $0.setPinnedURL(tabID, to: url, title: page.title) }
+        if let favicon = page.favicon { store.setSavedFavicon(tabID, favicon) }
+    }
+
+    /// As Arc's Edit Pinned URL: the tab opens at the new address, its title waits for the page's, and a live page goes
+    /// there at once.
+    func editPinnedURL(_ tabID: UUID, to url: URL) {
+        store.edit { $0.setPinnedURL(tabID, to: url, title: "") }
+        livePage(for: tabID)?.load(url)
+    }
+
     /// Whether the tab's page plays sound and is muted; nil while it has no page.
     func audio(of tabID: UUID) -> (isAudible: Bool, isMuted: Bool)? {
         livePage(for: tabID).map { ($0.isAudible, $0.isMuted) }
