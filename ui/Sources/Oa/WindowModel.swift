@@ -174,7 +174,8 @@ final class WindowModel {
     var record: WindowRecord {
         WindowRecord(
             id: id, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode, sidebarWidth: sidebarWidth,
-            lastActiveDates: lastActiveDates, createdDates: createdDates, collapsedPinnedSpaces: collapsedPinnedSpaces)
+            lastActiveDates: lastActiveDates, createdDates: createdDates, collapsedPinnedSpaces: collapsedPinnedSpaces,
+            selectedTabID: selectedTabIDs[selectedSpaceID])
     }
 
     init(
@@ -202,6 +203,24 @@ final class WindowModel {
         createdDates = record.createdDates
         collapsedPinnedSpaces = record.collapsedPinnedSpaces
         openCommandBar(.newTab)
+    }
+
+    /// As Arc with its switch on: the pages the engine brought back from the last session take their tabs here, and the
+    /// tab the window showed comes back shown, its page loading as it shows. Without its page it stays as `restore`
+    /// left it.
+    func restoreSession(_ restored: [(tabID: UUID, page: any Page)], selecting tabID: UUID?) {
+        for (tabID, page) in restored {
+            guard state.tree.tab(tabID) != nil, pages[tabID] == nil, creating[tabID] == nil else {
+                page.drop()
+                continue
+            }
+            page.move(toWindow: id)
+            install(page, for: tabID)
+            listen(to: page)
+        }
+        guard let tabID, pages[tabID] != nil else { return }
+        closeCommandBar()
+        select(tabID)
     }
 
     /// A pinned tab whose page has left its address reads "/ live title", as in Arc; a Favorite, whose tile has no
