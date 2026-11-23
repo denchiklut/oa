@@ -171,13 +171,20 @@ struct BrowserWindowView: View {
                     .transition(.identity)
                     .opacity(model.placeholder == nil ? 1 : 0)
             }
-            if let placeholder = model.placeholder {
-                PlaceholderView(image: placeholder)
-            } else if let page = model.page {
-                PageContentView(page: page).toast(of: model, on: page).pageRootBackground(page)
-            } else {
-                Color.clear
+            Group {
+                if let placeholder = model.placeholder {
+                    PlaceholderView(image: placeholder)
+                } else if let page = model.page {
+                    PageContentView(page: page).toast(of: model, on: page).pageRootBackground(page)
+                } else {
+                    Color.clear
+                }
             }
+            // Arc's page starts 32 pt down under its toolbar; Oa's line under the bar is left in the strip, so the
+            // strip takes as much of the page as Arc's.
+            .windowContentGrabber(
+                model: model, hasContent: model.placeholder != nil || model.page != nil,
+                barHeight: showsToolbar ? 32 : 0)
         }
         .onChange(of: showsToolbar ? model.page?.id : nil, initial: true) { _, _ in
             model.trackToolbarPage(showsToolbar)

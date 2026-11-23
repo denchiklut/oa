@@ -18,14 +18,20 @@ struct WindowDragRegion: NSViewRepresentable {
             guard let window else { return super.mouseDown(with: event) }
             if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
             guard event.clickCount == 2 else { return window.performDrag(with: event) }
-            // System Settings ▸ Desktop & Dock. Fill has no public API, so it zooms.
-            let defaults = UserDefaults.standard
-            switch defaults.string(forKey: "AppleActionOnDoubleClick") {
-            case "Minimize": window.performMiniaturize(nil)
-            case "None": break
-            case nil where defaults.bool(forKey: "AppleMiniaturizeOnDoubleClick"): window.performMiniaturize(nil)
-            default: window.performZoom(nil)
-            }
+            window.performTitleBarDoubleClickAction()
+        }
+    }
+}
+
+extension NSWindow {
+    /// System Settings ▸ Desktop & Dock. Fill has no public API, so it zooms.
+    func performTitleBarDoubleClickAction() {
+        let defaults = UserDefaults.standard
+        switch defaults.string(forKey: "AppleActionOnDoubleClick") {
+        case "Minimize": performMiniaturize(nil)
+        case "None": break
+        case nil where defaults.bool(forKey: "AppleMiniaturizeOnDoubleClick"): performMiniaturize(nil)
+        default: performZoom(nil)
         }
     }
 }
