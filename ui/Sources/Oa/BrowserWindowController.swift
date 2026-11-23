@@ -62,6 +62,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         guard let window else { return }
         engine.attachWindow(window, id: model.id)
         store.addWindow(model)
+        model.ensureBrowsersCreated()
         if let previous {
             window.setFrameTopLeftPoint(
                 window.cascadeTopLeft(from: NSPoint(x: previous.frame.minX, y: previous.frame.maxY)))

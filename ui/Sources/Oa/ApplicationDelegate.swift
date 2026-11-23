@@ -51,6 +51,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppAppearance.restore()
         RestoreWindowsPreference.registerAtLaunch()
+        engine.setRestoresLastSession(RestoreWindowsPreference.restoresLastSession)
     }
 
     /// As Arc's `AppDelegate`: AppKit hands back each window it kept, and the window comes back from its record in
@@ -67,36 +68,19 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
             await engine.adBlocker.start()
-            finishLaunching(restoring: await restoreLastSession())
+            finishLaunching()
         }
     }
 
-    /// As Arc with its switch on: the profiles of the last session's tabs bring their pages back, by the session ID
-    /// each tab had then.
-    private func restoreLastSession() async -> [UUID: [Int32: any Page]] {
-        guard RestoreWindowsPreference.restoresLastSession else { return [:] }
-        var restored: [UUID: [Int32: any Page]] = [:]
-        let profiles = Set(store.sessionRestoration.lastSession.keys.map(\.browser.contextID))
-        for profileID in profiles where store.state.profiles.contains(where: { $0.id == profileID }) {
-            let pages = await engine.browserContext(id: profileID).restoreLastSession()
-            restored[profileID] = Dictionary(pages.map { ($0.lastSessionID, $0.page) }) { first, _ in first }
-        }
-        return restored
-    }
-
-    private func finishLaunching(restoring lastSession: [UUID: [Int32: any Page]]) {
+    private func finishLaunching() {
         isLaunching = false
-        var lastSession = lastSession
         SiteSearchMigrations.seedOnce(in: engine)
         let saved = store.savedWindows
         let restoring = pendingRestorations
         pendingRestorations.removeAll()
-        var reopened: [(WindowModel, WindowRecord)] = []
         for (id, completion) in restoring {
-            let record = saved.first { $0.id == id }
-            let model = record.map { openWindow(restoring: $0) }
-            if let model, let record { reopened.append((model, record)) }
-            completion(model?.window, nil)
+            let window = saved.first { $0.id == id }.flatMap { openWindow(restoring: $0).window }
+            completion(window, nil)
             NSApplication.shared.completeStateRestoration()
         }
         let defaults = UserDefaults.standard
@@ -104,19 +88,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             if defaults.bool(forKey: Self.restoresWindowsThroughAppKitKey) || saved.isEmpty {
                 openWindow()
             } else {
-                reopened = saved.map { (openWindow(restoring: $0), $0) }
+                saved.forEach { openWindow(restoring: $0) }
             }
         }
         defaults.set(true, forKey: Self.restoresWindowsThroughAppKitKey)
-        for (model, record) in reopened {
-            let pages = store.sessionRestoration.lastSession.compactMap { key, sessionID in
-                key.browser.windowID == record.id
-                    ? lastSession[key.browser.contextID]?.removeValue(forKey: sessionID).map { (key.itemId, $0) } : nil
-            }
-            model.restoreSession(pages, selecting: record.selectedTabID)
-        }
-        // Pages no window took go, as Arc's unbound restored tabs do.
-        lastSession.values.forEach { $0.values.forEach { $0.drop() } }
+        engine.finishedRestoringWindows()
         openExternalLinks(pendingLinks)
         pendingLinks.removeAll()
         store.startAutoArchive()

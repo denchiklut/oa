@@ -84,6 +84,8 @@ final class WindowModel {
     @ObservationIgnored private var commandBarSelection: (spaceID: UUID, tabID: UUID?)?
     @ObservationIgnored var bringToFront: () -> Void = {}
     @ObservationIgnored weak var window: NSWindow?
+    /// A restored window's wait for the engine's restored pages in its Space's profile, with the tab it showed.
+    @ObservationIgnored private var awaitedRestoration: (profileID: UUID, tabID: UUID?)?
     /// Opens another window on this one's Space with the tab selected; the tab's page follows it there.
     @ObservationIgnored var openWindow: (_ tabID: UUID) -> Void = { _ in }
     @ObservationIgnored let downloads: DownloadsStore
@@ -193,8 +195,9 @@ final class WindowModel {
         loadExtensions()
     }
 
-    /// As Arc: a restored window comes back on its Space with nothing selected and no page. Its dates come back
-    /// too, as Oa's own: Arc saves them with the window, and what its restore does with them is unknown.
+    /// As Arc: a restored window comes back on its Space with nothing selected and no page, and doesn't build its
+    /// contents itself: they come with the engine's restored pages. Its dates come back too, as Oa's own: Arc saves
+    /// them with the window, and what its restore does with them is unknown.
     func restore(_ record: WindowRecord) {
         if state.space(record.selectedSpaceID) != nil { selectedSpaceID = record.selectedSpaceID }
         sidebarMode = record.sidebarMode
@@ -202,25 +205,8 @@ final class WindowModel {
         lastActiveDates = record.lastActiveDates
         createdDates = record.createdDates
         collapsedPinnedSpaces = record.collapsedPinnedSpaces
-        openCommandBar(.newTab)
-    }
-
-    /// As Arc with its switch on: the pages the engine brought back from the last session take their tabs here, and the
-    /// tab the window showed comes back shown, its page loading as it shows. Without its page it stays as `restore`
-    /// left it.
-    func restoreSession(_ restored: [(tabID: UUID, page: any Page)], selecting tabID: UUID?) {
-        for (tabID, page) in restored {
-            guard state.tree.tab(tabID) != nil, pages[tabID] == nil, creating[tabID] == nil else {
-                page.drop()
-                continue
-            }
-            page.move(toWindow: id)
-            install(page, for: tabID)
-            listen(to: page)
-        }
-        guard let tabID, pages[tabID] != nil else { return }
-        closeCommandBar()
-        select(tabID)
+        guard let profileID = space?.profileID else { return openCommandBar(.newTab) }
+        awaitedRestoration = (profileID, record.selectedTabID)
     }
 
     /// A pinned tab whose page has left its address reads "/ live title", as in Arc; a Favorite, whose tile has no
@@ -355,16 +341,47 @@ final class WindowModel {
         }
     }
 
+    /// As Arc's `ensureBrowsersCreated`, as the window appears: its browser in every profile it has a Space of.
+    func ensureBrowsersCreated() {
+        for profileID in Set(state.spaces.map(\.profileID)) { ensureBrowser(for: profileID) }
+    }
+
     private func ensureBrowser(for profileID: UUID) {
         guard browsers[profileID] == nil else { return }
         let browser = engine.browserContext(id: profileID).browser(windowID: id)
         browsers[profileID] = browser
         browserListeners[profileID] = Task { [weak self] in
             for await event in browser.events {
-                guard let self, case .opened(let page, let isActive) = event else { continue }
-                place(page, isActive: isActive, in: profileID)
+                guard let self else { continue }
+                switch event {
+                case .opened(let page, let isActive): place(page, isActive: isActive, in: profileID)
+                case .restoredPages(let pages): receive(pages, in: profileID)
+                }
             }
         }
+    }
+
+    /// As Arc's `restoreTab`: each restored page takes the sidebar item that had its tab in the last session, and one
+    /// with no item, or whose item has a page, goes. Oa's own: the tab the window showed then comes back shown; with
+    /// no page for it the window is as Arc's with its switch off.
+    private func receive(_ restored: [RestoredPage], in profileID: UUID) {
+        for entry in restored {
+            guard
+                let owner = store.sessionRestoration.owner(
+                    ofTab: entry.lastSessionID, contextID: profileID, windowID: id),
+                state.tree.tab(owner.itemId) != nil,
+                !store.windows.contains(where: { $0.pages[owner.itemId] != nil || $0.creating[owner.itemId] != nil })
+            else {
+                entry.page.drop()
+                continue
+            }
+            install(entry.page, for: owner.itemId)
+            listen(to: entry.page)
+        }
+        guard let awaited = awaitedRestoration, awaited.profileID == profileID else { return }
+        awaitedRestoration = nil
+        guard selectedTabID == nil, commandBar == nil else { return }
+        if let tabID = awaited.tabID, pages[tabID] != nil { select(tabID) } else { openCommandBar(.newTab) }
     }
 
     /// A page the engine made itself, as an extension's `chrome.tabs.create`. Oa's own: at the top of the shown Space

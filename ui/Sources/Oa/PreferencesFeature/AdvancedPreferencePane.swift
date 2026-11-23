@@ -2,6 +2,8 @@ import SwiftUI
 
 /// As Arc's Advanced pane, with only the rows whose feature Oa has, each in Arc's section and order.
 struct AdvancedPreferencePane: View {
+    /// As Arc's switch, which also sets the engine's feature as it changes.
+    let setRestoresLastSession: (Bool) -> Void
     let openMoreSettings: () -> Void
     @AppStorage(TabReorderingHaptics.key) private var hapticsDisabled = false
     @AppStorage(RestoreWindowsPreference.key) private var restoresWindows = true
@@ -23,6 +25,7 @@ struct AdvancedPreferencePane: View {
                         isOn: $restoresWindows
                     )
                     .accessibilityIdentifier("restoreWindowsPreference")
+                    .onChange(of: restoresWindows) { _, restores in setRestoresLastSession(restores) }
                     Divider()
                     row(
                         "Allow window dragging from the top of webpages", symbol: "rectangle.topthird.inset.filled",

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Arc's `SessionRestorationClient`: the engine tab each sidebar item had in each window and profile, so the pages the
-/// engine brings back from the last session find their tabs. Kept in Arc's `StorableSessionRestorationData.json`,
+/// engine restores from the last session find their items. Kept in Arc's `StorableSessionRestorationData.json`,
 /// with Oa's profile ID where Arc's context ID is.
 @MainActor
 final class SessionRestorationClient {
@@ -26,6 +26,13 @@ final class SessionRestorationClient {
         let stored = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
         lastSession = stored?.mapping.values ?? [:]
         written = lastSession
+    }
+
+    /// Arc's `getTabOwnerId`: the item whose tab had `sessionID` in the last session, in the window's own browser
+    /// first.
+    func owner(ofTab sessionID: Int32, contextID: UUID, windowID: UUID) -> Key? {
+        let owners = lastSession.filter { $0.value == sessionID && $0.key.browser.contextID == contextID }.keys
+        return owners.first { $0.browser.windowID == windowID } ?? owners.first
     }
 
     func save(_ mapping: [Key: Int32]) {
