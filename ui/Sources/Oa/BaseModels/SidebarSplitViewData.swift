@@ -242,7 +242,9 @@ extension SidebarState {
     /// As seen in Arc: Move to ▸ puts the item at the top of the Space's list. A pinned one stays pinned, as seen
     /// for a move to another profile's Space; the top of the pinned list is Oa's own.
     mutating func move(_ id: UUID, toSpace spaceID: UUID) {
-        guard let space = space(spaceID), let tabID = tree[id]?.childIDs.first else { return }
+        guard let space = space(spaceID), let tabID = splitView(id) != nil ? tree[id]?.childIDs.first : id else {
+            return
+        }
         tree.move(id, into: isPinned(tabID) ? space.pinnedRootID : space.unpinnedRootID, at: 0)
     }
 

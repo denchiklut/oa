@@ -1,0 +1,111 @@
+import AppKit
+
+/// Arc's tab menu (`SidebarMenu+TabContextMenu`) for one tab: a row, pinned or not, in a folder or not, or a
+/// Favorite's tile. AppKit's, as Arc's is: a SwiftUI menu can't show a submenu disabled.
+@MainActor
+struct TabContextMenu {
+    let model: WindowModel
+    let tab: SidebarTab
+
+    func make() -> NSMenu {
+        let state = model.state
+        let favorite = state.isFavorite(tab.id)
+        let current = model.selectedTabID == tab.id
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let copy = MenuActionItem("Copy Link") { [model, tab] in model.copyURL(of: tab.id) }
+        if current { copy.shortcut("c", [.shift, .command]) }
+        menu.addItem(copy)
+        if let url = model.liveURL(of: tab.id) { menu.addItem(share(url)) }
+        menu.addItem(.separator())
+        // Arc's opens Boosts, which Oa doesn't have.
+        if let scheme = model.pages[tab.id]?.url?.scheme, scheme == "http" || scheme == "https" {
+            menu.addItem(MenuActionItem("Customize Page…"))
+        }
+        menu.addItem(.separator())
+        if current {
+            menu.addItem(
+                MenuActionItem("Add Split View", enabled: model.canAddSplitViewPane) { [model] in
+                    model.addSplitViewPane()
+                })
+        } else {
+            menu.addItem(
+                MenuActionItem("Open in Split View", enabled: model.canOpenInSplitView(tab.id)) { [model, tab] in
+                    model.openInSplitView(tab.id)
+                })
+        }
+        menu.addItem(move(favorite: favorite))
+        menu.addItem(.separator())
+        for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
+        return menu
+    }
+
+    /// As Arc's: the system's sharing services for the address without its trackers, each with its own title and
+    /// image, and no "More…".
+    private func share(_ url: URL) -> NSMenuItem {
+        let shared = url.withTrackingRemoved.url
+        let submenu = NSMenu()
+        for service in (NSSharingService.self as SharingServiceList.Type).sharingServices(forItems: [shared]) {
+            let item = MenuActionItem(service.menuItemTitle) { service.perform(withItems: [shared]) }
+            item.image = service.image
+            submenu.addItem(item)
+        }
+        return MenuActionItem("Share", submenu: submenu)
+    }
+
+    /// Every Space, the tab's own ticked, then New Space…. Arc lists profiles for a Favorite; moving one to another
+    /// profile isn't Oa's yet.
+    private func move(favorite: Bool) -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        guard !favorite else { return MenuActionItem("Move to", submenu: submenu, enabled: false) }
+        let spaceID = model.state.space(containing: tab.id)?.id
+        for space in model.state.spaces {
+            let item = MenuActionItem(space.name) { [model, tab] in model.moveItem(tab.id, toSpace: space.id) }
+            item.state = space.id == spaceID ? .on : .off
+            submenu.addItem(item)
+        }
+        submenu.addItem(.separator())
+        submenu.addItem(
+            MenuActionItem("New Space…") { [model, tab] in
+                model.beginSpaceCreation(after: model.selectedSpaceID, moving: tab.id)
+            })
+        return MenuActionItem("Move to", submenu: submenu)
+    }
+
+    /// Arc's `CloseSidebarItemConstants`: a Favorite closes while shown and is removed, a pin is removed, which
+    /// archives it, and a Today tab is archived.
+    private func removal(favorite: Bool, current: Bool) -> [NSMenuItem] {
+        if favorite {
+            let remove = MenuActionItem("Remove Favorite") { [model, tab] in model.removeFavorite(tab.id) }
+            guard current else { return [remove] }
+            let close = MenuActionItem("Close Tab") { [model, tab] in model.close(tab.id) }
+            close.shortcut("w", .command)
+            return [close, remove]
+        }
+        if model.state.isPinned(tab.id) {
+            return [MenuActionItem("Remove Pin") { [model, tab] in model.archivePinned(tab.id) }]
+        }
+        let last = model.state.space(containing: tab.id).flatMap { model.state.tabs(in: $0.id, pinned: false).last }
+        return [
+            MenuActionItem("Archive Tab") { [model, tab] in model.close(tab.id) },
+            MenuActionItem("Archive Tabs Below", enabled: last?.id != tab.id) { [model, tab] in
+                model.archiveTabs(below: tab.id)
+            },
+        ]
+    }
+}
+
+/// Arc's list of services, which AppKit has deprecated for its own Share item, reached without the warning.
+private protocol SharingServiceList {
+    static func sharingServices(forItems items: [Any]) -> [NSSharingService]
+}
+
+extension NSSharingService: SharingServiceList {}
+
+extension NSMenuItem {
+    func shortcut(_ key: String, _ modifiers: NSEvent.ModifierFlags) {
+        keyEquivalent = key
+        keyEquivalentModifierMask = modifiers
+    }
+}

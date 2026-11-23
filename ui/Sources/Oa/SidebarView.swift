@@ -477,10 +477,8 @@ private struct FavoriteTile: View {
         )
         .onHover { hovering = $0 }
         .sidebarDragFrame { drag?.tiles[tab.id] = $0 }
-        .contextMenu {
-            if selected { Button("Close Tab") { model.close(tab.id) } }
-            Button("Unfavorite") { model.unfavorite(tab.id) }
-            Button("Remove Favorite") { model.removeFavorite(tab.id) }
+        .platformContextMenu(isEnabled: model.library == nil && !model.coversWindow) {
+            TabContextMenu(model: model, tab: tab).make()
         }
     }
 }
@@ -784,22 +782,12 @@ struct TabRow: View {
         .frame(height: 40)
         .onHover { hovering = $0 }
         .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
-        .spaceMenuExclusion()
-        .contextMenu {
-            if !pinned {
-                // As Arc's row: Add Split View on the selected one, Open in Split View on the others.
-                if model.selectedTabIDs[spaceID] == tab.id {
-                    Button("Add Split View") { model.addSplitViewPane() }
-                        .disabled(!model.canAddSplitViewPane)
-                } else {
-                    Button("Open in Split View") { model.openInSplitView(tab.id) }
-                        .disabled(!model.canOpenInSplitView(tab.id))
-                }
-                Divider()
-                Button("Archive Tab") { model.close(tab.id) }
-                Button("Archive Tabs Below") { model.archiveTabs(below: tab.id) }
-                    .disabled(model.state.tabs(in: spaceID, pinned: false).last?.id == tab.id)
-            }
+        .platformContextMenu(
+            isEnabled: inCard
+                ? model.library != nil
+                : spaceID == model.selectedSpaceID && model.library == nil && !model.coversWindow
+        ) {
+            TabContextMenu(model: model, tab: tab).make()
         }
     }
 }

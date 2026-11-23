@@ -228,6 +228,11 @@ final class WindowModel {
         livePage(for: tab.id)?.favicon ?? store.savedFavicon(tab.id)
     }
 
+    /// Where the tab's page is now, wherever it lives, else its saved address.
+    func liveURL(of tabID: UUID) -> URL? {
+        livePage(for: tabID)?.url ?? state.tree.tab(tabID)?.url
+    }
+
     private func livePage(for tabID: UUID) -> (any Page)? {
         pages[tabID] ?? store.windows.lazy.compactMap { $0.pages[tabID] }.first
     }
@@ -713,21 +718,23 @@ final class WindowModel {
         }
     }
 
-    /// As seen in Arc: Move to ▸ takes the split whole to the top of that Space's list. A selected split takes the
-    /// window to that Space with it; one that isn't leaves the window where it is. A Space of another profile asks
-    /// first, and as a page can't change profile, the split's pages close and load again in that profile, at once when
-    /// the window follows and once selected otherwise, with nothing of the old profile's.
-    func moveSplitView(_ splitID: UUID, toSpace spaceID: UUID) {
-        guard canMoveSplitView(splitID, toSpace: spaceID), let space = state.space(spaceID),
-            let tabIDs = state.tree[splitID]?.childIDs
-        else { return }
-        let focused = presentedTabIDs.contains { state.splitViewID(containing: $0) == splitID } ? selectedTabID : nil
+    /// As seen in Arc: Move to ▸ takes a tab or a split whole to the top of that Space's list, a pinned one staying
+    /// pinned. A shown one takes the window to that Space with it; one that isn't leaves the window where it is and its
+    /// page running. A Space of another profile asks first, and as a page can't change profile, the item's pages close
+    /// and load again in that profile, at once when the window follows and once selected otherwise, with nothing of
+    /// the old profile's.
+    func moveItem(_ itemID: UUID, toSpace spaceID: UUID) {
+        guard canMoveItem(itemID, toSpace: spaceID), let space = state.space(spaceID) else { return }
+        let tabIDs = state.splitView(itemID) != nil ? state.tree[itemID]?.childIDs ?? [] : [itemID]
+        let focused =
+            presentedTabIDs.contains { $0 == itemID || state.splitViewID(containing: $0) == itemID }
+            ? selectedTabID : nil
         let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
         let sourceSpaceID = selectedSpaceID
         let move = { [weak self] in
-            guard let self, canMoveSplitView(splitID, toSpace: spaceID) else { return }
+            guard let self, canMoveItem(itemID, toSpace: spaceID) else { return }
             if crossesProfile { for window in store.windows { window.dropPages(of: tabIDs) } }
-            store.edit { $0.move(splitID, toSpace: spaceID) }
+            store.edit { $0.move(itemID, toSpace: spaceID) }
             guard let focused else { return }
             selectedTabIDs[sourceSpaceID] = nil
             selectSpace(spaceID)
@@ -740,8 +747,10 @@ final class WindowModel {
         }
     }
 
-    func canMoveSplitView(_ splitID: UUID, toSpace spaceID: UUID) -> Bool {
-        guard let tabID = state.tree[splitID]?.childIDs.first, state.space(spaceID) != nil else { return false }
+    func canMoveItem(_ itemID: UUID, toSpace spaceID: UUID) -> Bool {
+        let tabID = state.splitView(itemID) != nil ? state.tree[itemID]?.childIDs.first : itemID
+        guard let tabID, state.tree.tab(tabID) != nil, state.space(spaceID) != nil
+        else { return false }
         return state.space(containing: tabID)?.id != spaceID
     }
 
@@ -1057,7 +1066,7 @@ final class WindowModel {
                 name: name, profileID: profileID, icon: creation.icon, theme: creation.spaceStyleEditor.theme,
                 after: creation.insertAfter)
         }
-        if let created, let moving = creation.moving { moveSplitView(moving, toSpace: created.id) }
+        if let created, let moving = creation.moving { moveItem(moving, toSpace: created.id) }
         if selecting, let created { selectSpace(created.id) }
     }
 
@@ -1213,7 +1222,7 @@ final class WindowModel {
         if state.isFavorite(tabID) { unfavorite(tabID) } else { favorite(tabID, at: nil) }
     }
 
-    /// The tile's Unfavorite and a tile dropped on the tab list, Oa's own ways to Arc's command-bar Unfavorite Tab.
+    /// A tile dropped on the tab list, Oa's own way to Arc's command-bar Unfavorite Tab.
     func unfavorite(_ tabID: UUID) {
         store.edit { $0.unfavoriteTab(tabID, in: selectedSpaceID) }
     }

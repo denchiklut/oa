@@ -7,16 +7,18 @@ extension WindowModel {
         copy(address, toastOn: frontPage?.id)
     }
 
-    /// A split's pane copies its own page's URL from its bar.
+    /// A split's pane from its bar and a tab's Copy Link. As seen in Arc, a tab that isn't shown gets no toast.
     func copyURL(of tabID: UUID) {
-        copy(pages[tabID]?.url ?? state.tree.tab(tabID)?.url, toastOn: pages[tabID]?.id)
+        let shown = presentedTabIDs.contains(tabID)
+        copy(liveURL(of: tabID), toastOn: shown ? pages[tabID]?.id : nil, toast: shown)
     }
 
-    private func copy(_ url: URL?, toastOn pageID: UUID?) {
+    private func copy(_ url: URL?, toastOn pageID: UUID?, toast: Bool = true) {
         guard let result = url?.withTrackingRemoved else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([result.url as NSURL])
         NSPasteboard.general.setString(result.url.absoluteString, forType: .string)
+        guard toast else { return }
         present(
             .copyTabURL(trackingRemoved: result.trackingRemoved, urls: [result.url]),
             at: pageID.map { .windowContent($0) } ?? .window)
