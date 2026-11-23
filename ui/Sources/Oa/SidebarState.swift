@@ -39,8 +39,11 @@ struct SidebarTab: Identifiable, Hashable {
     var viewedAt: Date?
     /// Kept after the opener is gone, as Arc keeps its grouping.
     var openerID: UUID?
+    /// Arc's item `title`: the user's name for the tab, which wins over the page's, `title` here being Arc's
+    /// `savedTitle`.
+    var customTitle: String?
 
-    var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
+    var displayTitle: String { customTitle ?? (title.isEmpty ? url?.host() ?? "Untitled" : title) }
 
     /// Whether `other` is this tab's saved address, ignoring a trailing slash on a bare host.
     func isAt(_ other: URL?) -> Bool {
@@ -392,7 +395,8 @@ struct SidebarState {
         tree.remove(id)
         archive.append(
             SidebarArchivedTab(
-                id: id, title: tab.title, url: tab.url, spaceID: space?.id, archivedAt: date, reason: reason))
+                id: id, title: tab.customTitle ?? tab.title, url: tab.url, spaceID: space?.id, archivedAt: date,
+                reason: reason))
     }
 
     /// A page without a row, a Peek's.
@@ -495,6 +499,16 @@ struct SidebarState {
             if let tab = tree.tab(id) { return .tab(tab) }
             if splitView(id) != nil { return .splitView(id: id, tabs: tree.tabs(under: id)) }
             return nil
+        }
+    }
+
+    /// As seen in Arc: an empty name gives the tab back its page's title.
+    mutating func renameTab(_ tabID: UUID, to title: String) {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        tree.update(tabID) { item in
+            guard var tab = item.tab else { return }
+            tab.customTitle = title.isEmpty ? nil : title
+            item.kind = .tab(tab)
         }
     }
 

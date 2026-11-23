@@ -6,6 +6,8 @@ import AppKit
 struct TabContextMenu {
     let model: WindowModel
     let tab: SidebarTab
+    /// A row's inline field; a Favorite's tile has the dialog instead.
+    var rename: () -> Void = {}
 
     func make() -> NSMenu {
         let state = model.state
@@ -18,6 +20,13 @@ struct TabContextMenu {
         menu.addItem(copy)
         if let url = model.liveURL(of: tab.id) { menu.addItem(share(url)) }
         menu.addItem(.separator())
+        menu.addItem(
+            MenuActionItem("Rename…") { [model, tab, rename] in
+                guard favorite else { return rename() }
+                // As Arc's: the Favorite is selected first, then asked about.
+                model.select(tab.id)
+                presentRenameDialog(for: tab, in: model)
+            })
         // Arc's opens Boosts, which Oa doesn't have.
         if let scheme = model.pages[tab.id]?.url?.scheme, scheme == "http" || scheme == "https" {
             menu.addItem(MenuActionItem("Customize Page…"))
@@ -38,6 +47,21 @@ struct TabContextMenu {
         menu.addItem(.separator())
         for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
         return menu
+    }
+
+    private func presentRenameDialog(for tab: SidebarTab, in model: WindowModel) {
+        guard let window = model.window else { return }
+        DialogSheet.present(on: window) { [model] dismiss in
+            TextInputDialog(
+                title: "Rename Tab…", text: tab.displayTitle, placeholder: "Keep it short and sweet!",
+                confirmTitle: "Rename"
+            ) { title in
+                model.renameTab(tab.id, to: title)
+                dismiss()
+            } onCancel: {
+                dismiss()
+            }
+        }
     }
 
     /// As Arc's: the system's sharing services for the address without its trackers, each with its own title and

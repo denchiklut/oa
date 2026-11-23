@@ -19,7 +19,7 @@ enum CommandBarRanking {
         /// A split's row, as the focused pane's tab.
         var isSplitView = false
 
-        var title: String { tab.title.isEmpty ? url.host() ?? readable(url) : tab.title }
+        var title: String { tab.customTitle ?? (tab.title.isEmpty ? url.host() ?? readable(url) : tab.title) }
     }
 
     struct Pick: Codable, Equatable {
