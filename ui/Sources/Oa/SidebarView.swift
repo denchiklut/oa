@@ -676,6 +676,9 @@ struct TabRow: View {
     @State private var pressed = false
     @State private var previousTabID: UUID?
     @State private var bounces = 0
+    @State private var renaming = false
+    @State private var draft = ""
+    @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
 
@@ -697,12 +700,18 @@ struct TabRow: View {
             if model.isRecording(tab) { RecordingDot().padding(.trailing, 2) }
             TabFavicon(model: model, tab: tab)
                 .frame(width: 24, height: 24)
-            Text(inCard ? tab.displayTitle : model.title(for: tab))
-                .font(.system(size: 14))
-                .foregroundStyle(theme.foreground)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .padding(.leading, 6)
+            Group {
+                if renaming {
+                    renameField
+                } else {
+                    Text(inCard ? tab.displayTitle : model.title(for: tab))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+            .font(.system(size: 14))
+            .foregroundStyle(theme.foreground)
+            .padding(.leading, 6)
             Spacer(minLength: 0)
         }
         .padding(.leading, 6)
@@ -741,8 +750,12 @@ struct TabRow: View {
                     guard CGRect(origin: .zero, size: size).contains(value.location) else { return }
                     layout.dismissSidebar()
                     model.show(tab.id)
-                }
+                },
+            including: renaming ? .subviews : .all
         )
+        // As Arc's: the first click selects, the second opens the field.
+        .simultaneousGesture(TapGesture(count: 2).onEnded { if !inCard { beginRename() } })
+        .help(inCard || renaming ? "" : "\(model.title(for: tab))\nDouble-click to rename")
         .onGeometryChange(for: CGSize.self) {
             $0.size
         } action: {
@@ -787,7 +800,34 @@ struct TabRow: View {
                 ? model.library != nil
                 : spaceID == model.selectedSpaceID && model.library == nil && !model.coversWindow
         ) {
-            TabContextMenu(model: model, tab: tab).make()
+            TabContextMenu(model: model, tab: tab, rename: beginRename).make()
         }
+    }
+
+    private func beginRename() {
+        draft = tab.displayTitle
+        renaming = true
+    }
+
+    /// As Arc's: Return or a click away keeps the name and Escape gives the old one back. Oa's own: a name left as it
+    /// was isn't stored as the tab's.
+    private var renameField: some View {
+        TextField("Title", text: $draft)
+            .textFieldStyle(.plain)
+            .focused($renameFocused)
+            .onSubmit { commitRename() }
+            .onExitCommand { renaming = false }
+            // After the menu has closed and given the window back its first responder.
+            .task {
+                try? await Task.sleep(for: .milliseconds(100))
+                renameFocused = true
+            }
+            .onChange(of: renameFocused) { _, focused in if !focused { commitRename() } }
+    }
+
+    private func commitRename() {
+        guard renaming else { return }
+        renaming = false
+        if tab.customTitle != nil || draft != tab.displayTitle { model.renameTab(tab.id, to: draft) }
     }
 }

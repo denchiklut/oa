@@ -42,7 +42,7 @@ struct SidebarSnapshot: Codable {
         var kind: SidebarItem.Kind
 
         private enum Key: String, CodingKey {
-            case id, parentID, childIDs, type, title, url, viewedAt, openerID, container, splitView
+            case id, parentID, childIDs, type, title, savedTitle, url, viewedAt, openerID, container, splitView
         }
 
         init(_ item: SidebarItem) {
@@ -63,11 +63,15 @@ struct SidebarSnapshot: Codable {
             switch try values.decode(String.self, forKey: .type) {
             case "container": kind = .container(try values.decode(SidebarItem.Container.self, forKey: .container))
             case "tab":
+                // As Arc's: the item's `title` is the user's name and `savedTitle` the page's. A file from before
+                // names had only the page's, under `title`.
+                let savedTitle = try values.decodeIfPresent(String.self, forKey: .savedTitle)
                 kind = .tab(
                     SidebarTab(
-                        id: id, title: title, url: try values.decodeIfPresent(URL.self, forKey: .url),
+                        id: id, title: savedTitle ?? title, url: try values.decodeIfPresent(URL.self, forKey: .url),
                         viewedAt: try values.decodeIfPresent(Date.self, forKey: .viewedAt),
-                        openerID: try values.decodeIfPresent(UUID.self, forKey: .openerID)))
+                        openerID: try values.decodeIfPresent(UUID.self, forKey: .openerID),
+                        customTitle: savedTitle == nil || title.isEmpty ? nil : title))
             case "folder": kind = .folder(title: title)
             case "splitView":
                 var data =
@@ -92,7 +96,8 @@ struct SidebarSnapshot: Codable {
                 try values.encode(container, forKey: .container)
             case .tab(let tab):
                 try values.encode("tab", forKey: .type)
-                try values.encode(tab.title, forKey: .title)
+                try values.encodeIfPresent(tab.customTitle, forKey: .title)
+                try values.encode(tab.title, forKey: .savedTitle)
                 try values.encodeIfPresent(tab.url, forKey: .url)
                 try values.encodeIfPresent(tab.viewedAt, forKey: .viewedAt)
                 try values.encodeIfPresent(tab.openerID, forKey: .openerID)

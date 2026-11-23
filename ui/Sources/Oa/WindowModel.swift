@@ -213,7 +213,7 @@ final class WindowModel {
     /// text, gives the window the live title as Arc's does.
     func title(for tab: SidebarTab) -> String {
         guard let url = leftAddress(tab), let page = pages[tab.id] else { return tab.displayTitle }
-        let live = page.title.isEmpty ? url.host() ?? url.absoluteString : page.title
+        let live = tab.customTitle ?? (page.title.isEmpty ? url.host() ?? url.absoluteString : page.title)
         // As seen in Arc: a split's pane shows no "/".
         return state.isFavorite(tab.id) || state.splitViewID(containing: tab.id) != nil ? live : "/ " + live
     }
@@ -1597,6 +1597,10 @@ final class WindowModel {
         let tabIDs = state.tabs(in: space.id, pinned: false).map(\.id)
         guard let index = tabIDs.firstIndex(of: tabID) else { return }
         closeTogether(tabIDs[(index + 1)...].reversed())
+    }
+
+    func renameTab(_ tabID: UUID, to title: String) {
+        store.edit { $0.renameTab(tabID, to: title) }
     }
 
     func renameSplitView(_ splitID: UUID, to title: String) {
