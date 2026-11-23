@@ -247,14 +247,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if alert.runModal() == .alertFirstButtonReturn { model.clearArchive() }
     }
 
-    /// The Peek when one is shown, else the selected tab, else the window.
+    /// The Peek when one is shown, else the multi-selection, else the selected tab, else the window.
     @objc func closeTab(_ sender: Any?) {
+        let rows = model.multiSelectedTabIDs
         if model.peek != nil {
             model.closePeek()
+        } else if !rows.isEmpty {
+            // As seen in Arc: the rows go whatever is shown; a Favorite stays, and a split goes whole with them. Oa's
+            // own: a pinned split is unloaded, as by ⌘W alone.
+            let splitID = model.selectedTabID.flatMap {
+                rows.contains($0) || model.state.isFavorite($0) ? nil : model.state.splitViewID(containing: $0)
+            }
+            let pinned = model.selectedTabID.map(model.state.isPinned) ?? false
+            // The split first: a loaded row's close finishes later, and the split's would pick it to show.
+            if let splitID { pinned ? model.closeSplitViewPages(splitID) : model.closeSplitView(splitID) }
+            model.archiveTabs(rows)
         } else if let tabID = model.selectedTabID {
-            if model.multiSelectedTabIDs.contains(tabID) {
-                model.archiveTabs(model.multiSelectedTabIDs)
-            } else if model.state.splitViewID(containing: tabID) != nil, model.state.isFavorite(tabID) {
+            if model.state.splitViewID(containing: tabID) != nil, model.state.isFavorite(tabID) {
                 model.deselectSplitView()
             } else if model.state.isPinned(tabID), let splitID = model.state.splitViewID(containing: tabID) {
                 // As seen in Arc: ⌘W on a pinned split's pane unloads the whole split.
@@ -332,7 +341,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         if item.action == #selector(closeTab(_:)) {
             let archives = model.selectedTabID.map { !model.state.keepsAddress($0) } ?? false
-            item.title = model.peek != nil ? "Close Peek" : archives ? "Archive Tab" : "Close Tab"
+            item.title =
+                model.peek != nil
+                ? "Close Peek"
+                : !model.multiSelectedTabIDs.isEmpty ? "Archive Tabs" : archives ? "Archive Tab" : "Close Tab"
             return true
         }
         return switch item.action {

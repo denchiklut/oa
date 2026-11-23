@@ -1129,6 +1129,8 @@ final class WindowModel {
         guard state.space(spaceID) != nil else { return }
         cancelSpaceCreation()
         guard spaceID != selectedSpaceID else { return }
+        // As seen in Arc: a Space switch ends the multi-selection.
+        multiSelection = SidebarMultiSelection()
         selectedSpaceID = spaceID
         ensurePresentedPages()
         presentedTabIDs.forEach(markViewed)
