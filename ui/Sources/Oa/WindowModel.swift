@@ -220,6 +220,8 @@ final class WindowModel {
 
     func leftAddress(_ tab: SidebarTab) -> URL? { leftAddress(tab, page: pages[tab.id]) }
 
+    func liveLeftAddress(_ tab: SidebarTab) -> URL? { leftAddress(tab, page: livePage(for: tab.id)) }
+
     private func leftAddress(_ tab: SidebarTab, page: (any Page)?) -> URL? {
         guard state.keepsAddress(tab.id), let url = page?.url, !tab.isAt(url) else { return nil }
         return url
