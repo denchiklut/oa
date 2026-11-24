@@ -70,8 +70,8 @@ public final class ChromiumBrowserApplication: BrowserApplication {
     public func saveSessionsForQuit() { engine?.saveSessionsForQuit() }
 
     public func terminate() {
-        NSApplication.shared.reply(toApplicationShouldTerminate: false)
-        engine?.quit()
+        guard let engine else { return NSApplication.shared.reply(toApplicationShouldTerminate: true) }
+        engine.flushForQuit({ NSApplication.shared.reply(toApplicationShouldTerminate: true) })
     }
 
     public func browserContext(id: UUID) -> any BrowserContext {

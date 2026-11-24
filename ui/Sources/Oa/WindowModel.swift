@@ -1969,24 +1969,19 @@ final class WindowModel {
         }
     }
 
-    /// As Arc: a closing window hands every page to another window, preferring one that shows its tab; quitting
-    /// hands nothing over.
-    func dropAll(handingOff: Bool) {
+    /// As Arc: a closing window hands every page to another window, preferring one that shows its tab.
+    func dropAll() {
         let others = store.windows.filter { $0 !== self }
         for tabID in Array(pages.keys) {
             guard let page = release(tabID) else { continue }
-            if handingOff, let heir = others.first(where: { $0.shows(tabID) }) ?? others.first {
+            if let heir = others.first(where: { $0.shows(tabID) }) ?? others.first {
                 heir.adopt(page, for: tabID, from: self)
             } else {
                 page.drop()
             }
         }
-        for (ownerID, page) in peeks {
-            if ownerID != archivePeekID, state.tree.tab(ownerID) != nil {
-                store.archivePage(page, in: spaceID(ofPeekOwner: ownerID))
-            }
-            page.drop()
-        }
+        archivePeeks()
+        peeks.values.forEach { $0.drop() }
         peeks = [:]
         dialogs = [:]
         permissionRequests = [:]
@@ -1997,6 +1992,13 @@ final class WindowModel {
         browsers = [:]
         archivePeekID = nil
         creating = [:]
+    }
+
+    /// As Arc: closing the window or quitting archives each Peek's page.
+    func archivePeeks() {
+        for (ownerID, page) in peeks where ownerID != archivePeekID && state.tree.tab(ownerID) != nil {
+            store.archivePage(page, in: spaceID(ofPeekOwner: ownerID))
+        }
     }
 
     /// Lets go of the page for `tabID` without ending it. Another window takes it over this way.

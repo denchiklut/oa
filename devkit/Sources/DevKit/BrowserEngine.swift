@@ -16,10 +16,11 @@ public protocol BrowserApplication: AnyObject {
     /// As ADK's `onFinishedRestoringWindows`: the windows of the last launch are back, and what the engine restored for
     /// a window that isn't goes.
     func finishedRestoringWindows()
-    /// As Chrome's quit: each profile's session is saved and closed, so the pages the app drops next stay in the last
-    /// session. Call it once the quit is certain.
+    /// As Chrome's quit: each profile's session is saved and closed with the pages it has. Call it once the quit is
+    /// certain.
     func saveSessionsForQuit()
-    /// Finishes quitting after the app answered `applicationShouldTerminate` with `.terminateLater`.
+    /// Finishes quitting after the app answered `applicationShouldTerminate` with `.terminateLater`. As Arc's, the
+    /// engine writes what it must keep and the app exits with its windows and pages as they are.
     func terminate()
     func browserContext(id: UUID) -> any BrowserContext
     /// The profiles the engine has, loaded or not, in the engine's own order, as ADK's `allProfiles()`.

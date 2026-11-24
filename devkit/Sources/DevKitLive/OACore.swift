@@ -18,7 +18,7 @@ import AppKit
     @objc(setRestoresLastSession:) func setRestoresLastSession(_ restores: Bool)
     func finishedRestoringWindows()
     func saveSessionsForQuit()
-    func quit()
+    @objc(flushForQuit:) func flushForQuit(_ completion: @escaping () -> Void)
 }
 
 @MainActor @objc protocol CoreProfileAttributes: NSObjectProtocol {
