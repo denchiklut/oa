@@ -60,6 +60,9 @@ final class SidebarDrag {
     private(set) var location = CGPoint.zero
     /// 0 a row, 1 a tile.
     private(set) var morph: CGFloat = 0
+    /// 0 the row or tile, 1 Arc's page card, shown while the tab is over a place on the page.
+    private(set) var pageCard: CGFloat = 0
+    private(set) var cardSize = CGSize.zero
     private(set) var glyph = SidebarCellButton.Glyph.close
     private(set) var settling = false
     private(set) var rowSize = CGSize.zero
@@ -130,6 +133,10 @@ final class SidebarDrag {
         if let next, next.combine == nil { tick(at: next, in: model.selectedSpaceID) }
         let dropTarget = next == nil ? splitViewDropTarget(at: location, model: model) : nil
         if dropTarget != model.proposedSplitViewDropTarget { model.proposedSplitViewDropTarget = dropTarget }
+        // As measured on Arc: AppKit turns the drag image into the card over about 0.2 s.
+        let card: CGFloat = dropTarget == nil ? 0 : 1
+        if card == 1 { cardSize = pageCardSize(model: model) }
+        if card != pageCard { withAnimation(.easeOut(duration: 0.2)) { pageCard = card } }
         let shape: CGFloat = next?.section == .favorites ? 1 : 0
         if next != nil, shape != morph {
             withAnimation(.easeInOut(duration: shape == 1 ? 0.28 : 0.2)) { morph = shape }
@@ -168,6 +175,7 @@ final class SidebarDrag {
             target = nil
             source = nil
             showsPrevious = false
+            pageCard = 0
             return layout.setHold(.drag, false)
         }
         // Oa's own: a tab dropped anywhere else is the selected one, as before it was dragged over the page.
@@ -221,6 +229,7 @@ final class SidebarDrag {
             source = nil
             self.target = nil
             settling = false
+            pageCard = 0
             layout.setHold(.drag, false)
         }
     }
@@ -322,6 +331,18 @@ final class SidebarDrag {
         return SplitViewDropTarget(
             target: .insertContent(edge == .left || edge == .top ? pane : pane + 1),
             layoutOrientation: splitID != nil ? orientation : edge == .left || edge == .right ? .horizontal : .vertical)
+    }
+
+    /// As measured on Arc: the card is the pane one more pane would make, scaled to 249 pt for the page's height,
+    /// so 176 pt wide over a lone page and 70 over a full split. A stacked split's is Oa's own, at the same scale.
+    private func pageCardSize(model: WindowModel) -> CGSize {
+        let splitID = model.selectedTabID.flatMap(model.state.splitViewID(containing:))
+        let count = model.presentedTabIDs.count + 1
+        let frames = SplitViewContentPanes.frames(
+            Array(repeating: 1 / CGFloat(count), count: count), in: pageArea,
+            vertical: splitID != nil && model.splitViewLayoutOrientation == .vertical)
+        let scale = 249 / max(pageArea.height, 1)
+        return CGSize(width: (frames.first?.width ?? 0) * scale, height: (frames.first?.height ?? 0) * scale)
     }
 
     /// The pointer picks the place, as AppKit's drag destinations do: among the Favorites the slot under it, in the
@@ -451,7 +472,7 @@ struct SidebarDragLayer: View {
             // As seen in Arc: held on a tab's row, the copy is gone into the row's preview of the split.
             if let entry = drag.entry, drag.target?.combine.map({ model.state.splitView($0) != nil }) ?? true {
                 if drag.stack.isEmpty {
-                    SidebarDragPreview(model: model, drag: drag, entry: entry, morph: drag.morph)
+                    SidebarDragPreview(model: model, drag: drag, entry: entry, morph: drag.morph, card: drag.pageCard)
                 } else {
                     // As seen in Arc: AppKit's stack, up to three rows each 6 pt down and right, the count at its
                     // corner.
@@ -489,23 +510,36 @@ private struct SidebarDragPreview: View, Animatable {
     let drag: SidebarDrag
     let entry: SidebarEntry
     var morph: CGFloat
+    var card: CGFloat = 0
     var depth: CGFloat = 0
     var count: Int?
     @Environment(\.theme) private var theme
 
-    nonisolated var animatableData: CGFloat {
-        get { morph }
-        set { morph = newValue }
+    nonisolated var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(morph, card) }
+        set {
+            morph = newValue.first
+            card = newValue.second
+        }
     }
 
     var body: some View {
         let t = min(max(morph, 0), 1)
-        let width = drag.rowSize.width + (drag.tileSize.width - drag.rowSize.width) * t
-        let height = drag.rowSize.height + (drag.tileSize.height - drag.rowSize.height) * t
-        let anchor = CGPoint(
+        let c = min(max(card, 0), 1)
+        let baseWidth = drag.rowSize.width + (drag.tileSize.width - drag.rowSize.width) * t
+        let baseHeight = drag.rowSize.height + (drag.tileSize.height - drag.rowSize.height) * t
+        let baseAnchor = CGPoint(
             x: drag.rowAnchor.x + (drag.tileAnchor.x - drag.rowAnchor.x) * t,
             y: drag.rowAnchor.y + (drag.tileAnchor.y - drag.rowAnchor.y) * t)
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        // As measured on Arc: the card keeps the pointer where it held the row, relatively.
+        let cardAnchor = CGPoint(
+            x: baseAnchor.x / max(baseWidth, 1) * drag.cardSize.width,
+            y: baseAnchor.y / max(baseHeight, 1) * drag.cardSize.height)
+        let width = baseWidth + (drag.cardSize.width - baseWidth) * c
+        let height = baseHeight + (drag.cardSize.height - baseHeight) * c
+        let anchor = CGPoint(
+            x: baseAnchor.x + (cardAnchor.x - baseAnchor.x) * c, y: baseAnchor.y + (cardAnchor.y - baseAnchor.y) * c)
+        let shape = RoundedRectangle(cornerRadius: 12 + 8 * c, style: .continuous)
         ZStack(alignment: .topLeading) {
             shape.fill(theme.selectedCard).opacity(1 - t)
             shape.fill(theme.selectedTile).opacity(t)
@@ -566,11 +600,13 @@ private struct SidebarDragPreview: View, Animatable {
                 }
             }
         }
+        .opacity(1 - c)
         .frame(width: width, height: height, alignment: .topLeading)
+        .overlay { if c > 0, case .tab(let tab) = entry { pageCardContent(tab).opacity(c) } }
         .clipShape(shape)
         .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
-        // As measured on Arc: a split's copy at 0.9.
-        .opacity({ if case .splitView = entry { 0.9 } else { 0.7 } }())
+        // As measured on Arc: a split's copy at 0.9, and the page card black at 0.9 over the page.
+        .opacity({ if case .splitView = entry { 0.9 } else { 0.7 + 0.3 * c } }())
         .overlay(alignment: .topLeading) {
             if let count {
                 // Arc's red 18 pt badge, on the stack's corner rather than left of it as Arc's, which the window
@@ -584,6 +620,27 @@ private struct SidebarDragPreview: View, Animatable {
             }
         }
         .offset(x: drag.location.x - anchor.x + depth * 6, y: drag.location.y - anchor.y + depth * 6)
+    }
+
+    /// Arc's card over the page, as measured: black at 0.9, the 16 pt favicon centred 42 % down and the title in
+    /// bold white centred 56 % down.
+    private func pageCardContent(_ tab: SidebarTab) -> some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black.opacity(0.9)
+                TabFavicon(model: model, tab: tab)
+                    .frame(width: 16, height: 16)
+                    .position(x: geometry.size.width / 2, y: geometry.size.height * 0.42)
+                Text(model.title(for: tab))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 8)
+                    .frame(width: geometry.size.width)
+                    .position(x: geometry.size.width / 2, y: geometry.size.height * 0.56)
+            }
+        }
     }
 
     private func title(_ text: String, at x: CGFloat, width: CGFloat? = nil, height: CGFloat, t: CGFloat) -> some View {
