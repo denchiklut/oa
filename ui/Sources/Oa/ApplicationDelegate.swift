@@ -203,20 +203,28 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         openWindow(context: .incognito, profileID: lastFocusedProfileID)
     }
 
-    /// As Arc's `onOpenLinkInIncognitoWindow`: a new tab in the open incognito window, which comes forward, else in a
-    /// new one with no command bar. Oa's own with several: the frontmost of the page's profile.
+    /// As Arc's `onOpenLinkInIncognitoWindow`: a new tab at the top of the newest incognito window, whatever its
+    /// profile, which comes forward, else of a new one with no command bar.
     private func openLinkInIncognitoWindow(_ url: URL, profileID: UUID) {
         guard !engine.incognitoDisabled else { return }
         let model =
-            frontWindows.first { $0.sidebarContext == .incognito && $0.space?.profileID == profileID }
-            ?? openWindow(context: .incognito, profileID: profileID)
+            windows.last { $0.model.sidebarContext == .incognito }?.model
+            ?? openWindow(context: .incognito, profileID: profileID, empty: true)
         model.bringToFront()
         model.newTab(url)
     }
 
-    private var incognitoProfileID: UUID {
-        let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
-        return key?.model.space?.profileID ?? SidebarProfile.defaultID
+    /// As Arc's `createTabInNewWindow(url:isIncognito:)` from a window with a sidebar of its own, as seen in Arc:
+    /// an incognito window's link opens a new incognito window, and a Blank Window's a global one on the last key
+    /// global window's Space, at the top of its tabs. Either way selected, with no command bar, cascaded from the
+    /// source. With no global window open, the first Space is Oa's own.
+    private func openURLInNewWindow(_ url: URL, from source: WindowModel) {
+        if source.sidebarContext == .incognito {
+            openWindow(from: source, context: .incognito, profileID: source.space?.profileID, empty: true).newTab(url)
+        } else {
+            let spaceID = frontWindows.first { $0.sidebarContext == .global }?.selectedSpaceID
+            openWindow(from: source, on: spaceID ?? store.state.spaces[0].id, empty: true).newTab(url)
+        }
     }
 
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
