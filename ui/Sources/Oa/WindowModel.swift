@@ -261,6 +261,10 @@ final class WindowModel {
         livePage(for: tabID)?.url ?? state.tree.tab(tabID)?.url
     }
 
+    func liveTitle(of tabID: UUID) -> String {
+        livePage(for: tabID)?.title ?? state.tree.tab(tabID)?.title ?? ""
+    }
+
     private func livePage(for tabID: UUID) -> (any Page)? {
         pages[tabID] ?? store.windows.lazy.compactMap { $0.pages[tabID] }.first
     }
