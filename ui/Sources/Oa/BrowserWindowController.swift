@@ -155,7 +155,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowDidBecomeKey(_ notification: Notification) {
         model.showSelected()
-        // Oa's own, as Arc's isn't traced: DevTools that had the keyboard keep it.
+        // As Arc's: DevTools that had the keyboard keep it.
         let devTools = model.page?.devTools.view
         if let devTools, (window?.firstResponder as? NSView)?.isDescendant(of: devTools) == true { return }
         // As Arc's: the find bar's field keeps the keyboard.
