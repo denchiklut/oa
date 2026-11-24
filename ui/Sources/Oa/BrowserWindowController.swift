@@ -372,7 +372,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         if model.dialog != nil || model.extensionRequest != nil { return false }
         // Oa's own, as Arc's isn't traced: ⌘← and ⌘→ stay with a text field that is editing.
-        if (item as? KeyBindableMenuItem)?.arcKeyBindingID.hasSuffix("_Alternate") == true,
+        let arrows = ["goBack_Alternate", "goForward_Alternate"]
+        if let id = (item as? KeyBindableMenuItem)?.arcKeyBindingID, arrows.contains(id),
             window?.firstResponder is NSText
         {
             return false
