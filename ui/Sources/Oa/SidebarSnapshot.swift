@@ -163,7 +163,7 @@ struct SidebarSnapshot: Codable {
             if case .standalone = $0.key { true } else { false }
         }
         .sorted { $0.value.id.uuidString < $1.value.id.uuidString }
-        let containerRootIDs = Set(state.containers.values.flatMap { [$0.pinnedRootID, $0.unpinnedRootID] })
+        let containerRootIDs = Set(state.containers.values.map(\.unpinnedRootID))
         profiles = state.profiles
         spaces = state.spaces
         self.tree = tree(state.tree.rootIDs.filter { !containerRootIDs.contains($0) })
@@ -173,7 +173,7 @@ struct SidebarSnapshot: Codable {
             ? nil
             : Containers(
                 entries: saved.map { type, space in
-                    (type, Containers.Value(spaces: [space], tree: tree([space.pinnedRootID, space.unpinnedRootID])))
+                    (type, Containers.Value(spaces: [space], tree: tree([space.unpinnedRootID])))
                 })
     }
 
@@ -185,8 +185,13 @@ struct SidebarSnapshot: Codable {
             tree: SidebarTree(rootIDs: trees.flatMap(\.rootIDs), items: trees.flatMap(\.items).map(\.item)),
             archive: archive)
         for entry in entries {
-            guard entry.value.spaces.count == 1, let space = entry.value.spaces.first else {
+            guard entry.value.spaces.count == 1, var space = entry.value.spaces.first else {
                 throw SnapshotError.invalid("container \(entry.type) hasn't one space")
+            }
+            // A file from before Arc's shape was matched, when a window's own Space had a pinned root, always empty.
+            if let pinnedRootID = space.pinnedRootID, state.tree[pinnedRootID]?.childIDs.isEmpty == true {
+                state.tree.removeRoot(pinnedRootID)
+                space.pinnedRootID = nil
             }
             state.containers[entry.type] = space
         }
@@ -218,11 +223,16 @@ extension SidebarState {
             try check(tree.rootIDs.contains(profile.favoritesRootID), "profile \(profile.id) has no favorites root")
             try check(tree[profile.favoritesRootID]?.container == .favorites, "bad favorites root for \(profile.id)")
         }
+        for space in spaces {
+            try check(space.pinnedRootID != nil, "space \(space.id) has no pinned root")
+        }
         for space in allSpaces {
             try check(profile(space.profileID) != nil, "space \(space.id) has no profile")
-            try check(tree.rootIDs.contains(space.pinnedRootID), "space \(space.id) has no pinned root")
+            if let pinnedRootID = space.pinnedRootID {
+                try check(tree.rootIDs.contains(pinnedRootID), "space \(space.id) has no pinned root")
+                try check(tree[pinnedRootID]?.container == .pinned, "bad pinned root for \(space.id)")
+            }
             try check(tree.rootIDs.contains(space.unpinnedRootID), "space \(space.id) has no unpinned root")
-            try check(tree[space.pinnedRootID]?.container == .pinned, "bad pinned root for \(space.id)")
             try check(tree[space.unpinnedRootID]?.container == .unpinned, "bad unpinned root for \(space.id)")
         }
     }
