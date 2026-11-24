@@ -198,7 +198,10 @@ final class MainMenu {
         tabs.addItem(last)
         tabs.addItem(.separator())
         tabs.addItem(item("Favorite Tab", #selector(BrowserWindowController.toggleFavorite(_:))))
-        tabs.addItem(item("Clear Today", #selector(BrowserWindowController.clearTabs(_:)), id: "clearExplore"))
+        tabs.addItem(
+            item(
+                "Clear Today", #selector(BrowserWindowController.clearTabs(_:)), key: "k",
+                modifiers: [.command, .shift], id: "clearExplore"))
         tabs.addItem(.separator())
         tabs.addItem(
             item(
@@ -222,7 +225,13 @@ final class MainMenu {
         window.addItem(item("Zoom", #selector(NSWindow.performZoom(_:))))
         window.addItem(.separator())
         window.addItem(
-            item("View Downloads…", #selector(BrowserWindowController.toggleDownloads(_:)), id: "viewDownloads"))
+            item(
+                "View Library", #selector(BrowserWindowController.toggleLibrary(_:)), key: "l",
+                modifiers: [.command, .shift], id: "viewLibrary"))
+        window.addItem(
+            item(
+                "View Downloads", #selector(BrowserWindowController.toggleDownloads(_:)), key: "j",
+                modifiers: [.command, .shift], id: "viewDownloads"))
         window.addItem(.separator())
         window.addItem(item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:))))
         application.windowsMenu = window
