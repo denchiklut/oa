@@ -104,6 +104,12 @@ final class MainMenu {
                 "Show/Hide Sidebar", #selector(BrowserWindowController.toggleSidebarMode(_:)), key: "s",
                 id: "showSidebar", priority: .promptAfterConsumedByWebView))
         view.addItem(item("Collapse Pinned Tabs", #selector(BrowserWindowController.togglePinnedSection(_:))))
+        let reveal = item(
+            "Reveal Current Tab", #selector(BrowserWindowController.focusSidebar(_:)), key: " ", modifiers: .control,
+            id: "focusSidebar", priority: .promptAfterConsumedByWebView)
+        reveal.isHidden = true
+        reveal.allowsKeyEquivalentWhenHidden = true
+        view.addItem(reveal)
         view.addItem(
             item(
                 "Show/Hide Toolbar", #selector(ApplicationDelegate.toggleToolbar(_:)), key: "d",
@@ -150,14 +156,21 @@ final class MainMenu {
                 modifiers: [.command, .control], id: "fullscreen", priority: .promptAfterConsumedByWebView))
 
         let archive = submenu("Archive", in: menu)
-        archive.addItem(
-            item(
-                "Back", #selector(BrowserWindowController.goBack(_:)), key: "[", id: "goBack",
-                priority: .overrideWebView))
-        archive.addItem(
-            item(
-                "Forward", #selector(BrowserWindowController.goForward(_:)), key: "]", id: "goForward",
-                priority: .overrideWebView))
+        // The alternates are hidden with their keys kept and the same titles, as in Arc's menu.
+        let back = #selector(BrowserWindowController.goBack(_:))
+        let forward = #selector(BrowserWindowController.goForward(_:))
+        let alternates = [
+            item("Back", back, key: "\u{F702}", id: "goBack_Alternate"),
+            item("Forward", forward, key: "\u{F703}", id: "goForward_Alternate"),
+        ]
+        for alternate in alternates {
+            alternate.isHidden = true
+            alternate.allowsKeyEquivalentWhenHidden = true
+        }
+        archive.addItem(item("Back", back, key: "[", id: "goBack", priority: .overrideWebView))
+        archive.addItem(alternates[0])
+        archive.addItem(item("Forward", forward, key: "]", id: "goForward", priority: .overrideWebView))
+        archive.addItem(alternates[1])
         archive.addItem(.separator())
         archive.addItem(
             item("View History", #selector(BrowserWindowController.viewHistory(_:)), key: "y", id: "viewHistory"))

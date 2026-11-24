@@ -183,6 +183,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func cycleToNextRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.next) }
     @objc func cycleToPreviousRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.previous) }
     @objc func togglePin(_ sender: Any?) { model.togglePin() }
+    @objc func focusSidebar(_ sender: Any?) { layout.revealCurrentTab() }
     @objc func toggleFavorite(_ sender: Any?) { model.toggleFavorite() }
 
     /// As Arc's File ▸ New Profile: the create sheet with the window's Space ticked.
@@ -309,6 +310,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             if item.isHidden { return false }
         }
         if model.dialog != nil || model.extensionRequest != nil { return false }
+        // Oa's own, as Arc's isn't traced: ⌘← and ⌘→ stay with a text field that is editing.
+        if (item as? KeyBindableMenuItem)?.arcKeyBindingID.hasSuffix("_Alternate") == true,
+            window?.firstResponder is NSText
+        {
+            return false
+        }
         // As Arc: the Create a Space panel holds back creating and editing a Space, not moving between them.
         let editsSpace = [
             #selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(editTheme(_:)), #selector(changeProfile(_:)),

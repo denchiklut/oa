@@ -72,6 +72,7 @@ final class WindowLayoutController: NSViewController {
     var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
     @ObservationIgnored private var holds: Set<Hold> = []
+    @ObservationIgnored private var revealingCurrentTab: Task<Void, Never>?
     @ObservationIgnored private var spaceStyleEditorPopover: (spaceID: UUID, popover: SpaceStyleEditorPopover)?
     @ObservationIgnored private var monitor: Any?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -544,6 +545,19 @@ final class WindowLayoutController: NSViewController {
         updatePresentation()
     }
 
+    /// As seen in Arc: a hidden sidebar comes out and goes again 3 s later, unless the pointer is over it then.
+    func revealCurrentTab() {
+        guard model.sidebarMode != .anchored else { return }
+        revealingCurrentTab?.cancel()
+        revealingCurrentTab = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled, let self else { return }
+            revealingCurrentTab = nil
+            trackPointer()
+        }
+        updatePresentation()
+    }
+
     /// Oa's own, after open-arch: a tab opened from the Library leaves the panel away until the pointer asks for it.
     func dismissSidebar() {
         guard sidebarPresentation == .floating else { return }
@@ -652,7 +666,9 @@ final class WindowLayoutController: NSViewController {
         let prompts = model.permissionRequest != nil && !PageToolbar.isShown
         // As Arc: the theme editor beside the sidebar brings it out and keeps it out.
         let editsTheme = model.spaceStyleEditor?.origin == .sidebar
-        if hover.reveals(active: floating, allowTop: allowTop) || model.selectedTabID == nil || prompts || editsTheme {
+        if hover.reveals(active: floating, allowTop: allowTop) || model.selectedTabID == nil || prompts || editsTheme
+            || revealingCurrentTab != nil
+        {
             return .floating
         }
         return floating && !holds.isEmpty ? .floating : .hidden
