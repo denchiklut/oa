@@ -68,6 +68,7 @@ extension ShortcutsPane {
         case "findNext": "Jumps to the next time your search query appears on the page."
         case "findPrevious": "Jumps to the previous time your search query appears on the page."
         case "useSelectionForFind": "Opens a search box to find the words you’ve highlighted on the current page."
+        case "jumpToSelection": "Jumps to the thing you searched for on a page."
         case "pasteAndMatchStyle": "Pastes the selected text and matches the current text styling."
         case "addSplitView": "Adds a new page to your current Split View."
         case "removeSplitView": "Closes the Split View page that’s currently in focus."
