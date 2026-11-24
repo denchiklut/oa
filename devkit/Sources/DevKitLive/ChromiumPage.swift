@@ -164,6 +164,10 @@ final class ChromiumPage: Page, MediaSession {
         if page != nil { continuation.yield(.wantsActivation) }
     }
 
+    fileprivate func openLinkInIncognitoWindow(_ url: URL) {
+        if page != nil { continuation.yield(.openLinkInIncognitoWindow(url)) }
+    }
+
     fileprivate func rendererGone(_ exit: Int) {
         if let crash = PageCrash(rendererExit: exit), crash != self.crash { self.crash = crash }
     }
@@ -318,6 +322,8 @@ final class PageDelegate: NSObject, CorePageDelegate {
     }
 
     func pageWantsActivation(_ page: CorePage) { content?.wantsActivation() }
+
+    func page(_ page: CorePage, openLinkInIncognitoWindow url: URL) { content?.openLinkInIncognitoWindow(url) }
 
     func page(_ page: CorePage, rendererGone exit: Int) { content?.rendererGone(exit) }
 

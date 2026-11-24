@@ -84,6 +84,7 @@ final class StubPage: Page, MediaSession {
 
     @ObservationIgnored private let downloads: StubDownloads
     @ObservationIgnored private let extensions: StubExtensions
+    @ObservationIgnored var isIncognito = false
 
     init(id: UUID, windowID: UUID, downloads: StubDownloads, extensions: StubExtensions) {
         self.id = id
@@ -332,6 +333,7 @@ final class StubPage: Page, MediaSession {
         components.query = nil
         guard let target = components.url else { return }
         let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
+        opened.isIncognito = isIncognito
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(disposition), byPage: byPage))
     }
@@ -360,6 +362,12 @@ final class StubPage: Page, MediaSession {
             StubMenuItem("Open Link in New Window") { [weak self] in self?.open(.newWindow, byPage: false) })
         menu.addItem(
             StubMenuItem("Open Link in Split View") { [weak self] in self?.open(.splitView, byPage: false) })
+        if !isIncognito, let url {
+            menu.addItem(
+                StubMenuItem("Open Link in Incognito Window") { [weak self] in
+                    self?.continuation?.yield(.openLinkInIncognitoWindow(url.appending(path: "incognito")))
+                })
+        }
         return menu
     }
 

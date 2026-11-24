@@ -308,6 +308,7 @@ import AppKit
     @objc(page:didOpenPage:targetURL:disposition:byPage:)
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int, byPage: Bool)
     @objc(pageWantsActivation:) func pageWantsActivation(_ page: CorePage)
+    @objc(page:openLinkInIncognitoWindow:) func page(_ page: CorePage, openLinkInIncognitoWindow url: URL)
     @objc(page:rendererGone:) func page(_ page: CorePage, rendererGone exit: Int)
     @objc(pageRendererReady:) func pageRendererReady(_ page: CorePage)
     @objc(page:didRequestDialog:) func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog)

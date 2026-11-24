@@ -175,6 +175,8 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
     disposition:(OAPageOpenDisposition)disposition
          byPage:(BOOL)byPage;
 - (void)pageWantsActivation:(OAPage*)page;
+// The page menu's Open Link in Incognito Window, as ArcCore's.
+- (void)page:(OAPage*)page openLinkInIncognitoWindow:(NSURL*)url;
 - (void)page:(OAPage*)page rendererGone:(OAPageRendererExit)exit;
 - (void)pageRendererReady:(OAPage*)page;
 - (void)page:(OAPage*)page didRequestDialog:(OAPageDialog*)dialog;
