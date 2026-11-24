@@ -28,6 +28,7 @@ final class StubPage: Page, MediaSession {
     private(set) var isCameraOn = false
     private(set) var isMicrophoneOn = false
     private(set) var hasFocus = false
+    private(set) var selectedText = ""
     var keepsAddress = false
     /// A video with sound, playing: what the engine's media session reports as active audio and video.
     var isPlayingVideo = false
@@ -58,6 +59,8 @@ final class StubPage: Page, MediaSession {
     @ObservationIgnored private var isInPictureInPicture = false
     @ObservationIgnored private var isObservingThumbnails = false
     @ObservationIgnored private var thumbnail: NSImage?
+    @ObservationIgnored private var findQuery = ""
+    @ObservationIgnored private var activeMatch = 0
     @ObservationIgnored private lazy var hostingView: NSView = {
         let view = StubHostingView(rootView: StubPageView(page: self))
         view.sizingOptions = []
@@ -135,6 +138,34 @@ final class StubPage: Page, MediaSession {
     }
 
     func reloadBypassingCache() { reload() }
+
+    /// As the engine's find, over what the stub page shows of itself: a new query activates its first match, the
+    /// same one steps through them.
+    func find(_ text: String, direction: FindDirection, findMatch: Bool) {
+        let query = text.lowercased()
+        guard !query.isEmpty else {
+            findQuery = ""
+            continuation?.yield(.findResult(FindResult(numberOfMatches: 0, activeMatchOrdinal: -1)))
+            return
+        }
+        let shown = [title, url?.absoluteString ?? "", "Stub engine"].joined(separator: "\n").lowercased()
+        let count = shown.components(separatedBy: query).count - 1
+        let step = direction == .backward ? -1 : 1
+        if count == 0 || !findMatch {
+            activeMatch = 0
+        } else if query != findQuery || activeMatch == 0 {
+            activeMatch = step > 0 ? 1 : count
+        } else {
+            activeMatch = (activeMatch - 1 + step + count) % count + 1
+        }
+        findQuery = query
+        continuation?.yield(.findResult(FindResult(numberOfMatches: count, activeMatchOrdinal: activeMatch)))
+    }
+
+    func stopFinding() { findQuery = "" }
+
+    /// Stands for the user selecting the page's title.
+    func selectTitle() { selectedText = title }
 
     func stopLoading() { finishLoading() }
 
@@ -651,6 +682,7 @@ private struct StubPageView: View {
                             Button("Open a page") { page.open(.foregroundTab) }
                             Button("Open in background") { page.open(.backgroundTab) }
                             Button("Shift-click a link") { page.open(.newWindow) }
+                            Button("Select the title") { page.selectTitle() }
                         }
                         HStack(spacing: 16) {
                             Button("Follow a link on this host") { page.followLink() }

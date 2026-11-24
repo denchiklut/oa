@@ -35,6 +35,8 @@
 - (void)pageThumbnail:(NSImage*)thumbnail;
 - (void)pageConsumedKey:(unsigned short)keyCode
           modifierFlags:(NSEventModifierFlags)modifierFlags;
+- (void)pageFindMatches:(int)numberOfMatches
+     activeMatchOrdinal:(int)activeMatchOrdinal;
 - (void)pageCloseCancelled;
 - (void)setPage:(std::unique_ptr<oa::Page>)page;
 - (void)pageStateChanged;
@@ -248,6 +250,11 @@ class PageObserverBridge : public oa::Page::Observer {
   }
   void OnPageConsumedKey(int key_code, unsigned long modifier_flags) override {
     [page_ pageConsumedKey:key_code modifierFlags:modifier_flags];
+  }
+  void OnPageFindResult(int number_of_matches,
+                        int active_match_ordinal) override {
+    [page_ pageFindMatches:number_of_matches
+        activeMatchOrdinal:active_match_ordinal];
   }
   void OnPageCloseCancelled() override { [page_ pageCloseCancelled]; }
   void OnPageClosed(std::optional<int32_t> session_id) override {
@@ -551,6 +558,10 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   return _page && _page->HasFocus();
 }
 
+- (NSString*)selectedText {
+  return _page ? ToNSString(_page->SelectedText()) : @"";
+}
+
 - (OAPageMediaSessionStatus)mediaSessionStatus {
   std::optional<oa::MediaSessionState> state;
   if (_page) {
@@ -626,6 +637,20 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 - (void)reloadBypassingCache {
   if (_page) {
     _page->ReloadBypassingCache();
+  }
+}
+
+- (void)findText:(NSString*)text
+         forward:(BOOL)forward
+       findMatch:(BOOL)findMatch {
+  if (_page) {
+    _page->Find(text.UTF8String ?: "", forward, findMatch);
+  }
+}
+
+- (void)stopFinding {
+  if (_page) {
+    _page->StopFinding();
   }
 }
 
@@ -827,6 +852,13 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   [self.delegate page:self
           didConsumeKey:keyCode
       withModifierFlags:modifierFlags];
+}
+
+- (void)pageFindMatches:(int)numberOfMatches
+     activeMatchOrdinal:(int)activeMatchOrdinal {
+  [self.delegate page:self
+          didFindMatches:numberOfMatches
+      activeMatchOrdinal:activeMatchOrdinal];
 }
 
 - (void)pageCloseCancelled {

@@ -237,6 +237,10 @@ class Page {
     // reports, so a key consumed in a frame of another process doesn't.
     virtual void OnPageConsumedKey(int key_code,
                                    unsigned long modifier_flags) = 0;
+    // Each result Chrome's find tab helper has for the page's find, as
+    // ArcCore's find completion: -1 for what it doesn't know yet.
+    virtual void OnPageFindResult(int number_of_matches,
+                                  int active_match_ordinal) = 0;
     // A beforeunload handler kept the page after Close().
     virtual void OnPageCloseCancelled() = 0;
     virtual void OnPageClosed(std::optional<int32_t> session_id) = 0;
@@ -276,6 +280,10 @@ class Page {
   virtual bool HasFocus() const = 0;
   // Null while the page has no media session.
   virtual std::optional<MediaSessionState> GetMediaSessionState() const = 0;
+  // As ArcCore's cached selectedText: what the user last selected in any of
+  // the page's frames. A script's selection doesn't count, and a navigation
+  // keeps it.
+  virtual std::string SelectedText() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;
@@ -284,6 +292,12 @@ class Page {
   virtual void ReloadBypassingCache() = 0;
   virtual void Stop() = 0;
   virtual void Activate() = 0;
+  // As ArcCore's find: through Chrome's find tab helper, never case-sensitive,
+  // scrolling to the active match. Empty text clears the find and reports no
+  // matches at once.
+  virtual void Find(const std::string& text, bool forward, bool find_match) = 0;
+  // As ArcCore's stopFind: the active match stays as the page's selection.
+  virtual void StopFinding() = 0;
   // As a pinned tab: a link to another host opens a new page, reported
   // through the observer, instead of navigating this one.
   virtual void SetKeepsAddress(bool keeps_address) = 0;

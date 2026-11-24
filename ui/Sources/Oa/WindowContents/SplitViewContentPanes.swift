@@ -204,7 +204,9 @@ private struct SplitViewContentPane: View {
             }
             .windowContentGrabber(
                 model: model, hasContent: page != nil || model.placeholder(for: tabID) != nil,
-                barHeight: splitID == nil ? 0 : 32)
+                barHeight: splitID == nil ? 0 : 32
+            )
+            .findInPage(of: model, on: model.placeholder(for: tabID) == nil ? page : nil)
         }
         .toast(of: model, on: page)
         .background(dark ? Color.black : .white)

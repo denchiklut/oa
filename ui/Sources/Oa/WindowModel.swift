@@ -78,6 +78,8 @@ final class WindowModel {
     /// As Arc's `WindowState.modalItemSwitcherPresentation`: the ⌃⇥ switcher while it is up.
     private(set) var modalItemSwitcher: ModalItemSwitcher?
     private(set) var toast: WindowToast?
+    /// By page: the find bars this window has open.
+    var findInPage: [UUID: FindInPage.State] = [:]
     /// Arc's `WindowState.queuedHotkey`: the menu item a consumed shortcut asked about, while its toast is up.
     @ObservationIgnored private weak var queuedHotkey: NSMenuItem?
     @ObservationIgnored private var toastRemoval: Task<Void, Never>?
@@ -2367,6 +2369,7 @@ final class WindowModel {
     private func handle(_ event: PageEvent, for pageID: UUID) {
         // As Arc's quit recording: pages that unload on quit leave the sidebar as it is.
         if case .closed = event, store.quitting { return }
+        if case .closed = event { findInPage[pageID] = nil }
         switch event {
         case .dialog(let dialog):
             // As Arc: a page asks to be shown first, and a "Leave site?" its window still can't show leaves unasked.
@@ -2394,6 +2397,8 @@ final class WindowModel {
             return forget(request)
         case .consumedKey(let keyCode, let modifierFlags):
             return webContentDidConsume(keyCode: keyCode, modifierFlags: modifierFlags, pageID: pageID)
+        case .findResult(let result):
+            return found(result, on: pageID)
         case .thumbnail(let thumbnail):
             // As Arc's thumbnail listener: every thumbnail is kept as its page's snapshot, then goes to the toolbar's
             // colours, which sample a shown page's.
