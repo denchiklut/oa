@@ -101,6 +101,8 @@ final class WindowModel {
     @ObservationIgnored private var awaitedRestoration: (profileID: UUID, tabID: UUID?)?
     /// Opens another window on this one's Space with the tab selected; the tab's page follows it there.
     @ObservationIgnored var openWindow: (_ tabID: UUID) -> Void = { _ in }
+    /// The global window a Blank Window's tabs go to for a Space, opened when there is none.
+    @ObservationIgnored var globalWindow: (_ spaceID: UUID) -> WindowModel? = { _ in nil }
     @ObservationIgnored var openLinkInIncognitoWindow: (_ url: URL, _ profileID: UUID) -> Void = { _, _ in }
     @ObservationIgnored let downloads: DownloadsStore
     @ObservationIgnored private let pictureInPicture: PictureInPicture
@@ -922,6 +924,7 @@ final class WindowModel {
     /// As seen in Arc: several items land at the top of the list in their order, and without the shown tab among
     /// them the window stays and says where they went.
     func moveItems(_ itemIDs: [UUID], toSpace spaceID: UUID) {
+        if sidebarContext == .standalone { return moveItemsToGlobalWindow(itemIDs, toSpace: spaceID) }
         let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
         guard !itemIDs.isEmpty, let space = state.space(spaceID) else { return }
         let tabIDs = itemIDs.flatMap { state.splitView($0) != nil ? state.tree[$0]?.childIDs ?? [] : [$0] }
@@ -942,6 +945,43 @@ final class WindowModel {
             selectedTabIDs[sourceSpaceID] = nil
             selectSpace(spaceID)
             select(focused)
+        }
+        if crossesProfile {
+            ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space.name, in: self, proceed: move)
+        } else {
+            move()
+        }
+    }
+
+    /// As Arc's `moveItemsToGlobalDestination` from a Blank Window: the items go in their order to the top of the
+    /// global Space's list, keeping their IDs and live pages, into the window `globalWindow` picks, which comes
+    /// forward. It shows the Space and the tab only when the tab was the one shown here. As seen in Arc, no toast,
+    /// and this window stays, empty or not, unless `closingWindow` (Arc's `hasCloseWindowIntent`, the header's Move
+    /// to…). As Arc's `beginMoveItems`, a Space of another profile asks first; the sheet on this window is Oa's own.
+    func moveItemsToGlobalWindow(_ itemIDs: [UUID], toSpace spaceID: UUID, closingWindow: Bool = false) {
+        let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
+        guard sidebarContext == .standalone, state.isGlobal(spaceID), !itemIDs.isEmpty, let space = state.space(spaceID)
+        else { return }
+        let tabIDs = itemIDs.flatMap { state.splitView($0) != nil ? state.tree[$0]?.childIDs ?? [] : [$0] }
+        let focused = presentedTabIDs.contains(where: tabIDs.contains) ? selectedTabID : nil
+        let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
+        let move = { [weak self] in
+            guard let self else { return }
+            let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
+            guard !itemIDs.isEmpty, let destination = globalWindow(spaceID) else { return }
+            multiSelection = SidebarMultiSelection()
+            if crossesProfile {
+                for window in store.windows { window.dropPages(of: tabIDs) }
+            } else {
+                for tabID in tabIDs { destination.takePage(of: tabID, from: self) }
+            }
+            store.edit { state in for itemID in itemIDs.reversed() { state.move(itemID, toSpace: spaceID) } }
+            if let focused {
+                destination.selectSpace(spaceID)
+                destination.select(focused)
+            }
+            destination.bringToFront()
+            if closingWindow { Task { [weak window] in window?.close() } }
         }
         if crossesProfile {
             ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space.name, in: self, proceed: move)
@@ -2300,8 +2340,12 @@ final class WindowModel {
     /// As Arc's eject on deselection, a page still being made goes too.
     private func handOff(_ tabID: UUID) {
         guard let heir = store.windows.first(where: { $0 !== self && $0.shows(tabID) }) else { return }
-        if creating[tabID] != nil { return heir.takeCreation(of: tabID, from: self) }
-        if let page = release(tabID) { heir.adopt(page, for: tabID, from: self) }
+        heir.takePage(of: tabID, from: self)
+    }
+
+    private func takePage(of tabID: UUID, from holder: WindowModel) {
+        if holder.creating[tabID] != nil { return takeCreation(of: tabID, from: holder) }
+        if let page = holder.release(tabID) { adopt(page, for: tabID, from: holder) }
     }
 
     private func takeCreation(of tabID: UUID, from maker: WindowModel) {
