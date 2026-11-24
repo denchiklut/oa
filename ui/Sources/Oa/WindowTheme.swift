@@ -201,18 +201,18 @@ extension WindowTheme {
 }
 
 extension WindowTheme {
-    /// Arc's `WindowTheme.incognito`: a basic colour, dark in either appearance. The colour is the frame Arc draws, as
-    /// measured; the palettes from it are Oa's own, as Arc's aren't decoded.
+    /// Arc's `WindowTheme.incognito`, with the values its binary builds it from: a basic colour, dark in either
+    /// appearance, and the palettes of the default theme. Arc leaves its translucency style and content appearance
+    /// nil, which in a window forced dark resolve to the dark ones.
     static let incognito: WindowTheme = {
-        let color = NSColor(displayP3Red: 0x0E / 255, green: 0x0F / 255, blue: 0x13 / 255, alpha: 1)
-        let palette = PrimaryColorPalette(key: color.usingColorSpace(.extendedSRGB)!)
+        let color = NSColor(displayP3Red: 0.054, green: 0.06, blue: 0.075, alpha: 1)
         return WindowTheme(
             background: .single(
                 Background(
                     style: .color(.basicColor(BasicColor(color: ThemeColor(color), translucencyStyle: .dark))),
                     contentOverBackgroundAppearance: .dark, isVibrant: false)),
-            windowAppearance: .single(.dark), primaryColorPalette: palette,
-            semanticColorPalette: .single(SemanticColorPalette(palette, .dark)))
+            windowAppearance: .single(.dark), primaryColorPalette: WindowTheme.default.primaryColorPalette,
+            semanticColorPalette: WindowTheme.default.semanticColorPalette)
     }()
 }
 
