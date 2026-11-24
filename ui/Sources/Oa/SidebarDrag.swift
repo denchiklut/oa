@@ -73,8 +73,8 @@ final class SidebarDrag {
     /// The tab the window showed before the press selected the dragged one.
     @ObservationIgnored private var previousTabID: UUID?
     @ObservationIgnored private var showsPrevious = false
-    /// As measured on Arc: the edge of a pane the pointer entered, which holds until the pane's middle.
-    @ObservationIgnored private var heldEdge: (pane: Int, edge: Edge)?
+    /// The insert shown, which holds while the pointer is over its slot.
+    @ObservationIgnored private var heldInsert: (index: Int, layoutOrientation: SidebarSplitViewData.LayoutOrientation)?
     /// As Arc's `dropHapticSubject`s, one per Space's list and grid: the last slot each was sent, kept across drags.
     @ObservationIgnored private var hapticSlots: [HapticSource: Int] = [:]
     /// The row under the pointer's middle band, and since when.
@@ -156,7 +156,7 @@ final class SidebarDrag {
     /// Over a place, the tab moves there at once and the copy glides onto it; elsewhere it glides back.
     func finish(model: WindowModel, layout: WindowLayoutController) {
         guard let entry, let tab = entry.tabs.first, !settling else { return }
-        heldEdge = nil
+        heldInsert = nil
         combineCandidate = nil
         // As seen in Arc: a drag ends the multi-selection however it ends.
         model.clearMultiSelection()
@@ -266,15 +266,15 @@ final class SidebarDrag {
     }
 
     /// Arc's page drop. Over the page the window shows what it showed before the press, as Arc's does once the drag
-    /// begins. An edge of a pane inserts there and the rest of it replaces its tab. As measured on a lone page: the
-    /// outer 40 % at the sides, 50 pt at the top and 40 pt at the bottom, and an edge once entered holds over the
-    /// half its preview takes. In a split, whose edges weren't measured: those of its orientation while it has room,
-    /// LIKELY by Arc's other sizes, a third of the pane up to 80 pt at the sides and 50 pt at the ends, with no hold.
+    /// begins. An edge of a pane inserts there and the rest of it replaces its tab. As measured on Arc: on a lone page
+    /// the outer 40 % at the sides, 50 pt at the top and 40 pt at the bottom; in a split a pane's outer 80 pt on
+    /// either side, LIKELY a third of the pane where that is less, and 50 pt at the ends of a stacked one. A shown
+    /// insert holds while the pointer is over its slot, the gap beside it included.
     /// A pinned tab or a Favorite goes in as itself and a copy keeps its place, LIKELY as by Arc's other ways in.
     private func splitViewDropTarget(at point: CGPoint, model: WindowModel) -> SplitViewDropTarget? {
         // As seen in Arc: several rows over the page show no drop.
         guard let entry, memberIDs.isEmpty, pageArea.contains(point), model.library == nil, !model.coversWindow else {
-            heldEdge = nil
+            heldInsert = nil
             return nil
         }
         if !showsPrevious, let previousTabID, !entry.tabs.contains(where: { $0.id == previousTabID }),
@@ -287,27 +287,33 @@ final class SidebarDrag {
         guard case .tab(let tab) = entry, let anchorID = model.selectedTabID, !tabIDs.contains(tab.id),
             model.state.canJoinSplitView(tab.id, of: anchorID, in: model.selectedSpaceID)
         else { return nil }
+        if let held = heldInsert {
+            let count = tabIDs.count + 1
+            let vertical = held.layoutOrientation == .vertical
+            let slots = SplitViewContentPanes.frames(
+                Array(repeating: 1 / CGFloat(count), count: count), in: pageArea, vertical: vertical)
+            let reach = SplitViewContentPanes.draggerHandleWidth
+            if held.index < slots.count,
+                slots[held.index].insetBy(dx: vertical ? 0 : -reach, dy: vertical ? -reach : 0).contains(point)
+            {
+                return SplitViewDropTarget(
+                    target: .insertContent(held.index), layoutOrientation: held.layoutOrientation)
+            }
+        }
         let splitID = model.state.splitViewID(containing: anchorID)
-        let orientation = model.splitViewLayoutOrientation
+        let orientation =
+            splitID == nil ? SidebarSplitViewData.LayoutOrientation.horizontal : model.splitViewLayoutOrientation
         let frames = SplitViewContentPanes.frames(
             splitID.map(model.paneShares(of:)) ?? [1], in: pageArea, vertical: orientation == .vertical)
-        guard let pane = frames.firstIndex(where: { $0.insetBy(dx: -5, dy: -5).contains(point) }) else { return nil }
+        guard let pane = frames.firstIndex(where: { $0.insetBy(dx: -5, dy: -5).contains(point) }) else {
+            heldInsert = nil
+            return nil
+        }
         let frame = frames[pane]
         let x = (point.x - frame.minX) / frame.width
-        let y = (point.y - frame.minY) / frame.height
         var edge: Edge?
         if splitID == nil {
-            let holds =
-                switch heldEdge?.edge {
-                case .left: x < 0.5
-                case .right: x > 0.5
-                case .top: y < 0.5
-                case .bottom: y > 0.5
-                case nil: false
-                }
-            if holds {
-                edge = heldEdge?.edge
-            } else if point.y <= frame.minY + min(frame.height / 3, 50) {
+            if point.y <= frame.minY + min(frame.height / 3, 50) {
                 edge = .top
             } else if point.y >= frame.maxY - 40 {
                 edge = .bottom
@@ -324,13 +330,16 @@ final class SidebarDrag {
             edge = point.y <= frame.minY + end ? .top : point.y >= frame.maxY - end ? .bottom : nil
         }
         guard let edge, tabIDs.count < SidebarSplitViewData.maxNumberSplit else {
-            heldEdge = nil
+            heldInsert = nil
             return SplitViewDropTarget(target: .replaceContent(pane), layoutOrientation: orientation)
         }
-        heldEdge = (pane, edge)
-        return SplitViewDropTarget(
+        let proposal = SplitViewDropTarget(
             target: .insertContent(edge == .left || edge == .top ? pane : pane + 1),
             layoutOrientation: splitID != nil ? orientation : edge == .left || edge == .right ? .horizontal : .vertical)
+        if case .insertContent(let index) = proposal.target {
+            heldInsert = (index, proposal.layoutOrientation)
+        }
+        return proposal
     }
 
     /// As measured on Arc: the card is the pane one more pane would make, scaled to 249 pt for the page's height,
