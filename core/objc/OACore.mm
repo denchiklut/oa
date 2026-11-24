@@ -90,7 +90,8 @@
 @end
 
 @interface OADownloads ()
-- (instancetype)initWithProfileIdentifier:(NSString*)identifier;
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier
+                                     type:(oa::BrowserContextType)type;
 - (void)downloadsInitialized:(const std::vector<oa::Download>&)downloads;
 - (void)downloadCreated:(const oa::Download&)download page:(oa::Page*)page;
 - (void)downloadUpdated:(const oa::Download&)download page:(oa::Page*)page;
@@ -1220,15 +1221,18 @@ class DownloadsObserverBridge : public oa::Downloads::Observer {
 
 @implementation OADownloads {
   NSString* _profileIdentifier;
+  oa::BrowserContextType _type;
   std::unique_ptr<DownloadsObserverBridge> _observer;
   std::unique_ptr<oa::Downloads> _downloads;
 }
 
 @synthesize delegate = _delegate;
 
-- (instancetype)initWithProfileIdentifier:(NSString*)identifier {
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier
+                                     type:(oa::BrowserContextType)type {
   if ((self = [super init])) {
     _profileIdentifier = [identifier copy];
+    _type = type;
     _observer = std::make_unique<DownloadsObserverBridge>(self);
   }
   return self;
@@ -1238,7 +1242,7 @@ class DownloadsObserverBridge : public oa::Downloads::Observer {
   _delegate = delegate;
   if (delegate && !_downloads) {
     _downloads = oa::ObserveDownloads(_profileIdentifier.UTF8String ?: "",
-                                      _observer.get());
+                                      _type, _observer.get());
   }
 }
 
@@ -1857,9 +1861,8 @@ class BrowserObserverBridge : public oa::Browser::Observer {
   if ((self = [super init])) {
     _identifier = [identifier copy];
     _type = type;
-    _downloads =
-        parent.downloads
-            ?: [[OADownloads alloc] initWithProfileIdentifier:identifier];
+    _downloads = [[OADownloads alloc] initWithProfileIdentifier:identifier
+                                                           type:type];
     _preferences =
         parent.preferences
             ?: [[OAPreferences alloc] initWithProfileIdentifier:identifier];

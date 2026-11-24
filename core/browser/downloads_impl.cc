@@ -7,13 +7,17 @@
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/download/download_core_service.h"
 #include "chrome/browser/download/download_core_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_observer.h"
+#include "chrome/common/pref_names.h"
 #include "components/download/content/public/all_download_item_notifier.h"
 #include "components/download/public/common/download_item.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/download_item_utils.h"
 #include "content/public/browser/download_manager.h"
 #include "oa/browser/page_impl.h"
@@ -63,13 +67,18 @@ bool IsListed(download::DownloadItem* item) {
   return !item->IsTransient() && !item->IsTemporary();
 }
 
-// As ArcCore's: an observer of every item of the profile's DownloadManager,
-// beside Chrome's own delegate, history and target determiner.
+// As ArcCore's: an observer of every item of the context's DownloadManager,
+// beside Chrome's own delegate, history and target determiner. An incognito
+// one follows its profile's off-the-record profile as Chromium makes and
+// destroys it.
 class DownloadsImpl : public Downloads,
-                      public download::AllDownloadItemNotifier::Observer {
+                      public download::AllDownloadItemNotifier::Observer,
+                      public ProfileObserver {
  public:
-  DownloadsImpl(const std::string& profile_id, Downloads::Observer* observer)
-      : observer_(observer) {
+  DownloadsImpl(const std::string& profile_id,
+                BrowserContextType type,
+                Downloads::Observer* observer)
+      : type_(type), observer_(observer) {
     LoadBrowserProfile(profile_id, base::BindOnce(&DownloadsImpl::Start,
                                                   weak_factory_.GetWeakPtr()));
   }
@@ -131,10 +140,38 @@ class DownloadsImpl : public Downloads,
         },
         item->GetGuid()));
   }
+  // As seen in Arc: an incognito context's downloads leave the list with it.
+  void OnManagerGoingDown(content::DownloadManager* manager) override {
+    if (type_ != BrowserContextType::kIncognito) {
+      return;
+    }
+    content::DownloadManager::DownloadVector items;
+    manager->GetAllDownloads(&items);
+    for (download::DownloadItem* item : items) {
+      OnDownloadRemoved(manager, item);
+    }
+  }
+
+  // ProfileObserver:
+  // Posted: the profile is still being set up when this is called.
+  void OnOffTheRecordProfileCreated(Profile* off_the_record) override {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&DownloadsImpl::WatchOffTheRecord,
+                                  weak_factory_.GetWeakPtr()));
+  }
+  void OnProfileWillBeDestroyed(Profile* profile) override {
+    notifier_.reset();
+    profile_observation_.Reset();
+  }
 
  private:
   void Start(Profile* profile) {
     if (!profile) {
+      return;
+    }
+    if (type_ == BrowserContextType::kIncognito) {
+      profile_observation_.Observe(profile);
+      WatchOffTheRecord();
       return;
     }
     notifier_.emplace(profile->GetDownloadManager(), this);
@@ -143,6 +180,21 @@ class DownloadsImpl : public Downloads,
     DownloadCoreServiceFactory::GetForBrowserContext(profile)
         ->InitializeHistory(
             DownloadCoreService::DownloadHistoryLoadTrigger::kDownloadBubble);
+  }
+
+  void WatchOffTheRecord() {
+    Profile* profile = profile_observation_.GetSource();
+    Profile* off_the_record =
+        profile ? profile->GetPrimaryOTRProfile(/*create_if_needed=*/false)
+                : nullptr;
+    if (!off_the_record) {
+      return;
+    }
+    notifier_.emplace(off_the_record->GetDownloadManager(), this);
+    // Chrome's download UI, made with the manager, sets an off-the-record
+    // profile to ask where each file goes. Arc's doesn't ask (seen), so the
+    // profile's own setting shows through again.
+    off_the_record->GetPrefs()->ClearPref(prefs::kPromptForDownload);
   }
 
   download::DownloadItem* Find(const std::string& id) {
@@ -180,16 +232,19 @@ class DownloadsImpl : public Downloads,
                        weak_factory_.GetWeakPtr(), std::move(call)));
   }
 
+  const BrowserContextType type_;
   raw_ptr<Downloads::Observer> observer_;
   std::optional<download::AllDownloadItemNotifier> notifier_;
+  base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
   base::WeakPtrFactory<DownloadsImpl> weak_factory_{this};
 };
 
 }  // namespace
 
 std::unique_ptr<Downloads> ObserveDownloads(const std::string& profile_id,
+                                            BrowserContextType type,
                                             Downloads::Observer* observer) {
-  return std::make_unique<DownloadsImpl>(profile_id, observer);
+  return std::make_unique<DownloadsImpl>(profile_id, type, observer);
 }
 
 }  // namespace oa

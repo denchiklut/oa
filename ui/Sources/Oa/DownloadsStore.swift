@@ -6,13 +6,16 @@ import Observation
 import UniformTypeIdentifiers
 
 /// Every profile's downloads as one list, as Arc's Library shows them, and the app's side of them: which open when
-/// they finish.
+/// they finish. As seen in Arc, an incognito context's are listed with them in every window, unmarked, until the
+/// context goes.
 @MainActor
 @Observable
 final class DownloadsStore {
     struct Entry: Identifiable, Equatable {
         let download: Download
         let profileID: UUID
+        /// Arc's `Download.isIncognito`: which of the profile's contexts runs it.
+        var isIncognito = false
 
         var id: Download.ID { download.id }
     }
@@ -34,8 +37,10 @@ final class DownloadsStore {
         // Not a profile the engine lost and the sidebar still records: asking for its downloads would make it anew.
         let listed = Set(engine.allProfiles() + [SidebarProfile.defaultID])
         return sidebar.state.profiles.filter { listed.contains($0.id) }.flatMap { profile in
-            engine.browserContext(id: profile.id).downloads.items.filter { $0.file != nil }
-                .map { Entry(download: $0, profileID: profile.id) }
+            [false, true].flatMap { isIncognito in
+                downloads(in: profile.id, isIncognito: isIncognito).items.filter { $0.file != nil }
+                    .map { Entry(download: $0, profileID: profile.id, isIncognito: isIncognito) }
+            }
         }
         .sorted { $0.download.startedAt > $1.download.startedAt }
     }
@@ -85,12 +90,16 @@ final class DownloadsStore {
     }
 
     func cancel(_ entry: Entry) {
-        engine.browserContext(id: entry.profileID).downloads.cancel(entry.id)
+        downloads(in: entry.profileID, isIncognito: entry.isIncognito).cancel(entry.id)
     }
 
     /// Arc's Hide: the row goes, from the engine's history too, and a finished file stays.
     func hide(_ entry: Entry) {
-        engine.browserContext(id: entry.profileID).downloads.remove(entry.id)
+        downloads(in: entry.profileID, isIncognito: entry.isIncognito).remove(entry.id)
+    }
+
+    private func downloads(in profileID: UUID, isIncognito: Bool) -> any Downloads {
+        engine.browserContext(id: profileID, type: isIncognito ? .incognito : .normal).downloads
     }
 
     func trash(_ entry: Entry) {

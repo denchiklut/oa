@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "oa/public/profiles.h"
+
 // A profile's downloads as Chromium runs and remembers them, in the shape of
 // ArcCore's browser context downloads and its download item. No Chromium
 // headers here.
@@ -52,8 +54,8 @@ class Downloads {
   // on a download from inside one.
   class Observer {
    public:
-    // Once, with the downloads Chromium's history brought back and any already
-    // running.
+    // With the downloads Chromium's history brought back and any already
+    // running; for an incognito context, each time Chromium makes it.
     virtual void OnDownloadsInitialized(
         const std::vector<Download>& downloads) = 0;
     // `page` started it and is still open; null otherwise, as for a download
@@ -77,9 +79,13 @@ class Downloads {
   virtual void Remove(const std::string& id) = 0;
 };
 
-// Loads the app profile `profile_id` if needed, then reports its downloads to
-// `observer` until the result is destroyed.
+// Loads the app profile `profile_id` if needed, then reports the downloads of
+// its context of `type` to `observer` until the result is destroyed. As
+// ArcCore's, each context has its own: an incognito one's are reported while
+// Chromium has that context and removed when it goes, their files staying.
+// Asking doesn't make one.
 std::unique_ptr<Downloads> ObserveDownloads(const std::string& profile_id,
+                                            BrowserContextType type,
                                             Downloads::Observer* observer);
 
 }  // namespace oa
