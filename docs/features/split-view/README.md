@@ -20,16 +20,21 @@ order, and each pane is an ordinary tab with its own page.
   open of a page in a new foreground tab while the click had ⌥, as a
   `target=_blank` link or a `window.open`, is a split too, by ADK's rule. An
   ⌥-click inside a frame is a download, as in Arc.
-- **Dropping a tab on the page.** A sidebar tab dragged over the page shows
-  where it would go. On a lone page an edge makes a split with it: the outer
-  40 % at the sides, 50 pt at the top and 40 pt at the bottom, and the top and
-  bottom make a stacked one. The page moves aside without being resized, over
-  0.2 s, and an outlined pane takes the other half; an edge once entered holds
-  over that half. The page's middle only outlines it, and a drop there selects
-  the tab. In a split, an edge of a pane inserts the tab there while there is
-  room, and the rest of the pane replaces its tab, which is a plain tab again
-  right after the split. The dropped tab takes the focus. While the tab is over
-  the page the window shows what it showed before the press.
+- **Dropping a tab on the page.** A sidebar tab dragged over the page turns
+  into Arc's card over about 0.2 s: black at 0.9 with 20 pt corners, its favicon
+  and its title, 249 pt tall and as wide as the pane one more pane would make at
+  that scale, so it narrows as the split grows. The pointer keeps its place on
+  it. On a lone page an edge makes a split with it: the outer 40 % at the sides,
+  50 pt at the top and 40 pt at the bottom, and the top and bottom make a stacked
+  one. In a split a pane's outer 80 pt on either side, a third of the pane where
+  that is less, and 50 pt at the ends of a stacked one, insert the tab there
+  while there is room. The panes take the places they would have after the
+  drop, over 0.2 s, moved and not resized, around a slot with no fill and a 2 pt
+  light border, and the slot holds while the pointer is over it. The rest of a
+  pane outlines it: the tab replaces that pane's tab, which is a plain tab again
+  right after the split; on a lone page the drop only selects the tab. The
+  dropped tab takes the focus. While the tab is over the page the window shows
+  what it showed before the press.
 - **Add Split View.** View ▸ Add Split View ⌃⇧=, New Split in the dock's "+", Add
   Split View in the selected row's menu and Add Tab… in a split's open an empty
   pane at the end with the command bar. Return opens the row in a new tab in
@@ -51,6 +56,7 @@ order, and each pane is an ordinary tab with its own page.
 - **Stacked splits.** Convert turns every pane and keeps the factors. A stacked
   pane's bar shows the whole address after its scheme.
 - **Resizing.** The gap between two panes is the handle, with a 2 × 24 pt grip
+  in its middle, white 0.2 and 0.49 while the pointer is anywhere on the gap,
   and the resize cursor. A drag moves the edge with the pointer, with no
   snapping, and neither pane beside it goes under 220 pt. A double click gives
   the two panes equal parts over about 0.19 s. The window keeps its own sizes
@@ -67,15 +73,18 @@ order, and each pane is an ordinary tab with its own page.
   Split View… in Site Controls' place, and shows the search prompt while an
   empty pane waits.
 - **Focus.** The focused pane is the window's selected tab. It has a 2 pt
-  outline inside its edge and a glow into the gaps beside it. A click on a
+  outline inside its edge and a glow into the gaps beside it, over its
+  neighbours' edges. Beside other panes the gap is the window's own, only a
+  little darker at their edges. A click on a
   pane's page reaches the page and focuses the pane: the engine reports which
   page has the keyboard, as ArcCore's `hasFocus`, and the window follows it. A
   click on a pane's bar focuses it too.
 - **Sidebar cell.** One card for the split with a small card for each tab. A
   press selects the split with the pane the window focused in it last, and on
   the selected split the tab pressed. Under the pointer the selected split
-  shows a ✕ for each tab, and one that isn't selected a single ✕ that archives
-  all its tabs; Edit ▸ Undo, "Undo Archive Tabs", brings the split back whole,
+  shows a ✕ for each tab, with its title while there is room, and lights no
+  tab; one that isn't selected shows a single ✕, its tabs making room for it,
+  that archives all its tabs. A tab's tooltip is its title; Edit ▸ Undo, "Undo Archive Tabs", brings the split back whole,
   with its ID, where it was. Its menu has Share Split View…, Separate All Tabs,
   Add Tab…, Convert, and for each tab Separate from Split View and Archive Item.
 - **Dragging a split.** A press anywhere on its cell, selected or not, drags
@@ -85,11 +94,13 @@ order, and each pane is an ordinary tab with its own page.
   tile, and a Favorite split's tile dragged out turns back into the cell. A
   split is never dropped on the page: the one under the drag is itself.
 - **Dropping on a row.** A tab held on the middle half of another row for
-  0.2 s from entering it turns that row into the split it would make, the held
-  tab first and lit; the drop makes it there, a pinned row's in the pinned
-  section, and the held tab takes the focus. Held on a split's cell, the cell
-  lights up and the tab joins it first, or last from the cell's right half; a
-  full split lights up and takes nothing. On a row's edges the line comes back.
+  0.2 s from entering it turns that row into the split it would make: the row's
+  tab keeps its card and a lit empty one takes the held tab's place, before it
+  from the row's left half and after it from its right half, with the held copy
+  still over it. The drop makes it there, in that order, a pinned row's in the
+  pinned section, and the held tab takes the focus. Held on a split's cell, the
+  cell lights up and the tab joins it first, or last from the cell's right half;
+  a full split lights up and takes nothing. On a row's edges the line comes back.
   A split's cell and the Favorites never combine.
 - **Change Icon….** The cell's and the tile's Change Icon… open the icon picker
   below the cell; a pick applies at once and the picker stays. A split with an
@@ -123,8 +134,11 @@ order, and each pane is an ordinary tab with its own page.
   a pinned split that isn't selected archives its tabs.
 - **Favorite splits.** Favorite Tab on a split's tab files the whole split under
   the profile's Favorites, as one tile in the grid: a 12 pt favicon on each
-  pane's part; selected, one card with the panes' favicons' tint and ring, the
-  ring also between the parts; not selected, a card for each part, 2 pt apart.
+  pane's part, two parts side by side and three or four in a 2 × 2 grid filled
+  by column, so a third pane takes the whole right column; selected, one card
+  with the panes' favicons' tint and ring, the ring also between the parts; not
+  selected, the tile's card cut into its parts 2 pt apart, which light together
+  under the pointer.
   A click selects the split with the pane focused last, ⌘W leaves nothing
   selected with its pages kept, and the tile's menu has Archive Item, which
   archives its tabs, and no Remove Favorite or Rename….
@@ -198,11 +212,11 @@ Oa's own:
 - A split's row in the command bar takes its focused pane's title; Arc's row
   title wasn't recorded. Picking it from an empty pane switches to the split;
   Arc's rule there wasn't made out.
-- A split's drop edges are Arc's other zone sizes, a third of the pane up to
-  80 pt at the sides and 50 pt at the ends, with no hold; Arc's weren't measured
-  in a split. The page comes back when the dragged tab reaches the page, where
-  Arc's comes back as the drag begins. Only a tab that can be in a split can be
-  dropped, and the dragged copy stays a row.
+- A stacked split's drop ends are 50 pt, and its card keeps the side by side
+  card's scale; Arc's weren't measured. The slot's border in light is black at
+  0.25; Arc's light wasn't measured. The lit card of a row's combine preview is
+  the selected card's fill; Arc's lay under the held copy in every capture. Only
+  a tab that can be in a split can be dropped.
 
 A permission prompt shows once its pane is the focused one, as Arc's waits for
 that. Arc's then closes by itself, unanswered; Oa's stays until it is answered.
