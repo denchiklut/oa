@@ -537,10 +537,11 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // The app's windows of the last launch are back: a Browser restored for a
 // window that isn't is closed.
 - (void)finishedRestoringWindows;
-// Saves and closes each profile's session before the app drops its pages, as
-// Chrome's quit does.
+// Saves and closes each profile's session on quit, as Chrome's quit does.
 - (void)saveSessionsForQuit;
-- (void)quit;
+// Writes what quitting must keep, then runs `completion`, as ArcCore's
+// shutdown does; nothing closes.
+- (void)flushForQuit:(void (^)(void))completion;
 @end
 
 NS_ASSUME_NONNULL_END

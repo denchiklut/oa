@@ -3,16 +3,20 @@
 #import <AppKit/AppKit.h>
 #import <objc/message.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <variant>
+#include <vector>
 
+#include "base/barrier_closure.h"
 #include "base/base_switches.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/ref_counted.h"
 #include "base/no_destructor.h"
 #include "base/sampling_heap_profiler/poisson_allocation_sampler.h"
 #include "base/strings/strcat.h"
@@ -22,13 +26,15 @@
 #include "chrome/app/chrome_main_delegate.h"
 #include "chrome/app/chrome_main_mac.h"
 #include "chrome/app/startup_timestamps.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_browser_application_mac.h"
 #include "chrome/browser/chrome_browser_main_mac.h"
 #include "chrome/browser/chrome_content_browser_client.h"
-#include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/sessions/exit_type_service.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
@@ -42,9 +48,11 @@
 #include "components/lens/lens_features.h"
 #include "components/omnibox/browser/autocomplete_provider.h"
 #include "components/omnibox/common/omnibox_features.h"
+#include "components/prefs/pref_service.h"
 #include "components/security_interstitials/core/features.h"
 #include "content/public/app/content_main.h"
 #include "content/public/browser/browser_main_runner.h"
+#include "content/public/browser/storage_partition.h"
 #include "content/public/common/main_function_params.h"
 #include "oa/browser/ad_blocker_service.h"
 #include "oa/browser/page_impl.h"
@@ -59,6 +67,7 @@
 #include "oa/browser/ui/video_overlay_window_impl.h"
 #include "oa/browser/window_browser.h"
 #include "oa/public/ad_blocker.h"
+#include "services/network/public/mojom/cookie_manager.mojom.h"
 
 // The app's NSApplication: Chrome's event handling without its AppController.
 @interface OAApplication : BrowserCrApplication
@@ -328,14 +337,41 @@ void SaveSessionsForQuit() {
   ProfileManager::ShutdownSessionServices();
 }
 
-void QuitEngine() {
-  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce([] {
-        browser_shutdown::SetTryingToQuit(true);
-        ChromeDevToolsManagerDelegate::AllowBrowserToClose();
-        WindowBrowser::CloseAll();
-        State().keep_alive.reset();
-      }));
+void FlushForQuit(std::function<void()> completion) {
+  browser_shutdown::SetTryingToQuit(true);
+  auto pending =
+      base::MakeRefCounted<base::RefCountedData<std::function<void()>>>(
+          std::move(completion));
+  base::RepeatingClosure finish = base::BindRepeating(
+      [](scoped_refptr<base::RefCountedData<std::function<void()>>> pending) {
+        if (std::function<void()> completion =
+                std::exchange(pending->data, nullptr)) {
+          completion();
+        }
+      },
+      pending);
+  std::vector<Profile*> profiles =
+      g_browser_process->profile_manager()->GetLoadedProfiles();
+  // As ArcCore's flush: each loaded profile's cookies and prefs, then Local
+  // State.
+  base::RepeatingClosure flushed =
+      base::BarrierClosure(2 * profiles.size() + 1, finish);
+  for (Profile* profile : profiles) {
+    // As ArcCore, for every loaded profile: without it the next launch reads
+    // as one after a crash.
+    if (ExitTypeService* exit_type =
+            ExitTypeService::GetInstanceForProfile(profile)) {
+      exit_type->SetCurrentSessionExitType(ExitType::kClean);
+    }
+    profile->GetDefaultStoragePartition()
+        ->GetCookieManagerForBrowserProcess()
+        ->FlushCookieStore(flushed);
+    profile->GetPrefs()->CommitPendingWrite(flushed);
+  }
+  g_browser_process->local_state()->CommitPendingWrite(flushed);
+  // As ArcCore's watchdog.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, finish, base::Seconds(10));
 }
 
 }  // namespace oa

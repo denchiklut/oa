@@ -157,7 +157,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         modalItemSwitcher?.controller.close()
         downloadPreview.close()
         extensionPopup.close()
-        model.dropAll(handingOff: true)
+        model.dropAll()
         store.removeWindow(model)
         engine.closeWindow(id: model.id)
         didClose(self)

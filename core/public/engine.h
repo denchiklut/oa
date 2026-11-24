@@ -49,7 +49,10 @@ void FinishedRestoringWindows();
 // pages go, so they stay in the last session.
 void SaveSessionsForQuit();
 
-void QuitEngine();
+// As ArcCore's production shutdown: the exit is marked clean and each loaded
+// profile's cookies and prefs are written, then `completion` runs, after 10 s
+// at the latest. No Browser closes; the process exits with its pages.
+void FlushForQuit(std::function<void()> completion);
 
 }  // namespace oa
 
