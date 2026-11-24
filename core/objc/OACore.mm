@@ -48,6 +48,7 @@
            disposition:(oa::OpenDisposition)disposition
                 byPage:(BOOL)byPage;
 - (void)pageWantsActivation;
+- (void)pageOpenLinkInIncognitoWindow:(const std::string&)url;
 - (void)pageRendererGone:(oa::RendererExit)exit;
 - (void)pageRendererReady;
 - (void)pageClosedWithSessionID:(int32_t)sessionID;
@@ -230,6 +231,9 @@ class PageObserverBridge : public oa::Page::Observer {
                    byPage:by_page];
   }
   void OnPageWantsActivation() override { [page_ pageWantsActivation]; }
+  void OnPageOpenLinkInIncognitoWindow(const std::string& url) override {
+    [page_ pageOpenLinkInIncognitoWindow:url];
+  }
   void OnPageRendererGone(oa::RendererExit exit) override {
     [page_ pageRendererGone:exit];
   }
@@ -942,6 +946,12 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (void)pageWantsActivation {
   [self.delegate pageWantsActivation:self];
+}
+
+- (void)pageOpenLinkInIncognitoWindow:(const std::string&)url {
+  if (NSURL* link = [NSURL URLWithString:ToNSString(url)]) {
+    [self.delegate page:self openLinkInIncognitoWindow:link];
+  }
 }
 
 - (void)pageRendererGone:(oa::RendererExit)exit {

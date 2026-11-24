@@ -668,6 +668,9 @@ public enum PageEvent {
     /// The page asked to be shown, as `window.focus()` and a `window.open` reusing a named page do. The app selects
     /// its tab or ignores it.
     case wantsActivation
+    /// The page menu's Open Link in Incognito Window, as ADK's `onOpenLinkInIncognitoWindow`: only the address. The
+    /// engine offers it only on a page of a profile's own context.
+    case openLinkInIncognitoWindow(URL)
     /// The page asked for a dialog; the app shows it and answers it once.
     case dialog(PageDialog)
     /// The engine closed the dialog: a navigation, a tab switch, a close. No answer is expected.

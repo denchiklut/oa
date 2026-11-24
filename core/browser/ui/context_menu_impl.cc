@@ -20,7 +20,6 @@ constexpr auto kHiddenCommands = base::MakeFixedFlatSet<int>({
     IDC_SEND_TAB_TO_SELF,
     IDC_LIVE_CAPTION,
     IDC_CONTEXT_COMPOSE,
-    IDC_CONTENT_CONTEXT_OPENLINKOFFTHERECORD,
     IDC_CONTENT_CONTEXT_OPENLINK_ISOLATED,
     IDC_CONTENT_CONTEXT_OPENLINKINPROFILE,
     IDC_CONTENT_CONTEXT_OPENLINKBOOKMARKAPP,
@@ -89,6 +88,12 @@ void EditModel(const content::ContextMenuParams& params,
     model->RemoveItemAt(*split);
     model->InsertItemAt(*split, IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW,
                         u"Open Link in Split View");
+  }
+  if (const std::optional<size_t> incognito = model->GetIndexOfCommandId(
+          IDC_CONTENT_CONTEXT_OPENLINKOFFTHERECORD)) {
+    model->RemoveItemAt(*incognito);
+    model->InsertItemAt(*incognito, IDC_CONTENT_CONTEXT_OPENLINKOFFTHERECORD,
+                        u"Open Link in Incognito Window");
   }
   // As Arc: the search for selected text leads the menu, ahead of Copy and
   // of spelling suggestions; on a link it stays where Chrome puts it.

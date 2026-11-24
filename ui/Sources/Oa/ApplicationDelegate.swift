@@ -203,6 +203,17 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         openWindow(context: .incognito, profileID: incognitoProfileID)
     }
 
+    /// As Arc's `onOpenLinkInIncognitoWindow`: a new tab in the open incognito window, which comes forward, else in a
+    /// new one with no command bar. Oa's own with several: the frontmost of the page's profile.
+    private func openLinkInIncognitoWindow(_ url: URL, profileID: UUID) {
+        guard !engine.incognitoDisabled else { return }
+        let model =
+            frontWindows.first { $0.sidebarContext == .incognito && $0.space?.profileID == profileID }
+            ?? openWindow(context: .incognito, profileID: profileID)
+        model.bringToFront()
+        model.newTab(url)
+    }
+
     private var incognitoProfileID: UUID {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
         return key?.model.space?.profileID ?? SidebarProfile.defaultID
@@ -361,6 +372,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         }
         controller.model.openWindow = { [weak self, weak model = controller.model] tabID in
             self?.openWindow(selecting: tabID, from: model)
+        }
+        controller.model.openLinkInIncognitoWindow = { [weak self] url, profileID in
+            self?.openLinkInIncognitoWindow(url, profileID: profileID)
         }
         // As seen in Arc: from the key window.
         let previous = (windows.first { $0.model === source } ?? key)?.window
