@@ -2580,11 +2580,10 @@ final class WindowModel {
         // ⌘ is Arc's Little Arc, which Oa doesn't have, so a background page, Oa's own.
         let held = NSEvent.modifierFlags.intersection([.option, .command, .shift, .control])
         let disposition = disposition == .backgroundTab && held == .option ? .splitView : disposition
-        // As seen in Arc from a Blank Window's Peek: a Shift-click inside it opens no second Peek but a window.
-        let ownSidebar = sidebarContext != .global
-        let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick || (insidePeek && ownSidebar))
+        // As seen in Arc, in any window: a Shift-click inside a Peek opens no second Peek but a window.
+        let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick || insidePeek)
         // As Arc's `createTabInNewWindow(url:isIncognito:)`: only the address goes, and loads afresh there.
-        if inWindow, ownSidebar {
+        if inWindow, insidePeek || sidebarContext != .global {
             page.drop()
             if let url { openURLInNewWindow(url) }
             return
