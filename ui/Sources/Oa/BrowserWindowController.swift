@@ -13,6 +13,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let downloadPreview = DownloadPreviewWindow()
     private let extensionPopup = ExtensionPopupWindow()
     private var modalItemSwitcher: (state: ModalItemSwitcher, controller: ModalItemSwitcherWindowController)?
+    private var webDialog: WebDialogWindowController?
     private var viewTimer: Task<Void, Never>?
     /// As Arc's `BrowserWindow.windowButtons`: the title bar's own, taken before the sidebar's header makes its set,
     /// which the window would hand out in their place. They show only in full screen.
@@ -74,6 +75,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         observeDownloadPreview()
         observeExtensionPopup()
         observeModalItemSwitcher()
+        observeWebDialog()
         // As Arc's per-window timer: each minute the shown tab counts as viewed, unless the window is fully hidden.
         viewTimer = Task { [weak self] in
             while !Task.isCancelled {
@@ -121,6 +123,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         controller.beginObservingEvents()
     }
 
+    private func observeWebDialog() {
+        let dialog = withObservationTracking {
+            model.webDialogs.first
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeWebDialog() }
+        }
+        guard webDialog?.dialog !== dialog else { return }
+        webDialog?.end()
+        webDialog = nil
+        guard let window, let dialog else { return }
+        let controller = WebDialogWindowController(dialog: dialog)
+        webDialog = controller
+        controller.begin(on: window)
+    }
+
     private func observeTitle() {
         let title = withObservationTracking {
             _ = model.peek
@@ -157,6 +174,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         modalItemSwitcher?.controller.close()
         downloadPreview.close()
         extensionPopup.close()
+        webDialog?.end()
         model.dropAll()
         store.removeWindow(model)
         engine.closeWindow(id: model.id)
@@ -172,6 +190,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func zoomIn(_ sender: Any?) { zoom(.in) }
     @objc func zoomOut(_ sender: Any?) { zoom(.out) }
     @objc func savePageAs(_ sender: Any?) { model.frontPage?.savePage() }
+    @objc func printPage(_ sender: Any?) { model.frontPage?.print() }
     @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
     @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
@@ -423,7 +442,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(resetZoom(_:)): model.canZoom(.reset)
         case #selector(zoomIn(_:)): model.canZoom(.in)
         case #selector(zoomOut(_:)): model.canZoom(.out)
-        case #selector(savePageAs(_:)): model.frontPage != nil
+        case #selector(savePageAs(_:)), #selector(printPage(_:)): model.frontPage != nil
         case #selector(addSplitView(_:)): model.canAddSplitViewPane
         case #selector(closeFocusedSplitViewPanel(_:)), #selector(separateTabFromSplitView(_:)),
             #selector(switchToNextSplitViewPane(_:)), #selector(switchToPreviousSplitViewPane(_:)):

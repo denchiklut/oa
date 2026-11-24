@@ -16,7 +16,6 @@ namespace oa {
 namespace {
 
 constexpr auto kHiddenCommands = base::MakeFixedFlatSet<int>({
-    IDC_PRINT,
     IDC_ROUTE_MEDIA,
     IDC_SEND_TAB_TO_SELF,
     IDC_LIVE_CAPTION,

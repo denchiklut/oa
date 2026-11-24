@@ -121,6 +121,17 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)respond:(BOOL)accepted;
 @end
 
+// A WebUI dialog Chrome shows over the page, such as print preview, as
+// ArcCore's ArcWebDialog. `view` is the engine's until the dialog closes.
+@interface OAPageWebDialog : NSObject
+@property(nonatomic, readonly) NSString* title;
+@property(nonatomic, readonly) NSString* accessibleTitle;
+@property(nonatomic, readonly) NSSize preferredSize;
+@property(nonatomic, readonly) NSSize minimumSize;
+@property(nonatomic, readonly) NSView* view;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
 // `openedPage` has no delegate yet; releasing it drops the page.
@@ -148,6 +159,10 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
     pictureInPicture:(OAPagePictureInPictureEvent)event
                 view:(nullable NSView*)view
                 rect:(NSRect)rect;
+// As ArcCore's webContents:showWebUIDialog: and
+// webContents:didCloseWebUIDialog:.
+- (void)page:(OAPage*)page didShowWebDialog:(OAPageWebDialog*)dialog;
+- (void)page:(OAPage*)page didCloseWebDialog:(OAPageWebDialog*)dialog;
 // Every thumbnail Chrome makes of the page, as ArcCore's
 // webContents:thumbnailReady:, at one pixel a point.
 - (void)page:(OAPage*)page thumbnailReady:(NSImage*)thumbnail;
@@ -208,6 +223,7 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)reloadBypassingCache;
 - (void)resetZoomAndScaleFactors;
 - (void)savePage;
+- (void)print;
 - (void)stopLoading;
 - (void)activate;
 // As ArcCore's find:forward:matchCase:findMatch:, never case-sensitive.

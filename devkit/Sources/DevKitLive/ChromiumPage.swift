@@ -38,6 +38,7 @@ final class ChromiumPage: Page, MediaSession {
     @ObservationIgnored private var permissionRequests: [ObjectIdentifier: PagePermissionRequest] = [:]
     @ObservationIgnored private var extensionRequests: [ObjectIdentifier: PageExtensionRequest] = [:]
     @ObservationIgnored private var hasPictureInPictureController = false
+    @ObservationIgnored private var webDialogs: [ObjectIdentifier: WebDialog] = [:]
     @ObservationIgnored private var isObservingThumbnails = false
 
     var view: NSView { hostingView }
@@ -79,6 +80,7 @@ final class ChromiumPage: Page, MediaSession {
     func setZoomFactor(_ factor: Float) { page?.zoomFactor = factor }
     func resetZoomAndScaleFactors() { page?.resetZoomAndScaleFactors() }
     func savePage() { page?.savePage() }
+    func print() { page?.print() }
     func stopLoading() { page?.stopLoading() }
     func activate() { page?.activate() }
     func find(_ text: String, direction: FindDirection, findMatch: Bool) {
@@ -227,6 +229,21 @@ final class ChromiumPage: Page, MediaSession {
         continuation.yield(.pictureInPicture(event))
     }
 
+    fileprivate func webDialogShown(_ core: CorePageWebDialog) {
+        guard page != nil else { return }
+        let dialog = WebDialog(
+            title: core.title, accessibleTitle: core.accessibleTitle, preferredSize: core.preferredSize,
+            minimumSize: core.minimumSize, view: core.view)
+        webDialogs[ObjectIdentifier(core)] = dialog
+        continuation.yield(.webDialog(dialog))
+    }
+
+    fileprivate func webDialogClosed(_ core: CorePageWebDialog) {
+        if let dialog = webDialogs.removeValue(forKey: ObjectIdentifier(core)) {
+            continuation.yield(.webDialogClosed(dialog))
+        }
+    }
+
     fileprivate func thumbnailReady(_ thumbnail: NSImage) {
         if page != nil { continuation.yield(.thumbnail(thumbnail)) }
     }
@@ -258,6 +275,9 @@ final class ChromiumPage: Page, MediaSession {
     private func finish() {
         page = nil
         extensionRequests = [:]
+        // The engine closes a page's dialogs after the page reports closed.
+        for dialog in webDialogs.values { continuation.yield(.webDialogClosed(dialog)) }
+        webDialogs = [:]
         if hasPictureInPictureController {
             hasPictureInPictureController = false
             continuation.yield(.pictureInPicture(.destroyed))
@@ -324,6 +344,10 @@ final class PageDelegate: NSObject, CorePageDelegate {
     func page(_ page: CorePage, pictureInPicture event: Int, view: NSView?, rect: NSRect) {
         content?.pictureInPicture(event, view: view, rect: rect)
     }
+
+    func page(_ page: CorePage, didShowWebDialog dialog: CorePageWebDialog) { content?.webDialogShown(dialog) }
+
+    func page(_ page: CorePage, didCloseWebDialog dialog: CorePageWebDialog) { content?.webDialogClosed(dialog) }
 
     func page(_ page: CorePage, thumbnailReady thumbnail: NSImage) { content?.thumbnailReady(thumbnail) }
 

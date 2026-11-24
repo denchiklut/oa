@@ -87,6 +87,10 @@ class PageImpl : public Page,
   // From the window Chromium shows this page's picture-in-picture video in.
   void NotifyPictureInPicture(const PictureInPictureEvent& event,
                               void* ns_view = nullptr);
+  // From a WebUI dialog Chrome shows over this page. False when nothing
+  // watches the page to show it.
+  bool NotifyWebDialog(const WebDialog& dialog, void* ns_view);
+  void NotifyWebDialogClosed(const WebDialog& dialog);
   // Runs the beforeunload handler as quitting does and keeps the page either
   // way. A handler-less page answers at once.
   void AskToLeave(std::function<void(bool leave)> callback);
@@ -121,6 +125,7 @@ class PageImpl : public Page,
   void Reload() override;
   void ReloadBypassingCache() override;
   void SavePage() override;
+  void Print() override;
   void Stop() override;
   void Activate() override;
   void Find(const std::string& text, bool forward, bool find_match) override;

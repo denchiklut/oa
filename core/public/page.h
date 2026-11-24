@@ -170,6 +170,18 @@ struct PictureInPictureEvent {
   double height = 0;
 };
 
+// A WebUI dialog Chrome shows over the page, such as print preview, as
+// ArcCore's ArcWebDialog. Sizes are in points.
+struct WebDialog {
+  uint64_t id = 0;
+  std::string title;
+  std::string accessible_title;
+  int preferred_width = 0;
+  int preferred_height = 0;
+  int minimum_width = 0;
+  int minimum_height = 0;
+};
+
 // sRGB and unpremultiplied, as SkColor4f.
 struct Color {
   float red = 0;
@@ -228,6 +240,12 @@ class Page {
     // sizes it.
     virtual void OnPagePictureInPicture(const PictureInPictureEvent& event,
                                         void* ns_view) = 0;
+    // `ns_view` draws the dialog, the engine's until OnPageWebDialogClosed.
+    // The app shows it over the page's window, as ArcCore's showWebUIDialog.
+    virtual void OnPageWebDialog(const WebDialog& dialog, void* ns_view) = 0;
+    // The dialog closed itself, from its own buttons or Escape, or with the
+    // page.
+    virtual void OnPageWebDialogClosed(const WebDialog& dialog) = 0;
     // Every thumbnail Chrome's tab thumbnail helper makes of the page, whoever
     // asked, as ArcCore's thumbnailReady: an NSImage of one pixel a point that
     // lives only for the call.
@@ -297,6 +315,9 @@ class Page {
   virtual void ReloadBypassingCache() = 0;
   // Chrome's Save Page As panel over the page's window, as ArcCore's save.
   virtual void SavePage() = 0;
+  // Chrome's print preview for the page, as ArcCore's print: nothing for a
+  // crashed page or one outside a Browser.
+  virtual void Print() = 0;
   virtual void Stop() = 0;
   virtual void Activate() = 0;
   // As ArcCore's find: through Chrome's find tab helper, never case-sensitive,

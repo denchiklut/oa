@@ -48,6 +48,7 @@ extension ShortcutsPane {
         case "reopenLastClosedTab": "Reopens the most recently closed tab."
         case "reloadPage": "Refreshes the current page."
         case "forceReloadPage": "Refreshes the page and clears any local caching."
+        case "printPage": "Prints the current page, or save it as a PDF."
         case "savePageAs": "Save the current page’s HTML, CSS, images, etc."
         case "stopLoading": "Stops loading the current page."
         case "resetZoom": "Zoom to actual page size."
