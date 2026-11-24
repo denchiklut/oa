@@ -930,7 +930,7 @@ final class WindowModel {
     /// into the window `globalWindow` picks, which comes forward. It shows the Space and the tab only when the tab
     /// was the one shown here. As seen in Arc, no toast, and this window stays, empty or not, unless `closingWindow`
     /// (Arc's `hasCloseWindowIntent`, the header's Move to…). As Arc's `beginMoveItems`, a Space of another profile
-    /// asks first; the sheet on this window is Oa's own.
+    /// asks first, and as seen in Arc on that window, which comes forward for it; a sheet there is Oa's own.
     func moveItems(_ itemIDs: [UUID], toSpace spaceID: UUID, closingWindow: Bool = false) {
         let standalone = sidebarContext == .standalone
         let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
@@ -939,10 +939,11 @@ final class WindowModel {
         let focused = presentedTabIDs.contains(where: tabIDs.contains) ? selectedTabID : nil
         let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
         let sourceSpaceID = selectedSpaceID
-        let move = { [weak self] in
-            guard let self else { return }
+        guard let destination = standalone ? globalWindow(spaceID) : self else { return }
+        let move = { [weak self, weak destination] in
+            guard let self, let destination else { return }
             let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
-            guard !itemIDs.isEmpty, let destination = standalone ? globalWindow(spaceID) : self else { return }
+            guard !itemIDs.isEmpty else { return }
             multiSelection = SidebarMultiSelection()
             if crossesProfile {
                 for window in store.windows { window.dropPages(of: tabIDs) }
@@ -962,7 +963,8 @@ final class WindowModel {
             if closingWindow { Task { [weak window] in window?.close() } }
         }
         if crossesProfile {
-            ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space.name, in: self, proceed: move)
+            if standalone { destination.bringToFront() }
+            ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space.name, in: destination, proceed: move)
         } else {
             move()
         }
