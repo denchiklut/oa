@@ -18,8 +18,9 @@ struct SidebarSnapshot: Codable {
     var spaces: [SidebarSpace]
     var tree: Tree
     var archive: [SidebarArchivedTab]
+    var containers: Containers?
 
-    private enum Key: String, CodingKey { case version, profiles, spaces, tree, archive }
+    private enum Key: String, CodingKey { case version, profiles, spaces, tree, archive, containers }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: Key.self)
@@ -28,6 +29,35 @@ struct SidebarSnapshot: Codable {
         spaces = try values.decode([SidebarSpace].self, forKey: .spaces)
         tree = try values.decode(Tree.self, forKey: .tree)
         archive = try values.decodeIfPresent([SidebarArchivedTab].self, forKey: .archive) ?? []
+        containers = try values.decodeIfPresent(Containers.self, forKey: .containers)
+    }
+
+    /// Arc's `sidebar.containers` past the global one, which is the rest of the file: an ordered dictionary written
+    /// as key, value, key, value, as Arc's is. A value holds its Spaces and its items as the global sidebar does.
+    struct Containers: Codable {
+        struct Value: Codable {
+            var spaces: [SidebarSpace]
+            var tree: Tree
+        }
+
+        var entries: [(type: SidebarContainerType, value: Value)] = []
+
+        init(entries: [(type: SidebarContainerType, value: Value)]) { self.entries = entries }
+
+        init(from decoder: Decoder) throws {
+            var values = try decoder.unkeyedContainer()
+            while !values.isAtEnd {
+                entries.append((try values.decode(SidebarContainerType.self), try values.decode(Value.self)))
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var values = encoder.unkeyedContainer()
+            for entry in entries {
+                try values.encode(entry.type)
+                try values.encode(entry.value)
+            }
+        }
     }
 
     struct Tree: Codable {
@@ -123,19 +153,40 @@ struct SidebarSnapshot: Codable {
     }
 
     init(state: SidebarState) {
+        func tree(_ rootIDs: [UUID]) -> Tree {
+            let items = rootIDs.flatMap { rootID in
+                (state.tree[rootID].map { [$0] } ?? []) + state.tree.descendants(of: rootID)
+            }
+            return Tree(rootIDs: rootIDs, items: items.map(Item.init))
+        }
+        let saved = state.containers.sorted { $0.value.id.uuidString < $1.value.id.uuidString }
+        let containerRootIDs = Set(state.containers.values.flatMap { [$0.pinnedRootID, $0.unpinnedRootID] })
         profiles = state.profiles
         spaces = state.spaces
-        let items = state.tree.rootIDs.flatMap { rootID in
-            (state.tree[rootID].map { [$0] } ?? []) + state.tree.descendants(of: rootID)
-        }
-        tree = Tree(rootIDs: state.tree.rootIDs, items: items.map(Item.init))
+        self.tree = tree(state.tree.rootIDs.filter { !containerRootIDs.contains($0) })
         archive = state.archive
+        containers =
+            saved.isEmpty
+            ? nil
+            : Containers(
+                entries: saved.map { type, space in
+                    (type, Containers.Value(spaces: [space], tree: tree([space.pinnedRootID, space.unpinnedRootID])))
+                })
     }
 
     func state() throws -> SidebarState {
-        let state = SidebarState(
-            profiles: profiles, spaces: spaces, tree: SidebarTree(rootIDs: tree.rootIDs, items: tree.items.map(\.item)),
+        let entries = containers?.entries ?? []
+        let trees = [tree] + entries.map(\.value.tree)
+        var state = SidebarState(
+            profiles: profiles, spaces: spaces,
+            tree: SidebarTree(rootIDs: trees.flatMap(\.rootIDs), items: trees.flatMap(\.items).map(\.item)),
             archive: archive)
+        for entry in entries {
+            guard entry.value.spaces.count == 1, let space = entry.value.spaces.first else {
+                throw SnapshotError.invalid("container \(entry.type) hasn't one space")
+            }
+            state.containers[entry.type] = space
+        }
         try state.validate()
         return state
     }
@@ -164,7 +215,7 @@ extension SidebarState {
             try check(tree.rootIDs.contains(profile.favoritesRootID), "profile \(profile.id) has no favorites root")
             try check(tree[profile.favoritesRootID]?.container == .favorites, "bad favorites root for \(profile.id)")
         }
-        for space in spaces {
+        for space in allSpaces {
             try check(profile(space.profileID) != nil, "space \(space.id) has no profile")
             try check(tree.rootIDs.contains(space.pinnedRootID), "space \(space.id) has no pinned root")
             try check(tree.rootIDs.contains(space.unpinnedRootID), "space \(space.id) has no unpinned root")
@@ -184,18 +235,25 @@ struct WindowRecord: Codable {
     var collapsedPinnedSpaces: Set<UUID>
     /// Oa's own key: the tab the window showed, which comes back shown with its page when the last session does.
     var selectedTabID: UUID?
+    var sidebarContext: SidebarContext
 
     private enum Key: String, CodingKey {
-        case id, selectedSpaceID, sidebarMode, sidebarWidth, lastActiveDates, createdDates, selectedTabID
+        case id, selectedSpaceID, sidebarMode, sidebarWidth, lastActiveDates, createdDates, selectedTabID, style
         case collapsedPinnedSpaces = "spacesWithCollapsedPinnedSections"
     }
 
+    /// Arc's `WindowCreationOptions.Style` as `StorableWindows` keeps it.
+    private enum Style: Codable {
+        case standard(sidebarContext: SidebarContext)
+    }
+
     init(
-        id: UUID, selectedSpaceID: UUID, sidebarMode: SidebarMode, sidebarWidth: CGFloat,
-        lastActiveDates: [UUID: Date], createdDates: [UUID: Date], collapsedPinnedSpaces: Set<UUID>,
-        selectedTabID: UUID?
+        id: UUID, sidebarContext: SidebarContext, selectedSpaceID: UUID, sidebarMode: SidebarMode,
+        sidebarWidth: CGFloat, lastActiveDates: [UUID: Date], createdDates: [UUID: Date],
+        collapsedPinnedSpaces: Set<UUID>, selectedTabID: UUID?
     ) {
         self.id = id
+        self.sidebarContext = sidebarContext
         self.selectedSpaceID = selectedSpaceID
         self.sidebarMode = sidebarMode
         self.sidebarWidth = sidebarWidth
@@ -222,6 +280,10 @@ struct WindowRecord: Codable {
         createdDates = try dates(.createdDates)
         collapsedPinnedSpaces = try values.decodeIfPresent(Set<UUID>.self, forKey: .collapsedPinnedSpaces) ?? []
         selectedTabID = try values.decodeIfPresent(UUID.self, forKey: .selectedTabID)
+        switch try values.decodeIfPresent(Style.self, forKey: .style) {
+        case .standard(let context): sidebarContext = context
+        case nil: sidebarContext = .global
+        }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -238,6 +300,7 @@ struct WindowRecord: Codable {
         try values.encode(
             collapsedPinnedSpaces.sorted { $0.uuidString < $1.uuidString }, forKey: .collapsedPinnedSpaces)
         try values.encodeIfPresent(selectedTabID, forKey: .selectedTabID)
+        try values.encode(Style.standard(sidebarContext: sidebarContext), forKey: .style)
     }
 }
 

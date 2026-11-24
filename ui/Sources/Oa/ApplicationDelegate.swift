@@ -92,6 +92,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             }
         }
         defaults.set(true, forKey: Self.restoresWindowsThroughAppKitKey)
+        store.removeContainersWithoutWindows()
         engine.finishedRestoringWindows()
         openExternalLinks(pendingLinks)
         pendingLinks.removeAll()
@@ -126,7 +127,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// As seen in Arc: in the last key window, switched to the routed Space, Most Recent being the one it shows.
     private func openExternalLinks(_ links: [URL]) {
         guard !links.isEmpty else { return }
-        let front = frontWindows.first ?? openWindow()
+        // Oa's own: a window with a sidebar of its own doesn't take them, as it can't switch Space.
+        let front = frontWindows.first { $0.sidebarContext == .global } ?? openWindow()
         for url in links {
             front.openRoutedLink(url, in: store.routedSpace(for: url, recent: front.selectedSpaceID))
         }
@@ -178,6 +180,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
 
     @objc func newWindow(_ sender: Any?) { openWindow() }
+
+    /// As Arc's `onCreateNewBlankWindow`: a window on a sidebar of its own, one Space on the last focused profile,
+    /// which is the key window's Space's as seen; the command bar opens, as for any new window.
+    @objc func blankWindow(_ sender: Any?) {
+        let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
+        openWindow(context: .standalone, profileID: key?.model.space?.profileID)
+    }
+
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
     @objc func toggleToolbar(_ sender: Any?) { PageToolbar.isShown.toggle() }
     @objc func setAutomaticAppearance(_ sender: Any?) { AppAppearance.set(nil) }
@@ -191,6 +201,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         ]
         if let action = item.action, let name = appearances[action] {
             item.state = AppAppearance.current == name ? .on : .off
+            // As Arc: not while Settings is key.
+            return !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController)
+        }
+        if item.action == #selector(blankWindow(_:)) {
             // As Arc: not while Settings is key.
             return !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController)
         }
@@ -236,9 +250,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @objc func restoreData(_ sender: Any?) { restoreData.show() }
 
     /// As Arc's help links in Settings: a new tab in the frontmost window's Space, which comes forward while
-    /// Settings stays open. A new window when none is open is Oa's own.
+    /// Settings stays open. A new window when none is open, and passing over a window with a sidebar of its own, are
+    /// Oa's own.
     private func openHelp(_ url: URL) {
-        let model = frontWindows.first ?? openWindow()
+        let model = frontWindows.first { $0.sidebarContext == .global } ?? openWindow()
         model.bringToFront()
         model.newTab(url)
     }
@@ -249,17 +264,17 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private func openSettings(_ page: ChromiumSettings, in profileID: UUID) {
         if page != .settings { settings.close() }
         guard let space = store.state.spaces.first(where: { $0.profileID == profileID }) else { return }
-        let model =
-            frontWindows.first { $0.space?.profileID == profileID } ?? frontWindows.first ?? openWindow(on: space.id)
+        let windows = frontWindows.filter { $0.sidebarContext == .global }
+        let model = windows.first { $0.space?.profileID == profileID } ?? windows.first ?? openWindow(on: space.id)
         if model.space?.profileID != profileID { model.selectSpace(space.id) }
         model.bringToFront()
         model.newTab(page.url)
     }
 
     /// As Arc's + in Settings: the create sheet goes on the last key browser window, which comes forward. With no
-    /// browser window there is none.
+    /// browser window there is none. Oa's own: a window with a sidebar of its own is passed over.
     private func createProfile() {
-        guard let model = frontWindows.first else { return }
+        guard let model = frontWindows.first(where: { $0.sidebarContext == .global }) else { return }
         model.bringToFront()
         ProfileDialogUtils.createProfile(in: model)
     }
@@ -291,17 +306,34 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
 
     /// A new window opens on the key window's Space, or on the one asked for. A restored one brings its own
     /// selection. One opened for a tab of `source` opens beside it on its Space and selects the tab, as Arc's Open
-    /// Link in New Window does.
+    /// Link in New Window does. A window with a sidebar of its own opens on its container's Space, made here unless a
+    /// restored record finds it; one whose container is gone comes back global.
     @discardableResult
     private func openWindow(
         restoring record: WindowRecord? = nil, selecting tabID: UUID? = nil, from source: WindowModel? = nil,
-        on spaceID: UUID? = nil
+        on spaceID: UUID? = nil, context: SidebarContext = .global, profileID: UUID? = nil
     ) -> WindowModel {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
-        let spaceID = spaceID ?? (source ?? key?.model)?.selectedSpaceID ?? store.state.spaces[0].id
+        let id = record?.id ?? UUID()
+        var context = record?.sidebarContext ?? context
+        var spaceID = spaceID
+        if let container = context.container(of: id) {
+            if let space = store.state.containers[container] {
+                spaceID = space.id
+            } else if record == nil {
+                var space: SidebarSpace?
+                store.edit { space = $0.addContainer(container, profileID: profileID ?? SidebarProfile.defaultID) }
+                spaceID = space?.id
+            } else {
+                context = .global
+            }
+        }
+        let openerSpaceID = (source ?? key?.model).flatMap {
+            $0.sidebarContext == .global ? $0.selectedSpaceID : nil
+        }
         let controller = BrowserWindowController(
-            id: record?.id ?? UUID(), engine: engine, store: store, downloads: downloads,
-            pictureInPicture: pictureInPicture, spaceID: spaceID
+            id: id, sidebarContext: context, engine: engine, store: store, downloads: downloads,
+            pictureInPicture: pictureInPicture, spaceID: spaceID ?? openerSpaceID ?? store.state.spaces[0].id
         ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
         }
@@ -315,7 +347,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             controller.model.restore(record)
         } else {
             if let opener = source ?? key?.model { controller.model.inheritCollapsedPinnedSpaces(from: opener) }
-            if let tabID {
+            if context != .global {
+                controller.model.openCommandBar(.newTab)
+            } else if let tabID {
                 controller.model.select(tabID)
             } else {
                 controller.model.showFirst(isOnlyWindow: windows.count == 1)

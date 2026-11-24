@@ -156,7 +156,7 @@ final class WindowLayoutController: NSViewController {
     /// Arc's sidebar pages in order: one per Space, and while the Create a Space panel is open its page, at the slot
     /// the Space will take.
     var sidebarPages: [WindowLayoutPage] {
-        var pages = model.state.spaces.map { WindowLayoutPage.space($0.id) }
+        var pages = model.spaces.map { WindowLayoutPage.space($0.id) }
         if let index = model.spaceCreationIndex { pages.insert(.spaceCreation, at: index) }
         return pages
     }
@@ -222,7 +222,7 @@ final class WindowLayoutController: NSViewController {
 
     /// Oa's own, by the author's decision, after open-arch: the Library is in the first Space's theme, blended in
     /// with the Library's progress. Arc's is the window's Space's.
-    var libraryTheme: WindowTheme { model.state.spaces.first.map(model.theme(of:)) ?? .default }
+    var libraryTheme: WindowTheme { model.spaces.first.map(model.theme(of:)) ?? .default }
 
     private var spaceTheme: WindowTheme { model.space.map(model.theme(of:)) ?? .default }
 
@@ -277,7 +277,7 @@ final class WindowLayoutController: NSViewController {
 
     var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         if let fade = spaceCreationFade { return (fade.themes.from, (fade.themes.to, fade.theme)) }
-        let spaces = model.state.spaces
+        let spaces = model.spaces
         guard restingSpaceID != nil, !spaces.isEmpty else { return (spaceTheme, nil) }
         let progress = min(libraryProgress, 1)
         guard progress > 0 else { return spaceThemes }
@@ -315,7 +315,7 @@ final class WindowLayoutController: NSViewController {
     }
 
     private func updatePages() {
-        let spaces = model.state.spaces
+        let spaces = model.spaces
         let sidebarPages = sidebarPages
         let index = sidebarPages.firstIndex(of: .space(model.selectedSpaceID)) ?? 0
         if model.spaceCreation == nil { pendingSpaceSelection = nil }
@@ -409,8 +409,9 @@ final class WindowLayoutController: NSViewController {
     private func trackPull() {
         guard !pager.isTracking else {
             if pullAllowed == nil {
-                let last = model.state.spaces.last.map { WindowLayoutPage.space($0.id) }
-                pullAllowed = model.spaceCreation == nil && pager.selectedPageID == last
+                let last = model.spaces.last.map { WindowLayoutPage.space($0.id) }
+                pullAllowed =
+                    model.spaceCreation == nil && model.sidebarContext == .global && pager.selectedPageID == last
             }
             return
         }
@@ -626,7 +627,7 @@ final class WindowLayoutController: NSViewController {
         withObservationTracking {
             _ = (model.sidebarMode, model.library, model.selectedTabID, model.selectedSpaceID, model.sidebarWidth)
             _ = model.permissionRequest
-            _ = model.state.spaces
+            _ = model.spaces
             _ = model.spaceCreation
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeModel() }

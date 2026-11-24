@@ -38,6 +38,10 @@ final class MainMenu {
                 priority: .overrideWebView))
         file.addItem(
             item(
+                "Blank Window", #selector(ApplicationDelegate.blankWindow(_:)), key: "n",
+                modifiers: [.command, .control], id: "newBlankWindow"))
+        file.addItem(
+            item(
                 "New Tab", #selector(BrowserWindowController.newTab(_:)), key: "t", id: "newTab",
                 priority: .overrideWebView))
         file.addItem(item("New Profile", #selector(BrowserWindowController.newProfile(_:))))

@@ -20,8 +20,10 @@ struct SidebarPagingContainerView: View {
         let pages = layout.sidebarPages.map { page -> SidebarSpace? in
             if case .space(let id) = page { model.state.space(id) } else { nil }
         }
+        // A window with a sidebar of its own has no Favorites, as Arc's.
+        let global = model.sidebarContext == .global
         let runs = pages.indices.compactMap { first -> (space: SidebarSpace, pages: ClosedRange<Int>)? in
-            guard let space = pages[first], first == 0 || pages[first - 1]?.profileID != space.profileID else {
+            guard global, let space = pages[first], first == 0 || pages[first - 1]?.profileID != space.profileID else {
                 return nil
             }
             let last = (first..<pages.count).prefix { pages[$0]?.profileID == space.profileID }.last ?? first
@@ -36,7 +38,9 @@ struct SidebarPagingContainerView: View {
                             model.state.favoriteEntries(for: space.id), drag: current ? drag : nil)
                         SidebarSpacePage(model: model, layout: layout, space: space)
                             .padding(
-                                .top, FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16
+                                .top,
+                                global
+                                    ? FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16 : 0
                             )
                             .frame(width: width)
                             .allowsHitTesting(current)
@@ -134,12 +138,18 @@ private struct SidebarSpacePage: View {
                 }
             })
         let pinnedIDs = Set(pinned.map(\.id))
-        let items = pinned + (unpinned.isEmpty ? [] : [.divider]) + [.newTab] + unpinned
+        // As seen in Arc: a window's own sidebar has no pinned section, so no divider.
+        let global = model.sidebarContext == .global
+        let items = pinned + (unpinned.isEmpty || !global ? [] : [.divider]) + [.newTab] + unpinned
         ScrollView {
             // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
             VStack(spacing: 1) {
-                SpaceNameRow(model: model, layout: layout, space: space)
-                    .sidebarDragFrame { drag?.lists[space.id, default: .init()].pinnedTop = $0.maxY + 0.5 }
+                if global {
+                    SpaceNameRow(model: model, layout: layout, space: space)
+                        .sidebarDragFrame { drag?.lists[space.id, default: .init()].pinnedTop = $0.maxY + 0.5 }
+                } else {
+                    ProfileIndicatorView(model: model, space: space)
+                }
                 ForEach(items) { item in
                     switch item {
                     case .tab(let tab):
@@ -175,7 +185,9 @@ private struct SidebarSpacePage: View {
             .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
         }
         // As Arc's: the list's empty space and its rows without a menu of their own give the Space's.
-        .spaceContextMenu(isEnabled: space.id == model.selectedSpaceID && model.library == nil && !model.coversWindow) {
+        .spaceContextMenu(
+            isEnabled: global && space.id == model.selectedSpaceID && model.library == nil && !model.coversWindow
+        ) {
             SpaceMenu(model: model, layout: layout, space: space)
         }
         .sidebarDragFrame { drag?.lists[space.id, default: .init()].area = $0 }
@@ -299,6 +311,34 @@ private struct SpaceNameRow: View {
         } set: {
             if !$0, layout.iconPickerSpaceID == space.id { layout.iconPickerSpaceID = nil }
         }
+    }
+}
+
+/// Arc's profile indicator, where a window with a sidebar of its own has its Space's name: the profile's icon and
+/// name in a pill. Oa has no profile icons yet, so the icon is the one the Spaces cards give a profile.
+private struct ProfileIndicatorView: View {
+    let model: WindowModel
+    let space: SidebarSpace
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let name = model.profileName(space.profileID)
+        HStack(spacing: 4) {
+            Image(systemName: "person.crop.circle")
+                .frame(width: 14, height: 14)
+            Text(name)
+                .lineLimit(1)
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(theme.secondaryText)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(theme.itemFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Profile: \(name)")
+        .padding(.leading, 6)
+        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+        .frame(height: 38, alignment: .top)
     }
 }
 

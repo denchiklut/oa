@@ -20,15 +20,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let windowButtons: [NSButton]
 
     init(
-        id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore,
-        pictureInPicture: PictureInPicture, spaceID: UUID, didClose: @escaping (BrowserWindowController) -> Void
+        id: UUID, sidebarContext: SidebarContext, engine: any BrowserApplication, store: SidebarStore,
+        downloads: DownloadsStore, pictureInPicture: PictureInPicture, spaceID: UUID,
+        didClose: @escaping (BrowserWindowController) -> Void
     ) {
         self.engine = engine
         self.store = store
         self.didClose = didClose
         model = WindowModel(
-            id: id, engine: engine, store: store, downloads: downloads, pictureInPicture: pictureInPicture,
-            spaceID: spaceID)
+            id: id, sidebarContext: sidebarContext, engine: engine, store: store, downloads: downloads,
+            pictureInPicture: pictureInPicture, spaceID: spaceID)
         layout = WindowLayoutController(model: model)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
@@ -382,6 +383,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             #selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(editTheme(_:)), #selector(changeProfile(_:)),
         ]
         if model.spaceCreation != nil, let action = item.action, editsSpace.contains(action) { return false }
+        // As seen in Arc: a window with a sidebar of its own has no Spaces to edit or move between and no pins, and
+        // no Change Profile or New Profile at all. Favorite Tab off is Oa's own, as it shows no Favorites.
+        if model.sidebarContext != .global, let action = item.action {
+            let hidden = [#selector(changeProfile(_:)), #selector(newProfile(_:))]
+            if hidden.contains(action) {
+                item.isHidden = true
+                return false
+            }
+            let spaces = [
+                #selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(editTheme(_:)),
+                #selector(deleteSpace(_:)), #selector(nextSpace(_:)), #selector(previousSpace(_:)),
+                #selector(focusSpace(_:)), #selector(togglePin(_:)), #selector(toggleFavorite(_:)),
+                #selector(togglePinnedSection(_:)),
+            ]
+            if spaces.contains(action) { return false }
+        } else if item.action == #selector(changeProfile(_:)) || item.action == #selector(newProfile(_:)) {
+            item.isHidden = false
+        }
         if item.action == #selector(runExtension(_:)) {
             return model.extensionActions.contains { $0.id == item.representedObject as? String }
         }
