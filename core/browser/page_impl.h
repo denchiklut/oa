@@ -199,8 +199,11 @@ class PageImpl : public Page,
   void WebContentsDestroyed() override;
   void OnAudioStateChanged(bool audible) override;
   void DidUpdateAudioMutingState(bool muted) override;
-  void OnTextSelectionChanged(content::RenderFrameHost* render_frame_host,
-                              std::u16string_view selected_text) override;
+  void OnTextSelectionRangeChanged(content::RenderFrameHost* render_frame_host,
+                                   const std::u16string& text,
+                                   uint32_t offset,
+                                   const gfx::Range& range,
+                                   bool can_copy) override;
 
   // content::RenderWidgetHost::InputEventObserver:
   void OnInputEventAck(const content::RenderWidgetHost& widget_host,

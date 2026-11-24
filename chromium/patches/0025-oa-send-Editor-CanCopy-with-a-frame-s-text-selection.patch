@@ -1,0 +1,237 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 24 Nov 2026 15:57:55 -0700
+Subject: [PATCH] oa: send Editor::CanCopy with a frame's text selection and
+ hand it to observers, as ArcCore does
+
+---
+ .../renderer_host/render_frame_host_delegate.h        |  8 ++++++++
+ .../browser/renderer_host/render_frame_host_impl.cc   |  5 ++++-
+ .../browser/renderer_host/render_frame_host_impl.h    |  3 ++-
+ content/browser/web_contents/web_contents_impl.cc     | 10 ++++++++++
+ content/browser/web_contents/web_contents_impl.h      |  5 +++++
+ content/public/browser/web_contents_observer.h        | 11 +++++++++++
+ content/renderer/render_view_browsertest.cc           | 10 ++++++----
+ third_party/blink/public/mojom/frame/frame.mojom      |  4 +++-
+ third_party/blink/renderer/core/frame/local_frame.cc  |  3 ++-
+ .../renderer/core/testing/fake_local_frame_host.cc    |  3 ++-
+ .../renderer/core/testing/fake_local_frame_host.h     |  3 ++-
+ 11 files changed, 55 insertions(+), 10 deletions(-)
+
+diff --git a/content/browser/renderer_host/render_frame_host_delegate.h b/content/browser/renderer_host/render_frame_host_delegate.h
+index d30f1f5e08c5f66a0c1d585c526f946eb06fa979..51e2c98453f0d3c040908651e4e5e1b312edd2e6 100644
+--- a/content/browser/renderer_host/render_frame_host_delegate.h
++++ b/content/browser/renderer_host/render_frame_host_delegate.h
+@@ -68,6 +68,7 @@
+ class GURL;
+ 
+ namespace gfx {
++class Range;
+ class Rect;
+ class Size;
+ }  // namespace gfx
+@@ -636,6 +637,13 @@ class CONTENT_EXPORT RenderFrameHostDelegate {
+   virtual void TextSelectionChanged(RenderFrameHostImpl* render_frame_host,
+                                     std::u16string_view selected_text) {}
+ 
++  // Oa: the selection as the renderer sent it, with its Editor::CanCopy().
++  virtual void TextSelectionRangeChanged(RenderFrameHostImpl* render_frame_host,
++                                         const std::u16string& text,
++                                         uint32_t offset,
++                                         const gfx::Range& range,
++                                         bool can_copy) {}
++
+   // Allows embedder to override the clipboard types if a policy has inspected
+   // or modified the clipboard content. Called from
+   // `ClipboardHostImpl::ReadAvailableTypes()` by the browser process when a
+diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
+index 2124095d3f93e824828c45a85ee6ffc94d3e9cec..6a2de996f05a43451b89a4b5ffb5d1c879e074fa 100644
+--- a/content/browser/renderer_host/render_frame_host_impl.cc
++++ b/content/browser/renderer_host/render_frame_host_impl.cc
+@@ -9766,7 +9766,8 @@ void RenderFrameHostImpl::FocusedElementChanged(
+ 
+ void RenderFrameHostImpl::TextSelectionChanged(const std::u16string& text,
+                                                uint32_t offset,
+-                                               const gfx::Range& range) {
++                                               const gfx::Range& range,
++                                               bool can_copy) {
+   has_selection_ = !text.empty();
+   GetRenderWidgetHost()->SelectionChanged(text, offset, range);
+ 
+@@ -9813,6 +9814,8 @@ void RenderFrameHostImpl::TextSelectionChanged(const std::u16string& text,
+   }
+ 
+   delegate_->TextSelectionChanged(this, selected_text);
++  // Oa, as ArcCore, whose own hook is called here with the same arguments.
++  delegate_->TextSelectionRangeChanged(this, text, offset, range, can_copy);
+ }
+ 
+ void RenderFrameHostImpl::DidReceiveUserActivation() {
+diff --git a/content/browser/renderer_host/render_frame_host_impl.h b/content/browser/renderer_host/render_frame_host_impl.h
+index 8a4abe73f00eb025c6d61154b23b6322864d0210..f7cb2119efbd86bb7632a8f087e02c94dc678410 100644
+--- a/content/browser/renderer_host/render_frame_host_impl.h
++++ b/content/browser/renderer_host/render_frame_host_impl.h
+@@ -2416,7 +2416,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
+       const blink::DOMNodeIdType& editable_dom_node_id) override;
+   void TextSelectionChanged(const std::u16string& text,
+                             uint32_t offset,
+-                            const gfx::Range& range) override;
++                            const gfx::Range& range,
++                            bool can_copy) override;
+   void ShowPopupMenu(
+       mojo::PendingRemote<blink::mojom::PopupMenuClient> popup_client,
+       const gfx::Rect& bounds,
+diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
+index ab4e05e763314a6a88be5eb5814ad9a277c1a26c..18fb5761dde91c1c10c1a7694f2a0bc161a1e2c8 100644
+--- a/content/browser/web_contents/web_contents_impl.cc
++++ b/content/browser/web_contents/web_contents_impl.cc
+@@ -12703,6 +12703,16 @@ void WebContentsImpl::TextSelectionChanged(
+                              render_frame_host, selected_text);
+ }
+ 
++void WebContentsImpl::TextSelectionRangeChanged(
++    RenderFrameHostImpl* render_frame_host,
++    const std::u16string& text,
++    uint32_t offset,
++    const gfx::Range& range,
++    bool can_copy) {
++  observers_.NotifyObservers(&WebContentsObserver::OnTextSelectionRangeChanged,
++                             render_frame_host, text, offset, range, can_copy);
++}
++
+ void WebContentsImpl::IsClipboardPasteAllowedWrapperCallback(
+     IsClipboardPasteAllowedCallback callback,
+     std::optional<ClipboardPasteData> clipboard_paste_data) {
+diff --git a/content/browser/web_contents/web_contents_impl.h b/content/browser/web_contents/web_contents_impl.h
+index cf38889ddd17af8a8c453cf3239a8f846b12caa7..093209115f9c67dc8fcaf52b6763f9433ae84d14 100644
+--- a/content/browser/web_contents/web_contents_impl.h
++++ b/content/browser/web_contents/web_contents_impl.h
+@@ -922,6 +922,11 @@ class CONTENT_EXPORT WebContentsImpl
+                                const std::u16string& copied_text) override;
+   void TextSelectionChanged(RenderFrameHostImpl* render_frame_host,
+                             std::u16string_view selected_text) override;
++  void TextSelectionRangeChanged(RenderFrameHostImpl* render_frame_host,
++                                 const std::u16string& text,
++                                 uint32_t offset,
++                                 const gfx::Range& range,
++                                 bool can_copy) override;
+   void IsClipboardPasteAllowedWrapperCallback(
+       IsClipboardPasteAllowedCallback callback,
+       std::optional<ClipboardPasteData> clipboard_paste_data);
+diff --git a/content/public/browser/web_contents_observer.h b/content/public/browser/web_contents_observer.h
+index 000fd0b7fd7df999ed71286441e3ed354d96b438..85615d8469665c73a7c51cb2687ccf30033b4dfb 100644
+--- a/content/public/browser/web_contents_observer.h
++++ b/content/public/browser/web_contents_observer.h
+@@ -46,6 +46,7 @@ enum class ViewportFit;
+ }  // namespace blink
+ 
+ namespace gfx {
++class Range;
+ class Rect;
+ class Size;
+ }  // namespace gfx
+@@ -975,6 +976,16 @@ class CONTENT_EXPORT WebContentsObserver : public base::CheckedObserver {
+   virtual void OnTextSelectionChanged(RenderFrameHost* render_frame_host,
+                                       std::u16string_view selected_text) {}
+ 
++  // Oa, as ArcCore's own hook: the selection as the renderer sent it, `text`
++  // being the text around it from `offset`, with the frame's
++  // Editor::CanCopy(). A password field's comes too, which the method above
++  // never gets.
++  virtual void OnTextSelectionRangeChanged(RenderFrameHost* render_frame_host,
++                                           const std::u16string& text,
++                                           uint32_t offset,
++                                           const gfx::Range& range,
++                                           bool can_copy) {}
++
+   // Notification that the |render_widget_host| for this WebContents has gained
+   // focus.
+   virtual void OnWebContentsFocused(RenderWidgetHost* render_widget_host) {}
+diff --git a/content/renderer/render_view_browsertest.cc b/content/renderer/render_view_browsertest.cc
+index 63b5867850f7a95723351f2d4ac19c9ff2b2d03e..a299d5249028a95618831bdf12695fdeec624489 100644
+--- a/content/renderer/render_view_browsertest.cc
++++ b/content/renderer/render_view_browsertest.cc
+@@ -2579,10 +2579,11 @@ class TextSelectionChangedLocalFrameHost : public LocalFrameHostInterceptor {
+   explicit TextSelectionChangedLocalFrameHost(
+       blink::AssociatedInterfaceProvider* provider)
+       : LocalFrameHostInterceptor(provider) {}
+-  MOCK_METHOD3(TextSelectionChanged,
++  MOCK_METHOD4(TextSelectionChanged,
+                void(const std::u16string& text,
+                     uint32_t offset,
+-                    const gfx::Range& range));
++                    const gfx::Range& range,
++                    bool can_copy));
+ };
+ }  // namespace
+ 
+@@ -2627,8 +2628,9 @@ TEST_F(RenderViewImplTextInputMessageOrder,
+   EXPECT_CALL(*GetMessageOrderFakeRenderWidgetHost(),
+               TextInputStateChanged(testing::_))
+       .Times(1);
+-  EXPECT_CALL(*GetMockLocalFrameHost(),
+-              TextSelectionChanged(testing::_, testing::_, testing::_))
++  EXPECT_CALL(
++      *GetMockLocalFrameHost(),
++      TextSelectionChanged(testing::_, testing::_, testing::_, testing::_))
+       .Times(1);
+ 
+   main_frame_widget()->SetHandlingInputEvent(true);
+diff --git a/third_party/blink/public/mojom/frame/frame.mojom b/third_party/blink/public/mojom/frame/frame.mojom
+index a5e66ee60ee97ed7008dfa965d769180fc9b9baa..1fe04cb8644c919afff4b28aa285819694b7c281 100644
+--- a/third_party/blink/public/mojom/frame/frame.mojom
++++ b/third_party/blink/public/mojom/frame/frame.mojom
+@@ -573,8 +573,10 @@ interface LocalFrameHost {
+   // Notification that the text selection has changed.
+   // Note: The second parameter is the character based offset of the
+   // std::u16string text in the document.
++  // Oa, as ArcCore: `can_copy` is the frame's Editor::CanCopy().
+   TextSelectionChanged(
+-      mojo_base.mojom.BigString16 text, uint32 offset, gfx.mojom.Range range);
++      mojo_base.mojom.BigString16 text, uint32 offset, gfx.mojom.Range range,
++      bool can_copy);
+ 
+   // Show a popup menu using native controls on Mac or Android.
+   // The popup menu is hidden when the mojo channel is closed.
+diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/blink/renderer/core/frame/local_frame.cc
+index 5cf4b1e38e03563dab2dbe394c54407e2a8483b3..5aaac9a83cb1eb5e7a5df6d47ee538c5ff2f0174 100644
+--- a/third_party/blink/renderer/core/frame/local_frame.cc
++++ b/third_party/blink/renderer/core/frame/local_frame.cc
+@@ -1971,7 +1971,8 @@ String LocalFrame::SelectedTextForClipboard() const {
+ void LocalFrame::TextSelectionChanged(const String& selection_text,
+                                       uint32_t offset,
+                                       const gfx::Range& range) const {
+-  GetLocalFrameHostRemote().TextSelectionChanged(selection_text, offset, range);
++  GetLocalFrameHostRemote().TextSelectionChanged(selection_text, offset, range,
++                                                 GetEditor().CanCopy());
+ }
+ 
+ PositionWithAffinity LocalFrame::PositionForPoint(
+diff --git a/third_party/blink/renderer/core/testing/fake_local_frame_host.cc b/third_party/blink/renderer/core/testing/fake_local_frame_host.cc
+index c947e741bf255c517d64c353dd60b58d980af3d7..d77f33f0a1bd206f1e96a2c3c9071ba059a43cad 100644
+--- a/third_party/blink/renderer/core/testing/fake_local_frame_host.cc
++++ b/third_party/blink/renderer/core/testing/fake_local_frame_host.cc
+@@ -171,7 +171,8 @@ void FakeLocalFrameHost::FocusedElementChanged(
+ 
+ void FakeLocalFrameHost::TextSelectionChanged(const String& text,
+                                               uint32_t offset,
+-                                              const gfx::Range& range) {}
++                                              const gfx::Range& range,
++                                              bool can_copy) {}
+ void FakeLocalFrameHost::ShowPopupMenu(
+     mojo::PendingRemote<mojom::blink::PopupMenuClient> popup_client,
+     const gfx::Rect& bounds,
+diff --git a/third_party/blink/renderer/core/testing/fake_local_frame_host.h b/third_party/blink/renderer/core/testing/fake_local_frame_host.h
+index dadb41b2811742e3130cd821655c9a467a3799a6..a659fb4b8edfad046bd530e5ba362df94b73fd77 100644
+--- a/third_party/blink/renderer/core/testing/fake_local_frame_host.h
++++ b/third_party/blink/renderer/core/testing/fake_local_frame_host.h
+@@ -122,7 +122,8 @@ class FakeLocalFrameHost : public mojom::blink::LocalFrameHost {
+                              mojom::blink::DOMNodeIdPtr dom_node_id) override;
+   void TextSelectionChanged(const String& text,
+                             uint32_t offset,
+-                            const gfx::Range& range) override;
++                            const gfx::Range& range,
++                            bool can_copy) override;
+   void ShowPopupMenu(
+       mojo::PendingRemote<mojom::blink::PopupMenuClient> popup_client,
+       const gfx::Rect& bounds,
