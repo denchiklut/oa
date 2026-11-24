@@ -304,8 +304,8 @@ class Page {
   // Null while the page has no media session.
   virtual std::optional<MediaSessionState> GetMediaSessionState() const = 0;
   // As ArcCore's cached selectedText: what the user last selected in any of
-  // the page's frames. A script's selection doesn't count, and a navigation
-  // keeps it.
+  // the page's frames that could be copied, so none in a password field that
+  // hides it. A script's selection doesn't count, and a navigation keeps it.
   virtual std::string SelectedText() const = 0;
   // As ADK's zoomLevel, a factor: Chrome's zoom level for the page's host in
   // its profile, so every page of the host follows a change.

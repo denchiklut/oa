@@ -69,6 +69,7 @@
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/image/image_skia.h"
+#include "ui/gfx/range/range.h"
 #include "url/gurl.h"
 
 namespace oa {
@@ -1148,11 +1149,18 @@ void PageImpl::DidUpdateAudioMutingState(bool muted) {
 }
 
 // Chromium sends a frame's selection to the browser only for input, so a
-// script's selection isn't seen, as in Arc.
-void PageImpl::OnTextSelectionChanged(
+// script's selection isn't seen, as in Arc. ArcCore's rule: the selection when
+// the frame could copy it, which a revealed password's is, else none.
+void PageImpl::OnTextSelectionRangeChanged(
     content::RenderFrameHost* render_frame_host,
-    std::u16string_view selected_text) {
-  selected_text_ = std::u16string(selected_text);
+    const std::u16string& text,
+    uint32_t offset,
+    const gfx::Range& range,
+    bool can_copy) {
+  const uint32_t start = range.start() - offset;
+  const bool within = can_copy && range.start() >= offset &&
+                      start + range.length() <= text.length();
+  selected_text_ = within ? text.substr(start, range.length()) : u"";
 }
 
 void PageImpl::OnFindResultAvailable(content::WebContents* contents) {
