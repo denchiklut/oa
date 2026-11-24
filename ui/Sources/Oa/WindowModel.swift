@@ -2495,7 +2495,8 @@ final class WindowModel {
             return found(result, on: pageID)
         case .thumbnail(let thumbnail):
             // As Arc's thumbnail listener: every thumbnail is kept as its page's snapshot, then goes to the toolbar's
-            // colours, which sample a shown page's.
+            // colours, which sample a shown page's. An incognito page's too: as seen in Arc's defaults, its host's hash
+            // and colour are cached like any other's.
             let page = page(id: pageID)
             if let page { store.contentSnapshots.storeSnapshot(thumbnail, of: page) }
             return store.topBarColors.process(thumbnail: thumbnail, ofPage: pageID, at: page?.url)
@@ -2691,7 +2692,7 @@ final class WindowModel {
     /// loses its own.
     private func save(_ page: any Page, for tabID: UUID) {
         store.setSavedPage(tabID, title: page.title, url: page.url)
-        // As seen in Arc: nothing of an incognito page goes to disk.
+        // As seen in Arc, which keeps no favicon of an incognito page.
         guard sidebarContext != .incognito else { return }
         let favicon = page.favicon
         let hasLoaded = page.navigationResult == .loaded
