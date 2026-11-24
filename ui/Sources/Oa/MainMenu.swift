@@ -197,6 +197,12 @@ final class MainMenu {
         view.addItem(item("Zoom Out", zoomOut, key: "-", id: "zoomOut"))
         view.addItem(zoomAlternates[1])
         view.addItem(.separator())
+        let developer = submenu("Developer", in: view)
+        developer.addItem(
+            item(
+                "View Source", #selector(BrowserWindowController.viewSource(_:)), key: "u",
+                modifiers: [.command, .option], id: "viewSource", priority: .promptAfterConsumedByWebView))
+        view.addItem(.separator())
         view.addItem(
             item(
                 "Enter/Exit Full Screen", #selector(NSWindow.toggleFullScreen(_:)), key: "f",

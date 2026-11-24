@@ -445,6 +445,11 @@ final class WindowModel {
         newTab(url)
     }
 
+    /// As Arc's ⌥⌘U: a new tab at the top of the Space, not the engine's view source, which opens after the page.
+    func viewSource() {
+        if let url = frontPage?.url, let source = URL(string: "view-source:" + url.absoluteString) { newTab(source) }
+    }
+
     /// As Arc: Chromium's History page in a new tab at the top of the Space, in the Space's profile.
     func viewHistory() {
         if let url = URL(string: "chrome://history/") { newTab(url) }

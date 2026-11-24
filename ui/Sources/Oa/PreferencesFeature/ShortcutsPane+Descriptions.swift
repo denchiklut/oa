@@ -54,6 +54,7 @@ extension ShortcutsPane {
         case "resetZoom": "Zoom to actual page size."
         case "zoomIn": "Increases the magnification of the current website."
         case "zoomOut": "Decreases the magnification of the current website."
+        case "viewSource": "Opens the page’s source in a new tab."
         case "showSidebar": "Shows or hides your Sidebar from the left edge of your window."
         case "toggleToolbar": "Shows or hides the toolbar at the top of your window."
         case "fullscreen": "Makes your current \(name) window fill the entire screen."

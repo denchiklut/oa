@@ -191,6 +191,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func zoomOut(_ sender: Any?) { zoom(.out) }
     @objc func savePageAs(_ sender: Any?) { model.frontPage?.savePage() }
     @objc func printPage(_ sender: Any?) { model.frontPage?.print() }
+    @objc func viewSource(_ sender: Any?) { model.viewSource() }
     @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
     @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
@@ -443,6 +444,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(zoomIn(_:)): model.canZoom(.in)
         case #selector(zoomOut(_:)): model.canZoom(.out)
         case #selector(savePageAs(_:)), #selector(printPage(_:)): model.frontPage != nil
+        case #selector(viewSource(_:)): model.frontPage?.url != nil
         case #selector(addSplitView(_:)): model.canAddSplitViewPane
         case #selector(closeFocusedSplitViewPanel(_:)), #selector(separateTabFromSplitView(_:)),
             #selector(switchToNextSplitViewPane(_:)), #selector(switchToPreviousSplitViewPane(_:)):
