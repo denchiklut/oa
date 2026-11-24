@@ -53,6 +53,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/referrer.h"
 #include "content/public/common/url_constants.h"
+#include "oa/browser/devtools_impl.h"
 #include "oa/browser/window_browser.h"
 #include "services/media_session/public/mojom/media_session.mojom.h"
 #include "skia/ext/skia_utils_mac.h"
@@ -207,7 +208,9 @@ void PageImpl::CloseAll() {
 }
 
 PageImpl::PageImpl(WindowBrowser* window_browser, Page::Observer* observer)
-    : window_browser_(window_browser->GetWeakPtr()), observer_(observer) {
+    : window_browser_(window_browser->GetWeakPtr()),
+      observer_(observer),
+      devtools_(std::make_unique<DevToolsImpl>(this)) {
   capture_observation_.Observe(MediaCaptureDevicesDispatcher::GetInstance()
                                    ->GetMediaStreamCaptureIndicator()
                                    .get());
@@ -815,6 +818,10 @@ void PageImpl::Drop() {
     window_browser_->Remove(contents);
   }
   OpenPages().erase(this);
+}
+
+DevTools* PageImpl::GetDevTools() {
+  return devtools_.get();
 }
 
 void PageImpl::RunDialog(const Dialog& dialog, DialogReply reply) {

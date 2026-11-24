@@ -153,6 +153,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowDidBecomeKey(_ notification: Notification) {
         model.showSelected()
+        // Oa's own, as Arc's isn't traced: DevTools that had the keyboard keep it.
+        let devTools = model.page?.devTools.view
+        if let devTools, (window?.firstResponder as? NSView)?.isDescendant(of: devTools) == true { return }
         if model.dialog == nil { model.page?.activate() }
     }
 
@@ -192,6 +195,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func savePageAs(_ sender: Any?) { model.frontPage?.savePage() }
     @objc func printPage(_ sender: Any?) { model.frontPage?.print() }
     @objc func viewSource(_ sender: Any?) { model.viewSource() }
+    @objc func toggleDevTools(_ sender: Any?) {
+        model.frontPage.map { $0.devTools.setOpen($0.devTools.display == nil) }
+    }
+    @objc func inspectElements(_ sender: Any?) { model.frontPage?.devTools.inspect() }
+    @objc func javaScriptConsole(_ sender: Any?) { model.frontPage?.devTools.toggleConsole() }
+    @objc func networkInspector(_ sender: Any?) { model.frontPage?.devTools.toggleNetwork() }
     @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
     @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
@@ -445,6 +454,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(zoomOut(_:)): model.canZoom(.out)
         case #selector(savePageAs(_:)), #selector(printPage(_:)): model.frontPage != nil
         case #selector(viewSource(_:)): model.frontPage?.url != nil
+        case #selector(toggleDevTools(_:)), #selector(inspectElements(_:)), #selector(javaScriptConsole(_:)),
+            #selector(networkInspector(_:)):
+            model.frontPage != nil
         case #selector(addSplitView(_:)): model.canAddSplitViewPane
         case #selector(closeFocusedSplitViewPanel(_:)), #selector(separateTabFromSplitView(_:)),
             #selector(switchToNextSplitViewPane(_:)), #selector(switchToPreviousSplitViewPane(_:)):

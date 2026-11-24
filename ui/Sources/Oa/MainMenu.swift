@@ -202,6 +202,29 @@ final class MainMenu {
             item(
                 "View Source", #selector(BrowserWindowController.viewSource(_:)), key: "u",
                 modifiers: [.command, .option], id: "viewSource", priority: .promptAfterConsumedByWebView))
+        let toggleDevTools = #selector(BrowserWindowController.toggleDevTools(_:))
+        developer.addItem(
+            item(
+                "Developer Tools", toggleDevTools, key: "i", modifiers: [.command, .option], id: "developerTools",
+                priority: .promptAfterConsumedByWebView))
+        // Hidden with its key kept, as in Arc's menu.
+        let f12 = item(
+            "Developer Tools", toggleDevTools, key: "\u{F70F}", modifiers: [], id: "developerTools_Alternate",
+            priority: .promptAfterConsumedByWebView)
+        f12.isHidden = true
+        f12.allowsKeyEquivalentWhenHidden = true
+        developer.addItem(f12)
+        developer.addItem(
+            item(
+                "Inspect Elements", #selector(BrowserWindowController.inspectElements(_:)), key: "c",
+                modifiers: [.command, .option], id: "inspectElements", priority: .promptAfterConsumedByWebView))
+        developer.addItem(
+            item(
+                "JavaScript Console", #selector(BrowserWindowController.javaScriptConsole(_:)), key: "j",
+                modifiers: [.command, .option], id: "javaScriptConsole"))
+        developer.addItem(
+            item(
+                "Network Inspector", #selector(BrowserWindowController.networkInspector(_:)), id: "networkInspector"))
         view.addItem(.separator())
         view.addItem(
             item(

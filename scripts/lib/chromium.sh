@@ -8,6 +8,11 @@ chromium_out="${CHROMIUM_OUT:-out/Release}"
 patches_dir="$repo_root/chromium/patches"
 version="$(tr -d '[:space:]' < "$repo_root/chromium/VERSION")"
 
+# The DevTools frontend is a repository of its own inside the checkout, pinned by Chromium's DEPS, with its own series
+# on a branch and base of the same names.
+frontend_src="$chromium_src/third_party/devtools-frontend/src"
+frontend_patches_dir="$patches_dir/devtools-frontend"
+
 patch_branch="oa-patches"
 patch_base_ref="refs/oa/base"
 
@@ -28,18 +33,28 @@ pinned_commit() {
   git -C "$chromium_src" rev-parse --verify --quiet "refs/tags/$version^{commit}"
 }
 
+frontend_pinned_commit() {
+  git -C "$chromium_src" show "refs/tags/$version:DEPS" |
+    sed -n "s/^ *'devtools_frontend_revision': '\([0-9a-f]*\)',\$/\1/p"
+}
+
+# require_clean_tree [repository], the Chromium checkout by default. Submodules are left out: the frontend is one in
+# Chromium's tree, on its own branch, and is checked on its own.
 require_clean_tree() {
-  [[ -z "$(git -C "$chromium_src" status --porcelain --untracked-files=no)" ]] ||
-    die "$chromium_src has uncommitted changes. Commit them on $patch_branch and run scripts/patches.sh export, or discard them"
+  local repo="${1:-$chromium_src}"
+  [[ -z "$(git -C "$repo" status --porcelain --untracked-files=no --ignore-submodules=all)" ]] ||
+    die "$repo has uncommitted changes. Commit them on $patch_branch and run scripts/patches.sh export, or discard them"
 }
 
+# range_patch_ids <range> [repository]
 range_patch_ids() {
-  git -C "$chromium_src" log --reverse -p --format='commit %H' "$1" | git patch-id --stable | cut -d' ' -f1
+  git -C "${2:-$chromium_src}" log --reverse -p --format='commit %H' "$1" | git patch-id --stable | cut -d' ' -f1
 }
 
+# series_patch_ids [patch directory]
 series_patch_ids() {
   local patch
-  for patch in "$patches_dir"/*.patch; do
+  for patch in "${1:-$patches_dir}"/*.patch; do
     [[ -e "$patch" ]] || continue
     git patch-id --stable < "$patch" | cut -d' ' -f1
   done
@@ -58,18 +73,28 @@ link_core() {
 }
 
 apply_patches() {
-  local base
+  local base frontend_base
   base="$(pinned_commit)" || die "tag $version is missing from the checkout"
+  frontend_base="$(frontend_pinned_commit)"
+  [[ -n "$frontend_base" ]] || die "Chromium $version's DEPS pins no DevTools frontend"
+  apply_series "$chromium_src" "$patches_dir" "$base"
+  apply_series "$frontend_src" "$frontend_patches_dir" "$frontend_base"
   cd "$chromium_src"
+}
+
+# apply_series <repository> <patch directory> <base commit>
+apply_series() {
+  local repo="$1" dir="$2" base="$3"
+  cd "$repo"
   [[ ! -d "$(git rev-parse --git-path rebase-apply)" ]] ||
-    die "a git am is in progress in $chromium_src; finish it (git am --continue) or abort it (git am --abort)"
-  require_clean_tree
+    die "a git am is in progress in $repo; finish it (git am --continue) or abort it (git am --abort)"
+  require_clean_tree "$repo"
   local series_ids
-  series_ids="$(series_patch_ids)"
+  series_ids="$(series_patch_ids "$dir")"
   if git rev-parse --verify --quiet "refs/heads/$patch_branch" > /dev/null; then
     local old_base branch_ids="unknown base"
     old_base="$(git rev-parse --verify --quiet "$patch_base_ref" || true)"
-    [[ -z "$old_base" ]] || branch_ids="$(range_patch_ids "$old_base..$patch_branch")"
+    [[ -z "$old_base" ]] || branch_ids="$(range_patch_ids "$old_base..$patch_branch" "$repo")"
     if [[ "$old_base" == "$base" && "$branch_ids" == "$series_ids" ]]; then
       git checkout --quiet "$patch_branch"
       return 0
@@ -77,17 +102,17 @@ apply_patches() {
     local unsaved="$branch_ids"
     [[ -z "$old_base" ]] || unsaved="$(comm -23 <(sort <<< "$branch_ids") <(sort <<< "$series_ids"))"
     if [[ -n "$unsaved" && "${FORCE:-0}" != "1" ]]; then
-      die "$patch_branch has commits that are not in chromium/patches. Run scripts/patches.sh export to keep them, or rerun with FORCE=1 to drop them"
+      die "$patch_branch in $repo has commits that are not in ${dir#"$repo_root"/}. Run scripts/patches.sh export to keep them, or rerun with FORCE=1 to drop them"
     fi
   fi
-  log "rebuilding $patch_branch on Chromium $version"
+  log "rebuilding $patch_branch in ${repo#"$chromium_root"/} on $(git rev-parse --short "$base")"
   git update-ref "$patch_base_ref" "$base"
   git checkout --quiet -B "$patch_branch" "$base"
   shopt -s nullglob
-  local patches=("$patches_dir"/*.patch)
+  local patches=("$dir"/*.patch)
   shopt -u nullglob
   ((${#patches[@]})) || return 0
   git am --quiet --3way "${patches[@]}" ||
-    die "a patch did not apply. Resolve it in $chromium_src, run git am --continue, then scripts/patches.sh export"
+    die "a patch did not apply. Resolve it in $repo, run git am --continue, then scripts/patches.sh export"
   log "applied ${#patches[@]} patch(es)"
 }

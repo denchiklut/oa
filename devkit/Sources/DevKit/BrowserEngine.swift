@@ -590,6 +590,8 @@ public protocol Page: AnyObject, Observable {
     var isPageScaled: Bool { get }
     /// The page's media, as ADK's media session.
     var mediaSession: any MediaSession { get }
+    /// The page's DevTools, as ArcCore's `ArcWebContentsDevTools`.
+    var devTools: any PageDevTools { get }
     /// Why the renderer is gone, nil once a new one is ready, as after a reload.
     var crash: PageCrash? { get }
     /// A page that keeps its address, as a pinned tab does: a link to another host opens a new page instead of
@@ -685,6 +687,31 @@ public enum PageEvent {
     case closeCancelled
     /// The page is gone, after `close()` or without the app asking, with the engine's record of it if it kept one.
     case closed(PageSessionID?)
+}
+
+/// Where a page's DevTools frontend asks to be shown, from its own Dock side setting, as ArcCore's
+/// `ArcDevToolsDisplayStyle`.
+public enum DevToolsDisplay: Sendable {
+    case undocked, left, right, bottom
+}
+
+/// A page's DevTools, as ArcCore's `ArcWebContentsDevTools`: the engine's own frontend, which the app shows beside the
+/// page or in a window. Observable.
+@MainActor
+public protocol PageDevTools: AnyObject, Observable {
+    /// Nil while closed; set as the frontend opens and whenever its dock side changes.
+    var display: DevToolsDisplay? { get }
+    /// The frontend's view while it is displayed.
+    var view: NSView? { get }
+    /// As ADK's: opening lands on Elements every time.
+    func setOpen(_ open: Bool)
+    /// Elements with the element picker on; never closes.
+    func inspect()
+    /// Closes while Console shows, else opens on it, as ADK's toggle on the current panel.
+    func toggleConsole()
+    func toggleNetwork()
+    /// Gives the frontend the keyboard once its view is in a window.
+    func focus()
 }
 
 /// A page's media as the engine plays it, as ArcCore's `ArcWebContentsMediaSession`.

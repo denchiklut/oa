@@ -10,6 +10,7 @@
 #include "oa/public/ad_blocker.h"
 #include "oa/public/autocomplete.h"
 #include "oa/public/browser.h"
+#include "oa/public/devtools.h"
 #include "oa/public/downloads.h"
 #include "oa/public/engine.h"
 #include "oa/public/extensions.h"
@@ -50,6 +51,14 @@
 - (void)pageRendererGone:(oa::RendererExit)exit;
 - (void)pageRendererReady;
 - (void)pageClosedWithSessionID:(int32_t)sessionID;
+- (nullable oa::DevTools*)coreDevTools;
+@end
+
+@interface OAPageDevTools ()
+- (instancetype)initWithPage:(OAPage*)page;
+- (void)attach;
+- (void)displayAs:(oa::DevTools::Display)display;
+- (void)didClose;
 @end
 
 @interface OAProfileAttributes ()
@@ -273,6 +282,19 @@ class PageObserverBridge : public oa::Page::Observer {
   __weak OAPage* page_;
 };
 
+class DevToolsObserverBridge : public oa::DevTools::Observer {
+ public:
+  explicit DevToolsObserverBridge(OAPageDevTools* devtools)
+      : devtools_(devtools) {}
+  void OnDevToolsDisplay(oa::DevTools::Display display) override {
+    [devtools_ displayAs:display];
+  }
+  void OnDevToolsClosed() override { [devtools_ didClose]; }
+
+ private:
+  __weak OAPageDevTools* devtools_;
+};
+
 OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   switch (kind) {
     case oa::Dialog::Kind::kAlert:
@@ -447,6 +469,105 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 @end
 
+@implementation OAPageDevTools {
+  __weak OAPage* _page;
+  std::unique_ptr<DevToolsObserverBridge> _observer;
+}
+
+@synthesize delegate = _delegate;
+
+- (instancetype)initWithPage:(OAPage*)page {
+  if ((self = [super init])) {
+    _page = page;
+    _observer = std::make_unique<DevToolsObserverBridge>(self);
+  }
+  return self;
+}
+
+- (void)attach {
+  if (oa::DevTools* devtools = [_page coreDevTools]) {
+    devtools->SetObserver(_observer.get());
+  }
+}
+
+- (void)displayAs:(oa::DevTools::Display)display {
+  OAPageDevToolsDisplay value = OAPageDevToolsDisplayRight;
+  switch (display) {
+    case oa::DevTools::Display::kUndocked:
+      value = OAPageDevToolsDisplayUndocked;
+      break;
+    case oa::DevTools::Display::kLeft:
+      value = OAPageDevToolsDisplayLeft;
+      break;
+    case oa::DevTools::Display::kRight:
+      value = OAPageDevToolsDisplayRight;
+      break;
+    case oa::DevTools::Display::kBottom:
+      value = OAPageDevToolsDisplayBottom;
+      break;
+  }
+  [_delegate devTools:self displayAs:value];
+}
+
+- (void)didClose {
+  [_delegate devToolsDidClose:self];
+}
+
+- (nullable NSView*)view {
+  oa::DevTools* devtools = [_page coreDevTools];
+  void* view = devtools ? devtools->NativeView() : nullptr;
+  return view ? (__bridge NSView*)view : nil;
+}
+
+- (void)open {
+  if (oa::DevTools* devtools = [_page coreDevTools]) {
+    devtools->Open();
+  }
+}
+
+- (void)openInspectView {
+  if (oa::DevTools* devtools = [_page coreDevTools]) {
+    devtools->OpenInspectView();
+  }
+}
+
+- (void)openConsoleView {
+  if (oa::DevTools* devtools = [_page coreDevTools]) {
+    devtools->OpenConsoleView();
+  }
+}
+
+- (void)openNetworkView {
+  if (oa::DevTools* devtools = [_page coreDevTools]) {
+    devtools->OpenNetworkView();
+  }
+}
+
+- (void)close {
+  if (oa::DevTools* devtools = [_page coreDevTools]) {
+    devtools->Close();
+  }
+}
+
+- (void)focus {
+  if (oa::DevTools* devtools = [_page coreDevTools]) {
+    devtools->Focus();
+  }
+}
+
+- (void)currentPanelWithCompletion:(void (^)(NSString* panel))completion {
+  oa::DevTools* devtools = [_page coreDevTools];
+  if (!devtools) {
+    completion(@"");
+    return;
+  }
+  devtools->CurrentPanel([completion](const std::string& panel) {
+    completion(ToNSString(panel));
+  });
+}
+
+@end
+
 @implementation OAPage {
   std::unique_ptr<PageObserverBridge> _observer;
   std::unique_ptr<oa::Page> _page;
@@ -459,11 +580,13 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 }
 
 @synthesize delegate = _delegate;
+@synthesize devTools = _devTools;
 
 - (instancetype)initWithDelegate:(nullable id<OAPageDelegate>)delegate {
   if ((self = [super init])) {
     _delegate = delegate;
     _observer = std::make_unique<PageObserverBridge>(self);
+    _devTools = [[OAPageDevTools alloc] initWithPage:self];
     _dialogs = [[NSMutableDictionary alloc] init];
     _permissionRequests = [[NSMutableDictionary alloc] init];
     // Weakly: a request the app let go of is declined.
@@ -482,10 +605,15 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   return _observer.get();
 }
 
+- (nullable oa::DevTools*)coreDevTools {
+  return _page ? _page->GetDevTools() : nullptr;
+}
+
 - (void)setPage:(std::unique_ptr<oa::Page>)page {
   _page = std::move(page);
   PagesByCore()[_page.get()] = self;
   _page->SetObserver(_observer.get());
+  [_devTools attach];
   _page->SetKeepsAddress(_keepsAddress);
   if (_muted) {
     _page->SetMuted(true);

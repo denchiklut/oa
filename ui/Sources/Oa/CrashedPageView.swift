@@ -36,10 +36,12 @@ struct PageContentView: View {
     var movedToWindow: () -> Void = {}
 
     var body: some View {
-        if page.crash != nil {
-            CrashedPageView(page: page)
-        } else {
-            PageHostView(view: page.view, movedToWindow: movedToWindow)
+        WebContentSplitView(page: page) {
+            if page.crash != nil {
+                CrashedPageView(page: page)
+            } else {
+                PageHostView(view: page.view, movedToWindow: movedToWindow)
+            }
         }
     }
 }

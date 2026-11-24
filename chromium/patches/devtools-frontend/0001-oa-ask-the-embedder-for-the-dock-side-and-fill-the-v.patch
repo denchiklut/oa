@@ -1,0 +1,161 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 24 Nov 2026 04:39:41 -0700
+Subject: [PATCH] oa: ask the embedder for the dock side and fill the view on
+ every side, as ArcCore's frontend does
+
+---
+ .../core/host/InspectorFrontendHostAPI.ts     |  4 ++++
+ .../core/host/InspectorFrontendHostStub.ts    |  6 +++++
+ front_end/devtools_compatibility.js           | 14 +++++++++++
+ .../elements/InspectElementModeController.ts  |  2 ++
+ front_end/panels/emulation/AdvancedApp.ts     | 23 ++++---------------
+ front_end/ui/legacy/DockController.ts         |  2 ++
+ 6 files changed, 33 insertions(+), 18 deletions(-)
+
+diff --git a/front_end/core/host/InspectorFrontendHostAPI.ts b/front_end/core/host/InspectorFrontendHostAPI.ts
+index 4ef5dd627102a50029b13d8a8b019286de338eb6..32ebad168f2af8b47b18e7a6dc71fec019902323 100644
+--- a/front_end/core/host/InspectorFrontendHostAPI.ts
++++ b/front_end/core/host/InspectorFrontendHostAPI.ts
+@@ -424,6 +424,10 @@ export interface InspectorFrontendHostAPI {
+ 
+   setIsDocked(isDocked: boolean, callback: () => void): void;
+ 
++  requestDockPosition(dockPosition: string): void;
++
++  inspectModeChanged(inspectMode: string): void;
++
+   showSurvey(trigger: string, callback: (arg0: ShowSurveyResult) => void): void;
+ 
+   canShowSurvey(trigger: string, callback: (arg0: CanShowSurveyResult) => void): void;
+diff --git a/front_end/core/host/InspectorFrontendHostStub.ts b/front_end/core/host/InspectorFrontendHostStub.ts
+index 1437b6938e08714937dfcd00f88fc445ed2fe150..c8bca2151bbdfc743ca6ec0bad5cf6a525ee319f 100644
+--- a/front_end/core/host/InspectorFrontendHostStub.ts
++++ b/front_end/core/host/InspectorFrontendHostStub.ts
+@@ -122,6 +122,12 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
+     globalThis.setTimeout(callback, 0);
+   }
+ 
++  requestDockPosition(_dockPosition: string): void {
++  }
++
++  inspectModeChanged(_inspectMode: string): void {
++  }
++
+   showSurvey(_trigger: string, callback: (arg0: ShowSurveyResult) => void): void {
+     globalThis.setTimeout(() => callback({surveyShown: false}), 0);
+   }
+diff --git a/front_end/devtools_compatibility.js b/front_end/devtools_compatibility.js
+index cd487260aeb4db92f47404190e5e608156b1a914..9c33cdc641efe1878757fd23e22aa3a062237209 100644
+--- a/front_end/devtools_compatibility.js
++++ b/front_end/devtools_compatibility.js
+@@ -1406,6 +1406,20 @@
+       DevToolsAPI.sendMessageToEmbedder('setIsDocked', [isDocked], callback);
+     }
+ 
++    /**
++     * @param dockPosition
++     */
++    requestDockPosition(dockPosition) {
++      DevToolsAPI.sendMessageToEmbedder('requestDockPosition', [dockPosition], null);
++    }
++
++    /**
++     * @param inspectMode
++     */
++    inspectModeChanged(inspectMode) {
++      DevToolsAPI.sendMessageToEmbedder('inspectModeChanged', [inspectMode], null);
++    }
++
+     /**
+      * @param trigger
+      * @param {(param: object) => unknown} callback
+diff --git a/front_end/panels/elements/InspectElementModeController.ts b/front_end/panels/elements/InspectElementModeController.ts
+index 0502e24162f1e1e10fa9f172997a9e61d303007f..e7be76d909a53ca12300842296e454c240b3d9d9 100644
+--- a/front_end/panels/elements/InspectElementModeController.ts
++++ b/front_end/panels/elements/InspectElementModeController.ts
+@@ -3,6 +3,7 @@
+ // found in the LICENSE file.
+ 
+ import * as Common from '../../core/common/common.js';
++import * as Host from '../../core/host/host.js';
+ import * as Root from '../../core/root/root.js';
+ import * as SDK from '../../core/sdk/sdk.js';
+ import * as Protocol from '../../generated/protocol.js';
+@@ -101,6 +102,7 @@ export class InspectElementModeController implements SDK.TargetManager.SDKModelO
+       void overlayModel.setInspectMode(mode, this.showDetailedInspectTooltipSetting.get());
+     }
+     this.toggleSearchAction.setToggled(this.isInInspectElementMode());
++    Host.InspectorFrontendHost.InspectorFrontendHostInstance.inspectModeChanged(mode);
+   }
+ 
+   private suspendStateChanged(): void {
+diff --git a/front_end/panels/emulation/AdvancedApp.ts b/front_end/panels/emulation/AdvancedApp.ts
+index 199ae25afcc0fd42a3b6189ff7359fcb09ea155f..0f8393505aca9b5a0cc7d3ca298fa7cd1d3181a5 100644
+--- a/front_end/panels/emulation/AdvancedApp.ts
++++ b/front_end/panels/emulation/AdvancedApp.ts
+@@ -118,21 +118,11 @@ export class AdvancedApp implements UI.App.App {
+     this.changingDockSide = true;
+   }
+ 
+-  private onDockSideChange(event?: Common.EventTarget.EventTargetEvent<UI.DockController.ChangeEvent>): void {
++  // The embedder lays out the page beside DevTools on every dock side, so DevTools always fills its own view, as
++  // ArcCore's frontend does.
++  private onDockSideChange(): void {
+     this.updateDeviceModeView();
+-
+-    const toDockSide = event ? event.data.to : UI.DockController.DockController.instance().dockSide();
+-    if (toDockSide === undefined) {
+-      throw new Error('Got onDockSideChange event with unexpected undefined for dockSide()');
+-    }
+-    if (toDockSide === UI.DockController.DockState.UNDOCKED) {
+-      this.updateForUndocked();
+-    } else if (this.toolboxRootView && event && event.data.from === UI.DockController.DockState.UNDOCKED) {
+-      // Don't update yet for smooth transition.
+-      this.rootSplitWidget.hideSidebar();
+-    } else {
+-      this.updateForDocked(toDockSide);
+-    }
++    this.updateForUndocked();
+   }
+ 
+   private onAfterDockSideChange(event: Common.EventTarget.EventTargetEvent<UI.DockController.ChangeEvent>): void {
+@@ -140,9 +130,6 @@ export class AdvancedApp implements UI.App.App {
+     if (!this.changingDockSide) {
+       return;
+     }
+-    if (event.data.from && event.data.from === UI.DockController.DockState.UNDOCKED) {
+-      this.updateForDocked(event.data.to);
+-    }
+     this.changingDockSide = false;
+     this.inspectedPagePlaceholder.update();
+   }
+@@ -169,7 +156,7 @@ export class AdvancedApp implements UI.App.App {
+   }
+ 
+   private isDocked(): boolean {
+-    return UI.DockController.DockController.instance().dockSide() !== UI.DockController.DockState.UNDOCKED;
++    return false;
+   }
+ 
+   private onSetInspectedPageBounds(event: Common.EventTarget.EventTargetEvent<Bounds>): void {
+diff --git a/front_end/ui/legacy/DockController.ts b/front_end/ui/legacy/DockController.ts
+index ca6d6b5743bb0a9677d3a04cb3f24b6697b17841..b80992ef24984058ae97ade516bac672de783364 100644
+--- a/front_end/ui/legacy/DockController.ts
++++ b/front_end/ui/legacy/DockController.ts
+@@ -85,6 +85,7 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
+ 
+   initialize(): void {
+     if (!this.#canDock) {
++      Host.InspectorFrontendHost.InspectorFrontendHostInstance.requestDockPosition(DockState.UNDOCKED);
+       return;
+     }
+ 
+@@ -123,6 +124,7 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
+       return;
+     }
+ 
++    Host.InspectorFrontendHost.InspectorFrontendHostInstance.requestDockPosition(dockSide);
+     if (this.#dockSide !== undefined) {
+       document.body.classList.remove(this.#dockSide);
+     }

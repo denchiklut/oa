@@ -45,6 +45,7 @@ final class ChromiumPage: Page, MediaSession {
     var tabSessionID: Int32 { page?.tabSessionID ?? -1 }
     var mediaSession: any MediaSession { self }
     var selectedText: String { page?.selectedText ?? "" }
+    let devTools: any PageDevTools
 
     var isMuted: Bool {
         get { muted }
@@ -66,6 +67,7 @@ final class ChromiumPage: Page, MediaSession {
         self.id = id
         self.page = page
         self.delegate = delegate
+        devTools = ChromiumPageDevTools(core: page.devTools)
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
         delegate.content = self
         page.delegate = delegate

@@ -28,6 +28,15 @@ can't live in `//oa` (`core/`). Every patch is rebased at each Chromium update, 
 | 0021 | Lets an embedder's switch decide about the last session, as ArcCore's does: the profile's first browser of a launch restores it with the switch on, each saved window into the browser the embedder titled with the same ID and any other into a new browser that keeps the title, where upstream puts the first window into the existing browser. A hook reports each restored tab with the session ID it had, restored background tabs wait to be shown, the last session keeps only normal windows (none with the switch off), and the startup preference defaults to continuing it, so session storage is kept for the restore |
 | 0022 | Makes Edit ▸ Paste and Match Style work over a page, as ArcCore does: `RenderWidgetHostViewCocoa` answers and enables `pasteAsPlainText:`, the selector of AppKit's item, with the same `PasteAndMatchStyle` as its `pasteAndMatchStyle:`. Upstream has no such method, so the item was disabled over a page |
 | 0023 | Lets `//oa` show Chrome's constrained WebUI dialogs, print preview among them, as ArcCore does: the embedder's dialog takes the dialog's WebContents and the app shows it as a sheet over the page; Chrome's Views dialog needs a `BrowserView` |
+| 0024 | Lets `//oa` host a page's DevTools itself, docked beside the page or in a window of its own, as ArcCore does: Chrome's toggles and opens for a page, as the page menu's Inspect, go to the embedder first; a page's frontend can dock without a `DevtoolsUIController` and stays docked to Chrome, so no DevTools browser is made, and the embedder shows the window DevTools is in; the frontend's new `requestDockPosition` and `inspectModeChanged` messages reach the bindings' delegate, and the dock side goes to the embedder |
+
+`devtools-frontend/` holds the series for the DevTools frontend, a repository of its own at
+`third_party/devtools-frontend/src`, applied the same way on its own `oa-patches` branch on the revision Chromium's DEPS
+pins:
+
+| Patch | Why |
+| --- | --- |
+| 0001 | As ArcCore's frontend: the dock side is asked of the embedder before it changes, and once as `undocked` when the frontend can't dock; DevTools fills its own view on every side, with no inspected-page placeholder, since the embedder lays out the page; inspect mode changes are reported |
 
 Don't edit these files by hand. Commit on the `oa-patches` branch in `.local/chromium/src`, then run
 `scripts/patches.sh export`. `scripts/build.sh` applies the series before building.

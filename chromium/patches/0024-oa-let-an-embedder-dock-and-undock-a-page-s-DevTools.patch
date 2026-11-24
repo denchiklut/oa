@@ -1,0 +1,254 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 24 Nov 2026 04:39:41 -0700
+Subject: [PATCH] oa: let an embedder dock and undock a page's DevTools itself,
+ as ArcCore does
+
+---
+ .../devtools_embedder_message_dispatcher.cc   |  4 ++
+ .../devtools_embedder_message_dispatcher.h    |  2 +
+ .../browser/devtools/devtools_ui_bindings.cc  |  8 +++
+ .../browser/devtools/devtools_ui_bindings.h   |  6 ++
+ chrome/browser/devtools/devtools_window.cc    | 70 ++++++++++++++++++-
+ chrome/browser/devtools/devtools_window.h     | 27 +++++++
+ 6 files changed, 115 insertions(+), 2 deletions(-)
+
+diff --git a/chrome/browser/devtools/devtools_embedder_message_dispatcher.cc b/chrome/browser/devtools/devtools_embedder_message_dispatcher.cc
+index 54066d377b224ddddabc66ae3fa6d0e336e63224..36f39f57b27d5e6b1adfd8e4a301e9d16f5d05b2 100644
+--- a/chrome/browser/devtools/devtools_embedder_message_dispatcher.cc
++++ b/chrome/browser/devtools/devtools_embedder_message_dispatcher.cc
+@@ -386,6 +386,10 @@ DevToolsEmbedderMessageDispatcher::CreateForDevToolsFrontend(
+                      AllowedFrontend::kAny);
+   d->RegisterHandlerWithCallback("setIsDocked", &Delegate::SetIsDocked,
+                                  AllowedFrontend::kAny);
++  d->RegisterHandler("requestDockPosition", &Delegate::RequestDockPosition,
++                     AllowedFrontend::kAny);
++  d->RegisterHandler("inspectModeChanged", &Delegate::InspectModeChanged,
++                     AllowedFrontend::kAny);
+   d->RegisterHandler("openInNewTab", &Delegate::OpenInNewTab,
+                      AllowedFrontend::kAny);
+   d->RegisterHandler("openSearchResultsInNewTab",
+diff --git a/chrome/browser/devtools/devtools_embedder_message_dispatcher.h b/chrome/browser/devtools/devtools_embedder_message_dispatcher.h
+index 78e1f4fe3748e11209a655c407c18e74be45d1e2..1274b8c2e76a7a15f786e4b9edc00e40438ae906 100644
+--- a/chrome/browser/devtools/devtools_embedder_message_dispatcher.h
++++ b/chrome/browser/devtools/devtools_embedder_message_dispatcher.h
+@@ -48,6 +48,8 @@ class DevToolsEmbedderMessageDispatcher {
+     virtual void InspectElementCompleted() = 0;
+     virtual void InspectedURLChanged(const std::string& url) = 0;
+     virtual void SetIsDocked(DispatchCallback callback, bool is_docked) = 0;
++    virtual void RequestDockPosition(const std::string& dock_side) = 0;
++    virtual void InspectModeChanged(const std::string& inspect_mode) = 0;
+     virtual void OpenInNewTab(const std::string& url) = 0;
+     virtual void OpenSearchResultsInNewTab(const std::string& query) = 0;
+     virtual void ShowItemInFolder(const std::string& file_system_path) = 0;
+diff --git a/chrome/browser/devtools/devtools_ui_bindings.cc b/chrome/browser/devtools/devtools_ui_bindings.cc
+index 11d60fabf3fc2af2c10d26bc2f17fcaf7b74e7e1..b30909c776599184b4d510de6982110b0ae8e6e5 100644
+--- a/chrome/browser/devtools/devtools_ui_bindings.cc
++++ b/chrome/browser/devtools/devtools_ui_bindings.cc
+@@ -1046,6 +1046,14 @@ void DevToolsUIBindings::SetIsDocked(DispatchCallback callback,
+   std::move(callback).Run(nullptr);
+ }
+ 
++void DevToolsUIBindings::RequestDockPosition(const std::string& dock_side) {
++  delegate_->RequestDockPosition(dock_side);
++}
++
++void DevToolsUIBindings::InspectModeChanged(const std::string& inspect_mode) {
++  delegate_->InspectModeChanged(inspect_mode);
++}
++
+ void DevToolsUIBindings::HandleAidaRequestError(
+     DispatchCallback callback,
+     std::variant<network::ResourceRequest, std::string>
+diff --git a/chrome/browser/devtools/devtools_ui_bindings.h b/chrome/browser/devtools/devtools_ui_bindings.h
+index ce62cad1122ee8df17a3e6120cb0e2da8d92aad2..0acaf60627a3440cb5dea7126059c6ece464577d 100644
+--- a/chrome/browser/devtools/devtools_ui_bindings.h
++++ b/chrome/browser/devtools/devtools_ui_bindings.h
+@@ -94,6 +94,10 @@ class DevToolsUIBindings : public DevToolsEmbedderMessageDispatcher::Delegate,
+     virtual void SetInspectedPageBounds(const gfx::Rect& rect) = 0;
+     virtual void InspectElementCompleted() = 0;
+     virtual void SetIsDocked(bool is_docked) = 0;
++    // From a frontend that asks for its dock side and reports its inspect
++    // mode, as ArcCore's does.
++    virtual void RequestDockPosition(const std::string& dock_side) {}
++    virtual void InspectModeChanged(const std::string& inspect_mode) {}
+     virtual void OpenInNewTab(const std::string& url) = 0;
+     virtual void OpenSearchResultsInNewTab(const std::string& query) = 0;
+     virtual void SetWhitelistedShortcuts(const std::string& message) = 0;
+@@ -218,6 +222,8 @@ class DevToolsUIBindings : public DevToolsEmbedderMessageDispatcher::Delegate,
+                            const std::string& headers,
+                            int stream_id) override;
+   void SetIsDocked(DispatchCallback callback, bool is_docked) override;
++  void RequestDockPosition(const std::string& dock_side) override;
++  void InspectModeChanged(const std::string& inspect_mode) override;
+   void OpenInNewTab(const std::string& url) override;
+   void OpenSearchResultsInNewTab(const std::string& query) override;
+   void ShowItemInFolder(const std::string& file_system_path) override;
+diff --git a/chrome/browser/devtools/devtools_window.cc b/chrome/browser/devtools/devtools_window.cc
+index e9803277eecb82c0769b02e3e48207d110b781af..eb0b82dcfe189136feb7c51d0c3cd7c612aa03fb 100644
+--- a/chrome/browser/devtools/devtools_window.cc
++++ b/chrome/browser/devtools/devtools_window.cc
+@@ -139,6 +139,8 @@ using content::WebContents;
+ 
+ namespace {
+ 
++DevToolsWindow::Embedder* g_embedder = nullptr;
++
+ typedef std::vector<DevToolsWindow*> DevToolsWindows;
+ DevToolsWindows& GetDevToolsWindowInstances() {
+   static base::NoDestructor<DevToolsWindows> instances;
+@@ -874,6 +876,10 @@ void DevToolsWindow::ToggleDevToolsWindow(
+     const std::string& settings,
+     DevToolsOpenedByAction toggled_by,
+     const content::DevToolsManagerDelegate::DevToolsOptions& devtools_options) {
++  if (g_embedder &&
++      g_embedder->ToggleDevTools(inspected_web_contents, force_open, action)) {
++    return;
++  }
+   scoped_refptr<DevToolsAgentHost> agent(
+       DevToolsAgentHost::GetOrCreateForTab(inspected_web_contents));
+   DevToolsWindow* window = FindDevToolsWindow(agent.get());
+@@ -949,6 +955,50 @@ void DevToolsWindow::ToggleDevToolsWindow(
+   }
+ }
+ 
++// static
++void DevToolsWindow::SetEmbedder(Embedder* embedder) {
++  g_embedder = embedder;
++}
++
++// static
++void DevToolsWindow::OpenForEmbedder(WebContents* inspected_web_contents,
++                                     const std::string& panel,
++                                     const DevToolsToggleAction& action) {
++  scoped_refptr<DevToolsAgentHost> agent(
++      DevToolsAgentHost::GetOrCreateForTab(inspected_web_contents));
++  if (DevToolsWindow* window = FindDevToolsWindow(agent.get())) {
++    if (window->life_stage_ != kLoadCompleted) {
++      window->ScheduleShow(action);
++      return;
++    }
++    if (!panel.empty()) {
++      window->bindings_->CallClientMethod("DevToolsAPI", "showPanel",
++                                          base::Value(panel));
++    }
++    window->DoAction(action);
++    return;
++  }
++  DevToolsWindow* window =
++      Create(GetProfileForDevToolsWindow(inspected_web_contents),
++             inspected_web_contents, kFrontendDefault, std::string(),
++             /*can_dock=*/true, std::string(), panel, agent->IsAttached(),
++             /*browser_connection=*/false,
++             DevToolsOpenedByAction::kMainMenuOrMainShortcut);
++  if (!window) {
++    return;
++  }
++  window->bindings_->AttachTo(agent.get());
++  window->ScheduleShow(action);
++}
++
++// static
++void DevToolsWindow::CloseForEmbedder(WebContents* inspected_web_contents) {
++  if (DevToolsWindow* window =
++          GetInstanceForInspectedWebContents(inspected_web_contents)) {
++    window->Close(DevToolsClosedByAction::kMainMenuOrMainShortcut);
++  }
++}
++
+ // static
+ void DevToolsWindow::InspectElement(
+     content::RenderFrameHost* inspected_frame_host,
+@@ -1080,7 +1130,11 @@ void DevToolsWindow::Show(const DevToolsToggleAction& action) {
+       devtools_ui_controller->UpdateDevtools(inspected_web_contents);
+     }
+     main_web_contents_->SetInitialFocus();
+-    inspected_window->Show();
++    // An embedder shows the window DevTools is in itself, which may be one of
++    // its own rather than the inspected page's.
++    if (!g_embedder) {
++      inspected_window->Show();
++    }
+     // On Aura, focusing once is not enough. Do it again.
+     // Note that focusing only here but not before isn't enough either. We just
+     // need to focus twice.
+@@ -1415,7 +1469,8 @@ DevToolsWindow* DevToolsWindow::Create(
+ #endif  // BUILDFLAG(IS_MAC)
+     DevtoolsUIController* devtools_ui_controller =
+         browser ? DevtoolsUIController::From(browser) : nullptr;
+-    if (!devtools_ui_controller || !devtools_ui_controller->CanDockDevtools()) {
++    if (!g_embedder && (!devtools_ui_controller ||
++                        !devtools_ui_controller->CanDockDevtools())) {
+       can_dock = false;
+     }
+   }
+@@ -1796,6 +1851,11 @@ void DevToolsWindow::SetIsDocked(bool dock_requested) {
+   if (!can_dock_) {
+     dock_requested = false;
+   }
++  // An embedder moves the frontend itself, on the dock side it asks for, so
++  // it stays docked here, as ArcCore's does.
++  if (g_embedder && can_dock_) {
++    dock_requested = true;
++  }
+ 
+   bool was_docked = is_docked_;
+   is_docked_ = dock_requested;
+@@ -1843,6 +1903,12 @@ void DevToolsWindow::SetIsDocked(bool dock_requested) {
+   Show(DevToolsToggleAction::Show());
+ }
+ 
++void DevToolsWindow::RequestDockPosition(const std::string& dock_side) {
++  if (g_embedder && GetInspectedWebContents()) {
++    g_embedder->DevToolsDockSideRequested(GetInspectedWebContents(), dock_side);
++  }
++}
++
+ int DevToolsWindow::GetDockStateForLogging() {
+   const int kUndocked = 0;
+   const int kLeft = 1;
+diff --git a/chrome/browser/devtools/devtools_window.h b/chrome/browser/devtools/devtools_window.h
+index b2fd119f429b4bd6ef2b72084173224110cf9891..fd63fdfee0f2405e5795b3cdd313e34c1937394e 100644
+--- a/chrome/browser/devtools/devtools_window.h
++++ b/chrome/browser/devtools/devtools_window.h
+@@ -330,6 +330,32 @@ class DevToolsWindow : public DevToolsUIBindings::Delegate,
+   // Attaches this devtools window to the given browser.
+   void AttachToBrowser(BrowserWindowInterface* browser);
+ 
++  // An embedder that lays out a page's DevTools itself, beside the page or in
++  // a window of its own, as ArcCore does. Once set, a page's frontend can
++  // dock without a DevtoolsUIController, the frontend's dock side goes to the
++  // embedder instead of moving it into a DevTools browser, and Chrome's own
++  // toggles and opens for a page ask the embedder first.
++  class Embedder {
++   public:
++    virtual ~Embedder() = default;
++    // True when the embedder took the toggle; false runs Chrome's.
++    virtual bool ToggleDevTools(content::WebContents* inspected_web_contents,
++                                bool force_open,
++                                const DevToolsToggleAction& action) = 0;
++    // "undocked", "left", "right" or "bottom", as the frontend asks.
++    virtual void DevToolsDockSideRequested(
++        content::WebContents* inspected_web_contents,
++        const std::string& dock_side) = 0;
++  };
++  // Call before the browser starts.
++  static void SetEmbedder(Embedder* embedder);
++  // For the embedder: shows `panel` in the page's open DevTools, or opens them
++  // on it, then performs `action`; never asks the embedder.
++  static void OpenForEmbedder(content::WebContents* inspected_web_contents,
++                              const std::string& panel,
++                              const DevToolsToggleAction& action);
++  static void CloseForEmbedder(content::WebContents* inspected_web_contents);
++
+  private:
+   friend class DevToolsWindowTesting;
+   friend class DevToolsWindowCreationObserver;
+@@ -477,6 +503,7 @@ class DevToolsWindow : public DevToolsUIBindings::Delegate,
+   void SetInspectedPageBounds(const gfx::Rect& rect) override;
+   void InspectElementCompleted() override;
+   void SetIsDocked(bool is_docked) override;
++  void RequestDockPosition(const std::string& dock_side) override;
+   void OpenInNewTab(const std::string& url) override;
+   void OpenSearchResultsInNewTab(const std::string& url) override;
+   void SetWhitelistedShortcuts(const std::string& message) override;
