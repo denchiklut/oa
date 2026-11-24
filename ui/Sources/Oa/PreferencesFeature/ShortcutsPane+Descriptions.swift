@@ -56,6 +56,11 @@ extension ShortcutsPane {
         case "newSpace": "Creates a new Space — for your work tabs, personal tabs, or otherwise."
         case "minimize": "Minimizes the current window."
         case "viewDownloads": "Opens the Downloads section of your Library."
+        case "viewLibrary":
+            """
+            Opens your Library, which is like your Camera Roll within \(name). Screenshots, Captures, Downloads, and \
+            more can appear here.
+            """
         default: "Missing shortcut description."
         }
     }
