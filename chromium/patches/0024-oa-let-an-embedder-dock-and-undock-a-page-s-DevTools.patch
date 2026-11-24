@@ -9,9 +9,9 @@ Subject: [PATCH] oa: let an embedder dock and undock a page's DevTools itself,
  .../devtools_embedder_message_dispatcher.h    |   2 +
  .../browser/devtools/devtools_ui_bindings.cc  |   8 ++
  .../browser/devtools/devtools_ui_bindings.h   |   6 +
- chrome/browser/devtools/devtools_window.cc    | 122 +++++++++++++++++-
- chrome/browser/devtools/devtools_window.h     |  39 ++++++
- 6 files changed, 180 insertions(+), 1 deletion(-)
+ chrome/browser/devtools/devtools_window.cc    | 129 +++++++++++++++++-
+ chrome/browser/devtools/devtools_window.h     |  43 ++++++
+ 6 files changed, 191 insertions(+), 1 deletion(-)
 
 diff --git a/chrome/browser/devtools/devtools_embedder_message_dispatcher.cc b/chrome/browser/devtools/devtools_embedder_message_dispatcher.cc
 index 54066d377b224ddddabc66ae3fa6d0e336e63224..36f39f57b27d5e6b1adfd8e4a301e9d16f5d05b2 100644
@@ -85,7 +85,7 @@ index ce62cad1122ee8df17a3e6120cb0e2da8d92aad2..0acaf60627a3440cb5dea7126059c6ec
    void OpenSearchResultsInNewTab(const std::string& query) override;
    void ShowItemInFolder(const std::string& file_system_path) override;
 diff --git a/chrome/browser/devtools/devtools_window.cc b/chrome/browser/devtools/devtools_window.cc
-index e9803277eecb82c0769b02e3e48207d110b781af..3b9056b77e79874756638a3c7ae2e26de7257c4a 100644
+index e9803277eecb82c0769b02e3e48207d110b781af..1998350c3ef994cbb1509a05e8f46a679dedab5d 100644
 --- a/chrome/browser/devtools/devtools_window.cc
 +++ b/chrome/browser/devtools/devtools_window.cc
 @@ -139,6 +139,16 @@ using content::WebContents;
@@ -259,7 +259,7 @@ index e9803277eecb82c0769b02e3e48207d110b781af..3b9056b77e79874756638a3c7ae2e26d
  
    bool was_docked = is_docked_;
    is_docked_ = dock_requested;
-@@ -1843,6 +1956,13 @@ void DevToolsWindow::SetIsDocked(bool dock_requested) {
+@@ -1843,6 +1956,20 @@ void DevToolsWindow::SetIsDocked(bool dock_requested) {
    Show(DevToolsToggleAction::Show());
  }
  
@@ -270,14 +270,21 @@ index e9803277eecb82c0769b02e3e48207d110b781af..3b9056b77e79874756638a3c7ae2e26d
 +  }
 +}
 +
++void DevToolsWindow::InspectModeChanged(const std::string& inspect_mode) {
++  if (Embedder* embedder =
++          Embedder::FromWebContents(GetInspectedWebContents())) {
++    embedder->InspectModeChanged(inspect_mode);
++  }
++}
++
  int DevToolsWindow::GetDockStateForLogging() {
    const int kUndocked = 0;
    const int kLeft = 1;
 diff --git a/chrome/browser/devtools/devtools_window.h b/chrome/browser/devtools/devtools_window.h
-index b2fd119f429b4bd6ef2b72084173224110cf9891..c551bf3437682050996f1470f69fb48b8600a3e4 100644
+index b2fd119f429b4bd6ef2b72084173224110cf9891..f010d20932e3f704e31a86c0d05ce27ce6a215df 100644
 --- a/chrome/browser/devtools/devtools_window.h
 +++ b/chrome/browser/devtools/devtools_window.h
-@@ -330,6 +330,44 @@ class DevToolsWindow : public DevToolsUIBindings::Delegate,
+@@ -330,6 +330,47 @@ class DevToolsWindow : public DevToolsUIBindings::Delegate,
    // Attaches this devtools window to the given browser.
    void AttachToBrowser(BrowserWindowInterface* browser);
  
@@ -301,6 +308,9 @@ index b2fd119f429b4bd6ef2b72084173224110cf9891..c551bf3437682050996f1470f69fb48b
 +                                int y) = 0;
 +    // "undocked", "left", "right" or "bottom", as the frontend asks.
 +    virtual void DockSideRequested(const std::string& dock_side) = 0;
++    // An Overlay.InspectMode of the protocol; "none" when no element is being
++    // picked.
++    virtual void InspectModeChanged(const std::string& inspect_mode) = 0;
 +    virtual void NeedsFocus() = 0;
 +
 +   protected:
@@ -322,11 +332,12 @@ index b2fd119f429b4bd6ef2b72084173224110cf9891..c551bf3437682050996f1470f69fb48b
   private:
    friend class DevToolsWindowTesting;
    friend class DevToolsWindowCreationObserver;
-@@ -477,6 +515,7 @@ class DevToolsWindow : public DevToolsUIBindings::Delegate,
+@@ -477,6 +518,8 @@ class DevToolsWindow : public DevToolsUIBindings::Delegate,
    void SetInspectedPageBounds(const gfx::Rect& rect) override;
    void InspectElementCompleted() override;
    void SetIsDocked(bool is_docked) override;
 +  void RequestDockPosition(const std::string& dock_side) override;
++  void InspectModeChanged(const std::string& inspect_mode) override;
    void OpenInNewTab(const std::string& url) override;
    void OpenSearchResultsInNewTab(const std::string& url) override;
    void SetWhitelistedShortcuts(const std::string& message) override;

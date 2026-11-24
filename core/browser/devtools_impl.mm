@@ -78,6 +78,10 @@ void DevToolsImpl::DockSideRequested(const std::string& dock_side) {
   }
 }
 
+void DevToolsImpl::InspectModeChanged(const std::string& inspect_mode) {
+  picking_element_ = inspect_mode != "none";
+}
+
 void DevToolsImpl::NeedsFocus() {
   if (observer_) {
     observer_->OnDevToolsNeedsFocus();
@@ -99,8 +103,12 @@ void DevToolsImpl::Open() {
   OpenPanel("elements", DevToolsToggleAction::Show());
 }
 
+// As seen in Arc: asked again, the element picker stays on. The frontend's
+// enterInspectElementMode would turn it off.
 void DevToolsImpl::OpenInspectView() {
-  OpenPanel("elements", DevToolsToggleAction::Inspect());
+  OpenPanel("elements", picking_element_
+                            ? DevToolsToggleAction::ShowElementsPanel()
+                            : DevToolsToggleAction::Inspect());
 }
 
 void DevToolsImpl::OpenConsoleView() {
@@ -140,6 +148,7 @@ void DevToolsImpl::CurrentPanel(PanelCallback callback) {
 
 void DevToolsImpl::WebContentsDestroyed() {
   Observe(nullptr);
+  picking_element_ = false;
   if (observer_) {
     observer_->OnDevToolsClosed();
   }
