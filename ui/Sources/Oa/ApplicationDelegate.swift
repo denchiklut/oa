@@ -195,7 +195,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
 
     /// As Arc's `newIncognitoWindow:`: a window on the incognito context of the key window's Space's profile, with
     /// its own sidebar kept in memory; the command bar opens, as for any new window. Arc's profile with no browser
-    /// window key isn't known; Oa's own takes the default profile then.
+    /// window key isn't known; Oa's own takes the last window's then, else the default profile.
     @objc func newIncognitoWindow(_ sender: Any?) {
         guard !engine.incognitoDisabled else {
             return NSLog("Oa: attempted to create an incognito window but incognito is disabled.")

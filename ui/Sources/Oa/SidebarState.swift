@@ -274,7 +274,8 @@ struct SidebarState {
         return allSpaces.first { $0.pinnedRootID == rootID || $0.unpinnedRootID == rootID }
     }
 
-    /// As Arc's: an untitled Space on `profileID`, with no theme, or Arc's incognito one.
+    /// As Arc's: an untitled Space on `profileID`, with no theme, or Arc's incognito one. Oa's own: it has a pinned
+    /// root too, always empty, where Arc's has only an unpinned container; a Space here has both.
     @discardableResult
     mutating func addContainer(_ type: SidebarContainerType, profileID: UUID) -> SidebarSpace {
         var space = SidebarSpace(

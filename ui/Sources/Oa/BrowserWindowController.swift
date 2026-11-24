@@ -398,7 +398,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                 #selector(togglePinnedSection(_:)),
             ]
             if spaces.contains(action) { return false }
-            // As seen in Arc: an incognito window has no Extensions, Library, Downloads, Archive or Clear Today.
+            // As seen in Arc: an incognito window's menus have Extensions, Library, Downloads, Archive and Clear
+            // Today off; its Library still opens from the sidebar.
             let incognito = [
                 #selector(addExtension(_:)), #selector(manageExtensions(_:)), #selector(toggleLibrary(_:)),
                 #selector(toggleDownloads(_:)), #selector(toggleArchive(_:)), #selector(clearArchive(_:)),
