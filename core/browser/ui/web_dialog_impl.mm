@@ -8,7 +8,6 @@
 #include <string>
 #include <utility>
 
-#include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
@@ -90,12 +89,9 @@ void WebDialogImpl::Show() {
   dialog_.minimum_width = minimum.width();
   dialog_.minimum_height = minimum.height();
   NSView* view = contents_->GetNativeView().GetNativeNSView();
+  // As ArcCore's: with no app window watching the page, the dialog is never
+  // shown and stays open until its page or its WebUI closes it.
   if (!page_ || !page_->NotifyWebDialog(dialog_, (__bridge void*)view)) {
-    // No app window to show it in: it closes as if cancelled, once Chrome has
-    // taken it.
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&WebDialogImpl::Close, weak_factory_.GetWeakPtr()));
     return;
   }
   // As the Views dialog's initially focused view.
