@@ -77,7 +77,7 @@ struct LibraryView: View {
     private var rail: some View {
         VStack(alignment: .leading, spacing: 20) {
             Spacer()
-            ForEach(LibrarySection.allCases, id: \.self) { item in
+            ForEach(model.librarySections, id: \.self) { item in
                 let isPageSelected = item == section
                 Button {
                     // Oa's own: how Arc moves the page between sections of different widths wasn't measured.
