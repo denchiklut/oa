@@ -182,7 +182,6 @@ import AppKit
     var downloads: CoreDownloads { get }
     var preferences: CorePreferences { get }
     var extensions: CoreExtensions { get }
-    var isIncognitoDisabled: Bool { get }
     @objc(browserInWindow:delegate:)
     func browser(inWindow windowIdentifier: String, delegate: CoreBrowserDelegate) -> CoreBrowser
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.

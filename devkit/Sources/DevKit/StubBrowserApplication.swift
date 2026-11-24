@@ -8,6 +8,7 @@ public final class StubBrowserApplication: BrowserApplication {
     private var contexts: [UUID: StubBrowserContext] = [:]
     private var incognitoContexts: [UUID: StubBrowserContext] = [:]
     public let adBlocker: AdBlocker
+    public let incognitoDisabled = UserDefaults.standard.integer(forKey: "IncognitoModeAvailability") == 1
     private let profilesFile: URL
     /// What Chromium's profile storage is to the live engine: the stub's profiles and names, kept across launches.
     private var profiles: [StubProfile] {
@@ -99,7 +100,6 @@ final class StubBrowserContext: BrowserContext {
     let preferences: any BrowserContextPreferences
     private let stubExtensions: StubExtensions
     var extensions: any Extensions { stubExtensions }
-    let incognitoDisabled = false
     private var browsers: [UUID: WeakBrowser] = [:]
 
     init(id: UUID, name: @escaping (String) -> Void) {

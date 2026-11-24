@@ -546,10 +546,6 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @property(nonatomic, readonly) OADownloads* downloads;
 @property(nonatomic, readonly) OAPreferences* preferences;
 @property(nonatomic, readonly) OAExtensions* extensions;
-// Chrome's incognito availability policy keeps the profile from opening an
-// incognito window, as ADK's incognitoDisabled. NO until it has loaded.
-@property(nonatomic, readonly, getter=isIncognitoDisabled)
-    BOOL incognitoDisabled;
 - (instancetype)init NS_UNAVAILABLE;
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;

@@ -13,6 +13,7 @@ public final class ChromiumBrowserApplication: BrowserApplication {
     /// As ADK's `deletedProfiles`: Chromium still lists a profile until it has unloaded it.
     private var deletedProfiles: Set<UUID> = []
     private let dataDirectory: URL
+    public let incognitoDisabled = UserDefaults.standard.integer(forKey: "IncognitoModeAvailability") == 1
     public lazy var adBlocker = AdBlocker(
         directory: dataDirectory,
         apply: { [weak self] texts in
@@ -163,7 +164,6 @@ final class ChromiumBrowserContext: BrowserContext {
     var preferences: any BrowserContextPreferences { chromiumPreferences }
     private lazy var chromiumExtensions = ChromiumExtensions(core: profile()?.extensions)
     var extensions: any Extensions { chromiumExtensions }
-    var incognitoDisabled: Bool { profile()?.isIncognitoDisabled ?? false }
     /// Weakly, as ADK's `browsers`: the window that asked holds its browser.
     private var browsers: [UUID: WeakBrowser] = [:]
 

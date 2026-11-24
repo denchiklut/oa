@@ -1855,10 +1855,6 @@ class BrowserObserverBridge : public oa::Browser::Observer {
   return self;
 }
 
-- (BOOL)isIncognitoDisabled {
-  return oa::IsIncognitoDisabled(_identifier.UTF8String ?: "");
-}
-
 - (void)createPageInWindow:(NSString*)windowIdentifier
         restoringSessionID:(int32_t)sessionID
                   delegate:(nullable id<OAPageDelegate>)delegate

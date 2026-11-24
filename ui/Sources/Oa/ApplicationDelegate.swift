@@ -192,7 +192,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// its own sidebar kept in memory; the command bar opens, as for any new window. Arc's profile with no browser
     /// window key isn't known; Oa's own takes the default profile then.
     @objc func newIncognitoWindow(_ sender: Any?) {
-        guard !engine.browserContext(id: incognitoProfileID).incognitoDisabled else {
+        guard !engine.incognitoDisabled else {
             return NSLog("Oa: attempted to create an incognito window but incognito is disabled.")
         }
         openWindow(context: .incognito, profileID: incognitoProfileID)
@@ -220,10 +220,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             return !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController)
         }
         if item.action == #selector(blankWindow(_:)) || item.action == #selector(newIncognitoWindow(_:)) {
-            // As Arc: not while Settings is key, and incognito only while the engine allows it.
+            // As Arc: not while Settings is key, and incognito not while it is disabled.
             guard !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController) else { return false }
             return item.action == #selector(blankWindow(_:))
-                || !engine.browserContext(id: incognitoProfileID).incognitoDisabled
+                || !engine.incognitoDisabled
         }
         if item.action == #selector(toggleToolbar(_:)) {
             item.title = PageToolbar.isShown ? "Hide Toolbar" : "Show Toolbar"
