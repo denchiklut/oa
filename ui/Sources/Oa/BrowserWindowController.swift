@@ -240,6 +240,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
     @objc func clearTabs(_ sender: Any?) { model.clearTabs() }
     @objc func copyCurrentURL(_ sender: Any?) { model.copyCurrentURLs() }
+    @objc func copyCurrentURLAsMarkdown(_ sender: Any?) { model.copyCurrentURLs(asMarkdown: true) }
     @objc func addExtension(_ sender: Any?) { model.addExtension() }
     @objc func manageExtensions(_ sender: Any?) { model.manageExtensions() }
 
@@ -383,7 +384,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(restoreLastClosed(_:)): model.canRestoreLastClosed
         case #selector(clearTabs(_:)): model.canClearTabs
         // Oa's own: with no tab Arc's stays on and offers to share the Space.
-        case #selector(copyCurrentURL(_:)): model.address != nil
+        case #selector(copyCurrentURL(_:)), #selector(copyCurrentURLAsMarkdown(_:)): model.address != nil
         case #selector(clearArchive(_:)): !model.state.archive.isEmpty
         default: true
         }
