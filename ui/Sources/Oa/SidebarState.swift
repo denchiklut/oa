@@ -1,6 +1,24 @@
 import DevKit
 import Foundation
 
+/// Arc's `SidebarContainerType` for a window's own sidebar, by window ID.
+enum SidebarContainerType: Hashable, Codable {
+    case standalone(UUID)
+}
+
+/// Arc's `StandardWindowState.SidebarContext`: the sidebar a window shows.
+enum SidebarContext: Codable {
+    case global
+    case standalone
+
+    func container(of windowID: UUID) -> SidebarContainerType? {
+        switch self {
+        case .global: nil
+        case .standalone: .standalone(windowID)
+        }
+    }
+}
+
 /// What the sidebar keeps for a profile: its Favorites, as Arc's `topAppsContainerIDs`. The engine owns the list of
 /// profiles and their names.
 struct SidebarProfile: Identifiable, Hashable, Codable {
@@ -224,6 +242,9 @@ struct SidebarState {
     var tree = SidebarTree()
     /// Oldest first.
     var archive: [SidebarArchivedTab] = []
+    /// Arc's containers past the global sidebar, which is the rest of the state: a window's own sidebar, one Space
+    /// with only its unpinned tabs. Their roots are in `tree` with the global ones.
+    var containers: [SidebarContainerType: SidebarSpace] = [:]
 
     static func initial() -> SidebarState {
         var state = SidebarState()
@@ -237,11 +258,40 @@ struct SidebarState {
 
     var tabCount: Int { tree.items.values.filter { $0.tab != nil }.count }
 
-    func space(_ id: UUID) -> SidebarSpace? { spaces.first { $0.id == id } }
+    func space(_ id: UUID) -> SidebarSpace? { allSpaces.first { $0.id == id } }
+
+    /// The global sidebar's Spaces and the windows' own.
+    var allSpaces: [SidebarSpace] { spaces + containers.values }
+
+    func isGlobal(_ spaceID: UUID) -> Bool { spaces.contains { $0.id == spaceID } }
 
     func space(containing tabID: UUID) -> SidebarSpace? {
         guard tree.tab(tabID) != nil, let rootID = tree.rootID(of: tabID) else { return nil }
-        return spaces.first { $0.pinnedRootID == rootID || $0.unpinnedRootID == rootID }
+        return allSpaces.first { $0.pinnedRootID == rootID || $0.unpinnedRootID == rootID }
+    }
+
+    /// As Arc's `standaloneSidebar` and the like: an untitled Space with no theme on `profileID`.
+    @discardableResult
+    mutating func addContainer(_ type: SidebarContainerType, profileID: UUID) -> SidebarSpace {
+        let space = SidebarSpace(
+            id: UUID(), name: "", profileID: profileID, pinnedRootID: UUID(), unpinnedRootID: UUID())
+        tree.addRoot(.pinned, id: space.pinnedRootID)
+        tree.addRoot(.unpinned, id: space.unpinnedRootID)
+        containers[type] = space
+        return space
+    }
+
+    /// As seen in Arc: its tabs go with it, not to the Archive.
+    mutating func removeContainer(_ type: SidebarContainerType) {
+        guard let space = containers.removeValue(forKey: type) else { return }
+        tree.removeRoot(space.pinnedRootID)
+        tree.removeRoot(space.unpinnedRootID)
+    }
+
+    /// As seen in Arc: a window's last tab goes without an Archive entry, as the window closes with it.
+    mutating func removeTab(_ id: UUID) {
+        guard tree.tab(id) != nil else { return }
+        tree.remove(id)
     }
 
     func isPinned(_ tabID: UUID) -> Bool {
@@ -271,7 +321,7 @@ struct SidebarState {
 
     /// The Space's profile's Favorites, shown in every Space of the profile as Arc does.
     func favorites(for spaceID: UUID) -> [SidebarTab] {
-        guard let space = space(spaceID), let profile = profile(space.profileID) else { return [] }
+        guard isGlobal(spaceID), let space = space(spaceID), let profile = profile(space.profileID) else { return [] }
         return tree.tabs(under: profile.favoritesRootID)
     }
 
@@ -309,7 +359,8 @@ struct SidebarState {
 
     /// As Arc: the profile's Favorites go with it, not to the Archive. A profile with a Space stays.
     mutating func removeProfile(_ id: UUID) {
-        guard !spaces.contains(where: { $0.profileID == id }), let index = profiles.firstIndex(where: { $0.id == id })
+        guard !allSpaces.contains(where: { $0.profileID == id }),
+            let index = profiles.firstIndex(where: { $0.id == id })
         else { return }
         tree.removeRoot(profiles.remove(at: index).favoritesRootID)
     }
@@ -331,6 +382,7 @@ struct SidebarState {
     mutating func setProfile(_ profileID: UUID, forSpaces spaceIDs: [UUID]) {
         guard profile(profileID) != nil else { return }
         for index in spaces.indices where spaceIDs.contains(spaces[index].id) { spaces[index].profileID = profileID }
+        for (type, space) in containers where spaceIDs.contains(space.id) { containers[type]?.profileID = profileID }
     }
 
     mutating func moveSpace(_ id: UUID, to index: Int) {
@@ -515,7 +567,7 @@ struct SidebarState {
 
     /// The profile's Favorites as its grid shows them: a split is one tile.
     func favoriteEntries(for spaceID: UUID) -> [SidebarEntry] {
-        guard let space = space(spaceID), let profile = profile(space.profileID) else { return [] }
+        guard isGlobal(spaceID), let space = space(spaceID), let profile = profile(space.profileID) else { return [] }
         return (tree[profile.favoritesRootID]?.childIDs ?? []).compactMap { id in
             if let tab = tree.tab(id) { return .tab(tab) }
             if splitView(id) != nil { return .splitView(id: id, tabs: tree.tabs(under: id)) }

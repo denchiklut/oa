@@ -62,7 +62,11 @@ struct SidebarView: View {
                 .onHover { overLibraryButton = $0 }
                 .opacity(fade)
                 .allowsHitTesting(creation == 0)
-            SidebarDock(model: model, layout: layout)
+            if model.sidebarContext == .global {
+                SidebarDock(model: model, layout: layout)
+            } else {
+                Spacer(minLength: 0)
+            }
             SidebarPlusButton(model: model, layout: layout)
                 .modifier(DockHoverFill())
                 .opacity(fade)
@@ -191,7 +195,7 @@ private struct SidebarDock: View {
     }
 
     private var items: [WindowLayoutPage] {
-        var items = model.state.spaces.map { WindowLayoutPage.space($0.id) }
+        var items = model.spaces.map { WindowLayoutPage.space($0.id) }
         items.insert(.spaceCreation, at: min(model.spaceCreationIndex ?? creationIndex, items.count))
         return items
     }

@@ -9,6 +9,7 @@ import Observation
 @Observable
 final class WindowModel {
     let id: UUID
+    let sidebarContext: SidebarContext
     private(set) var selectedSpaceID: UUID {
         didSet {
             dismissSpaceStyleEditor()
@@ -141,6 +142,11 @@ final class WindowModel {
     private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
+    /// The Spaces the window pages through: the global sidebar's, or the one of its own container.
+    var spaces: [SidebarSpace] {
+        guard let container = sidebarContext.container(of: id) else { return state.spaces }
+        return state.containers[container].map { [$0] } ?? []
+    }
     var adBlocker: AdBlocker { engine.adBlocker }
     var space: SidebarSpace? { state.space(selectedSpaceID) }
     var selectedTabID: UUID? { spaceCreation == nil ? selectedTabIDs[selectedSpaceID] : nil }
@@ -199,16 +205,17 @@ final class WindowModel {
 
     var record: WindowRecord {
         WindowRecord(
-            id: id, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode, sidebarWidth: sidebarWidth,
-            lastActiveDates: lastActiveDates, createdDates: createdDates, collapsedPinnedSpaces: collapsedPinnedSpaces,
-            selectedTabID: selectedTabIDs[selectedSpaceID])
+            id: id, sidebarContext: sidebarContext, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode,
+            sidebarWidth: sidebarWidth, lastActiveDates: lastActiveDates, createdDates: createdDates,
+            collapsedPinnedSpaces: collapsedPinnedSpaces, selectedTabID: selectedTabIDs[selectedSpaceID])
     }
 
     init(
-        id: UUID, engine: any BrowserApplication, store: SidebarStore, downloads: DownloadsStore,
-        pictureInPicture: PictureInPicture, spaceID: UUID
+        id: UUID, sidebarContext: SidebarContext, engine: any BrowserApplication, store: SidebarStore,
+        downloads: DownloadsStore, pictureInPicture: PictureInPicture, spaceID: UUID
     ) {
         self.id = id
+        self.sidebarContext = sidebarContext
         self.engine = engine
         self.store = store
         self.downloads = downloads
@@ -380,7 +387,7 @@ final class WindowModel {
 
     /// As Arc's `ensureBrowsersCreated`, as the window appears: its browser in every profile it has a Space of.
     func ensureBrowsersCreated() {
-        for profileID in Set(state.spaces.map(\.profileID)) { ensureBrowser(for: profileID) }
+        for profileID in Set(spaces.map(\.profileID)) { ensureBrowser(for: profileID) }
     }
 
     private func ensureBrowser(for profileID: UUID) {
@@ -425,7 +432,7 @@ final class WindowModel {
     /// when it is the profile's, else of the profile's first; where Arc puts one is unknown.
     private func place(_ page: any Page, isActive: Bool, in profileID: UUID) {
         let shown = space?.profileID == profileID ? selectedSpaceID : nil
-        guard let spaceID = shown ?? state.spaces.first(where: { $0.profileID == profileID })?.id else {
+        guard let spaceID = shown ?? spaces.first(where: { $0.profileID == profileID })?.id else {
             return page.drop()
         }
         let tab = makeTab(url: page.url)
@@ -529,7 +536,8 @@ final class WindowModel {
     /// an address.
     var commandBarTabs: [CommandBarRanking.Tab] {
         guard let space else { return [] }
-        let others = state.spaces.filter { $0.profileID == space.profileID && $0.id != space.id }
+        // Oa's own: a window with a sidebar of its own offers only its own tabs.
+        let others = spaces.filter { $0.profileID == space.profileID && $0.id != space.id }
         let tabs: [(SidebarTab, String?)] =
             selectableTabs.map { ($0, nil) }
             + others.flatMap { other in
@@ -1202,21 +1210,21 @@ final class WindowModel {
 
     /// As seen in Arc: wraps at either end, and never into the Library.
     func selectAdjacentSpace(_ offset: Int) {
-        let spaces = state.spaces
+        let spaces = spaces
         guard let index = spaces.firstIndex(where: { $0.id == selectedSpaceID }) else { return }
         selectSpace(at: (index + offset + spaces.count) % spaces.count)
     }
 
     /// Oa's own: out of the Library, as a swipe to the Space goes.
     func selectSpace(at index: Int) {
-        guard state.spaces.indices.contains(index) else { return }
+        guard spaces.indices.contains(index) else { return }
         exitLibrary()
-        selectSpace(state.spaces[index].id)
+        selectSpace(spaces[index].id)
     }
 
     /// As Arc: a Space with nothing to show is shown empty, with no command bar.
     func selectSpace(_ spaceID: UUID) {
-        guard state.space(spaceID) != nil else { return }
+        guard spaces.contains(where: { $0.id == spaceID }) else { return }
         cancelSpaceCreation()
         guard spaceID != selectedSpaceID else { return }
         // As seen in Arc: a Space switch ends the multi-selection.
@@ -1242,7 +1250,7 @@ final class WindowModel {
     /// Arc's Create a Space panel, on the window's Space's profile, after `spaceID` or, as Arc's `.absolute(-1)`, at
     /// the end. As Arc, it leaves the Library and changes neither the Space nor the selection.
     func beginSpaceCreation(after spaceID: UUID? = nil, moving itemIDs: [UUID] = []) {
-        guard spaceCreation == nil, let space else { return }
+        guard spaceCreation == nil, sidebarContext == .global, let space else { return }
         closeCommandBar()
         library = nil
         spaceCreation = SpaceCreationState(insertAfter: spaceID, profileID: space.profileID, moving: itemIDs)
@@ -1539,7 +1547,7 @@ final class WindowModel {
     /// Default doesn't apply, and the tab isn't selected.
     func restoreArchived(_ id: UUID) {
         guard let entry = state.archive.first(where: { $0.id == id }) else { return }
-        let origin = entry.spaceID.flatMap { state.space($0)?.id } ?? selectedSpaceID
+        let origin = entry.spaceID.flatMap { state.isGlobal($0) || $0 == selectedSpaceID ? $0 : nil } ?? selectedSpaceID
         let spaceID = store.routedSpace(for: entry.url, recent: selectedSpaceID, unmatched: origin)
         store.edit { $0.restoreArchived(id, in: spaceID) }
         guard let space = state.space(containing: id) else { return }
@@ -2045,7 +2053,7 @@ final class WindowModel {
 
     /// After a state edit: selections, placeholders and pages of tabs or Spaces that are gone go too.
     func reconcile() {
-        if space == nil, let first = state.spaces.first { selectedSpaceID = first.id }
+        if space == nil, let first = spaces.first { selectedSpaceID = first.id }
         for (spaceID, tabID) in selectedTabIDs where !state.isSelectable(tabID, in: spaceID) {
             selectedTabIDs.removeValue(forKey: spaceID)
         }
@@ -2120,10 +2128,15 @@ final class WindowModel {
             // As Arc's close: a pinned tab keeps when a window last showed it, not when one made it.
             window.createdDates[tabID] = nil
         }
-        if !pinned || store.archivingPins.remove(tabID) != nil {
+        // As seen in Arc: a Blank Window's last tab goes unarchived, and the window closes with it.
+        let closesWindow = sidebarContext == .standalone && state.tabs(in: spaceID).map(\.id) == [tabID]
+        if closesWindow {
+            store.edit { $0.removeTab(tabID) }
+        } else if !pinned || store.archivingPins.remove(tabID) != nil {
             archive(tabID, reason: reason, closedBy: request, sessionID: sessionID)
         }
         if let page { finish(page, pinned) }
+        if closesWindow { Task { [weak window] in window?.close() } }
         if deselecting { deselectedTabIDs.insert(tabID) }
         if wasSelected { show(next, after: deselecting ? tabID : nil, in: spaceID) }
         for window in store.windows { window.updateModalItemSwitcher(closing: tabID) }
@@ -2560,7 +2573,9 @@ final class WindowModel {
     /// Switches to the tab's Space and raises the window, as Arc does for a page asking to be shown and for another
     /// Space's tab picked in the command bar.
     func show(_ tabID: UUID) {
-        guard let spaceID = spaceToShow(tabID), state.isSelectable(tabID, in: spaceID) else { return }
+        guard let spaceID = spaceToShow(tabID), spaces.contains(where: { $0.id == spaceID }),
+            state.isSelectable(tabID, in: spaceID)
+        else { return }
         if spaceID != selectedSpaceID {
             library = nil
             selectedTabIDs[spaceID] = tabID
