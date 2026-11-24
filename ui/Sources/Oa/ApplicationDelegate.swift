@@ -290,9 +290,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
 
     @objc func restoreData(_ sender: Any?) { restoreData.show() }
 
-    /// As Arc's help links in Settings: a new tab in the frontmost window's Space, which comes forward while
-    /// Settings stays open. A new window when none is open, and passing over a window with a sidebar of its own, are
-    /// Oa's own.
+    /// As Arc's help links in Settings: a new tab in the frontmost global window's Space, which comes forward while
+    /// Settings stays open; as seen in Arc, a window with a sidebar of its own is passed over. A new window when none
+    /// is open is Oa's own.
     private func openHelp(_ url: URL) {
         let model = frontWindows.first { $0.sidebarContext == .global } ?? openWindow()
         model.bringToFront()

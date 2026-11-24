@@ -94,8 +94,8 @@ void WebDialogImpl::Show() {
   if (!page_ || !page_->NotifyWebDialog(dialog_, (__bridge void*)view)) {
     return;
   }
-  // Oa's own, as the Views dialog's initially focused view: ArcCore's doesn't
-  // focus the contents, and where Arc does isn't traced.
+  // As seen in Arc, where the dialog's page has the keyboard once shown.
+  // ArcCore doesn't focus it, its sheet window does; here it is asked for.
   contents_->Focus();
 }
 
@@ -177,8 +177,10 @@ bool WebDialogImpl::HandleKeyboardEvent(
   return initiator->GetDelegate()->HandleKeyboardEvent(initiator, event);
 }
 
-// Oa's own: ArcCore's observer does nothing here, and what closes its dialog
-// when the page goes isn't traced.
+// Oa's own: ArcCore's observer does nothing here, and Arc, as seen, leaves
+// an empty sheet over the window of a tab closed under its dialog, which only
+// the window's close button gets past. A page that navigates away closes its
+// print preview in Chrome's own code, as seen in Arc too.
 void WebDialogImpl::WebContentsDestroyed() {
   Close();
 }
