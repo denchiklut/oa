@@ -102,9 +102,12 @@ final class StubBrowserContext: BrowserContext {
     var extensions: any Extensions { stubExtensions }
     private var browsers: [UUID: WeakBrowser] = [:]
 
+    private let isIncognito: Bool
+
     init(id: UUID, name: @escaping (String) -> Void) {
         self.id = id
         self.name = name
+        isIncognito = false
         stubDownloads = StubDownloads()
         preferences = StubPreferences()
         stubExtensions = StubExtensions()
@@ -114,6 +117,7 @@ final class StubBrowserContext: BrowserContext {
     init(sharingWith parent: StubBrowserContext) {
         id = parent.id
         name = parent.name
+        isIncognito = true
         stubDownloads = parent.stubDownloads
         preferences = parent.preferences
         stubExtensions = parent.stubExtensions
@@ -128,7 +132,9 @@ final class StubBrowserContext: BrowserContext {
         {
             return (page, true)
         }
-        return (StubPage(id: UUID(), windowID: windowID, downloads: stubDownloads, extensions: stubExtensions), false)
+        let page = StubPage(id: UUID(), windowID: windowID, downloads: stubDownloads, extensions: stubExtensions)
+        page.isIncognito = isIncognito
+        return (page, false)
     }
 
     func browser(windowID: UUID) -> any Browser {

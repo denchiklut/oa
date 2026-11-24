@@ -921,6 +921,11 @@ content::WebContents* PageImpl::OpenURLFromTab(
                                                            std::move(callback));
     }
     disposition = OpenDisposition::kForegroundTab;
+  } else if (params.disposition == WindowOpenDisposition::OFF_THE_RECORD) {
+    if (observer_) {
+      observer_->OnPageOpenLinkInIncognitoWindow(params.url.spec());
+    }
+    return nullptr;
   } else if (params.disposition == WindowOpenDisposition::SAVE_TO_DISK &&
              params.is_renderer_initiated) {
     // As ArcCore: a link the page sends as a save, as Blink does an

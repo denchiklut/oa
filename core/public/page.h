@@ -216,6 +216,9 @@ class Page {
                                   OpenDisposition disposition,
                                   bool by_page) = 0;
     virtual void OnPageWantsActivation() = 0;
+    // The page menu's Open Link in Incognito Window, as ArcCore's: only the
+    // address, which the app opens in its profile's incognito window.
+    virtual void OnPageOpenLinkInIncognitoWindow(const std::string& url) = 0;
     // The app decides which exits show the page as crashed, as Arc's does.
     virtual void OnPageRendererGone(RendererExit exit) = 0;
     // Also after a reload of a page whose renderer was gone.

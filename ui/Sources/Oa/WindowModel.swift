@@ -101,6 +101,7 @@ final class WindowModel {
     @ObservationIgnored private var awaitedRestoration: (profileID: UUID, tabID: UUID?)?
     /// Opens another window on this one's Space with the tab selected; the tab's page follows it there.
     @ObservationIgnored var openWindow: (_ tabID: UUID) -> Void = { _ in }
+    @ObservationIgnored var openLinkInIncognitoWindow: (_ url: URL, _ profileID: UUID) -> Void = { _, _ in }
     @ObservationIgnored let downloads: DownloadsStore
     @ObservationIgnored private let pictureInPicture: PictureInPicture
     @ObservationIgnored private var presentedPage: (any Page)?
@@ -2459,6 +2460,10 @@ final class WindowModel {
             return closeCancelled(pageID)
         case .wantsActivation:
             return showPage(pageID)
+        case .openLinkInIncognitoWindow(let url):
+            let ownerID = tabID(of: pageID) ?? peekOwner(of: pageID)
+            if let profile = ownerID.flatMap(state.profile(containing:)) { openLinkInIncognitoWindow(url, profile.id) }
+            return
         default:
             break
         }
