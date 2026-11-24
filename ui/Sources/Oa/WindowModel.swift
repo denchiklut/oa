@@ -58,7 +58,11 @@ final class WindowModel {
             if library != .archive { closeArchivePeek() }
         }
     }
-    var lastLibrarySection: LibrarySection { store.home.lastSelectedHomePage }
+    var lastLibrarySection: LibrarySection {
+        librarySections.contains(store.home.lastSelectedHomePage) ? store.home.lastSelectedHomePage : librarySections[0]
+    }
+    /// As seen in Arc: an incognito window's Library has only Media, Downloads and Easels, of which Oa has Downloads.
+    var librarySections: [LibrarySection] { sidebarContext == .incognito ? [.downloads] : LibrarySection.allCases }
     /// As Arc's `WindowState.sidebarMode` and width: the window's own, saved with it.
     private(set) var sidebarMode: SidebarMode
     private(set) var sidebarWidth: CGFloat
@@ -1507,10 +1511,8 @@ final class WindowModel {
     var showingArchive: Bool { library == .archive }
     var showingDownloads: Bool { library == .downloads }
 
-    /// Oa's own: not from an incognito window, whose Library and Downloads Arc's menu leaves off.
     func viewLibrary(_ section: LibrarySection? = nil) {
-        guard sidebarContext != .incognito else { return }
-        library = section ?? lastLibrarySection
+        library = section.flatMap { librarySections.contains($0) ? $0 : nil } ?? lastLibrarySection
     }
 
     func exitLibrary() {
