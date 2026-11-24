@@ -34,14 +34,16 @@ private struct FindInPageView: View {
     var body: some View {
         let dark = scheme == .dark
         HStack(spacing: 0) {
-            // Oa's own: the glyph's tint and the field's ForegroundPrimary weren't read from Arc's assets.
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14))
                 .foregroundStyle(inputText.opacity(0.6))
                 .frame(width: 28, height: 28)
                 .padding(.trailing, 1)
             FindInPageField(
-                text: state.text, focuses: state.focusesField, textColor: dark ? .white : .black,
+                text: state.text, focuses: state.focusesField,
+                textColor: dark
+                    ? NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.8)
+                    : NSColor(displayP3Red: 0.055, green: 0.059, blue: 0.063, alpha: 0.9),
                 onChange: { model.updateFindQuery($0, on: page) },
                 onNext: { model.findNext(forward: $0, on: page) },
                 onDismiss: { model.dismissFindInPage(on: page) },
@@ -52,13 +54,13 @@ private struct FindInPageView: View {
             if !state.text.isEmpty, let result = state.result, result.numberOfMatches >= 0 {
                 if result.numberOfMatches == 0 {
                     Text("Not Found")
-                        .font(.system(size: 12, weight: .semibold).smallCaps())
+                        .font(.system(size: 12).smallCaps())
                         .foregroundStyle(Color(nsColor: NSColor(displayP3Red: 0.788, green: 0.2, blue: 0.2, alpha: 1)))
                         .padding(.horizontal, 4)
                         .accessibilityIdentifier("findInPageMatchesTextBlock")
                 } else {
                     Text("\(max(0, result.activeMatchOrdinal))/\(result.numberOfMatches)")
-                        .font(.system(size: 12, weight: .semibold).smallCaps())
+                        .font(.system(size: 12).smallCaps())
                         .monospacedDigit()
                         .foregroundStyle(inputText)
                         .padding(.trailing, 4)
@@ -81,8 +83,12 @@ private struct FindInPageView: View {
         .background {
             let shape = RoundedRectangle(cornerRadius: 5)
             ZStack {
-                // Oa's own: the strength of ARCUI's popover shadow wasn't read.
-                ShadowView(shape: shape, color: .black.opacity(0.35), radius: 8, y: 3)
+                // ARCUI's popover NSShadow: PopoverShadow, blur 5, 3 pt down.
+                ShadowView(
+                    shape: shape,
+                    color: Color(
+                        nsColor: NSColor(displayP3Red: 0.082, green: 0.110, blue: 0.196, alpha: dark ? 0.8 : 0.3)),
+                    radius: 5, y: 3)
                 shape.fill(
                     Color(
                         nsColor: dark
@@ -135,6 +141,7 @@ private struct FindInPageField: NSViewRepresentable {
         field.cell?.isScrollable = true
         field.cell?.wraps = false
         field.font = .systemFont(ofSize: 13)
+        field.placeholderString = "Find in page..."
         field.delegate = context.coordinator
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return field
@@ -143,9 +150,6 @@ private struct FindInPageField: NSViewRepresentable {
     func updateNSView(_ field: FindInPageTextField, context: Context) {
         context.coordinator.field = self
         field.textColor = textColor
-        field.placeholderAttributedString = NSAttributedString(
-            string: "Find in page...",
-            attributes: [.font: NSFont.systemFont(ofSize: 13), .foregroundColor: textColor.withAlphaComponent(0.5)])
         if field.stringValue != text { field.stringValue = text }
         guard focuses else { return }
         DispatchQueue.main.async {
