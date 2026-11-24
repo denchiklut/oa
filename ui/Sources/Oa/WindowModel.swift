@@ -773,8 +773,8 @@ final class WindowModel {
     }
 
     /// As seen in Arc: a tab dropped on a row's middle makes a split with that row's tab where it is, a pinned one's
-    /// in the pinned section, or joins the row's split, first, or last from the cell's right half; it takes the
-    /// focus. Both tabs move as they are, with no copy left behind.
+    /// in the pinned section, or joins the row's split, before the row's tabs from its left half and after them from
+    /// its right half; it takes the focus. Both tabs move as they are, with no copy left behind.
     func combineIntoSplitView(_ tabID: UUID, onto rowID: UUID, last: Bool) {
         guard let anchorID = combineAnchor(rowID),
             state.canOpenInSplitView(tabID, beside: anchorID, in: selectedSpaceID)
@@ -792,8 +792,9 @@ final class WindowModel {
                 .prefix(max(SidebarSplitViewData.maxNumberSplit - panes, 0)))
     }
 
-    /// As seen in Arc: dragged rows dropped on a row's middle make one split with it, the row last, and the leftmost
-    /// pane is shown. Oa's own: the rows in the sidebar's order, where Arc reverses them, and those past four panes
+    /// As seen in Arc: dragged rows dropped on a row's middle make one split with it, and the leftmost pane is shown.
+    /// The rows go on the side of the row's half they are held on, LIKELY as a single tab's: Arc's were only seen
+    /// from the left half, before the row. Oa's own: the rows in the sidebar's order, where Arc reverses them, and those past four panes
     /// stay rows, where Arc leaves out one it picks.
     func combineIntoSplitView(_ tabIDs: [UUID], onto rowID: UUID, last: Bool) {
         let tabIDs = combinedTabIDs(tabIDs, onto: rowID)
