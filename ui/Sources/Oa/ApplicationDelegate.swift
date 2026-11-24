@@ -33,7 +33,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         application.delegate = delegate
         let menu = MainMenu()
         delegate.mainMenu = menu
-        menu.install(in: application, keyBindings: delegate.store.keyBindings)
+        menu.install(in: application, store: delegate.store)
     }
 
     private init(engine: any BrowserApplication) {

@@ -1184,6 +1184,20 @@ final class WindowModel {
         if tabs.indices.contains(index) { select(tabs[index].id) }
     }
 
+    /// As seen in Arc: wraps at either end, and never into the Library.
+    func selectAdjacentSpace(_ offset: Int) {
+        let spaces = state.spaces
+        guard let index = spaces.firstIndex(where: { $0.id == selectedSpaceID }) else { return }
+        selectSpace(at: (index + offset + spaces.count) % spaces.count)
+    }
+
+    /// Oa's own: out of the Library, as a swipe to the Space goes.
+    func selectSpace(at index: Int) {
+        guard state.spaces.indices.contains(index) else { return }
+        exitLibrary()
+        selectSpace(state.spaces[index].id)
+    }
+
     /// As Arc: a Space with nothing to show is shown empty, with no command bar.
     func selectSpace(_ spaceID: UUID) {
         guard state.space(spaceID) != nil else { return }
