@@ -46,4 +46,7 @@ final class ChromiumPageDevTools: NSObject, PageDevTools, CorePageDevToolsDelega
     }
 
     func devToolsDidClose(_ devTools: CorePageDevTools) { display = nil }
+
+    /// As Arc's `onDevToolsNeedsFocus`: the frontend takes the keyboard.
+    func devToolsNeedsFocus(_ devTools: CorePageDevTools) { core.focus() }
 }

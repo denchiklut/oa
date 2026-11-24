@@ -24,6 +24,9 @@ class DevTools {
     // As the frontend opens and whenever its dock side changes.
     virtual void OnDevToolsDisplay(Display display) = 0;
     virtual void OnDevToolsClosed() = 0;
+    // As ArcCore's webContentsDevToolsNeedsFocus:, when the frontend asks to
+    // be brought forward.
+    virtual void OnDevToolsNeedsFocus() = 0;
 
    protected:
     virtual ~Observer() = default;

@@ -5,10 +5,10 @@
 #include <utility>
 
 #include "base/functional/bind.h"
-#include "base/no_destructor.h"
 #include "base/values.h"
 #include "chrome/browser/devtools/devtools_toggle_action.h"
 #include "chrome/browser/devtools/devtools_window.h"
+#include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "oa/browser/page_impl.h"
@@ -22,34 +22,7 @@ constexpr char16_t kCurrentPanelScript[] =
     uR"(document.querySelector('.main-tabbed-pane > .view-container .panel')
     ?.getAttribute('jslog')?.match(/context: ([^;]+)/)?.[1] ?? '')";
 
-class Embedder : public DevToolsWindow::Embedder {
- public:
-  bool ToggleDevTools(content::WebContents* inspected_web_contents,
-                      bool force_open,
-                      const DevToolsToggleAction& action) override {
-    PageImpl* page = PageImpl::FromWebContents(inspected_web_contents);
-    if (!page) {
-      return false;
-    }
-    page->devtools()->Toggle(force_open, action);
-    return true;
-  }
-
-  void DevToolsDockSideRequested(content::WebContents* inspected_web_contents,
-                                 const std::string& dock_side) override {
-    if (PageImpl* page = PageImpl::FromWebContents(inspected_web_contents)) {
-      page->devtools()->DockSideRequested(dock_side);
-    }
-  }
-};
-
 }  // namespace
-
-// static
-void DevToolsImpl::InstallEmbedder() {
-  static base::NoDestructor<Embedder> embedder;
-  DevToolsWindow::SetEmbedder(embedder.get());
-}
 
 DevToolsImpl::DevToolsImpl(PageImpl* page) : page_(page) {}
 
@@ -78,6 +51,18 @@ void DevToolsImpl::Toggle(bool force_open, const DevToolsToggleAction& action) {
   }
 }
 
+// As ArcCore's Impl: the agent picks the element, and DevTools opens on
+// Elements.
+void DevToolsImpl::InspectElement(
+    content::RenderFrameHost* inspected_frame_host,
+    int x,
+    int y) {
+  scoped_refptr<content::DevToolsAgentHost> agent(
+      content::DevToolsAgentHost::GetOrCreateForTab(page_->web_contents()));
+  agent->InspectElement(inspected_frame_host, x, y);
+  OpenPanel("elements", DevToolsToggleAction::ShowElementsPanel());
+}
+
 void DevToolsImpl::DockSideRequested(const std::string& dock_side) {
   DevToolsWindow* window =
       DevToolsWindow::GetInstanceForInspectedWebContents(page_->web_contents());
@@ -99,6 +84,12 @@ void DevToolsImpl::DockSideRequested(const std::string& dock_side) {
   }
   if (observer_) {
     observer_->OnDevToolsDisplay(display);
+  }
+}
+
+void DevToolsImpl::NeedsFocus() {
+  if (observer_) {
+    observer_->OnDevToolsNeedsFocus();
   }
 }
 

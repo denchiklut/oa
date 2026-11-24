@@ -147,6 +147,8 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
 - (void)devTools:(OAPageDevTools*)devTools
        displayAs:(OAPageDevToolsDisplay)display;
 - (void)devToolsDidClose:(OAPageDevTools*)devTools;
+// As ArcCore's webContentsDevToolsNeedsFocus:.
+- (void)devToolsNeedsFocus:(OAPageDevTools*)devTools;
 @end
 
 // A page's DevTools, as ArcCore's ArcWebContentsDevTools.

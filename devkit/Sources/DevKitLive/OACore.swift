@@ -266,6 +266,7 @@ import AppKit
     /// `OAPageDevToolsDisplay` in `core/objc/OACore.h`.
     @objc(devTools:displayAs:) func devTools(_ devTools: CorePageDevTools, displayAs display: Int)
     @objc(devToolsDidClose:) func devToolsDidClose(_ devTools: CorePageDevTools)
+    @objc(devToolsNeedsFocus:) func devToolsNeedsFocus(_ devTools: CorePageDevTools)
 }
 
 @MainActor @objc protocol CorePageDialog: NSObjectProtocol {
