@@ -2,9 +2,10 @@ import AppKit
 
 extension WindowModel {
     /// As Arc's `copyCurrentURLs`: the URL of the page in front as it is now, a Peek's before its tab's, without
-    /// its trackers, written as Arc's `writeURL` does, a URL and the same as text, and its toast on that page.
-    func copyCurrentURLs() {
-        copy(address, toastOn: frontPage?.id)
+    /// its trackers, written as Arc's `writeURL` does, a URL and the same as text, and its toast on that page. As
+    /// Markdown, as seen in Arc: `[title](URL)` as plain text alone, the title as the page has it.
+    func copyCurrentURLs(asMarkdown: Bool = false) {
+        copy(address, title: asMarkdown ? frontPage?.title ?? selectedTab?.title ?? "" : nil, toastOn: frontPage?.id)
     }
 
     /// A split's pane from its bar and a tab's Copy Link. As seen in Arc, a tab that isn't shown gets no toast.
@@ -21,11 +22,15 @@ extension WindowModel {
         NSPasteboard.general.setString(urls.joined(separator: "\n"), forType: .string)
     }
 
-    private func copy(_ url: URL?, toastOn pageID: UUID?, toast: Bool = true) {
+    private func copy(_ url: URL?, title: String? = nil, toastOn pageID: UUID?, toast: Bool = true) {
         guard let result = url?.withTrackingRemoved else { return }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.writeObjects([result.url as NSURL])
-        NSPasteboard.general.setString(result.url.absoluteString, forType: .string)
+        if let title {
+            NSPasteboard.general.setString("[\(title)](\(result.url.absoluteString))", forType: .string)
+        } else {
+            NSPasteboard.general.writeObjects([result.url as NSURL])
+            NSPasteboard.general.setString(result.url.absoluteString, forType: .string)
+        }
         guard toast else { return }
         present(
             .copyTabURL(trackingRemoved: result.trackingRemoved, urls: [result.url]),
