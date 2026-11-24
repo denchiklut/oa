@@ -486,6 +486,13 @@ void PageImpl::Reload() {
   }
 }
 
+void PageImpl::ReloadBypassingCache() {
+  if (web_contents()) {
+    web_contents()->GetController().Reload(content::ReloadType::BYPASSING_CACHE,
+                                           /*check_for_repost=*/false);
+  }
+}
+
 void PageImpl::Stop() {
   if (web_contents()) {
     web_contents()->Stop();

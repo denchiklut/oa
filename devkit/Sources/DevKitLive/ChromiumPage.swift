@@ -72,6 +72,7 @@ final class ChromiumPage: Page, MediaSession {
     func goBack() { page?.goBack() }
     func goForward() { page?.goForward() }
     func reload() { page?.reload() }
+    func reloadBypassingCache() { page?.reloadBypassingCache() }
     func stopLoading() { page?.stopLoading() }
     func activate() { page?.activate() }
     func move(toWindow windowID: UUID) { page?.move(toWindowIdentifier: windowID.uuidString) }

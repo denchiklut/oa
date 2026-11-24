@@ -595,6 +595,8 @@ public protocol Page: AnyObject, Observable {
     func goBack()
     func goForward()
     func reload()
+    /// As Chrome's ⇧⌘R: the page and its resources from the network, not the cache.
+    func reloadBypassingCache()
     func stopLoading()
     func activate()
     /// A new page with this one's history, as ADK's `cloneWebContent`: in the same window, hidden, loading its entry at

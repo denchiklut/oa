@@ -623,6 +623,12 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   }
 }
 
+- (void)reloadBypassingCache {
+  if (_page) {
+    _page->ReloadBypassingCache();
+  }
+}
+
 - (void)stopLoading {
   if (_page) {
     _page->Stop();

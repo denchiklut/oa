@@ -23,6 +23,7 @@ extension ShortcutsPane {
         case "archiveTab": "Closes the tab or window that’s in focus."
         case "reopenLastClosedTab": "Reopens the most recently closed tab."
         case "reloadPage": "Refreshes the current page."
+        case "forceReloadPage": "Refreshes the page and clears any local caching."
         case "stopLoading": "Stops loading the current page."
         case "showSidebar": "Shows or hides your Sidebar from the left edge of your window."
         case "toggleToolbar": "Shows or hides the toolbar at the top of your window."

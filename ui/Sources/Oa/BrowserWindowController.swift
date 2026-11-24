@@ -166,6 +166,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func goBack(_ sender: Any?) { model.frontPage?.goBack() }
     @objc func goForward(_ sender: Any?) { model.frontPage?.goForward() }
     @objc func reload(_ sender: Any?) { model.frontPage?.reload() }
+    @objc func forceReload(_ sender: Any?) { model.frontPage?.reloadBypassingCache() }
     @objc func stopLoading(_ sender: Any?) { model.frontPage?.stopLoading() }
     @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
