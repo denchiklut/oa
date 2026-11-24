@@ -117,8 +117,8 @@ extension SidebarState {
     }
 
     func entries(in spaceID: UUID, pinned: Bool) -> [SidebarEntry] {
-        guard let space = space(spaceID) else { return [] }
-        return (tree[pinned ? space.pinnedRootID : space.unpinnedRootID]?.childIDs ?? []).compactMap { id in
+        guard let rootID = space(spaceID)?.rootID(pinned: pinned) else { return [] }
+        return (tree[rootID]?.childIDs ?? []).compactMap { id in
             if let tab = tree.tab(id) { return .tab(tab) }
             if splitView(id) != nil { return .splitView(id: id, tabs: tree.tabs(under: id)) }
             return nil
@@ -245,7 +245,7 @@ extension SidebarState {
         guard let space = space(spaceID), let tabID = splitView(id) != nil ? tree[id]?.childIDs.first : id else {
             return
         }
-        tree.move(id, into: isPinned(tabID) ? space.pinnedRootID : space.unpinnedRootID, at: 0)
+        tree.move(id, into: space.rootID(pinned: isPinned(tabID)) ?? space.unpinnedRootID, at: 0)
     }
 
     /// As seen in Arc: Reset Name and Icon clears both, and the cell shows the tabs again.

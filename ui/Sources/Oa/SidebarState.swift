@@ -39,7 +39,8 @@ struct SidebarSpace: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
     var profileID: UUID
-    let pinnedRootID: UUID
+    /// None in a window's own sidebar, as Arc's, whose Space there has only an unpinned container.
+    var pinnedRootID: UUID?
     let unpinnedRootID: UUID
     var customInfo: CustomInfo?
 
@@ -52,6 +53,8 @@ struct SidebarSpace: Identifiable, Hashable, Codable {
     /// As Arc: a Space without a theme shows the default.
     var theme: WindowTheme { customInfo?.windowTheme ?? .default }
     var icon: String? { customInfo?.icon }
+
+    func rootID(pinned: Bool) -> UUID? { pinned ? pinnedRootID : unpinnedRootID }
 }
 
 struct SidebarTab: Identifiable, Hashable {
@@ -296,14 +299,12 @@ struct SidebarState {
         return allSpaces.first { $0.pinnedRootID == rootID || $0.unpinnedRootID == rootID }
     }
 
-    /// As Arc's: an untitled Space on `profileID`, with no theme, or Arc's incognito one. Oa's own: it has a pinned
-    /// root too, always empty, where Arc's has only an unpinned container; a Space here has both.
+    /// As Arc's: an untitled Space on `profileID` with only an unpinned container, and no theme or Arc's incognito
+    /// one.
     @discardableResult
     mutating func addContainer(_ type: SidebarContainerType, profileID: UUID) -> SidebarSpace {
-        var space = SidebarSpace(
-            id: UUID(), name: "", profileID: profileID, pinnedRootID: UUID(), unpinnedRootID: UUID())
+        var space = SidebarSpace(id: UUID(), name: "", profileID: profileID, unpinnedRootID: UUID())
         if case .incognito = type { space.customInfo = SidebarSpace.CustomInfo(windowTheme: .incognito) }
-        tree.addRoot(.pinned, id: space.pinnedRootID)
         tree.addRoot(.unpinned, id: space.unpinnedRootID)
         containers[type] = space
         return space
@@ -312,7 +313,6 @@ struct SidebarState {
     /// As seen in Arc: its tabs go with it, not to the Archive.
     mutating func removeContainer(_ type: SidebarContainerType) {
         guard let space = containers.removeValue(forKey: type) else { return }
-        tree.removeRoot(space.pinnedRootID)
         tree.removeRoot(space.unpinnedRootID)
     }
 
@@ -359,8 +359,8 @@ struct SidebarState {
     }
 
     func tabs(in spaceID: UUID, pinned: Bool) -> [SidebarTab] {
-        guard let space = space(spaceID) else { return [] }
-        return tree.tabs(under: pinned ? space.pinnedRootID : space.unpinnedRootID)
+        guard let rootID = space(spaceID)?.rootID(pinned: pinned) else { return [] }
+        return tree.tabs(under: rootID)
     }
 
     /// The Space's own tabs, pinned then unpinned.
@@ -397,10 +397,11 @@ struct SidebarState {
     mutating func addSpace(
         name: String, profileID: UUID, icon: String? = nil, theme: WindowTheme? = nil, after: UUID? = nil
     ) -> SidebarSpace {
+        let pinnedRootID = UUID()
         let space = SidebarSpace(
-            id: UUID(), name: name, profileID: profileID, pinnedRootID: UUID(), unpinnedRootID: UUID(),
+            id: UUID(), name: name, profileID: profileID, pinnedRootID: pinnedRootID, unpinnedRootID: UUID(),
             customInfo: icon == nil && theme == nil ? nil : SidebarSpace.CustomInfo(windowTheme: theme, icon: icon))
-        tree.addRoot(.pinned, id: space.pinnedRootID)
+        tree.addRoot(.pinned, id: pinnedRootID)
         tree.addRoot(.unpinned, id: space.unpinnedRootID)
         let index = after.flatMap { id in spaces.firstIndex { $0.id == id } }.map { $0 + 1 } ?? spaces.count
         spaces.insert(space, at: index)
@@ -443,7 +444,7 @@ struct SidebarState {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0.id == id }) else { return }
         for tab in tabs(in: id) { archiveTab(tab.id, reason: .manual, at: date) }
         let space = spaces.remove(at: index)
-        tree.removeRoot(space.pinnedRootID)
+        if let pinnedRootID = space.pinnedRootID { tree.removeRoot(pinnedRootID) }
         tree.removeRoot(space.unpinnedRootID)
     }
 
@@ -555,23 +556,22 @@ struct SidebarState {
     /// A move to the end of the other section. As seen in Arc, a split's tab takes its split whole, and an unpinned
     /// split goes to the top of the list.
     mutating func togglePin(_ tabID: UUID) {
-        guard let space = space(containing: tabID) else { return }
+        guard let space = space(containing: tabID), let pinnedRootID = space.pinnedRootID else { return }
         if let splitID = splitViewID(containing: tabID) {
             return isPinned(tabID)
-                ? tree.move(splitID, into: space.unpinnedRootID, at: 0) : tree.move(splitID, into: space.pinnedRootID)
+                ? tree.move(splitID, into: space.unpinnedRootID, at: 0) : tree.move(splitID, into: pinnedRootID)
         }
-        tree.move(tabID, into: isPinned(tabID) ? space.unpinnedRootID : space.pinnedRootID)
+        tree.move(tabID, into: isPinned(tabID) ? space.unpinnedRootID : pinnedRootID)
     }
 
     /// A row dropped in the list, as Arc's: the section it lands in pins, unpins or unfavorites it.
     mutating func moveTab(_ tabID: UUID, in spaceID: UUID, pinned: Bool, at index: Int) {
-        guard let space = space(spaceID) else { return }
-        tree.move(tabID, into: pinned ? space.pinnedRootID : space.unpinnedRootID, at: index)
+        guard let rootID = space(spaceID)?.rootID(pinned: pinned) else { return }
+        tree.move(tabID, into: rootID, at: index)
     }
 
     mutating func moveTabs(_ tabIDs: [UUID], in spaceID: UUID, pinned: Bool, after anchorID: UUID?) {
-        guard let space = space(spaceID) else { return }
-        let rootID = pinned ? space.pinnedRootID : space.unpinnedRootID
+        guard let rootID = space(spaceID)?.rootID(pinned: pinned) else { return }
         var previousID = anchorID
         for tabID in tabIDs {
             let index = previousID.flatMap { tree[rootID]?.childIDs.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
