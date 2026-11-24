@@ -70,7 +70,6 @@ class WebDialogImpl : public ConstrainedWebDialogDelegate,
   WebDialog dialog_;
   bool closed_via_web_ui_ = false;
   bool closed_ = false;
-  base::WeakPtrFactory<WebDialogImpl> weak_factory_{this};
 };
 
 }  // namespace oa
