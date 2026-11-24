@@ -48,6 +48,8 @@ source_set("oa") {
     "browser/ui/side_panel_ui_impl.h",
     "browser/ui/video_overlay_window_impl.h",
     "browser/ui/video_overlay_window_impl.mm",
+    "browser/ui/web_dialog_impl.h",
+    "browser/ui/web_dialog_impl.mm",
     "browser/window_browser.h",
     "browser/window_browser.mm",
     "common/ad_block_rules.cc",

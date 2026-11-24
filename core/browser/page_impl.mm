@@ -18,6 +18,7 @@
 #include "cc/trees/render_frame_metadata.h"
 #include "chrome/browser/media/webrtc/media_capture_devices_dispatcher.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
+#include "chrome/browser/printing/print_view_manager_common.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/ssl/chrome_security_state_util.h"
@@ -28,13 +29,16 @@
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_muted_utils.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_tab_helper.h"
+#include "chrome/common/pref_names.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/find_in_page/find_notification_details.h"
 #include "components/find_in_page/find_types.h"
+#include "components/prefs/pref_service.h"
 #include "components/security_state/core/security_state.h"
 #include "components/sessions/content/content_live_tab.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/sessions/core/tab_restore_service.h"
+#include "components/tabs/public/tab_interface.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/frame_tree_node_id.h"
 #include "content/public/browser/media_session.h"
@@ -543,6 +547,22 @@ void PageImpl::SavePage() {
   }
 }
 
+// As ArcCore: its own checks, then the page itself printed with no selection,
+// without chrome::Print's other ones.
+void PageImpl::Print() {
+  content::WebContents* contents = web_contents();
+  if (!contents || contents->IsCrashed() || !window_browser_ ||
+      !tabs::TabInterface::MaybeGetFromContents(contents)) {
+    return;
+  }
+  printing::StartPrint(
+      contents,
+      Profile::FromBrowserContext(contents->GetBrowserContext())
+          ->GetPrefs()
+          ->GetBoolean(prefs::kPrintPreviewDisabled),
+      /*has_selection=*/false);
+}
+
 void PageImpl::Stop() {
   if (web_contents()) {
     web_contents()->Stop();
@@ -866,6 +886,20 @@ void PageImpl::NotifyPictureInPicture(const PictureInPictureEvent& event,
                                       void* ns_view) {
   if (observer_) {
     observer_->OnPagePictureInPicture(event, ns_view);
+  }
+}
+
+bool PageImpl::NotifyWebDialog(const WebDialog& dialog, void* ns_view) {
+  if (!observer_) {
+    return false;
+  }
+  observer_->OnPageWebDialog(dialog, ns_view);
+  return true;
+}
+
+void PageImpl::NotifyWebDialogClosed(const WebDialog& dialog) {
+  if (observer_) {
+    observer_->OnPageWebDialogClosed(dialog);
   }
 }
 

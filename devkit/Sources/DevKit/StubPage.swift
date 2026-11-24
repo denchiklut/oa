@@ -60,6 +60,7 @@ final class StubPage: Page, MediaSession {
     @ObservationIgnored private var pictureInPictureController: PictureInPictureController?
     @ObservationIgnored private var isInPictureInPicture = false
     @ObservationIgnored private var isObservingThumbnails = false
+    @ObservationIgnored private var webDialog: WebDialog?
     @ObservationIgnored private var thumbnail: NSImage?
     @ObservationIgnored private var findQuery = ""
     @ObservationIgnored private var activeMatch = 0
@@ -188,6 +189,23 @@ final class StubPage: Page, MediaSession {
 
     func savePage() {}
 
+    /// A placeholder for the engine's print preview: a sheet-sized view whose Cancel closes it, as the preview's does.
+    func print() {
+        guard webDialog == nil, crash == nil else { return }
+        let view = NSHostingView(
+            rootView: StubWebDialogView(title: title) { [weak self] in
+                guard let self, let shown = webDialog else { return }
+                webDialog = nil
+                continuation?.yield(.webDialogClosed(shown))
+            })
+        view.sizingOptions = []
+        let dialog = WebDialog(
+            title: "", accessibleTitle: "Print", preferredSize: CGSize(width: 983, height: 660),
+            minimumSize: CGSize(width: 1, height: 1), view: view)
+        webDialog = dialog
+        continuation?.yield(.webDialog(dialog))
+    }
+
     func stopLoading() { finishLoading() }
 
     /// As Chromium's tab strip: one active page per window, and only it shows its permission request.
@@ -295,6 +313,10 @@ final class StubPage: Page, MediaSession {
         if pictureInPictureController != nil {
             pictureInPictureController = nil
             continuation?.yield(.pictureInPicture(.destroyed))
+        }
+        if let webDialog {
+            self.webDialog = nil
+            continuation?.yield(.webDialogClosed(webDialog))
         }
         if Self.activePages[windowID]?.page === self { Self.activePages[windowID] = nil }
         continuation?.finish()
@@ -768,6 +790,23 @@ private struct StubVideoView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.7))
         }
+    }
+}
+
+private struct StubWebDialogView: View {
+    let title: String
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Stub print preview")
+                .font(.system(size: 15, weight: .semibold))
+            Text(title)
+                .foregroundStyle(.secondary)
+            Button("Cancel", action: cancel)
+                .keyboardShortcut(.cancelAction)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

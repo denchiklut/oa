@@ -232,6 +232,7 @@ import AppKit
     func reloadBypassingCache()
     func resetZoomAndScaleFactors()
     func savePage()
+    func print()
     func stopLoading()
     func activate()
     @objc(findText:forward:findMatch:) func find(_ text: String, forward: Bool, findMatch: Bool)
@@ -257,6 +258,14 @@ import AppKit
     var offersSuppression: Bool { get }
     @objc(acceptWithText:suppress:) func accept(text: String?, suppress: Bool)
     @objc(cancelWithSuppress:) func cancel(suppress: Bool)
+}
+
+@MainActor @objc protocol CorePageWebDialog: NSObjectProtocol {
+    var title: String { get }
+    var accessibleTitle: String { get }
+    var preferredSize: NSSize { get }
+    var minimumSize: NSSize { get }
+    var view: NSView { get }
 }
 
 @MainActor @objc protocol CorePagePermissionRequest: NSObjectProtocol {
@@ -294,6 +303,8 @@ import AppKit
     func page(_ page: CorePage, didCloseExtensionRequest request: CorePageExtensionRequest)
     @objc(page:pictureInPicture:view:rect:)
     func page(_ page: CorePage, pictureInPicture event: Int, view: NSView?, rect: NSRect)
+    @objc(page:didShowWebDialog:) func page(_ page: CorePage, didShowWebDialog dialog: CorePageWebDialog)
+    @objc(page:didCloseWebDialog:) func page(_ page: CorePage, didCloseWebDialog dialog: CorePageWebDialog)
     @objc(page:thumbnailReady:) func page(_ page: CorePage, thumbnailReady thumbnail: NSImage)
     @objc(page:didConsumeKey:withModifierFlags:)
     func page(_ page: CorePage, didConsumeKey keyCode: UInt16, withModifierFlags modifierFlags: NSEvent.ModifierFlags)

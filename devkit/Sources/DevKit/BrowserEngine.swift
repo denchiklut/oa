@@ -611,6 +611,9 @@ public protocol Page: AnyObject, Observable {
     func resetZoomAndScaleFactors()
     /// As ADK's `save()`: Chrome's Save Page As panel over the page's window.
     func savePage()
+    /// As ADK's `print()`: the engine's print preview for the page, which comes as a `webDialog` event. Nothing for a
+    /// crashed page.
+    func print()
     func stopLoading()
     func activate()
     /// As ADK's `performFindInPage`: never case-sensitive, scrolling to the active match, its results as `findResult`
@@ -665,6 +668,11 @@ public enum PageEvent {
     case extensionRequestClosed(PageExtensionRequest)
     /// What the engine asks of the app's window for the page's picture-in-picture video.
     case pictureInPicture(PictureInPictureEvent)
+    /// The engine shows a dialog of its own over the page, as ADK's `onShowWebUIDialog`: print preview, for one,
+    /// after `print()` or the page's `window.print()`. The app shows it over the page's window.
+    case webDialog(WebDialog)
+    /// The dialog closed itself, from its own buttons or Escape, or with its page, as ADK's `onDidCloseWebUIDialog`.
+    case webDialogClosed(WebDialog)
     /// The page consumed a key down, as ADK's `webContents:didConsumeKey:withModifierFlags:underlyingEventType:`
     /// for a raw key down: the key's code and the modifier flags of its event.
     case consumedKey(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags)
@@ -737,6 +745,25 @@ public final class PictureInPictureController {
     public init(view: NSView, sourceBounds: CGRect) {
         self.view = view
         self.sourceBounds = sourceBounds
+    }
+}
+
+/// A dialog the engine draws itself and the app shows over a page, as ADK's `ArcWebDialog`.
+@MainActor
+public final class WebDialog {
+    public let title: String
+    public let accessibleTitle: String
+    public let preferredSize: CGSize
+    public let minimumSize: CGSize
+    /// Draws the dialog. The engine's until `webDialogClosed`; attach it while the dialog is shown.
+    public let view: NSView
+
+    public init(title: String, accessibleTitle: String, preferredSize: CGSize, minimumSize: CGSize, view: NSView) {
+        self.title = title
+        self.accessibleTitle = accessibleTitle
+        self.preferredSize = preferredSize
+        self.minimumSize = minimumSize
+        self.view = view
     }
 }
 
