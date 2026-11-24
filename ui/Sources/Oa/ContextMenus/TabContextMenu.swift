@@ -38,8 +38,10 @@ struct TabContextMenu {
             MenuActionItem(
                 audio?.isMuted == true ? "Unmute" : "Mute", enabled: audio.map { $0.isAudible || $0.isMuted } ?? false
             ) { [model, tab] in model.toggleMuted(tab.id) })
-        // Arc's opens Boosts, which Oa doesn't have.
-        if let scheme = model.pages[tab.id]?.url?.scheme, scheme == "http" || scheme == "https" {
+        // Arc's opens Boosts, which Oa doesn't have. As seen in Arc, an incognito window has none.
+        if model.sidebarContext != .incognito, let scheme = model.pages[tab.id]?.url?.scheme,
+            scheme == "http" || scheme == "https"
+        {
             menu.addItem(MenuActionItem("Customize Page…"))
         }
         if favorite || state.isPinned(tab.id), let url = tab.url { menu.addItem(editPinnedPage(url)) }
@@ -56,7 +58,8 @@ struct TabContextMenu {
                 })
         }
         menu.addItem(MenuActionItem("Duplicate") { [model, tab] in model.duplicate(tab.id) })
-        // Oa's own: a window with a sidebar of its own keeps its tabs, as it has no Spaces to move them to.
+        // As seen in Arc, an incognito window has none. A Blank Window's lists the global Spaces in Arc; what moving
+        // from it does wasn't seen, so Oa leaves it out there.
         if model.sidebarContext == .global { menu.addItem(move([tab.id], favorite: favorite)) }
         menu.addItem(.separator())
         for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
