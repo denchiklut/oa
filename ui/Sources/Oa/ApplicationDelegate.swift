@@ -362,7 +362,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         controller.model.openWindow = { [weak self, weak model = controller.model] tabID in
             self?.openWindow(selecting: tabID, from: model)
         }
-        let previous = (windows.first { $0.model === source } ?? windows.last)?.window
+        // As seen in Arc: from the key window.
+        let previous = (windows.first { $0.model === source } ?? key)?.window
         windows.append(controller)
         controller.open(cascadingFrom: previous)
         if let record {
