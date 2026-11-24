@@ -2345,6 +2345,9 @@ final class WindowModel {
                 // The app's one window for it, whichever window holds the page, or none any more.
                 if case .pictureInPicture(let event) = event {
                     pictureInPicture.handle(event, for: pageID)
+                } else if case .webDialogClosed(let dialog) = event {
+                    // The engine closes a page's dialog after the page, when no window holds it any more.
+                    for window in store.windows where window.webDialog === dialog { window.webDialog = nil }
                 } else if let window = store.windows.first(where: { $0.holds(pageID) }) {
                     window.handle(event, for: pageID)
                 } else if case .dialog(let dialog) = event, case .beforeUnload = dialog.kind {
@@ -2411,9 +2414,6 @@ final class WindowModel {
             return forget(request)
         case .webDialog(let dialog):
             if webDialog == nil { webDialog = dialog }
-            return
-        case .webDialogClosed(let dialog):
-            if webDialog === dialog { webDialog = nil }
             return
         case .consumedKey(let keyCode, let modifierFlags):
             return webContentDidConsume(keyCode: keyCode, modifierFlags: modifierFlags, pageID: pageID)
