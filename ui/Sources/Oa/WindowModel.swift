@@ -540,7 +540,7 @@ final class WindowModel {
     /// an address.
     var commandBarTabs: [CommandBarRanking.Tab] {
         guard let space else { return [] }
-        // Oa's own: a window with a sidebar of its own offers only its own tabs.
+        // As seen in Arc: a Blank Window offers only its own tabs.
         let others = spaces.filter { $0.profileID == space.profileID && $0.id != space.id }
         let tabs: [(SidebarTab, String?)] =
             selectableTabs.map { ($0, nil) }

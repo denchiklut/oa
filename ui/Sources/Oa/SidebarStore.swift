@@ -182,8 +182,8 @@ final class SidebarStore {
         scheduleSave()
     }
 
-    /// A window's own container goes with it, as seen in Arc when its last tab closes it. Oa's own: closing it by
-    /// its button does the same, unseen in Arc.
+    /// A window's own container goes with it, its tabs unarchived, as seen in Arc when its last tab closes it and
+    /// when it is closed by its button.
     func removeWindow(_ window: WindowModel) {
         windows.removeAll { $0 === window }
         if !quitting, let container = window.sidebarContext.container(of: window.id) {
