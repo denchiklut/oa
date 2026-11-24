@@ -23,10 +23,10 @@ public protocol BrowserApplication: AnyObject {
     /// with unload handlers run them and close, the engine writes what it must keep, and the app exits with its
     /// windows as they are.
     func terminate()
-    /// As ADK's `BrowserContextID`: the profile's own context, or its incognito one, which shares its downloads,
-    /// preferences and extensions, reads its history and keeps nothing once its last window has closed.
     /// As ADK's `incognitoDisabled`: the app's `IncognitoModeAvailability` default is 1, as read at launch.
     var incognitoDisabled: Bool { get }
+    /// As ADK's `BrowserContextID`: the profile's own context, or its incognito one, which shares its downloads,
+    /// preferences and extensions, reads its history and keeps nothing once its last window has closed.
     func browserContext(id: UUID, type: BrowserContextType) -> any BrowserContext
     /// The profiles the engine has, loaded or not, in the engine's own order, as ADK's `allProfiles()`.
     func allProfiles() -> [UUID]

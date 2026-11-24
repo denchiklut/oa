@@ -36,7 +36,7 @@ pins:
 
 | Patch | Why |
 | --- | --- |
-| 0001 | As ArcCore's frontend: the dock side is asked of the embedder before it changes, and once as `undocked` when the frontend can't dock; DevTools fills its own view on every side, with no inspected-page placeholder, since the embedder lays out the page; inspect mode changes are reported |
+| 0001 | As ArcCore's frontend: the dock side is asked of the embedder before it changes, and once as `undocked` when the frontend can't dock; DevTools fills its own view on every side, with no inspected-page placeholder, since the embedder lays out the page; inspect mode changes are reported, and `DevToolsAPI.currentPanel()` answers with the shown panel. The added lines are those of Arc's bundled frontend, its comments included |
 
 Don't edit these files by hand. Commit on the `oa-patches` branch in `.local/chromium/src`, then run
 `scripts/patches.sh export`. `scripts/build.sh` applies the series before building.

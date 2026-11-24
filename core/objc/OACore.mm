@@ -133,7 +133,6 @@
 @end
 
 @interface OAProfile ()
-// An incognito one shares its parent's downloads, preferences and extensions.
 - (instancetype)initWithIdentifier:(NSString*)identifier
                               type:(oa::BrowserContextType)type
                             parent:(nullable OAProfile*)parent;
