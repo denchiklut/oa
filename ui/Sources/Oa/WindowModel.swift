@@ -990,6 +990,11 @@ final class WindowModel {
         }
     }
 
+    func moveAllItemsToGlobalWindow(toSpace spaceID: UUID) {
+        moveItemsToGlobalWindow(
+            state.entries(in: selectedSpaceID, pinned: false).map(\.id), toSpace: spaceID, closingWindow: true)
+    }
+
     /// As seen in Arc: a Favorite moved to another profile keeps its ID, last in that profile's grid. Its page closes
     /// and loads again there from its saved address, at once when shown, the window following, else once selected.
     /// Oa's own: the sheet names the profile, and the window follows to the profile's first Space.

@@ -320,6 +320,7 @@ private struct SpaceNameRow: View {
 private struct ProfileIndicatorView: View {
     let model: WindowModel
     let space: SidebarSpace
+    @State private var hovering = false
     @State private var hoveringClear = false
     @Environment(\.theme) private var theme
 
@@ -352,12 +353,48 @@ private struct ProfileIndicatorView: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hoveringClear = $0 }
+            } else if model.sidebarContext == .standalone, hovering, !model.state.tabs(in: space.id).isEmpty {
+                // Arc's `moveToMainWindow` accessory, in Clear's slot while there are tabs; shown on hover, as seen.
+                MoveToMainWindowButton(model: model)
             }
         }
         .padding(.leading, 6)
         .padding(.trailing, 11)
         .frame(maxWidth: .infinity, minHeight: 36)
         .frame(height: 38, alignment: .top)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+    }
+}
+
+/// Arc's `presentMoveAllTabsMenu:`: the global Spaces, with no New Space…, at the pointer.
+private struct MoveToMainWindowButton: View {
+    let model: WindowModel
+    @State private var hovering = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button {
+            guard let window = model.window, let view = window.contentView else { return }
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            for space in model.state.spaces {
+                menu.addItem(
+                    MenuActionItem(space.name) { [model] in model.moveAllItemsToGlobalWindow(toSpace: space.id) })
+            }
+            menu.appearance = window.effectiveAppearance
+            menu.popUp(
+                positioning: nil, at: view.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil),
+                in: view)
+        } label: {
+            Text("Move to…")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(hovering ? theme.foreground : theme.tertiaryText)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Move to main window")
     }
 }
 
