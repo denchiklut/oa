@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Arc's `SplitViewCellView` as measured: a tab row's card with a 28 pt card for each of the split's tabs, 4 pt in
-/// and 8.5 pt apart, a hairline between them while the split isn't selected. A split with a title shows a 16 pt
+/// and 8.5 pt apart, a hairline between them while the split isn't selected. Under the pointer the cell has one ✕,
+/// its tabs making room for it, or on the selected split a ✕ on each tab's card, none of them lit. A split with a title shows a 16 pt
 /// badge with its count where a row's favicon is and the title where a row's is, in place of its tabs. A press selects
 /// the split with the pane the window focused in it last, and on the selected split the tab pressed.
 struct SplitViewCellView: View {
@@ -125,7 +126,8 @@ struct SplitViewCellView: View {
                 SidebarCellButton(glyph: selected ? .minus : .close) {
                     if selected { model.closeSplitViewPages(splitID) } else { model.closeSplitView(splitID) }
                 }
-                .help(selected ? "Close and Keep Pinned" : "Archive this Split View")
+                // Arc's tooltip on the "—" also shows ⌘W as key badges.
+                .help(selected ? "Close this item" : "Archive this item")
                 .padding(.trailing, 7.5)
             }
         }
@@ -185,7 +187,8 @@ struct SplitViewCellView: View {
     }
 
     /// Arc's `SplitViewItem.ChildItem`: 28 pt high, its title gone under Arc's 20 pt of room for it, and with the ✕
-    /// of the selected split under the pointer.
+    /// of the selected split under the pointer, beside the title while there is room, as two panes' have and three
+    /// panes' don't. Its tooltip is its tab's title.
     fileprivate struct ChildItem: View {
         let model: WindowModel
         let tab: SidebarTab
@@ -200,18 +203,19 @@ struct SplitViewCellView: View {
                 TabFavicon(model: model, tab: tab)
                     .frame(width: 18, height: 18)
                     .padding(.leading, 3.5)
-                if showsClose {
-                    Spacer(minLength: 0)
-                    SidebarCellButton(glyph: .close) { model.close(tab.id) }
-                        .help("Archive this tab")
-                        .padding(.trailing, 2)
-                } else if width >= 52 {
+                if width >= (showsClose ? 78 : 52) {
                     Text(model.title(for: tab))
                         .font(.system(size: 14))
                         .foregroundStyle(theme.foreground)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .padding(.leading, 10)
+                }
+                if showsClose {
+                    Spacer(minLength: 0)
+                    SidebarCellButton(glyph: .close) { model.close(tab.id) }
+                        .help("Archive this item")
+                        .padding(.trailing, 2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -224,6 +228,7 @@ struct SplitViewCellView: View {
             // As measured on Arc: white 7 % over the selected card in dark, black 8 % in light.
             .background { if isSelected { card.fill(theme.isDark ? .white.opacity(0.07) : .black.opacity(0.08)) } }
             .contentShape(card)
+            .help(model.title(for: tab))
         }
     }
 }

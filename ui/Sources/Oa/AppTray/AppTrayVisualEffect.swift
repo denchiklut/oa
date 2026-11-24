@@ -71,22 +71,54 @@ struct AppTrayRingShape: Shape {
     }
 }
 
+/// A split Favorite's parts as seen in Arc, 2 pt apart: two panes side by side, and three or four in two columns
+/// filled top to bottom, so a third pane takes the whole right column.
+enum SplitTileLayout {
+    static func parts(_ count: Int, in size: CGSize) -> [CGRect] {
+        guard count > 2 else {
+            let part = (size.width - 2 * CGFloat(max(count - 1, 0))) / CGFloat(max(count, 1))
+            return (0..<count).map { CGRect(x: CGFloat($0) * (part + 2), y: 0, width: part, height: size.height) }
+        }
+        let column = (size.width - 2) / 2
+        let row = (size.height - 2) / 2
+        return (0..<count).map { index in
+            let x = CGFloat(index / 2) * (column + 2)
+            let alone = index == 2 && count == 3
+            return CGRect(
+                x: x, y: alone ? 0 : CGFloat(index % 2) * (row + 2), width: column, height: alone ? size.height : row)
+        }
+    }
+
+    /// The 2 pt gaps between the parts.
+    static func gaps(_ count: Int, in size: CGSize) -> [CGRect] {
+        let parts = parts(count, in: size)
+        var gaps: [CGRect] = []
+        for (a, b) in zip(parts, parts.dropFirst()) where a.maxX < b.minX {
+            gaps.append(CGRect(x: a.maxX, y: 0, width: b.minX - a.maxX, height: size.height))
+        }
+        for (a, b) in zip(parts, parts.dropFirst()) where a.minX == b.minX {
+            gaps.append(CGRect(x: a.minX, y: a.maxY, width: a.width, height: b.minY - a.maxY))
+        }
+        return gaps
+    }
+}
+
 /// Arc's tile image for a split Favorite: each pane's filtered favicon at 12 pt's size, centred on the pane's part of
-/// the tile, parts 2 pt apart, a later one over an earlier with no clip.
+/// the tile, a later one over an earlier with no clip.
 struct SplitAppTrayVisualEffect: View {
     let favicons: [NSImage?]
     let tileWidth: CGFloat
 
     var body: some View {
         let side = tileWidth / 5 * 12
-        let part = (tileWidth - 2 * CGFloat(favicons.count - 1)) / CGFloat(favicons.count)
         GeometryReader { geometry in
+            let parts = SplitTileLayout.parts(favicons.count, in: geometry.size)
             ForEach(Array(favicons.enumerated()), id: \.offset) { index, favicon in
                 if let favicon, let image = AppTrayVisualEffect.image(for: favicon) {
                     Image(nsImage: image)
                         .resizable()
                         .frame(width: side, height: side)
-                        .position(x: CGFloat(index) * (part + 2) + part / 2, y: geometry.size.height / 2)
+                        .position(x: parts[index].midX, y: parts[index].midY)
                 }
             }
         }
@@ -94,7 +126,7 @@ struct SplitAppTrayVisualEffect: View {
     }
 }
 
-/// Arc's selection ring on a split Favorite, LIKELY with the 2 pt gaps between its parts cut out with it.
+/// Arc's selection ring on a split Favorite, with the gaps between its parts drawn in it.
 struct SplitAppTrayRing: View {
     let favicons: [NSImage?]
     let tileWidth: CGFloat
@@ -102,13 +134,15 @@ struct SplitAppTrayRing: View {
     var body: some View {
         SplitAppTrayVisualEffect(favicons: favicons, tileWidth: tileWidth)
             .mask {
-                ZStack {
-                    AppTrayRingShape().fill(style: FillStyle(eoFill: true))
-                    let part = (tileWidth - 2 * CGFloat(favicons.count - 1)) / CGFloat(favicons.count)
-                    ForEach(1..<max(favicons.count, 1), id: \.self) { index in
-                        Rectangle().frame(width: 2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, CGFloat(index) * (part + 2) - 2)
+                GeometryReader { geometry in
+                    ZStack(alignment: .topLeading) {
+                        AppTrayRingShape().fill(style: FillStyle(eoFill: true))
+                        ForEach(
+                            Array(SplitTileLayout.gaps(favicons.count, in: geometry.size).enumerated()), id: \.offset
+                        ) {
+                            _, gap in
+                            Rectangle().frame(width: gap.width, height: gap.height).offset(x: gap.minX, y: gap.minY)
+                        }
                     }
                 }
             }

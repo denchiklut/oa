@@ -583,15 +583,17 @@ private struct SidebarDragPreview: View, Animatable {
                     glyph(width: width, height: height, t: t)
                 } else {
                     // As measured on Arc: the cell as it is selected and under the pointer, each tab's card with its
-                    // ✕, 4 pt in and 8.5 pt apart; as the tile, its parts 2 pt apart.
+                    // ✕, 4 pt in and 8.5 pt apart; as the tile, its parts.
                     let count = CGFloat(tabs.count)
                     let row = (drag.rowSize.width - 8 - 8.5 * (count - 1)) / count
-                    let tile = (drag.tileSize.width - 2 * (count - 1)) / count
+                    let parts = SplitTileLayout.parts(tabs.count, in: drag.tileSize)
                     ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                         let i = CGFloat(index)
                         let size = 16 - 4 * t
                         let rowX = 4 + i * (row + 8.5)
-                        let tileX = i * (tile + 2) + (tile - size) / 2
+                        let tileX = parts[index].midX - size / 2
+                        let rowY = (drag.rowSize.height - size) / 2
+                        let tileY = parts[index].midY - size / 2
                         Group {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(theme.isDark ? .white.opacity(0.07) : .black.opacity(0.08))
@@ -605,7 +607,7 @@ private struct SidebarDragPreview: View, Animatable {
                         TabFavicon(model: model, tab: tab)
                             .scaleEffect(size / 16)
                             .frame(width: size, height: size)
-                            .offset(x: rowX + 4.5 + (tileX - rowX - 4.5) * t, y: (height - size) / 2)
+                            .offset(x: rowX + 4.5 + (tileX - rowX - 4.5) * t, y: rowY + (tileY - rowY) * t)
                     }
                 }
             }
