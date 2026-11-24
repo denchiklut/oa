@@ -295,6 +295,8 @@ class Page {
   virtual void GoForward() = 0;
   virtual void Reload() = 0;
   virtual void ReloadBypassingCache() = 0;
+  // Chrome's Save Page As panel over the page's window, as ArcCore's save.
+  virtual void SavePage() = 0;
   virtual void Stop() = 0;
   virtual void Activate() = 0;
   // As ArcCore's find: through Chrome's find tab helper, never case-sensitive,

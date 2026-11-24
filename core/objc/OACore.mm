@@ -674,6 +674,12 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   }
 }
 
+- (void)savePage {
+  if (_page) {
+    _page->SavePage();
+  }
+}
+
 - (void)stopLoading {
   if (_page) {
     _page->Stop();

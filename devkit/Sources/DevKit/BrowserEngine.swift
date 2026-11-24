@@ -609,6 +609,8 @@ public protocol Page: AnyObject, Observable {
     func setZoomFactor(_ factor: Float)
     /// As ADK's `resetZoomAndScaleFactors`: 100 %, not the profile's default zoom, and the pinch undone.
     func resetZoomAndScaleFactors()
+    /// As ADK's `save()`: Chrome's Save Page As panel over the page's window.
+    func savePage()
     func stopLoading()
     func activate()
     /// As ADK's `performFindInPage`: never case-sensitive, scrolling to the active match, its results as `findResult`

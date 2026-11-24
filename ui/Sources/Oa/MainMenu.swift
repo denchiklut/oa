@@ -63,6 +63,11 @@ final class MainMenu {
             item(
                 "Restore Last Closed Tab", #selector(BrowserWindowController.restoreLastClosed(_:)), key: "t",
                 modifiers: [.command, .shift], id: "reopenLastClosedTab", priority: .overrideWebView))
+        file.addItem(.separator())
+        file.addItem(
+            item(
+                "Save Page As", #selector(BrowserWindowController.savePageAs(_:)), key: "s",
+                modifiers: [.command, .shift], id: "savePageAs"))
 
         let edit = submenu("Edit", in: menu)
         edit.addItem(item("Undo", Selector(("undo:")), key: "z"))
