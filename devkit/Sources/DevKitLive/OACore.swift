@@ -225,6 +225,7 @@ import AppKit
     var mediaSessionStatus: Int { get }
     var mediaContentType: Int { get }
     var keepsAddress: Bool { get set }
+    var devTools: CorePageDevTools { get }
     @objc(loadURL:) func load(_ url: URL)
     func goBack()
     func goForward()
@@ -247,6 +248,24 @@ import AppKit
     @objc(exitPictureInPictureAndPause:) func exitPictureInPicture(pausing: Bool) -> Bool
     func close()
     func drop()
+}
+
+@MainActor @objc protocol CorePageDevTools: NSObjectProtocol {
+    var delegate: CorePageDevToolsDelegate? { get set }
+    var view: NSView? { get }
+    func open()
+    func openInspectView()
+    func openConsoleView()
+    func openNetworkView()
+    func close()
+    func focus()
+    @objc(currentPanelWithCompletion:) func currentPanel(completion: @escaping (String) -> Void)
+}
+
+@MainActor @objc protocol CorePageDevToolsDelegate: NSObjectProtocol {
+    /// `OAPageDevToolsDisplay` in `core/objc/OACore.h`.
+    @objc(devTools:displayAs:) func devTools(_ devTools: CorePageDevTools, displayAs display: Int)
+    @objc(devToolsDidClose:) func devToolsDidClose(_ devTools: CorePageDevTools)
 }
 
 @MainActor @objc protocol CorePageDialog: NSObjectProtocol {

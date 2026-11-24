@@ -8,10 +8,49 @@ usage() {
   cat <<'HELP'
 Usage: scripts/patches.sh <apply|export|status>
 
-apply    Link core/ as src/oa and rebuild the oa-patches branch from chromium/patches on the pinned tag.
-export   Write one NNNN-subject.patch per commit on oa-patches into chromium/patches.
+apply    Link core/ as src/oa and rebuild the oa-patches branches from chromium/patches on the pinned tag, and from
+         chromium/patches/devtools-frontend on the DevTools frontend that tag's DEPS pins.
+export   Write one NNNN-subject.patch per commit on each oa-patches branch into its directory.
 status   Show whether the checkout matches chromium/patches.
 HELP
+}
+
+# export_series <repository> <patch directory> <pinned base>
+export_series() {
+  local repo="$1" dir="$2" pinned="$3" base staging
+  cd "$repo"
+  git rev-parse --verify --quiet "refs/heads/$patch_branch" > /dev/null ||
+    die "no $patch_branch branch in $repo; run scripts/patches.sh apply"
+  base="$(git rev-parse --verify --quiet "$patch_base_ref")" || die "$patch_base_ref is missing; run scripts/patches.sh apply"
+  [[ "$base" == "$pinned" ]] || die "$patch_branch in $repo is based on another revision than $version pins; run scripts/patches.sh apply"
+  require_clean_tree "$repo"
+  staging="$(mktemp -d)"
+  git -c diff.noprefix=false -c diff.mnemonicPrefix=false -c diff.relative=false \
+    format-patch --quiet --zero-commit --no-signature --no-numbered --full-index \
+    --output-directory "$staging" "$base..$patch_branch"
+  mkdir -p "$dir"
+  rm -f "$dir"/*.patch
+  shopt -s nullglob
+  local new=("$staging"/*.patch)
+  shopt -u nullglob
+  ((${#new[@]})) && cp "${new[@]}" "$dir/"
+  rm -rf "$staging"
+  log "exported ${#new[@]} patch(es) to ${dir#"$repo_root"/}"
+}
+
+# status_series <repository> <patch directory> <pinned base> <name>
+status_series() {
+  local repo="$1" dir="$2" pinned="$3" name="$4" branch
+  cd "$repo"
+  branch="$(git symbolic-ref --quiet --short HEAD || echo detached)"
+  echo "$name: $branch at $(git rev-parse --short HEAD), pinned $version at $(git rev-parse --short "$pinned")"
+  if [[ "$branch" == "$patch_branch" ]] && git rev-parse --verify --quiet "$patch_base_ref" > /dev/null; then
+    if [[ "$(range_patch_ids "$patch_base_ref..HEAD" "$repo")" == "$(series_patch_ids "$dir")" ]]; then
+      echo "$name patches: in step with ${dir#"$repo_root"/}"
+    else
+      echo "$name patches: branch differs from ${dir#"$repo_root"/} (run scripts/patches.sh export)"
+    fi
+  fi
 }
 
 require_checkout
@@ -21,34 +60,13 @@ case "${1:-}" in
     apply_patches
     ;;
   export)
-    cd "$chromium_src"
-    git rev-parse --verify --quiet "refs/heads/$patch_branch" > /dev/null || die "no $patch_branch branch; run scripts/patches.sh apply"
-    base="$(git rev-parse --verify --quiet "$patch_base_ref")" || die "$patch_base_ref is missing; run scripts/patches.sh apply"
-    [[ "$base" == "$(pinned_commit)" ]] || die "$patch_branch is based on another Chromium than $version; run scripts/patches.sh apply"
-    require_clean_tree
-    staging="$(mktemp -d)"
-    trap 'rm -rf "$staging"' EXIT
-    git -c diff.noprefix=false -c diff.mnemonicPrefix=false -c diff.relative=false \
-      format-patch --quiet --zero-commit --no-signature --no-numbered --full-index \
-      --output-directory "$staging" "$base..$patch_branch"
-    rm -f "$patches_dir"/*.patch
-    shopt -s nullglob
-    new=("$staging"/*.patch)
-    ((${#new[@]})) && cp "${new[@]}" "$patches_dir/"
-    log "exported ${#new[@]} patch(es) to chromium/patches"
+    export_series "$chromium_src" "$patches_dir" "$(pinned_commit)"
+    export_series "$frontend_src" "$frontend_patches_dir" "$(frontend_pinned_commit)"
     git -C "$repo_root" status --short -- chromium/patches
     ;;
   status)
-    cd "$chromium_src"
-    branch="$(git symbolic-ref --quiet --short HEAD || echo detached)"
-    echo "checkout: $branch at $(git rev-parse --short HEAD), pinned $version at $(git rev-parse --short "$(pinned_commit)")"
-    if [[ "$branch" == "$patch_branch" ]] && git rev-parse --verify --quiet "$patch_base_ref" > /dev/null; then
-      if [[ "$(range_patch_ids "$patch_base_ref..HEAD")" == "$(series_patch_ids)" ]]; then
-        echo "patches: in step with chromium/patches"
-      else
-        echo "patches: branch differs from chromium/patches (run scripts/patches.sh export)"
-      fi
-    fi
+    status_series "$chromium_src" "$patches_dir" "$(pinned_commit)" checkout
+    status_series "$frontend_src" "$frontend_patches_dir" "$(frontend_pinned_commit)" "devtools frontend"
     ;;
   *)
     usage

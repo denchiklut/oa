@@ -79,6 +79,10 @@ if [[ "$saved_version" != "$version" || ! -d src/.git ]]; then
   if [[ -d src/.git ]]; then
     require_clean_tree
     git -C src checkout --quiet --detach
+    if [[ -d "$frontend_src/.git" ]]; then
+      require_clean_tree "$frontend_src"
+      git -C "$frontend_src" checkout --quiet --detach
+    fi
   fi
   log "Downloading Chromium $version and its dependencies; the first download can take hours"
   gclient config --managed --name=src https://chromium.googlesource.com/chromium/src.git
