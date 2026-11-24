@@ -73,9 +73,9 @@ final class WindowModel {
     private var answeredPermissionRequest: (pageID: UUID, request: PagePermissionRequest)?
     /// By page, as Arc's ADK queues an install consent on its page.
     private(set) var extensionRequests: [UUID: [PageExtensionRequest]] = [:]
-    /// The engine's dialogs over this window's pages; the first is shown, as Arc's `currentWebDialog`. Queuing a
-    /// second one is Oa's own.
-    private(set) var webDialogs: [WebDialog] = []
+    /// The engine's dialog shown over this window, as Arc's `currentWebDialog`: one that comes while another is shown
+    /// is never shown, and its page waits until it closes some other way.
+    private(set) var webDialog: WebDialog?
     /// By profile, as ADK keeps a browser per window and profile: from the window's first page in the profile on.
     private(set) var browsers: [UUID: any Browser] = [:]
     private(set) var commandBar: CommandBar?
@@ -2435,10 +2435,10 @@ final class WindowModel {
         case .extensionRequestClosed(let request):
             return forget(request)
         case .webDialog(let dialog):
-            webDialogs.append(dialog)
+            if webDialog == nil { webDialog = dialog }
             return
         case .webDialogClosed(let dialog):
-            webDialogs.removeAll { $0 === dialog }
+            if webDialog === dialog { webDialog = nil }
             return
         case .consumedKey(let keyCode, let modifierFlags):
             return webContentDidConsume(keyCode: keyCode, modifierFlags: modifierFlags, pageID: pageID)

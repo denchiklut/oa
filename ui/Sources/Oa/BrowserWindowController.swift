@@ -127,7 +127,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     private func observeWebDialog() {
         let dialog = withObservationTracking {
-            model.webDialogs.first
+            model.webDialog
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeWebDialog() }
         }
