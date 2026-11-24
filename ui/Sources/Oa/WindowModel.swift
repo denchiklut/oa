@@ -923,10 +923,16 @@ final class WindowModel {
 
     /// As seen in Arc: several items land at the top of the list in their order, and without the shown tab among
     /// them the window stays and says where they went.
-    func moveItems(_ itemIDs: [UUID], toSpace spaceID: UUID) {
-        if sidebarContext == .standalone { return moveItemsToGlobalWindow(itemIDs, toSpace: spaceID) }
+    ///
+    /// From a Blank Window, as Arc's `moveItemsToGlobalDestination`: the items keep their IDs and live pages and go
+    /// into the window `globalWindow` picks, which comes forward. It shows the Space and the tab only when the tab
+    /// was the one shown here. As seen in Arc, no toast, and this window stays, empty or not, unless `closingWindow`
+    /// (Arc's `hasCloseWindowIntent`, the header's Move to…). As Arc's `beginMoveItems`, a Space of another profile
+    /// asks first; the sheet on this window is Oa's own.
+    func moveItems(_ itemIDs: [UUID], toSpace spaceID: UUID, closingWindow: Bool = false) {
+        let standalone = sidebarContext == .standalone
         let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
-        guard !itemIDs.isEmpty, let space = state.space(spaceID) else { return }
+        guard !itemIDs.isEmpty, let space = state.space(spaceID), !standalone || state.isGlobal(spaceID) else { return }
         let tabIDs = itemIDs.flatMap { state.splitView($0) != nil ? state.tree[$0]?.childIDs ?? [] : [$0] }
         let focused = presentedTabIDs.contains(where: tabIDs.contains) ? selectedTabID : nil
         let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
@@ -934,52 +940,22 @@ final class WindowModel {
         let move = { [weak self] in
             guard let self else { return }
             let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
-            guard !itemIDs.isEmpty else { return }
-            multiSelection = SidebarMultiSelection()
-            if crossesProfile { for window in store.windows { window.dropPages(of: tabIDs) } }
-            store.edit { state in for itemID in itemIDs.reversed() { state.move(itemID, toSpace: spaceID) } }
-            guard let focused else {
-                if itemIDs.count > 1, let first = tabIDs.first { present(.itemsMoved(first), at: .window) }
-                return
-            }
-            selectedTabIDs[sourceSpaceID] = nil
-            selectSpace(spaceID)
-            select(focused)
-        }
-        if crossesProfile {
-            ProfileDialogUtils.confirmMove(tabCount: tabIDs.count, to: space.name, in: self, proceed: move)
-        } else {
-            move()
-        }
-    }
-
-    /// As Arc's `moveItemsToGlobalDestination` from a Blank Window: the items go in their order to the top of the
-    /// global Space's list, keeping their IDs and live pages, into the window `globalWindow` picks, which comes
-    /// forward. It shows the Space and the tab only when the tab was the one shown here. As seen in Arc, no toast,
-    /// and this window stays, empty or not, unless `closingWindow` (Arc's `hasCloseWindowIntent`, the header's Move
-    /// to…). As Arc's `beginMoveItems`, a Space of another profile asks first; the sheet on this window is Oa's own.
-    func moveItemsToGlobalWindow(_ itemIDs: [UUID], toSpace spaceID: UUID, closingWindow: Bool = false) {
-        let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
-        guard sidebarContext == .standalone, state.isGlobal(spaceID), !itemIDs.isEmpty, let space = state.space(spaceID)
-        else { return }
-        let tabIDs = itemIDs.flatMap { state.splitView($0) != nil ? state.tree[$0]?.childIDs ?? [] : [$0] }
-        let focused = presentedTabIDs.contains(where: tabIDs.contains) ? selectedTabID : nil
-        let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
-        let move = { [weak self] in
-            guard let self else { return }
-            let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
-            guard !itemIDs.isEmpty, let destination = globalWindow(spaceID) else { return }
+            guard !itemIDs.isEmpty, let destination = standalone ? globalWindow(spaceID) : self else { return }
             multiSelection = SidebarMultiSelection()
             if crossesProfile {
                 for window in store.windows { window.dropPages(of: tabIDs) }
-            } else {
+            } else if standalone {
                 for tabID in tabIDs { destination.takePage(of: tabID, from: self) }
             }
             store.edit { state in for itemID in itemIDs.reversed() { state.move(itemID, toSpace: spaceID) } }
             if let focused {
+                selectedTabIDs[sourceSpaceID] = nil
                 destination.selectSpace(spaceID)
                 destination.select(focused)
+            } else if !standalone, itemIDs.count > 1, let first = tabIDs.first {
+                present(.itemsMoved(first), at: .window)
             }
+            guard standalone else { return }
             destination.bringToFront()
             if closingWindow { Task { [weak window] in window?.close() } }
         }
@@ -991,8 +967,7 @@ final class WindowModel {
     }
 
     func moveAllItemsToGlobalWindow(toSpace spaceID: UUID) {
-        moveItemsToGlobalWindow(
-            state.entries(in: selectedSpaceID, pinned: false).map(\.id), toSpace: spaceID, closingWindow: true)
+        moveItems(state.entries(in: selectedSpaceID, pinned: false).map(\.id), toSpace: spaceID, closingWindow: true)
     }
 
     /// As seen in Arc: a Favorite moved to another profile keeps its ID, last in that profile's grid. Its page closes
@@ -2576,9 +2551,6 @@ final class WindowModel {
         guard let page = peeks.removeValue(forKey: ownerID) else { return }
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
-        // Oa's own until Arc's is seen: a window with a sidebar of its own keeps the link's tab, selected, as no
-        // other window has its tabs.
-        let leavesWindow = inWindow && sidebarContext == .global
         extensionRequests[page.id] = nil
         if let request = store.closing.removeValue(forKey: page.id), state.tree.tab(ownerID) != nil {
             archivePeek(page, of: ownerID, saving: true)
@@ -2604,6 +2576,9 @@ final class WindowModel {
         let held = NSEvent.modifierFlags.intersection([.option, .command, .shift, .control])
         let disposition = disposition == .backgroundTab && held == .option ? .splitView : disposition
         let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick)
+        // Oa's own until Arc's is seen: a window with a sidebar of its own keeps the link's tab, selected, as no
+        // other window has its tabs.
+        let leavesWindow = inWindow && sidebarContext == .global
         guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
             let tab = makeTab(url: url)
