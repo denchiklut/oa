@@ -90,7 +90,8 @@ final class CommandBar {
     @ObservationIgnored private var lastSuggestedText: String?
     @ObservationIgnored private let profileID: UUID
     @ObservationIgnored private let picks: CommandBarPicks
-    @ObservationIgnored private let recordsPicks: Bool
+    /// Off in an incognito window, which neither applies the profile's picks nor records its own, as seen in Arc.
+    @ObservationIgnored private let usesPicks: Bool
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
     @ObservationIgnored private let searchEngines: () -> [SearchEngine]
     @ObservationIgnored private let dominantColor: (_ host: String) async -> NSColor?
@@ -101,7 +102,7 @@ final class CommandBar {
 
     init(
         destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, profileID: UUID,
-        picks: CommandBarPicks, recordsPicks: Bool = true, searchEngines: @escaping () -> [SearchEngine],
+        picks: CommandBarPicks, usesPicks: Bool = true, searchEngines: @escaping () -> [SearchEngine],
         dominantColor: @escaping (_ host: String) async -> NSColor?,
         tabs: @escaping () -> [CommandBarRanking.Tab]
     ) {
@@ -110,7 +111,7 @@ final class CommandBar {
         self.currentURL = currentURL
         self.profileID = profileID
         self.picks = picks
-        self.recordsPicks = recordsPicks
+        self.usesPicks = usesPicks
         self.tabs = tabs
         self.searchEngines = searchEngines
         self.dominantColor = dominantColor
@@ -321,9 +322,7 @@ final class CommandBar {
     private func act(_ modifiers: NSEvent.ModifierFlags) {
         guard rows.indices.contains(selectedIndex) else { return }
         let row = rows[selectedIndex]
-        // As seen in Arc, where a pick made in an incognito window wasn't recorded. Reading the profile's picks there
-        // is Oa's own, as Arc's isn't known.
-        if !text.isEmpty, recordsPicks { picks.record(row.id, for: text, in: profileID) }
+        if !text.isEmpty, usesPicks { picks.record(row.id, for: text, in: profileID) }
         switch row.source {
         case .tab(let tab): perform(.switchTo(tab.tab.id))
         case .match(let match):
@@ -347,7 +346,7 @@ final class CommandBar {
         let ranked = CommandBarRanking.rank(
             query: text, matches: kept(autocomplete.matches), additionalMatches: kept(autocomplete.additionalMatches),
             tabs: destination == .newTab && scope == nil ? tabs() : [],
-            lastPick: picks.pick(for: text, in: profileID), now: .now)
+            lastPick: usesPicks ? picks.pick(for: text, in: profileID) : nil, now: .now)
         if ranked != rows { rows = ranked }
         let output = suggestedField.string
         guard output != lastSuggestedText else { return }
