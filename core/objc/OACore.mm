@@ -32,6 +32,8 @@
 - (void)pageExtensionRequestClosed:(const oa::ExtensionRequest&)request;
 - (void)pagePictureInPicture:(const oa::PictureInPictureEvent&)event
                         view:(nullable NSView*)view;
+- (void)pageWebDialog:(const oa::WebDialog&)dialog view:(NSView*)view;
+- (void)pageWebDialogClosed:(const oa::WebDialog&)dialog;
 - (void)pageThumbnail:(NSImage*)thumbnail;
 - (void)pageConsumedKey:(unsigned short)keyCode
           modifierFlags:(NSEventModifierFlags)modifierFlags;
@@ -245,6 +247,12 @@ class PageObserverBridge : public oa::Page::Observer {
                               void* ns_view) override {
     [page_ pagePictureInPicture:event view:(__bridge NSView*)ns_view];
   }
+  void OnPageWebDialog(const oa::WebDialog& dialog, void* ns_view) override {
+    [page_ pageWebDialog:dialog view:(__bridge NSView*)ns_view];
+  }
+  void OnPageWebDialogClosed(const oa::WebDialog& dialog) override {
+    [page_ pageWebDialogClosed:dialog];
+  }
   void OnPageThumbnail(void* ns_image) override {
     [page_ pageThumbnail:(__bridge NSImage*)ns_image];
   }
@@ -320,6 +328,32 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   if (oa::Page::DialogReply reply = std::exchange(_reply, nullptr)) {
     reply(false, std::string(), suppress);
   }
+}
+
+@end
+
+@interface OAPageWebDialog ()
+- (instancetype)initWithDialog:(const oa::WebDialog&)dialog view:(NSView*)view;
+@end
+
+@implementation OAPageWebDialog
+
+@synthesize title = _title;
+@synthesize accessibleTitle = _accessibleTitle;
+@synthesize preferredSize = _preferredSize;
+@synthesize minimumSize = _minimumSize;
+@synthesize view = _view;
+
+- (instancetype)initWithDialog:(const oa::WebDialog&)dialog view:(NSView*)view {
+  if ((self = [super init])) {
+    _title = ToNSString(dialog.title);
+    _accessibleTitle = ToNSString(dialog.accessible_title);
+    _preferredSize =
+        NSMakeSize(dialog.preferred_width, dialog.preferred_height);
+    _minimumSize = NSMakeSize(dialog.minimum_width, dialog.minimum_height);
+    _view = view;
+  }
+  return self;
 }
 
 @end
@@ -419,6 +453,7 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   NSMutableDictionary<NSNumber*, OAPageDialog*>* _dialogs;
   NSMutableDictionary<NSNumber*, OAPagePermissionRequest*>* _permissionRequests;
   NSMapTable<NSNumber*, OAPageExtensionRequest*>* _extensionRequests;
+  NSMutableDictionary<NSNumber*, OAPageWebDialog*>* _webDialogs;
   BOOL _keepsAddress;
   BOOL _muted;
 }
@@ -433,6 +468,7 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
     _permissionRequests = [[NSMutableDictionary alloc] init];
     // Weakly: a request the app let go of is declined.
     _extensionRequests = [NSMapTable strongToWeakObjectsMapTable];
+    _webDialogs = [[NSMutableDictionary alloc] init];
   }
   return self;
 }
@@ -680,6 +716,12 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   }
 }
 
+- (void)print {
+  if (_page) {
+    _page->Print();
+  }
+}
+
 - (void)stopLoading {
   if (_page) {
     _page->Stop();
@@ -867,6 +909,23 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
       pictureInPicture:kind
                   view:view
                   rect:NSMakeRect(event.x, event.y, event.width, event.height)];
+}
+
+- (void)pageWebDialog:(const oa::WebDialog&)dialog view:(NSView*)view {
+  OAPageWebDialog* shown = [[OAPageWebDialog alloc] initWithDialog:dialog
+                                                              view:view];
+  _webDialogs[@(dialog.id)] = shown;
+  [self.delegate page:self didShowWebDialog:shown];
+}
+
+- (void)pageWebDialogClosed:(const oa::WebDialog&)dialog {
+  NSNumber* key = @(dialog.id);
+  OAPageWebDialog* shown = _webDialogs[key];
+  if (!shown) {
+    return;
+  }
+  [_webDialogs removeObjectForKey:key];
+  [self.delegate page:self didCloseWebDialog:shown];
 }
 
 - (void)pageThumbnail:(NSImage*)thumbnail {

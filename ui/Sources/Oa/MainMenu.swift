@@ -68,6 +68,10 @@ final class MainMenu {
             item(
                 "Save Page As", #selector(BrowserWindowController.savePageAs(_:)), key: "s",
                 modifiers: [.command, .shift], id: "savePageAs"))
+        file.addItem(
+            item(
+                "Print", #selector(BrowserWindowController.printPage(_:)), key: "p", id: "printPage",
+                priority: .promptAfterConsumedByWebView))
 
         let edit = submenu("Edit", in: menu)
         edit.addItem(item("Undo", Selector(("undo:")), key: "z"))

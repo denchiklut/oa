@@ -21,6 +21,7 @@
 #include "chrome/browser/ui/unload_controller.h"
 #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "components/tabs/public/tab_interface.h"
 #include "components/web_modal/modal_dialog_host.h"
 #include "components/web_modal/web_contents_modal_dialog_host.h"
 #include "content/public/browser/eye_dropper.h"
@@ -143,10 +144,9 @@ class HiddenFindBar : public FindBar {
 
 }  // namespace
 
-// Where Chrome puts a dialog over one of the window's pages, such as print
-// preview: the app's window. Chrome sizes the dialog to fit it. With no Views
-// widget to parent it to, the dialog opens as a window of its own, which the
-// page's tab puts over this one (TabImpl::AttachPrintPreview()).
+// Where Chrome puts a dialog over one of the window's pages: the app's window.
+// Chrome sizes print preview to fit the maximum size, which is the shown
+// page's view, as the sizes of Arc's preview show.
 class BrowserWindowImpl::ModalDialogHost
     : public web_modal::WebContentsModalDialogHost {
  public:
@@ -162,12 +162,9 @@ class BrowserWindowImpl::ModalDialogHost
 
   // web_modal::WebContentsModalDialogHost:
   gfx::Size GetMaximumDialogSize() override {
-    NSWindow* window = AppWindow(window_browser_);
-    if (!window) {
-      return gfx::Size();
-    }
-    const NSSize size = window.contentView.bounds.size;
-    return gfx::Size(size.width, size.height);
+    tabs::TabInterface* tab =
+        window_browser_->browser()->GetActiveTabInterface();
+    return tab ? tab->GetContents()->GetContainerBounds().size() : gfx::Size();
   }
 
   // web_modal::ModalDialogHost:
@@ -176,9 +173,13 @@ class BrowserWindowImpl::ModalDialogHost
     return window ? gfx::NativeView(window.contentView) : gfx::NativeView();
   }
   gfx::Point GetDialogPosition(const gfx::Size& size) override {
-    const gfx::Size host = GetMaximumDialogSize();
-    return gfx::Point((host.width() - size.width()) / 2,
-                      (host.height() - size.height()) / 2);
+    NSWindow* window = AppWindow(window_browser_);
+    if (!window) {
+      return gfx::Point();
+    }
+    const NSSize host = window.contentView.bounds.size;
+    return gfx::Point((host.width - size.width()) / 2,
+                      (host.height - size.height()) / 2);
   }
   void AddObserver(web_modal::ModalDialogHostObserver* observer) override {
     observers_.AddObserver(observer);

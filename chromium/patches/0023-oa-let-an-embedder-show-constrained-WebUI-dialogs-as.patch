@@ -1,0 +1,81 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 24 Nov 2026 04:40:00 -0700
+Subject: [PATCH] oa: let an embedder show constrained WebUI dialogs, as
+ ArcCore does
+
+---
+ .../constrained_web_dialog_delegate_views.cc     | 16 ++++++++++++++++
+ .../browser/ui/webui/constrained_web_dialog_ui.h | 14 ++++++++++++++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc b/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc
+index 69631a50c86284d4c790794bab113e41f87b2e8e..18de7a419dd74bbb50033afa26ab830fc6744300 100644
+--- a/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc
++++ b/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc
+@@ -35,6 +35,9 @@
+ 
+ namespace {
+ 
++// Set by SetConstrainedWebDialogFactoryForEmbedder().
++ConstrainedWebDialogFactory g_embedder_factory = nullptr;
++
+ gfx::Size RestrictToPlatformMinimumSize(const gfx::Size& min_size) {
+ #if BUILDFLAG(IS_MAC)
+   // http://crbug.com/40552209 - MacOS does not handle zero-sized windows well.
+@@ -524,10 +527,19 @@ void ConstrainedDialogWebView::UpdateAccessibleNameForRootView() {
+ 
+ }  // namespace
+ 
++void SetConstrainedWebDialogFactoryForEmbedder(
++    ConstrainedWebDialogFactory factory) {
++  g_embedder_factory = factory;
++}
++
+ ConstrainedWebDialogDelegate* ShowConstrainedWebDialog(
+     content::BrowserContext* browser_context,
+     std::unique_ptr<ui::WebDialogDelegate> delegate,
+     content::WebContents* web_contents) {
++  if (g_embedder_factory) {
++    return g_embedder_factory(browser_context, std::move(delegate),
++                              web_contents, gfx::Size(), gfx::Size());
++  }
+   ConstrainedDialogWebView* dialog =
+       new ConstrainedDialogWebView(browser_context, std::move(delegate),
+                                    web_contents, gfx::Size(), gfx::Size());
+@@ -543,6 +555,10 @@ ConstrainedWebDialogDelegate* ShowConstrainedWebDialogWithAutoResize(
+     const gfx::Size& max_size) {
+   DCHECK(!min_size.IsEmpty());
+   DCHECK(!max_size.IsEmpty());
++  if (g_embedder_factory) {
++    return g_embedder_factory(browser_context, std::move(delegate),
++                              web_contents, min_size, max_size);
++  }
+   ConstrainedDialogWebView* dialog = new ConstrainedDialogWebView(
+       browser_context, std::move(delegate), web_contents, min_size, max_size);
+ 
+diff --git a/chrome/browser/ui/webui/constrained_web_dialog_ui.h b/chrome/browser/ui/webui/constrained_web_dialog_ui.h
+index b0aa9c228e70db3dcb138cfa84cea79f2feb25c6..6023eb25020ef1202f50b7b4c89d3b2a86ae0671 100644
+--- a/chrome/browser/ui/webui/constrained_web_dialog_ui.h
++++ b/chrome/browser/ui/webui/constrained_web_dialog_ui.h
+@@ -128,6 +128,20 @@ ConstrainedWebDialogDelegate* ShowConstrainedWebDialogWithAutoResize(
+     const gfx::Size& min_size,
+     const gfx::Size& max_size);
+ 
++// For an embedder that shows constrained WebUI dialogs itself. Once a factory
++// is set, ShowConstrainedWebDialog() and
++// ShowConstrainedWebDialogWithAutoResize() return the factory's dialog instead
++// of Chrome's Views one, which needs a BrowserView; `min_size` and `max_size`
++// are empty unless the dialog auto-resizes. Call it before the browser starts.
++using ConstrainedWebDialogFactory = ConstrainedWebDialogDelegate* (*)(
++    content::BrowserContext* browser_context,
++    std::unique_ptr<ui::WebDialogDelegate> delegate,
++    content::WebContents* overshadowed,
++    const gfx::Size& min_size,
++    const gfx::Size& max_size);
++void SetConstrainedWebDialogFactoryForEmbedder(
++    ConstrainedWebDialogFactory factory);
++
+ views::WidgetDelegate* GetConstrainedWebDialogForAccessibilityTesting(
+     content::BrowserContext* browser_context,
+     std::unique_ptr<ui::WebDialogDelegate> delegate,
