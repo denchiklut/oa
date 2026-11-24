@@ -142,11 +142,6 @@ Profile* GetLoadedBrowserContext(const std::string& identifier,
                    /*create=*/false);
 }
 
-bool IsIncognitoDisabled(const std::string& profile_id) {
-  Profile* profile = GetLoadedBrowserProfile(profile_id);
-  return profile && !IncognitoModePrefs::IsIncognitoAllowed(profile);
-}
-
 std::vector<ProfileAttributes> GetAvailableProfileAttributes() {
   std::vector<ProfileAttributes> profiles;
   for (ProfileAttributesEntry* entry : g_browser_process->profile_manager()
