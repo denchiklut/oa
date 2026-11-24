@@ -2040,12 +2040,12 @@ final class WindowModel {
         }
     }
 
-    /// As Arc: a closing window hands every page to another window, preferring one that shows its tab. Oa's own, as
-    /// Arc's isn't traced: the pages of a window with a sidebar of its own go with it, since no other window has its
-    /// tabs, and an incognito window takes none.
+    /// As Arc's `tryToEjectWindowContentsForClosing`: a closing global window hands every page to another global
+    /// window, preferring one that shows its tab. A window with a sidebar of its own neither gives nor takes: as seen
+    /// in Arc, its pages end with it, a Peek's with no Archive entry.
     func dropAll() {
-        let others =
-            sidebarContext == .global ? store.windows.filter { $0 !== self && $0.sidebarContext != .incognito } : []
+        let global = sidebarContext == .global
+        let others = global ? store.windows.filter { $0 !== self && $0.sidebarContext == .global } : []
         for tabID in Array(pages.keys) {
             guard let page = release(tabID) else { continue }
             if let heir = others.first(where: { $0.shows(tabID) }) ?? others.first {
@@ -2054,7 +2054,7 @@ final class WindowModel {
                 page.drop()
             }
         }
-        archivePeeks()
+        if global { archivePeeks() }
         peeks.values.forEach { $0.drop() }
         peeks = [:]
         dialogs = [:]
