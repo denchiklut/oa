@@ -213,16 +213,16 @@ final class MainMenu {
         let back = #selector(BrowserWindowController.goBack(_:))
         let forward = #selector(BrowserWindowController.goForward(_:))
         let alternates = [
-            item("Back", back, key: "\u{F702}", id: "goBack_Alternate"),
-            item("Forward", forward, key: "\u{F703}", id: "goForward_Alternate"),
+            item("Go Back", back, key: "\u{F702}", id: "goBack_Alternate"),
+            item("Go Forward", forward, key: "\u{F703}", id: "goForward_Alternate"),
         ]
         for alternate in alternates {
             alternate.isHidden = true
             alternate.allowsKeyEquivalentWhenHidden = true
         }
-        archive.addItem(item("Back", back, key: "[", id: "goBack", priority: .overrideWebView))
+        archive.addItem(item("Go Back", back, key: "[", id: "goBack", priority: .overrideWebView))
         archive.addItem(alternates[0])
-        archive.addItem(item("Forward", forward, key: "]", id: "goForward", priority: .overrideWebView))
+        archive.addItem(item("Go Forward", forward, key: "]", id: "goForward", priority: .overrideWebView))
         archive.addItem(alternates[1])
         archive.addItem(.separator())
         archive.addItem(
