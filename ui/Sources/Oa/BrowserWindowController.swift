@@ -158,6 +158,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // Oa's own, as Arc's isn't traced: DevTools that had the keyboard keep it.
         let devTools = model.page?.devTools.view
         if let devTools, (window?.firstResponder as? NSView)?.isDescendant(of: devTools) == true { return }
+        // As Arc's: the find bar's field keeps the keyboard.
+        if (window?.firstResponder as? NSText)?.delegate is FindInPageTextField { return }
         if model.dialog == nil { model.page?.activate() }
     }
 
