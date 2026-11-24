@@ -27,6 +27,7 @@
 #include "third_party/blink/public/common/renderer_preferences/renderer_preferences.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/web_dialogs/web_dialog_delegate.h"
 
 namespace oa {
@@ -40,39 +41,17 @@ uint64_t NextWebDialogID() {
 
 }  // namespace
 
-// static
-void WebDialogImpl::InstallFactory() {
-  SetConstrainedWebDialogFactoryForEmbedder(&WebDialogImpl::Create);
-}
-
-// static
-ConstrainedWebDialogDelegate* WebDialogImpl::Create(
-    content::BrowserContext* browser_context,
-    std::unique_ptr<ui::WebDialogDelegate> delegate,
-    content::WebContents* initiator,
-    const gfx::Size& min_size,
-    const gfx::Size& max_size) {
-  auto* dialog = new WebDialogImpl(browser_context, std::move(delegate),
-                                   initiator, min_size, max_size);
-  dialog->Show();
-  return dialog;
-}
-
 // As Chrome's Views dialog, without its widget: the same WebContents setup,
 // and the WebUI finds this through its user data.
 WebDialogImpl::WebDialogImpl(content::BrowserContext* browser_context,
                              std::unique_ptr<ui::WebDialogDelegate> delegate,
-                             content::WebContents* initiator,
-                             const gfx::Size& min_size,
-                             const gfx::Size& max_size)
+                             content::WebContents* initiator)
     : ui::WebDialogWebContentsDelegate(
           browser_context,
           std::make_unique<ChromeWebContentsHandler>()),
       content::WebContentsObserver(
           guest_view::GuestViewBase::GetTopLevelWebContents(initiator)),
-      delegate_(std::move(delegate)),
-      min_size_(min_size),
-      max_size_(max_size) {
+      delegate_(std::move(delegate)) {
   if (PageImpl* page = PageImpl::FromWebContents(web_contents())) {
     page_ = page->GetWeakPtr();
   }
@@ -102,10 +81,12 @@ void WebDialogImpl::Show() {
   dialog_.title = base::UTF16ToUTF8(delegate_->GetDialogTitle());
   dialog_.accessible_title =
       base::UTF16ToUTF8(delegate_->GetAccessibleDialogTitle());
-  const gfx::Size preferred = GetConstrainedWebDialogPreferredSize();
+  gfx::Size preferred;
+  delegate_->GetDialogSize(&preferred);
   dialog_.preferred_width = preferred.width();
   dialog_.preferred_height = preferred.height();
-  const gfx::Size minimum = GetConstrainedWebDialogMinimumSize();
+  gfx::Size minimum;
+  delegate_->GetMinimumDialogSize(&minimum);
   dialog_.minimum_width = minimum.width();
   dialog_.minimum_height = minimum.height();
   NSView* view = contents_->GetNativeView().GetNativeNSView();
@@ -163,31 +144,17 @@ gfx::NativeWindow WebDialogImpl::GetNativeDialog() {
   return contents_ ? contents_->GetTopLevelNativeWindow() : gfx::NativeWindow();
 }
 
+// As ArcCore's: the app sizes the dialog from what it was shown with.
 gfx::Size WebDialogImpl::GetConstrainedWebDialogMinimumSize() const {
-  gfx::Size size = min_size_;
-  if (size.IsEmpty()) {
-    delegate_->GetMinimumDialogSize(&size);
-  }
-  return size;
+  return gfx::Size();
 }
 
 gfx::Size WebDialogImpl::GetConstrainedWebDialogMaximumSize() const {
-  return max_size_;
+  return gfx::Size();
 }
 
-// Oa's own for an auto-resizing dialog: it keeps the size it opened at,
-// within its bounds. Only Chrome's sign-in confirmation asks for one.
 gfx::Size WebDialogImpl::GetConstrainedWebDialogPreferredSize() const {
-  if (closed_) {
-    return gfx::Size();
-  }
-  gfx::Size size;
-  delegate_->GetDialogSize(&size);
-  if (!max_size_.IsEmpty()) {
-    size.SetToMax(min_size_);
-    size.SetToMin(max_size_);
-  }
-  return size;
+  return gfx::Size();
 }
 
 void WebDialogImpl::CloseContents(content::WebContents* source) {
@@ -218,3 +185,15 @@ void WebDialogImpl::WebContentsDestroyed() {
 }
 
 }  // namespace oa
+
+// As ArcCore's arc/browser/ui/constrained_web_dialog_ui.cc, in place of
+// Chrome's Views dialog.
+ConstrainedWebDialogDelegate* ShowConstrainedWebDialog(
+    content::BrowserContext* browser_context,
+    std::unique_ptr<ui::WebDialogDelegate> delegate,
+    content::WebContents* overshadowed) {
+  auto* dialog =
+      new oa::WebDialogImpl(browser_context, std::move(delegate), overshadowed);
+  dialog->Show();
+  return dialog;
+}

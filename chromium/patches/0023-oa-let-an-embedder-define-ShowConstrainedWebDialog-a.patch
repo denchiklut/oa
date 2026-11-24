@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 24 Nov 2026 04:40:00 -0700
+Subject: [PATCH] oa: let an embedder define ShowConstrainedWebDialog, as
+ ArcCore does
+
+---
+ .../ui/views/constrained_web_dialog_delegate_views.cc | 11 -----------
+ chrome/browser/ui/webui/constrained_web_dialog_ui.h   |  2 ++
+ 2 files changed, 2 insertions(+), 11 deletions(-)
+
+diff --git a/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc b/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc
+index 69631a50c86284d4c790794bab113e41f87b2e8e..f72509dae7bf8c92690a9bc48bdc12424e52ed36 100644
+--- a/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc
++++ b/chrome/browser/ui/views/constrained_web_dialog_delegate_views.cc
+@@ -524,17 +524,6 @@ void ConstrainedDialogWebView::UpdateAccessibleNameForRootView() {
+ 
+ }  // namespace
+ 
+-ConstrainedWebDialogDelegate* ShowConstrainedWebDialog(
+-    content::BrowserContext* browser_context,
+-    std::unique_ptr<ui::WebDialogDelegate> delegate,
+-    content::WebContents* web_contents) {
+-  ConstrainedDialogWebView* dialog =
+-      new ConstrainedDialogWebView(browser_context, std::move(delegate),
+-                                   web_contents, gfx::Size(), gfx::Size());
+-  constrained_window::ShowWebModalDialogViews(dialog, web_contents);
+-  return dialog;
+-}
+-
+ ConstrainedWebDialogDelegate* ShowConstrainedWebDialogWithAutoResize(
+     content::BrowserContext* browser_context,
+     std::unique_ptr<ui::WebDialogDelegate> delegate,
+diff --git a/chrome/browser/ui/webui/constrained_web_dialog_ui.h b/chrome/browser/ui/webui/constrained_web_dialog_ui.h
+index b0aa9c228e70db3dcb138cfa84cea79f2feb25c6..0ba69e96c71de214734a89657b19623803ea4415 100644
+--- a/chrome/browser/ui/webui/constrained_web_dialog_ui.h
++++ b/chrome/browser/ui/webui/constrained_web_dialog_ui.h
+@@ -108,6 +108,8 @@ class ConstrainedWebDialogUI : public content::WebUIController {
+ //                   WebContents.
+ // |delegate| controls the behavior of the dialog.
+ // |overshadowed| is the tab being overshadowed by the dialog.
++// The embedder defines it and shows the dialog over the page itself, as
++// ArcCore does; Chrome's Views dialog needs a BrowserView.
+ ConstrainedWebDialogDelegate* ShowConstrainedWebDialog(
+     content::BrowserContext* browser_context,
+     std::unique_ptr<ui::WebDialogDelegate> delegate,
