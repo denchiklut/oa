@@ -66,7 +66,6 @@
 #include "oa/browser/ui/permission_prompt_impl.h"
 #include "oa/browser/ui/sad_tab_impl.h"
 #include "oa/browser/ui/video_overlay_window_impl.h"
-#include "oa/browser/ui/web_dialog_impl.h"
 #include "oa/browser/window_browser.h"
 #include "oa/public/ad_blocker.h"
 #include "services/network/public/mojom/cookie_manager.mojom.h"
@@ -258,7 +257,6 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   BrowserWindowImpl::InstallFactory();
   PermissionPromptImpl::InstallFactory();
   SadTabImpl::InstallFactory();
-  WebDialogImpl::InstallFactory();
   PageImpl::InstallFrameMetadataObserver();
   DevToolsImpl::InstallEmbedder();
   InstallContextMenuEditor();
