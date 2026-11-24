@@ -488,8 +488,9 @@ private struct FavoriteTile: View {
     }
 }
 
-/// A split Favorite as seen in Arc: one tile with a 12 pt favicon centred on each pane's part. Selected, one card with
-/// the panes' favicons' tint and ring, the ring also between the parts; not selected, a card for each part, 2 pt apart.
+/// A split Favorite as seen in Arc: one tile with a 12 pt favicon centred on each pane's part, two parts side by side
+/// and three or four in a 2 × 2 grid. Selected, one card with the panes' favicons' tint and ring, the ring also
+/// between the parts; not selected, the tile's card cut into its parts, 2 pt apart.
 /// A press selects the split with the pane the window focused in it last, and drags it whole as a tile's does.
 private struct FavoriteSplitTile: View {
     let model: WindowModel
@@ -508,6 +509,7 @@ private struct FavoriteSplitTile: View {
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         let favicons = tabs.map(model.favicon(for:))
         let data = model.state.splitView(splitID)
+        let size = CGSize(width: width, height: 47)
         ZStack {
             // As seen in Arc: a split Favorite with an icon is one tile with only the icon. Its look selected, with
             // no favicon to tint by, is Oa's own.
@@ -523,23 +525,32 @@ private struct FavoriteSplitTile: View {
                     .opacity(theme.isDark ? (hovering ? 0.3 : 0.2) : (hovering ? 0.1 : 0))
                 SplitAppTrayRing(favicons: favicons, tileWidth: width)
             } else {
-                HStack(spacing: 2) {
-                    ForEach(tabs) { _ in shape.fill(hovering ? theme.itemHoveredFill : theme.itemFill) }
-                }
-                .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
-            }
-            HStack(spacing: 2) {
-                ForEach(data?.icon == nil ? tabs : []) { tab in
-                    Group {
-                        if let favicon = model.favicon(for: tab) {
-                            Image(nsImage: favicon)
-                                .resizable()
-                                .interpolation(.high)
-                                .frame(width: 12, height: 12)
-                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                // As seen in Arc: the parts light together under the pointer, never one alone.
+                shape.fill(hovering ? theme.itemHoveredFill : theme.itemFill)
+                    .mask {
+                        ZStack(alignment: .topLeading) {
+                            Rectangle()
+                            ForEach(Array(SplitTileLayout.gaps(tabs.count, in: size).enumerated()), id: \.offset) {
+                                _, gap in
+                                Rectangle().frame(width: gap.width, height: gap.height).offset(x: gap.minX, y: gap.minY)
+                                    .blendMode(.destinationOut)
+                            }
                         }
+                        .compositingGroup()
                     }
-                    .frame(maxWidth: .infinity)
+                    .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
+            }
+            if data?.icon == nil {
+                let parts = SplitTileLayout.parts(tabs.count, in: size)
+                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                    if let favicon = model.favicon(for: tab) {
+                        Image(nsImage: favicon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 12, height: 12)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                            .position(x: parts[index].midX, y: parts[index].midY)
+                    }
                 }
             }
         }
