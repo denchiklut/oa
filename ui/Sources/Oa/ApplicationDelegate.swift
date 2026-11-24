@@ -181,11 +181,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
 
     @objc func newWindow(_ sender: Any?) { openWindow() }
 
-    /// As Arc's `onCreateNewBlankWindow`: a window on a sidebar of its own, one Space on the last focused profile,
-    /// which is the key window's Space's as seen; the command bar opens, as for any new window.
+    /// As Arc's `onCreateNewBlankWindow`: a window on a sidebar of its own, one Space on the last focused profile;
+    /// the command bar opens, as for any new window.
     @objc func blankWindow(_ sender: Any?) {
-        let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
-        openWindow(context: .standalone, profileID: key?.model.space?.profileID)
+        openWindow(context: .standalone, profileID: lastFocusedProfileID)
+    }
+
+    /// As Arc's `WindowsData.lastFocusedProfile`: the Space's profile of the frontmost window that isn't incognito,
+    /// else the default one.
+    private var lastFocusedProfileID: UUID {
+        frontWindows.first { $0.sidebarContext != .incognito }?.space?.profileID ?? SidebarProfile.defaultID
     }
 
     /// As Arc's `newIncognitoWindow:`: a window on the incognito context of the key window's Space's profile, with
