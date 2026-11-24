@@ -924,7 +924,6 @@ public enum OpenDisposition: Sendable, Equatable {
     }
 }
 
-/// Why a page's renderer is gone.
 /// ADK's `FindInPageDirection`; ADK searches forward for `current`.
 public enum FindDirection: Sendable {
     case backward, current, forward
@@ -941,6 +940,7 @@ public struct FindResult: Sendable, Equatable {
     }
 }
 
+/// Why a page's renderer is gone.
 public enum PageCrash: Sendable, Equatable {
     case crashed
     case killed
