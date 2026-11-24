@@ -36,6 +36,7 @@ extension ShortcutsPane {
         case "stopLoading": "Stops loading the current page."
         case "showSidebar": "Shows or hides your Sidebar from the left edge of your window."
         case "toggleToolbar": "Shows or hides the toolbar at the top of your window."
+        case "fullscreen": "Makes your current \(name) window fill the entire screen."
         case "addSplitView": "Adds a new page to your current Split View."
         case "removeSplitView": "Closes the Split View page that’s currently in focus."
         case "separateTabFromSplitView": "Separate Page from Split View."
