@@ -45,7 +45,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // As Arc's browser windows: AppKit keeps them across a quit and hands them back by the window's ID.
         window.identifier = NSUserInterfaceItemIdentifier(id.uuidString)
         window.restorationClass = ApplicationDelegate.self
-        window.isRestorable = true
+        // As Arc's: an incognito window never comes back.
+        window.isRestorable = sidebarContext != .incognito
         windowButtons = [.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
         windowButtons.forEach { $0.isHidden = true }
         super.init(window: window)
@@ -398,6 +399,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                 #selector(togglePinnedSection(_:)),
             ]
             if spaces.contains(action) { return false }
+            // As seen in Arc: an incognito window has no Extensions, Library, Downloads, Archive or Clear Today.
+            let incognito = [
+                #selector(addExtension(_:)), #selector(manageExtensions(_:)), #selector(toggleLibrary(_:)),
+                #selector(toggleDownloads(_:)), #selector(toggleArchive(_:)), #selector(clearArchive(_:)),
+                #selector(clearTabs(_:)),
+            ]
+            if model.sidebarContext == .incognito, incognito.contains(action) {
+                let titles = [
+                    #selector(toggleLibrary(_:)): "Open Library…", #selector(toggleDownloads(_:)): "View Downloads…",
+                    #selector(toggleArchive(_:)): "View Archive…",
+                ]
+                if let title = titles[action] { item.title = title }
+                return false
+            }
         } else if item.action == #selector(changeProfile(_:)) || item.action == #selector(newProfile(_:)) {
             item.isHidden = false
         }

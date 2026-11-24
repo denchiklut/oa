@@ -35,21 +35,31 @@ class BrowserImpl : public Browser {
  public:
   BrowserImpl(const std::string& window_id,
               const std::string& profile_id,
+              BrowserContextType type,
               Browser::Observer* observer)
-      : window_id_(window_id), profile_id_(profile_id), observer_(observer) {
+      : window_id_(window_id),
+        profile_id_(profile_id),
+        restores_(type == BrowserContextType::kNormal),
+        observer_(observer) {
     AllBrowsers().push_back(this);
     // As ADK's: the profile is expected to restore before its Browser is
-    // asked for, so the first Browser's own restored tabs are parked too.
-    SessionRestoration::Expect(profile_id_);
-    LoadBrowserProfile(profile_id, base::BindOnce(&BrowserImpl::Start,
-                                                  weak_factory_.GetWeakPtr()));
+    // asked for, so the first Browser's own restored tabs are parked too. An
+    // incognito context never restores.
+    if (restores_) {
+      SessionRestoration::Expect(profile_id_);
+    }
+    LoadBrowserContext(
+        profile_id, type,
+        base::BindOnce(&BrowserImpl::Start, weak_factory_.GetWeakPtr()));
   }
 
   ~BrowserImpl() override {
     std::erase(AllBrowsers(), this);
     CloseExtensionPopup();
     if (!started_) {
-      SessionRestoration::Resolve(profile_id_, nullptr);
+      if (restores_) {
+        SessionRestoration::Resolve(profile_id_, nullptr);
+      }
     } else if (WindowBrowser* window_browser = FindWindowBrowser()) {
       window_browser->CloseIfEmpty();
     }
@@ -110,7 +120,9 @@ class BrowserImpl : public Browser {
       // The profile's first Browser starts Chrome's restore of its session.
       WindowBrowser::GetOrCreate(window_id_, profile);
     }
-    SessionRestoration::Resolve(profile_id_, profile);
+    if (restores_) {
+      SessionRestoration::Resolve(profile_id_, profile);
+    }
     if (ExtensionsContainerImpl* container = Container()) {
       container->ReportActions();
     }
@@ -127,6 +139,7 @@ class BrowserImpl : public Browser {
 
   const std::string window_id_;
   const std::string profile_id_;
+  const bool restores_;
   bool started_ = false;
   bool awaits_restored_pages_ = true;
   const raw_ptr<Browser::Observer> observer_;
@@ -160,8 +173,9 @@ void HandOffRestoredPages() {
 
 std::unique_ptr<Browser> ObserveBrowser(const std::string& window_id,
                                         const std::string& profile_id,
+                                        BrowserContextType type,
                                         Browser::Observer* observer) {
-  return std::make_unique<BrowserImpl>(window_id, profile_id, observer);
+  return std::make_unique<BrowserImpl>(window_id, profile_id, type, observer);
 }
 
 }  // namespace oa

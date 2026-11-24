@@ -41,6 +41,7 @@ extension ShortcutsPane {
         case "hideOthers": "Quickly minimize all windows from other apps."
         case "newWindow": "Creates a new window, blank window, or incognito window."
         case "newBlankWindow": "Creates a new blank window."
+        case "newIncognitoWindow": "Creates a new incognito window."
         case "newTab": "Creates a new tab."
         case "addressBar":
             "Opens the Command Bar to search the web, navigate to recent tabs, launch an extension, and more."

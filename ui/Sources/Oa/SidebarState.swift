@@ -4,17 +4,21 @@ import Foundation
 /// Arc's `SidebarContainerType` for a window's own sidebar, by window ID.
 enum SidebarContainerType: Hashable, Codable {
     case standalone(UUID)
+    /// Never saved, as Arc's.
+    case incognito(UUID)
 }
 
 /// Arc's `StandardWindowState.SidebarContext`: the sidebar a window shows.
 enum SidebarContext: Codable {
     case global
     case standalone
+    case incognito
 
     func container(of windowID: UUID) -> SidebarContainerType? {
         switch self {
         case .global: nil
         case .standalone: .standalone(windowID)
+        case .incognito: .incognito(windowID)
         }
     }
 }
@@ -270,11 +274,12 @@ struct SidebarState {
         return allSpaces.first { $0.pinnedRootID == rootID || $0.unpinnedRootID == rootID }
     }
 
-    /// As Arc's `standaloneSidebar` and the like: an untitled Space with no theme on `profileID`.
+    /// As Arc's: an untitled Space on `profileID`, with no theme, or Arc's incognito one.
     @discardableResult
     mutating func addContainer(_ type: SidebarContainerType, profileID: UUID) -> SidebarSpace {
-        let space = SidebarSpace(
+        var space = SidebarSpace(
             id: UUID(), name: "", profileID: profileID, pinnedRootID: UUID(), unpinnedRootID: UUID())
+        if case .incognito = type { space.customInfo = SidebarSpace.CustomInfo(windowTheme: .incognito) }
         tree.addRoot(.pinned, id: space.pinnedRootID)
         tree.addRoot(.unpinned, id: space.unpinnedRootID)
         containers[type] = space
@@ -288,7 +293,7 @@ struct SidebarState {
         tree.removeRoot(space.unpinnedRootID)
     }
 
-    /// As seen in Arc: a window's last tab goes without an Archive entry, as the window closes with it.
+    /// As seen in Arc: a Blank Window's last tab, and any incognito tab, closes without an Archive entry.
     mutating func removeTab(_ id: UUID) {
         guard tree.tab(id) != nil else { return }
         tree.remove(id)

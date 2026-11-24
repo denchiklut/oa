@@ -23,7 +23,9 @@ public protocol BrowserApplication: AnyObject {
     /// with unload handlers run them and close, the engine writes what it must keep, and the app exits with its
     /// windows as they are.
     func terminate()
-    func browserContext(id: UUID) -> any BrowserContext
+    /// As ADK's `BrowserContextID`: the profile's own context, or its incognito one, which shares its downloads,
+    /// preferences and extensions, reads its history and keeps nothing once its last window has closed.
+    func browserContext(id: UUID, type: BrowserContextType) -> any BrowserContext
     /// The profiles the engine has, loaded or not, in the engine's own order, as ADK's `allProfiles()`.
     func allProfiles() -> [UUID]
     /// Whether a profile absent from `allProfiles()` is gone. Not for the stub, which lists only the profiles made
@@ -45,6 +47,16 @@ public protocol BrowserApplication: AnyObject {
     func askToLeave(windowID: UUID) async -> Bool
 }
 
+extension BrowserApplication {
+    public func browserContext(id: UUID) -> any BrowserContext { browserContext(id: id, type: .normal) }
+}
+
+/// As ADK's `BrowserContextType`.
+public enum BrowserContextType: Hashable, Sendable {
+    case normal
+    case incognito
+}
+
 public enum BrowserProfile {
     /// As ADK's `Profile.initial`: the profile every install has. It can't be deleted.
     public static let initialID = UUID(uuidString: "6B0F3E1A-0A5C-4F7B-9C1D-0A0A0A0A0A01")!
@@ -54,6 +66,9 @@ public enum BrowserProfile {
 @MainActor
 public protocol BrowserContext: AnyObject {
     var id: UUID { get }
+    /// As ADK's `incognitoDisabled`: whether the engine's incognito availability policy keeps the profile from opening
+    /// an incognito window. False until the profile has loaded.
+    var incognitoDisabled: Bool { get }
     /// Without an event back, as ADK's: the next `userVisibleName(of:)` reads it.
     func setUserVisibleName(_ name: String)
     /// A page with an `id` of its own in the app's window `windowID`, in the background; nil if the engine can't.

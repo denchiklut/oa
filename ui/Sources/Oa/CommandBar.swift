@@ -90,6 +90,7 @@ final class CommandBar {
     @ObservationIgnored private var lastSuggestedText: String?
     @ObservationIgnored private let profileID: UUID
     @ObservationIgnored private let picks: CommandBarPicks
+    @ObservationIgnored private let recordsPicks: Bool
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
     @ObservationIgnored private let searchEngines: () -> [SearchEngine]
     @ObservationIgnored private let dominantColor: (_ host: String) async -> NSColor?
@@ -100,7 +101,7 @@ final class CommandBar {
 
     init(
         destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, profileID: UUID,
-        picks: CommandBarPicks, searchEngines: @escaping () -> [SearchEngine],
+        picks: CommandBarPicks, recordsPicks: Bool = true, searchEngines: @escaping () -> [SearchEngine],
         dominantColor: @escaping (_ host: String) async -> NSColor?,
         tabs: @escaping () -> [CommandBarRanking.Tab]
     ) {
@@ -109,6 +110,7 @@ final class CommandBar {
         self.currentURL = currentURL
         self.profileID = profileID
         self.picks = picks
+        self.recordsPicks = recordsPicks
         self.tabs = tabs
         self.searchEngines = searchEngines
         self.dominantColor = dominantColor
@@ -319,7 +321,8 @@ final class CommandBar {
     private func act(_ modifiers: NSEvent.ModifierFlags) {
         guard rows.indices.contains(selectedIndex) else { return }
         let row = rows[selectedIndex]
-        if !text.isEmpty { picks.record(row.id, for: text, in: profileID) }
+        // Oa's own: an incognito window's bar reads the profile's picks and records none.
+        if !text.isEmpty, recordsPicks { picks.record(row.id, for: text, in: profileID) }
         switch row.source {
         case .tab(let tab): perform(.switchTo(tab.tab.id))
         case .match(let match):

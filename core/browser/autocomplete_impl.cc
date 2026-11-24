@@ -65,9 +65,10 @@ class AutocompleteImpl : public Autocomplete,
                          public AutocompleteController::Observer,
                          public ProfileObserver {
  public:
-  explicit AutocompleteImpl(const std::string& profile_id) {
-    LoadBrowserProfile(profile_id, base::BindOnce(&AutocompleteImpl::Init,
-                                                  weak_factory_.GetWeakPtr()));
+  AutocompleteImpl(const std::string& profile_id, BrowserContextType type) {
+    LoadBrowserContext(
+        profile_id, type,
+        base::BindOnce(&AutocompleteImpl::Init, weak_factory_.GetWeakPtr()));
   }
 
   ~AutocompleteImpl() override {
@@ -203,9 +204,9 @@ class AutocompleteImpl : public Autocomplete,
 
 }  // namespace
 
-std::unique_ptr<Autocomplete> CreateAutocomplete(
-    const std::string& profile_id) {
-  return std::make_unique<AutocompleteImpl>(profile_id);
+std::unique_ptr<Autocomplete> CreateAutocomplete(const std::string& profile_id,
+                                                 BrowserContextType type) {
+  return std::make_unique<AutocompleteImpl>(profile_id, type);
 }
 
 }  // namespace oa

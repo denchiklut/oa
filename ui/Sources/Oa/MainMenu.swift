@@ -42,6 +42,10 @@ final class MainMenu {
                 modifiers: [.command, .control], id: "newBlankWindow"))
         file.addItem(
             item(
+                "New Incognito Window", #selector(ApplicationDelegate.newIncognitoWindow(_:)), key: "n",
+                modifiers: [.command, .shift], id: "newIncognitoWindow", priority: .overrideWebView))
+        file.addItem(
+            item(
                 "New Tab", #selector(BrowserWindowController.newTab(_:)), key: "t", id: "newTab",
                 priority: .overrideWebView))
         file.addItem(item("New Profile", #selector(BrowserWindowController.newProfile(_:))))

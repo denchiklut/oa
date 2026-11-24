@@ -310,7 +310,7 @@ final class WindowModel {
         else { return }
         components.queryItems = [URLQueryItem(name: "site", value: url.absoluteString)]
         guard let settings = components.url else { return }
-        let context = engine.browserContext(id: profile.id)
+        let context = context(for: profile.id)
         Task { [weak self, id] in
             guard let page = await context.makePage(windowID: id, restoring: nil)?.page, let self else { return }
             guard pages[tabID] != nil else { return page.drop() }
@@ -323,7 +323,7 @@ final class WindowModel {
         guard let tabID = tabID(of: pageID), let url = pages[tabID]?.url,
             let profile = state.profile(containing: tabID)
         else { return nil }
-        return engine.browserContext(id: profile.id).changedSiteSettings(for: url)?.first { $0.type == type }?.value
+        return context(for: profile.id).changedSiteSettings(for: url)?.first { $0.type == type }?.value
     }
 
     /// As Arc's presentation updates, which its picture-in-picture rule answers: the page the window shows changed.
@@ -337,7 +337,12 @@ final class WindowModel {
     }
 
     private var siteContext: (any BrowserContext)? {
-        selectedTabID.flatMap { state.profile(containing: $0) }.map { engine.browserContext(id: $0.id) }
+        selectedTabID.flatMap { state.profile(containing: $0) }.map { context(for: $0.id) }
+    }
+
+    /// As ADK's `browserContextID(for:)`: an incognito window's pages are its profile's incognito context's.
+    private func context(for profileID: UUID) -> any BrowserContext {
+        engine.browserContext(id: profileID, type: sidebarContext == .incognito ? .incognito : .normal)
     }
 
     /// Read as a Space is shown, so the engine has reported its profile's by the time the Extensions menu opens.
@@ -386,7 +391,7 @@ final class WindowModel {
 
     private func ensureBrowser(for profileID: UUID) {
         guard browsers[profileID] == nil else { return }
-        let browser = engine.browserContext(id: profileID).browser(windowID: id)
+        let browser = context(for: profileID).browser(windowID: id)
         browsers[profileID] = browser
         browserListeners[profileID] = Task { [weak self] in
             for await event in browser.events {
@@ -470,13 +475,14 @@ final class WindowModel {
         let profileID = editing ? selectedTabID.flatMap { state.profile(containing: $0)?.id } : space?.profileID
         guard let profileID else { return }
         commandBar?.autocomplete.stop()
-        let context = engine.browserContext(id: profileID)
+        let context = context(for: profileID)
         let autocomplete = autocompletes[profileID] ?? context.makeAutocomplete()
         autocompletes[profileID] = autocomplete
         let preferences = context.preferences
         let bar = CommandBar(
             destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
             currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks,
+            recordsPicks: sidebarContext != .incognito,
             searchEngines: { preferences.activeSearchEngines },
             dominantColor: { await context.siteSearchDominantColor(host: $0) }
         ) { [weak self] in self?.commandBarTabs ?? [] }
@@ -1501,7 +1507,9 @@ final class WindowModel {
     var showingArchive: Bool { library == .archive }
     var showingDownloads: Bool { library == .downloads }
 
+    /// Oa's own: not from an incognito window, whose Library and Downloads Arc's menu leaves off.
     func viewLibrary(_ section: LibrarySection? = nil) {
+        guard sidebarContext != .incognito else { return }
         library = section ?? lastLibrarySection
     }
 
@@ -1564,7 +1572,7 @@ final class WindowModel {
         else { return }
         closeArchivePeek()
         archivePeekID = entryID
-        let context = engine.browserContext(id: profileID)
+        let context = context(for: profileID)
         Task { [weak self, id] in
             guard let page = await context.makePage(windowID: id, restoring: nil)?.page, let self else { return }
             guard showingArchive, archivePeekID == entryID else { return page.drop() }
@@ -1756,7 +1764,7 @@ final class WindowModel {
         if let spaceID = state.space(containing: ownerID)?.id { selectSpace(spaceID) }
         library = nil
         select(ownerID)
-        let context = engine.browserContext(id: profile.id)
+        let context = context(for: profile.id)
         ensureBrowser(for: profile.id)
         Task { [weak self, id] in
             guard let made = await context.makePage(windowID: id, restoring: closed.sessionID), let self else { return }
@@ -2151,7 +2159,12 @@ final class WindowModel {
         }
         let requester = store.windows.first { $0.id == request?.windowID }
         let focused = requester?.selectedTabID == tabID
-        store.edit { $0.archiveTab(tabID, reason: reason) }
+        // As seen in Arc: an incognito tab closes without an Archive entry, and ⇧⌘T still brings it back.
+        if sidebarContext == .incognito {
+            store.edit { $0.removeTab(tabID) }
+        } else {
+            store.edit { $0.archiveTab(tabID, reason: reason) }
+        }
         if let closed {
             requester?.remember(
                 closed,
@@ -2256,7 +2269,7 @@ final class WindowModel {
         guard let profile = state.profile(containing: tabID) else { return }
         let token = UUID()
         creating[tabID] = token
-        let context = engine.browserContext(id: profile.id)
+        let context = context(for: profile.id)
         ensureBrowser(for: profile.id)
         Task { [store, id] in
             let made = await context.makePage(windowID: id, restoring: sessionID)
@@ -2616,6 +2629,8 @@ final class WindowModel {
     /// loses its own.
     private func save(_ page: any Page, for tabID: UUID) {
         store.setSavedPage(tabID, title: page.title, url: page.url)
+        // Oa's own: nothing of an incognito page goes to disk.
+        guard sidebarContext != .incognito else { return }
         let favicon = page.favicon
         let hasLoaded = page.navigationResult == .loaded
         guard favicon != nil || (hasLoaded && !state.keepsAddress(tabID)) else { return }
