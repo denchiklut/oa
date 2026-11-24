@@ -46,8 +46,11 @@ struct SplitViewContentPanes: View {
                         }
                     }
                     .frame(width: vertical ? nil : lengths[index], height: vertical ? lengths[index] : nil)
+                    // So the focused pane's glow lies over its neighbours' edges, as Arc's does.
+                    .zIndex(model.selectedTabID.map { pane == .tab($0) } == true ? 1 : 0)
                     if index < panes.count - 1, let splitID, resizes {
                         SplitViewDraggerHandleView(isVertical: vertical)
+                            .zIndex(2)
                             .gesture(
                                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
                                     .onChanged { value in
@@ -133,10 +136,10 @@ private struct SplitViewDraggerHandleView: View {
     @Environment(\.windowColorScheme) private var colorScheme
 
     var body: some View {
-        // As measured over Arc's default theme: white 29 % and 56 % under the pointer in dark, black 19 % in light,
-        // where its hover wasn't measured.
+        // As measured over Arc's default theme: white 20 %, and 49 % while the pointer is anywhere on the gap, in
+        // dark; black 19 % in light, where its hover wasn't measured.
         let dark = colorScheme == .dark
-        let ink = dark ? Color.white.opacity(hovering ? 0.56 : 0.29) : Color.black.opacity(hovering ? 0.37 : 0.19)
+        let ink = dark ? Color.white.opacity(hovering ? 0.49 : 0.2) : Color.black.opacity(hovering ? 0.37 : 0.19)
         let width = SplitViewContentPanes.draggerHandleWidth
         Color.clear
             .frame(width: isVertical ? nil : width, height: isVertical ? width : nil)
@@ -216,15 +219,15 @@ private struct SplitViewContentPane: View {
                 shape.strokeBorder(model.splitViewFocusColor(dark: dark), lineWidth: 2)
             }
         }
-        // As measured on Arc's default theme: beside the focused pane the gap is lighter by white 18 % at the pane's
-        // edge and 5 % at 9 pt in dark, and darker by black 7 % at the edge in light. An unfocused pane keeps the
-        // card's shadow.
+        // As measured on Arc's default theme: beside the focused pane the gap is lighter by white 16–18 % at the
+        // pane's edge, fading out over 10 pt and onto its neighbours' edges, in dark, and darker by black 7 % at the
+        // edge in light. Beside an unfocused pane the gap is the window's own, only 8 % darker at the edge.
         .background {
             shape
                 .padding(1)
                 .shadow(
-                    color: focused ? (dark ? .white.opacity(0.44) : .black.opacity(0.17)) : .black.opacity(0.3),
-                    radius: focused ? 9.5 : 4, y: focused ? 0 : 1)
+                    color: focused ? (dark ? .white.opacity(0.44) : .black.opacity(0.17)) : .black.opacity(0.16),
+                    radius: focused ? 9.5 : 4)
         }
     }
 }
