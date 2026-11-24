@@ -393,6 +393,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             self?.openLinkInIncognitoWindow(url, profileID: profileID)
         }
         // As seen in Arc: from the key window.
+        controller.model.openURLInNewWindow = { [weak self, weak model = controller.model] url in
+            if let model { self?.openURLInNewWindow(url, from: model) }
+        }
         let previous = (windows.first { $0.model === source } ?? key)?.window
         windows.append(controller)
         controller.open(cascadingFrom: previous)
@@ -401,7 +404,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         } else {
             if let opener = source ?? key?.model { controller.model.inheritCollapsedPinnedSpaces(from: opener) }
             if context != .global {
-                controller.model.openCommandBar(.newTab)
+                if !empty { controller.model.openCommandBar(.newTab) }
             } else if let tabID {
                 controller.model.select(tabID)
             } else if !empty {
