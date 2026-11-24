@@ -96,7 +96,6 @@ class PageImpl : public Page,
   // way. A handler-less page answers at once.
   void AskToLeave(std::function<void(bool leave)> callback);
   base::WeakPtr<PageImpl> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
-  DevToolsImpl* devtools() const { return devtools_.get(); }
 
   // Page:
   void SetObserver(Page::Observer* observer) override;
