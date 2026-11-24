@@ -42,7 +42,7 @@ struct SplitViewContentPanes: View {
                         case .empty:
                             SplitViewContentPlaceholderView(model: model)
                         case .dropTarget:
-                            SplitViewDropTargetView(model: model)
+                            SplitViewDropTargetView()
                         }
                     }
                     .frame(width: vertical ? nil : lengths[index], height: vertical ? lengths[index] : nil)
@@ -440,15 +440,13 @@ private struct SplitViewContentPlaceholderView: View {
     }
 }
 
-/// The pane a dragged tab would take, as seen in Arc: empty and outlined. LIKELY Arc's `dropTargetBorderWidth`.
+/// The pane a dragged tab would take, as measured on Arc: no fill, so the window shows through, inside a 2 pt border
+/// of white at 0.45 in dark. Light wasn't measured; black at 0.25 there is Oa's own.
 private struct SplitViewDropTargetView: View {
-    let model: WindowModel
     @Environment(\.windowColorScheme) private var colorScheme
 
     var body: some View {
-        let dark = colorScheme == .dark
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-        shape.fill(Color.white.opacity(dark ? 0.1 : 0.666))
-            .overlay { shape.strokeBorder(model.splitViewFocusColor(dark: dark), lineWidth: 3) }
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(colorScheme == .dark ? Color.white.opacity(0.45) : .black.opacity(0.25), lineWidth: 2)
     }
 }
