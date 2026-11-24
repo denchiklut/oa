@@ -200,6 +200,22 @@ extension WindowTheme {
     }()
 }
 
+extension WindowTheme {
+    /// Arc's `WindowTheme.incognito`: a basic colour, dark in either appearance. The colour is the frame Arc draws, as
+    /// measured; the palettes from it are Oa's own, as Arc's aren't decoded.
+    static let incognito: WindowTheme = {
+        let color = NSColor(displayP3Red: 0x0E / 255, green: 0x0F / 255, blue: 0x13 / 255, alpha: 1)
+        let palette = PrimaryColorPalette(key: color.usingColorSpace(.extendedSRGB)!)
+        return WindowTheme(
+            background: .single(
+                Background(
+                    style: .color(.basicColor(BasicColor(color: ThemeColor(color), translucencyStyle: .dark))),
+                    contentOverBackgroundAppearance: .dark, isVibrant: false)),
+            windowAppearance: .single(.dark), primaryColorPalette: palette,
+            semanticColorPalette: .single(SemanticColorPalette(palette, .dark)))
+    }()
+}
+
 extension WindowTheme.PrimaryColorPalette {
     /// Arc's rule: each entry is the key colour, moved in 1 % steps of HSL lightness until its luminance is in the
     /// entry's range. Both are worked on the colour's own components, so a Display P3 key steps in P3.

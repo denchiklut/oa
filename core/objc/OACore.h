@@ -546,6 +546,10 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @property(nonatomic, readonly) OADownloads* downloads;
 @property(nonatomic, readonly) OAPreferences* preferences;
 @property(nonatomic, readonly) OAExtensions* extensions;
+// Chrome's incognito availability policy keeps the profile from opening an
+// incognito window, as ADK's incognitoDisabled. NO until it has loaded.
+@property(nonatomic, readonly, getter=isIncognitoDisabled)
+    BOOL incognitoDisabled;
 - (instancetype)init NS_UNAVAILABLE;
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
@@ -583,7 +587,11 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
            completion:(void (^)(BOOL success))completion;
 - (void)setAdBlockExcludedHosts:(NSArray<NSString*>*)hosts;
 - (instancetype)init NS_UNAVAILABLE;
-- (OAProfile*)profileWithIdentifier:(NSString*)identifier;
+// The profile's own context, or its incognito one, as ArcCore's
+// getBrowserContext:type:. An incognito one shares its profile's downloads,
+// preferences and extensions.
+- (OAProfile*)profileWithIdentifier:(NSString*)identifier
+                          incognito:(BOOL)incognito;
 // In Chromium's order, as ArcCore's availableBrowserContextAttributes.
 - (NSArray<OAProfileAttributes*>*)availableProfileAttributes;
 // `completion` gets the new profile's identifier once it has loaded, or nil.

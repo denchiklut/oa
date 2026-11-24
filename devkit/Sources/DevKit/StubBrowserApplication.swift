@@ -6,6 +6,7 @@ import Observation
 @MainActor
 public final class StubBrowserApplication: BrowserApplication {
     private var contexts: [UUID: StubBrowserContext] = [:]
+    private var incognitoContexts: [UUID: StubBrowserContext] = [:]
     public let adBlocker: AdBlocker
     private let profilesFile: URL
     /// What Chromium's profile storage is to the live engine: the stub's profiles and names, kept across launches.
@@ -38,10 +39,13 @@ public final class StubBrowserApplication: BrowserApplication {
         NSApplication.shared.reply(toApplicationShouldTerminate: true)
     }
 
-    public func browserContext(id: UUID) -> any BrowserContext {
-        if let context = contexts[id] { return context }
-        let context = StubBrowserContext(id: id) { [weak self] in self?.name(id, $0) }
-        contexts[id] = context
+    public func browserContext(id: UUID, type: BrowserContextType) -> any BrowserContext {
+        let parent = contexts[id] ?? StubBrowserContext(id: id) { [weak self] in self?.name(id, $0) }
+        contexts[id] = parent
+        guard type == .incognito else { return parent }
+        if let context = incognitoContexts[id] { return context }
+        let context = StubBrowserContext(sharingWith: parent)
+        incognitoContexts[id] = context
         return context
     }
 
@@ -59,6 +63,7 @@ public final class StubBrowserApplication: BrowserApplication {
     public func deleteBrowserContext(id: UUID) -> Bool {
         guard id != BrowserProfile.initialID, profiles.contains(where: { $0.id == id }) else { return false }
         contexts[id] = nil
+        incognitoContexts[id] = nil
         profiles.removeAll { $0.id == id }
         return true
     }
@@ -89,16 +94,29 @@ private struct StubProfile: Codable {
 final class StubBrowserContext: BrowserContext {
     let id: UUID
     private let name: (String) -> Void
-    private let stubDownloads = StubDownloads()
+    private let stubDownloads: StubDownloads
     var downloads: any Downloads { stubDownloads }
-    let preferences: any BrowserContextPreferences = StubPreferences()
-    private let stubExtensions = StubExtensions()
+    let preferences: any BrowserContextPreferences
+    private let stubExtensions: StubExtensions
     var extensions: any Extensions { stubExtensions }
+    let incognitoDisabled = false
     private var browsers: [UUID: WeakBrowser] = [:]
 
     init(id: UUID, name: @escaping (String) -> Void) {
         self.id = id
         self.name = name
+        stubDownloads = StubDownloads()
+        preferences = StubPreferences()
+        stubExtensions = StubExtensions()
+    }
+
+    /// An incognito context, on its profile's downloads, preferences and extensions.
+    init(sharingWith parent: StubBrowserContext) {
+        id = parent.id
+        name = parent.name
+        stubDownloads = parent.stubDownloads
+        preferences = parent.preferences
+        stubExtensions = parent.stubExtensions
     }
 
     func setUserVisibleName(_ name: String) { self.name(name) }

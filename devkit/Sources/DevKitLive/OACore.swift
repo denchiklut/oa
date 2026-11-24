@@ -6,7 +6,7 @@ import AppKit
 @MainActor @objc protocol CoreEngine: NSObjectProtocol {
     @objc(setBlockLists:completion:) func setBlockLists(_ lists: [String], completion: @escaping (Bool) -> Void)
     @objc(setAdBlockExcludedHosts:) func setAdBlockExcludedHosts(_ hosts: [String])
-    @objc(profileWithIdentifier:) func profile(identifier: String) -> CoreProfile
+    @objc(profileWithIdentifier:incognito:) func profile(identifier: String, incognito: Bool) -> CoreProfile
     /// `OAProfileAttributes`, which Swift can't check against `CoreProfileAttributes`.
     func availableProfileAttributes() -> [NSObject]
     @objc(createProfileWithName:completion:) func createProfile(name: String, completion: @escaping (String?) -> Void)
@@ -182,6 +182,7 @@ import AppKit
     var downloads: CoreDownloads { get }
     var preferences: CorePreferences { get }
     var extensions: CoreExtensions { get }
+    var isIncognitoDisabled: Bool { get }
     @objc(browserInWindow:delegate:)
     func browser(inWindow windowIdentifier: String, delegate: CoreBrowserDelegate) -> CoreBrowser
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.

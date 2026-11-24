@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "oa/public/profiles.h"
+
 // Chromium's omnibox for the app's command bar, in the shape of ArcCore's
 // autocomplete result and match. No Chromium headers here.
 
@@ -82,9 +84,10 @@ class Autocomplete {
 };
 
 // Loads the app profile `profile_id` if needed and keeps a Chromium
-// AutocompleteController for it until the result is destroyed. ArcCore keeps
-// one per window.
-std::unique_ptr<Autocomplete> CreateAutocomplete(const std::string& profile_id);
+// AutocompleteController for its context of `type` until the result is
+// destroyed. ArcCore keeps one per window.
+std::unique_ptr<Autocomplete> CreateAutocomplete(const std::string& profile_id,
+                                                 BrowserContextType type);
 
 }  // namespace oa
 

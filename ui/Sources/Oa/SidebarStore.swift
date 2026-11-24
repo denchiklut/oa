@@ -241,7 +241,7 @@ final class SidebarStore {
 
     private var sessionRestorationMapping: [SessionRestorationClient.Key: Int32] {
         var mapping: [SessionRestorationClient.Key: Int32] = [:]
-        for window in windows {
+        for window in windows where window.sidebarContext != .incognito {
             for (tabID, page) in window.pages where page.tabSessionID >= 0 {
                 guard let profile = state.profile(containing: tabID) else { continue }
                 mapping[.init(itemId: tabID, browser: .init(windowID: window.id, contextID: profile.id))] =
@@ -254,7 +254,9 @@ final class SidebarStore {
     private func save() {
         persistence.save(
             state,
-            windows: WindowsSnapshot(sidebarViewPreferences: sidebarViewPreferences, windows: windows.map(\.record)))
+            windows: WindowsSnapshot(
+                sidebarViewPreferences: sidebarViewPreferences,
+                windows: windows.filter { $0.sidebarContext != .incognito }.map(\.record)))
         sessionRestoration.save(sessionRestorationMapping)
         favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
     }

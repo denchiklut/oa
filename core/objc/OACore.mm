@@ -111,6 +111,7 @@
 @interface OABrowser ()
 - (instancetype)initWithWindowIdentifier:(NSString*)windowIdentifier
                        profileIdentifier:(NSString*)profileIdentifier
+                                    type:(oa::BrowserContextType)type
                                 delegate:(id<OABrowserDelegate>)delegate;
 - (id<OABrowserDelegate>)target;
 @end
@@ -125,11 +126,15 @@
 @end
 
 @interface OAAutocomplete ()
-- (instancetype)initWithProfileIdentifier:(NSString*)identifier;
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier
+                                     type:(oa::BrowserContextType)type;
 @end
 
 @interface OAProfile ()
-- (instancetype)initWithIdentifier:(NSString*)identifier;
+// An incognito one shares its parent's downloads, preferences and extensions.
+- (instancetype)initWithIdentifier:(NSString*)identifier
+                              type:(oa::BrowserContextType)type
+                            parent:(nullable OAProfile*)parent;
 @end
 
 @interface OAEngine ()
@@ -1528,9 +1533,10 @@ NSArray<OAAutocompleteMatch*>* ToNSArray(
   std::unique_ptr<oa::Autocomplete> _autocomplete;
 }
 
-- (instancetype)initWithProfileIdentifier:(NSString*)identifier {
+- (instancetype)initWithProfileIdentifier:(NSString*)identifier
+                                     type:(oa::BrowserContextType)type {
   if ((self = [super init])) {
-    _autocomplete = oa::CreateAutocomplete(identifier.UTF8String ?: "");
+    _autocomplete = oa::CreateAutocomplete(identifier.UTF8String ?: "", type);
   }
   return self;
 }
@@ -1763,13 +1769,14 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 
 - (instancetype)initWithWindowIdentifier:(NSString*)windowIdentifier
                        profileIdentifier:(NSString*)profileIdentifier
+                                    type:(oa::BrowserContextType)type
                                 delegate:(id<OABrowserDelegate>)delegate {
   if ((self = [super init])) {
     _delegate = delegate;
     _observer = std::make_unique<BrowserObserverBridge>(self);
-    _browser =
-        oa::ObserveBrowser(windowIdentifier.UTF8String ?: "",
-                           profileIdentifier.UTF8String ?: "", _observer.get());
+    _browser = oa::ObserveBrowser(windowIdentifier.UTF8String ?: "",
+                                  profileIdentifier.UTF8String ?: "", type,
+                                  _observer.get());
   }
   return self;
 }
@@ -1822,20 +1829,34 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 
 @implementation OAProfile {
   NSString* _identifier;
+  oa::BrowserContextType _type;
 }
 
 @synthesize downloads = _downloads;
 @synthesize preferences = _preferences;
 @synthesize extensions = _extensions;
 
-- (instancetype)initWithIdentifier:(NSString*)identifier {
+- (instancetype)initWithIdentifier:(NSString*)identifier
+                              type:(oa::BrowserContextType)type
+                            parent:(nullable OAProfile*)parent {
   if ((self = [super init])) {
     _identifier = [identifier copy];
-    _downloads = [[OADownloads alloc] initWithProfileIdentifier:identifier];
-    _preferences = [[OAPreferences alloc] initWithProfileIdentifier:identifier];
-    _extensions = [[OAExtensions alloc] initWithProfileIdentifier:identifier];
+    _type = type;
+    _downloads =
+        parent.downloads
+            ?: [[OADownloads alloc] initWithProfileIdentifier:identifier];
+    _preferences =
+        parent.preferences
+            ?: [[OAPreferences alloc] initWithProfileIdentifier:identifier];
+    _extensions =
+        parent.extensions
+            ?: [[OAExtensions alloc] initWithProfileIdentifier:identifier];
   }
   return self;
+}
+
+- (BOOL)isIncognitoDisabled {
+  return oa::IsIncognitoDisabled(_identifier.UTF8String ?: "");
 }
 
 - (void)createPageInWindow:(NSString*)windowIdentifier
@@ -1845,7 +1866,7 @@ class BrowserObserverBridge : public oa::Browser::Observer {
   OAPage* page = [[OAPage alloc] initWithDelegate:delegate];
   void (^handler)(OAPage* _Nullable, BOOL) = [completion copy];
   oa::CreatePage(
-      windowIdentifier.UTF8String ?: "", _identifier.UTF8String ?: "",
+      windowIdentifier.UTF8String ?: "", _identifier.UTF8String ?: "", _type,
       sessionID < 0 ? std::nullopt : std::optional(sessionID), page.observer,
       [page, handler](std::unique_ptr<oa::Page> created, bool restored) {
         if (!created) {
@@ -1859,7 +1880,7 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url {
   std::optional<std::vector<oa::SiteSetting>> settings =
-      oa::GetChangedSiteSettings(_identifier.UTF8String ?: "",
+      oa::GetChangedSiteSettings(_identifier.UTF8String ?: "", _type,
                                  url.absoluteString.UTF8String ?: "");
   if (!settings) {
     return nil;
@@ -1872,18 +1893,20 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 }
 
 - (OAAutocomplete*)makeAutocomplete {
-  return [[OAAutocomplete alloc] initWithProfileIdentifier:_identifier];
+  return [[OAAutocomplete alloc] initWithProfileIdentifier:_identifier
+                                                      type:_type];
 }
 
 - (OABrowser*)browserInWindow:(NSString*)windowIdentifier
                      delegate:(id<OABrowserDelegate>)delegate {
   return [[OABrowser alloc] initWithWindowIdentifier:windowIdentifier
                                    profileIdentifier:_identifier
+                                                type:_type
                                             delegate:delegate];
 }
 
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url {
-  oa::SetSiteSetting(_identifier.UTF8String ?: "",
+  oa::SetSiteSetting(_identifier.UTF8String ?: "", _type,
                      url.absoluteString.UTF8String ?: "",
                      static_cast<oa::SiteSettingType>(type),
                      static_cast<oa::SiteSettingValue>(value));
@@ -1922,6 +1945,7 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 
 @implementation OAEngine {
   NSMutableDictionary<NSString*, OAProfile*>* _profiles;
+  NSMutableDictionary<NSString*, OAProfile*>* _incognitoProfiles;
 }
 
 + (OAEngine*)sharedEngine {
@@ -1932,15 +1956,25 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 - (instancetype)initShared {
   if ((self = [super init])) {
     _profiles = [[NSMutableDictionary alloc] init];
+    _incognitoProfiles = [[NSMutableDictionary alloc] init];
   }
   return self;
 }
 
-- (OAProfile*)profileWithIdentifier:(NSString*)identifier {
-  OAProfile* profile = _profiles[identifier];
+- (OAProfile*)profileWithIdentifier:(NSString*)identifier
+                          incognito:(BOOL)incognito {
+  NSMutableDictionary<NSString*, OAProfile*>* profiles =
+      incognito ? _incognitoProfiles : _profiles;
+  OAProfile* profile = profiles[identifier];
   if (!profile) {
-    profile = [[OAProfile alloc] initWithIdentifier:identifier];
-    _profiles[identifier] = profile;
+    profile = [[OAProfile alloc]
+        initWithIdentifier:identifier
+                      type:incognito ? oa::BrowserContextType::kIncognito
+                                     : oa::BrowserContextType::kNormal
+                    parent:incognito ? [self profileWithIdentifier:identifier
+                                                         incognito:NO]
+                                     : nil];
+    profiles[identifier] = profile;
   }
   return profile;
 }
@@ -1966,6 +2000,7 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 
 - (BOOL)deleteProfileWithIdentifier:(NSString*)identifier {
   [_profiles removeObjectForKey:identifier];
+  [_incognitoProfiles removeObjectForKey:identifier];
   return oa::DeleteProfile(identifier.UTF8String ?: "");
 }
 

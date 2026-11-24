@@ -9,7 +9,7 @@ public final class ChromiumBrowserApplication: BrowserApplication {
     private let main: CoreMain
     private let arguments: [String]
     private var engine: CoreEngine?
-    private var contexts: [UUID: ChromiumBrowserContext] = [:]
+    private var contexts: [ContextKey: ChromiumBrowserContext] = [:]
     /// As ADK's `deletedProfiles`: Chromium still lists a profile until it has unloaded it.
     private var deletedProfiles: Set<UUID> = []
     private let dataDirectory: URL
@@ -74,12 +74,21 @@ public final class ChromiumBrowserApplication: BrowserApplication {
         engine.shutDownForQuit({ NSApplication.shared.reply(toApplicationShouldTerminate: true) })
     }
 
-    public func browserContext(id: UUID) -> any BrowserContext {
-        if let context = contexts[id] { return context }
+    public func browserContext(id: UUID, type: BrowserContextType) -> any BrowserContext {
+        let key = ContextKey(id: id, type: type)
+        if let context = contexts[key] { return context }
         let context = ChromiumBrowserContext(
-            id: id, profile: { [weak self] in self?.engine?.profile(identifier: id.uuidString) })
-        contexts[id] = context
+            id: id,
+            profile: { [weak self] in
+                self?.engine?.profile(identifier: id.uuidString, incognito: type == .incognito)
+            })
+        contexts[key] = context
         return context
+    }
+
+    private struct ContextKey: Hashable {
+        let id: UUID
+        let type: BrowserContextType
     }
 
     public let listsEveryProfile = true
@@ -106,7 +115,7 @@ public final class ChromiumBrowserApplication: BrowserApplication {
 
     public func deleteBrowserContext(id: UUID) -> Bool {
         guard id != BrowserProfile.initialID, let engine else { return false }
-        contexts[id] = nil
+        contexts = contexts.filter { $0.key.id != id }
         guard engine.deleteProfile(identifier: id.uuidString) else { return false }
         deletedProfiles.insert(id)
         return true
@@ -154,6 +163,7 @@ final class ChromiumBrowserContext: BrowserContext {
     var preferences: any BrowserContextPreferences { chromiumPreferences }
     private lazy var chromiumExtensions = ChromiumExtensions(core: profile()?.extensions)
     var extensions: any Extensions { chromiumExtensions }
+    var incognitoDisabled: Bool { profile()?.isIncognitoDisabled ?? false }
     /// Weakly, as ADK's `browsers`: the window that asked holds its browser.
     private var browsers: [UUID: WeakBrowser] = [:]
 
