@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "oa/public/profiles.h"
+
 // A profile's settings for a site, by origin, as Chrome's page info reads them
 // (components/page_info/page_info.cc). No Chromium headers here.
 
@@ -77,23 +79,27 @@ struct SiteSetting {
 // The settings of `origin`'s site that differ from Chrome's: the site has its
 // own value, something other than the user set it (a policy or an extension),
 // or the user changed its default. In page info's order. Nullopt if the app
-// profile `profile_id` hasn't loaded or `origin` isn't a valid URL. Only the
-// URL's origin counts.
+// profile `profile_id`'s context of `type` hasn't loaded or `origin` isn't a
+// valid URL. Only the URL's origin counts.
 std::optional<std::vector<SiteSetting>> GetChangedSiteSettings(
     const std::string& profile_id,
+    BrowserContextType type,
     const std::string& origin);
 
 // The value of one setting for `origin`'s site, whether or not it was changed.
 // Nullopt as for GetChangedSiteSettings().
 std::optional<SiteSettingValue> GetSiteSetting(const std::string& profile_id,
+                                               BrowserContextType context,
                                                const std::string& origin,
                                                SiteSettingType type);
 
-// Sets one setting for `origin`'s site in the app profile `profile_id`, as
+// Sets one setting for `origin`'s site in the app profile `profile_id`'s
+// context of `context`, as
 // Chrome's site settings page does: for the whole origin, without reloading
 // its pages. kDefault resets it. Does nothing for an invalid URL, or a setting
 // whose value isn't a ContentSetting.
 void SetSiteSetting(const std::string& profile_id,
+                    BrowserContextType context,
                     const std::string& origin,
                     SiteSettingType type,
                     SiteSettingValue value);

@@ -159,7 +159,10 @@ struct SidebarSnapshot: Codable {
             }
             return Tree(rootIDs: rootIDs, items: items.map(Item.init))
         }
-        let saved = state.containers.sorted { $0.value.id.uuidString < $1.value.id.uuidString }
+        let saved = state.containers.filter {
+            if case .standalone = $0.key { true } else { false }
+        }
+        .sorted { $0.value.id.uuidString < $1.value.id.uuidString }
         let containerRootIDs = Set(state.containers.values.flatMap { [$0.pinnedRootID, $0.unpinnedRootID] })
         profiles = state.profiles
         spaces = state.spaces

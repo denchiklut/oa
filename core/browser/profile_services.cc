@@ -14,6 +14,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/uuid.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/delete_profile_helper.h"
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
@@ -49,6 +50,15 @@ bool IsValidIdentifier(const std::string& identifier) {
 base::FilePath ProfilePath(const std::string& identifier) {
   return g_browser_process->profile_manager()->user_data_dir().AppendASCII(
       kDirectoryPrefix + identifier);
+}
+
+Profile* ContextOf(Profile* profile, BrowserContextType type, bool create) {
+  if (!profile || type == BrowserContextType::kNormal) {
+    return profile;
+  }
+  return IncognitoModePrefs::IsIncognitoAllowed(profile)
+             ? profile->GetPrimaryOTRProfile(create)
+             : nullptr;
 }
 
 bool SetLocalName(const std::string& identifier, const std::string& name) {
@@ -111,6 +121,30 @@ Profile* GetLoadedBrowserProfile(const std::string& identifier) {
     return nullptr;
   }
   return found->second.profile;
+}
+
+void LoadBrowserContext(const std::string& identifier,
+                        BrowserContextType type,
+                        base::OnceCallback<void(Profile*)> ready) {
+  LoadBrowserProfile(
+      identifier,
+      base::BindOnce(
+          [](BrowserContextType type, base::OnceCallback<void(Profile*)> ready,
+             Profile* profile) {
+            std::move(ready).Run(ContextOf(profile, type, /*create=*/true));
+          },
+          type, std::move(ready)));
+}
+
+Profile* GetLoadedBrowserContext(const std::string& identifier,
+                                 BrowserContextType type) {
+  return ContextOf(GetLoadedBrowserProfile(identifier), type,
+                   /*create=*/false);
+}
+
+bool IsIncognitoDisabled(const std::string& profile_id) {
+  Profile* profile = GetLoadedBrowserProfile(profile_id);
+  return profile && !IncognitoModePrefs::IsIncognitoAllowed(profile);
 }
 
 std::vector<ProfileAttributes> GetAvailableProfileAttributes() {

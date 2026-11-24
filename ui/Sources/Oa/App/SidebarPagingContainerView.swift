@@ -315,29 +315,48 @@ private struct SpaceNameRow: View {
 }
 
 /// Arc's profile indicator, where a window with a sidebar of its own has its Space's name: the profile's icon and
-/// name in a pill. Oa has no profile icons yet, so the icon is the one the Spaces cards give a profile.
+/// name in a pill, or in an incognito window "Incognito" with Clear beside it while it has tabs. Oa has no profile
+/// icons yet, so the icon is the one the Spaces cards give a profile.
 private struct ProfileIndicatorView: View {
     let model: WindowModel
     let space: SidebarSpace
+    @State private var hoveringClear = false
     @Environment(\.theme) private var theme
 
     var body: some View {
-        let name = model.profileName(space.profileID)
-        HStack(spacing: 4) {
-            Image(systemName: "person.crop.circle")
-                .frame(width: 14, height: 14)
-            Text(name)
-                .lineLimit(1)
+        let incognito = model.sidebarContext == .incognito
+        let name = incognito ? "Incognito" : model.profileName(space.profileID)
+        HStack(spacing: 0) {
+            HStack(spacing: 4) {
+                Image(systemName: incognito ? "eye.slash" : "person.crop.circle")
+                    .frame(width: 14, height: 14)
+                Text(name)
+                    .lineLimit(1)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(theme.secondaryText)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(theme.itemFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(incognito ? name : "Profile: \(name)")
+            Spacer(minLength: 0)
+            if incognito, !model.state.tabs(in: space.id).isEmpty {
+                Button {
+                    model.clearTabs(in: space.id)
+                } label: {
+                    Text("Clear")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(hoveringClear ? theme.foreground : theme.tertiaryText)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hoveringClear = $0 }
+            }
         }
-        .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(theme.secondaryText)
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
-        .background(theme.itemFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Profile: \(name)")
         .padding(.leading, 6)
-        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+        .padding(.trailing, 11)
+        .frame(maxWidth: .infinity, minHeight: 36)
         .frame(height: 38, alignment: .top)
     }
 }

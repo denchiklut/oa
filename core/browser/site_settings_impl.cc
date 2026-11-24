@@ -134,9 +134,11 @@ GURL OriginURL(const std::string& url) {
   return origin.opaque() ? GURL() : origin.GetURL();
 }
 
-// The map of the app profile `profile_id`, or null until it has loaded.
-HostContentSettingsMap* LoadedMap(const std::string& profile_id) {
-  Profile* profile = GetLoadedBrowserProfile(profile_id);
+// The map of the app profile `profile_id`'s context of `type`, or null until
+// it has loaded.
+HostContentSettingsMap* LoadedMap(const std::string& profile_id,
+                                  BrowserContextType type) {
+  Profile* profile = GetLoadedBrowserContext(profile_id, type);
   return profile ? HostContentSettingsMapFactory::GetForProfile(profile)
                  : nullptr;
 }
@@ -184,8 +186,9 @@ bool IsChanged(HostContentSettingsMap* map,
 
 std::optional<std::vector<SiteSetting>> GetChangedSiteSettings(
     const std::string& profile_id,
+    BrowserContextType type,
     const std::string& origin) {
-  Profile* profile = GetLoadedBrowserProfile(profile_id);
+  Profile* profile = GetLoadedBrowserContext(profile_id, type);
   const GURL url = OriginURL(origin);
   if (!profile || !url.is_valid()) {
     return std::nullopt;
@@ -212,9 +215,10 @@ std::optional<std::vector<SiteSetting>> GetChangedSiteSettings(
 }
 
 std::optional<SiteSettingValue> GetSiteSetting(const std::string& profile_id,
+                                               BrowserContextType context,
                                                const std::string& origin,
                                                SiteSettingType type) {
-  HostContentSettingsMap* map = LoadedMap(profile_id);
+  HostContentSettingsMap* map = LoadedMap(profile_id, context);
   const GURL url = OriginURL(origin);
   const ContentSettingsType content_type = ToContentSettingsType(type);
   if (!map || !url.is_valid() ||
@@ -227,6 +231,7 @@ std::optional<SiteSettingValue> GetSiteSetting(const std::string& profile_id,
 }
 
 void SetSiteSetting(const std::string& profile_id,
+                    BrowserContextType context,
                     const std::string& origin,
                     SiteSettingType type,
                     SiteSettingValue value) {
@@ -242,8 +247,14 @@ void SetSiteSetting(const std::string& profile_id,
   LoadBrowserProfile(
       profile_id,
       base::BindOnce(
-          [](const GURL& url, ContentSettingsType type, ContentSetting setting,
+          [](BrowserContextType context, const GURL& url,
+             ContentSettingsType type, ContentSetting setting,
              Profile* profile) {
+            // An incognito context gone with its windows has nothing to set.
+            if (profile && context == BrowserContextType::kIncognito) {
+              profile =
+                  profile->GetPrimaryOTRProfile(/*create_if_needed=*/false);
+            }
             if (!profile) {
               return;
             }
@@ -260,7 +271,7 @@ void SetSiteSetting(const std::string& profile_id,
             HostContentSettingsMapFactory::GetForProfile(profile)
                 ->SetContentSettingDefaultScope(url, url, type, setting);
           },
-          url, content_type, ToContentSetting(content_type, value)));
+          context, url, content_type, ToContentSetting(content_type, value)));
 }
 
 }  // namespace oa

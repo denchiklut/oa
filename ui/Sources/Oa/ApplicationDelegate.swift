@@ -188,6 +188,21 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         openWindow(context: .standalone, profileID: key?.model.space?.profileID)
     }
 
+    /// As Arc's `newIncognitoWindow:`: a window on the incognito context of the key window's Space's profile, with
+    /// its own sidebar kept in memory; the command bar opens, as for any new window. Arc's profile with no browser
+    /// window key isn't known; Oa's own takes the default profile then.
+    @objc func newIncognitoWindow(_ sender: Any?) {
+        guard !engine.browserContext(id: incognitoProfileID).incognitoDisabled else {
+            return NSLog("Oa: attempted to create an incognito window but incognito is disabled.")
+        }
+        openWindow(context: .incognito, profileID: incognitoProfileID)
+    }
+
+    private var incognitoProfileID: UUID {
+        let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
+        return key?.model.space?.profileID ?? SidebarProfile.defaultID
+    }
+
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
     @objc func toggleToolbar(_ sender: Any?) { PageToolbar.isShown.toggle() }
     @objc func setAutomaticAppearance(_ sender: Any?) { AppAppearance.set(nil) }
@@ -204,9 +219,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             // As Arc: not while Settings is key.
             return !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController)
         }
-        if item.action == #selector(blankWindow(_:)) {
-            // As Arc: not while Settings is key.
-            return !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController)
+        if item.action == #selector(blankWindow(_:)) || item.action == #selector(newIncognitoWindow(_:)) {
+            // As Arc: not while Settings is key, and incognito only while the engine allows it.
+            guard !(NSApplication.shared.keyWindow?.windowController is SettingsWindowController) else { return false }
+            return item.action == #selector(blankWindow(_:))
+                || !engine.browserContext(id: incognitoProfileID).incognitoDisabled
         }
         if item.action == #selector(toggleToolbar(_:)) {
             item.title = PageToolbar.isShown ? "Hide Toolbar" : "Show Toolbar"

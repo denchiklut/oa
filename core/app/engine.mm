@@ -276,6 +276,7 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
 void CreatePage(
     const std::string& window_id,
     const std::string& profile_id,
+    BrowserContextType type,
     std::optional<int32_t> restorable_session_id,
     Page::Observer* observer,
     std::function<void(std::unique_ptr<Page> page, bool restored)> completion) {
@@ -283,8 +284,8 @@ void CreatePage(
     completion(nullptr, false);
     return;
   }
-  LoadBrowserProfile(
-      profile_id,
+  LoadBrowserContext(
+      profile_id, type,
       base::BindOnce(
           [](std::string window_id,
              std::optional<int32_t> restorable_session_id,

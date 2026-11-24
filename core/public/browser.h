@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "oa/public/page.h"
+#include "oa/public/profiles.h"
 
 // One app window's side in one profile: Chromium's Browser for the pair, in
 // the shape of ArcCore's ArcBrowser and its delegate. No Chromium headers
@@ -82,11 +83,12 @@ class Browser {
 };
 
 // Loads the app profile `profile_id` if needed, makes `window_id`'s Browser
-// for it, and reports that Browser to `observer` until the result is
-// destroyed. As Arc's, the Browser stays while the result does, with pages or
-// without.
+// for its context of `type`, and reports that Browser to `observer` until the
+// result is destroyed. As Arc's, the Browser stays while the result does, with
+// pages or without.
 std::unique_ptr<Browser> ObserveBrowser(const std::string& window_id,
                                         const std::string& profile_id,
+                                        BrowserContextType type,
                                         Browser::Observer* observer);
 
 }  // namespace oa
