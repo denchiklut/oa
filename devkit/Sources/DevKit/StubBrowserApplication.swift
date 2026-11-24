@@ -113,12 +113,13 @@ final class StubBrowserContext: BrowserContext {
         stubExtensions = StubExtensions()
     }
 
-    /// An incognito context, on its profile's downloads, preferences and extensions.
+    /// An incognito context, on its profile's preferences and extensions. Its downloads are its own, and the stub
+    /// keeps them listed after its windows have closed, where the engine drops them.
     init(sharingWith parent: StubBrowserContext) {
         id = parent.id
         name = parent.name
         isIncognito = true
-        stubDownloads = parent.stubDownloads
+        stubDownloads = StubDownloads()
         preferences = parent.preferences
         stubExtensions = parent.stubExtensions
     }

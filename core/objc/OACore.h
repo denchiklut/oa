@@ -319,14 +319,15 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @end
 
 @protocol OADownloadsDelegate <NSObject>
-// Once, with the downloads Chromium's history brought back.
+// With the downloads Chromium's history brought back; for an incognito
+// context, each time Chromium makes it, with none.
 - (void)downloadsDidInitialize:(NSArray<OADownload*>*)downloads;
 - (void)downloadWasCreated:(OADownload*)download;
 - (void)downloadWasUpdated:(OADownload*)download;
 - (void)downloadWasRemovedWithIdentifier:(NSString*)identifier;
 @end
 
-// A profile's downloads, as ArcCore's ArcBrowserContextDownloads.
+// A browser context's downloads, as ArcCore's ArcBrowserContextDownloads.
 @interface OADownloads : NSObject
 // Setting it the first time loads the profile and starts the events.
 @property(nonatomic, weak, nullable) id<OADownloadsDelegate> delegate;
@@ -588,8 +589,9 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)setAdBlockExcludedHosts:(NSArray<NSString*>*)hosts;
 - (instancetype)init NS_UNAVAILABLE;
 // The profile's own context, or its incognito one, as ArcCore's
-// getBrowserContext:type:. An incognito one shares its profile's downloads,
-// preferences and extensions.
+// getBrowserContext:type:. An incognito one shares its profile's preferences
+// and extensions, and has downloads of its own, as ArcCore's
+// ArcBrowserContext.downloads.
 - (OAProfile*)profileWithIdentifier:(NSString*)identifier
                           incognito:(BOOL)incognito;
 // In Chromium's order, as ArcCore's availableBrowserContextAttributes.
