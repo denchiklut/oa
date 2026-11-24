@@ -22,16 +22,17 @@ extension WindowModel {
         findInPage[page.id].flatMap { $0.url == page.url ? $0 : nil }
     }
 
-    /// As Arc's `beginFindInPage`: the user's selection on one line becomes the query when it is short enough,
-    /// else an open bar keeps its text, and the query is searched again, which steps to the next match.
+    /// As Arc's `beginFindInPage`: the user's selection on one line becomes the query when it is short enough, and
+    /// its matches are only highlighted; else an open bar keeps its text, which is searched again and so steps to the
+    /// next match.
     func beginFindInPage() {
         guard let page = frontPage else { return }
         let selection = page.selectedText.replacing(/\r\n|\r|\n/, with: " ").trimmingCharacters(in: .whitespaces)
         let open = findInPageState(of: page)
-        let text =
-            !selection.isEmpty && selection.count <= FindInPage.maxPrefillLength ? selection : open?.text ?? ""
+        let prefills = !page.selectedText.isEmpty && selection.count <= FindInPage.maxPrefillLength
+        let text = prefills ? selection : open?.text ?? ""
         findInPage[page.id] = FindInPage.State(url: page.url, text: text, result: open?.result)
-        page.find(text, direction: .current, findMatch: true)
+        page.find(text, direction: .current, findMatch: !prefills)
     }
 
     func updateFindQuery(_ text: String, on page: any Page) {
