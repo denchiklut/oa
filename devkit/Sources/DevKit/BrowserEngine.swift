@@ -19,8 +19,9 @@ public protocol BrowserApplication: AnyObject {
     /// As Chrome's quit: each profile's session is saved and closed with the pages it has. Call it once the quit is
     /// certain.
     func saveSessionsForQuit()
-    /// Finishes quitting after the app answered `applicationShouldTerminate` with `.terminateLater`. As Arc's, the
-    /// engine writes what it must keep and the app exits with its windows and pages as they are.
+    /// Finishes quitting after the app answered `applicationShouldTerminate` with `.terminateLater`. As Arc's, pages
+    /// with unload handlers run them and close, the engine writes what it must keep, and the app exits with its
+    /// windows as they are.
     func terminate()
     func browserContext(id: UUID) -> any BrowserContext
     /// The profiles the engine has, loaded or not, in the engine's own order, as ADK's `allProfiles()`.

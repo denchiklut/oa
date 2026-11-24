@@ -539,9 +539,9 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (void)finishedRestoringWindows;
 // Saves and closes each profile's session on quit, as Chrome's quit does.
 - (void)saveSessionsForQuit;
-// Writes what quitting must keep, then runs `completion`, as ArcCore's
-// shutdown does; nothing closes.
-- (void)flushForQuit:(void (^)(void))completion;
+// As ArcCore's shutdown: unload handlers run, what quitting must keep is
+// written, then `completion` runs.
+- (void)shutDownForQuit:(void (^)(void))completion;
 @end
 
 NS_ASSUME_NONNULL_END

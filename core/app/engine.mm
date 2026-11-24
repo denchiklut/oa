@@ -337,8 +337,9 @@ void SaveSessionsForQuit() {
   ProfileManager::ShutdownSessionServices();
 }
 
-void FlushForQuit(std::function<void()> completion) {
+void ShutDownForQuit(std::function<void()> completion) {
   browser_shutdown::SetTryingToQuit(true);
+  WindowBrowser::UnloadForQuit();
   auto pending =
       base::MakeRefCounted<base::RefCountedData<std::function<void()>>>(
           std::move(completion));
