@@ -262,6 +262,7 @@ void PageImpl::Bind(content::WebContents* contents) {
       true;
   contents->SyncRendererPrefs();
   Observe(contents);
+  DevToolsWindow::Embedder::SetForWebContents(contents, devtools_.get());
   favicon_observation_.Reset();
   if (auto* driver = favicon::ContentFaviconDriver::FromWebContents(contents)) {
     favicon_observation_.Observe(driver);
@@ -286,6 +287,7 @@ void PageImpl::Unbind() {
   StopObservingMainWidget();
   if (content::WebContents* contents = web_contents()) {
     contents->RemoveUserData(kPageMarkerKey);
+    DevToolsWindow::Embedder::SetForWebContents(contents, nullptr);
     if (contents->GetDelegate() == this) {
       contents->SetDelegate(inner());
     }

@@ -60,6 +60,7 @@
 - (void)attach;
 - (void)displayAs:(oa::DevTools::Display)display;
 - (void)didClose;
+- (void)needsFocus;
 @end
 
 @interface OAProfileAttributes ()
@@ -299,6 +300,7 @@ class DevToolsObserverBridge : public oa::DevTools::Observer {
     [devtools_ displayAs:display];
   }
   void OnDevToolsClosed() override { [devtools_ didClose]; }
+  void OnDevToolsNeedsFocus() override { [devtools_ needsFocus]; }
 
  private:
   __weak OAPageDevTools* devtools_;
@@ -520,6 +522,10 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 - (void)didClose {
   [_delegate devToolsDidClose:self];
+}
+
+- (void)needsFocus {
+  [_delegate devToolsNeedsFocus:self];
 }
 
 - (nullable NSView*)view {
