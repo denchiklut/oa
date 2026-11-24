@@ -25,6 +25,9 @@ export_series() {
   [[ "$base" == "$pinned" ]] || die "$patch_branch in $repo is based on another revision than $version pins; run scripts/patches.sh apply"
   require_clean_tree "$repo"
   staging="$(mktemp -d)"
+  # Expanded now: the function's local is gone by the time the trap runs.
+  # shellcheck disable=SC2064
+  trap "rm -rf '$staging'" EXIT
   git -c diff.noprefix=false -c diff.mnemonicPrefix=false -c diff.relative=false \
     format-patch --quiet --zero-commit --no-signature --no-numbered --full-index \
     --output-directory "$staging" "$base..$patch_branch"
