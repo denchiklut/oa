@@ -85,7 +85,12 @@ final class MainMenu {
         appearance.addItem(item("Light", #selector(ApplicationDelegate.setLightAppearance(_:))))
         appearance.addItem(item("Dark", #selector(ApplicationDelegate.setDarkAppearance(_:))))
         view.addItem(.separator())
-        view.addItem(item("Reload Page", #selector(BrowserWindowController.reload(_:)), key: "r", id: "reloadPage"))
+        view.addItem(
+            item("Refresh the Page", #selector(BrowserWindowController.reload(_:)), key: "r", id: "reloadPage"))
+        view.addItem(
+            item(
+                "Force Refresh the Page", #selector(BrowserWindowController.forceReload(_:)), key: "r",
+                modifiers: [.command, .shift], id: "forceReloadPage"))
         view.addItem(
             item("Stop Loading", #selector(BrowserWindowController.stopLoading(_:)), key: ".", id: "stopLoading"))
         view.addItem(.separator())

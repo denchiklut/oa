@@ -195,6 +195,7 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)goBack;
 - (void)goForward;
 - (void)reload;
+- (void)reloadBypassingCache;
 - (void)stopLoading;
 - (void)activate;
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
