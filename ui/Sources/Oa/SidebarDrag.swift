@@ -378,11 +378,11 @@ final class SidebarDrag {
         let index = ids.filter { (rows[$0]?.rect.midY ?? .infinity) < point.y }.count
         let y: CGFloat =
             if index < ids.count, let rect = rows[ids[index]]?.rect {
-                rect.minY - 0.5
+                rect.minY
             } else if let last = ids.last, let rect = rows[last]?.rect {
-                rect.maxY + 0.5
+                rect.maxY + 1
             } else {
-                pinned ? list.pinnedTop : list.newTab.maxY + 0.5
+                pinned ? list.pinnedTop : list.newTab.maxY + 1
             }
         let section = pinned ? Section.pinned : .today
         if let combine = combineTarget(at: point, among: ids, model: model) {
@@ -390,7 +390,7 @@ final class SidebarDrag {
             let last = point.x > rows[combine]?.rect.midX ?? .infinity
             return Target(section: section, index: index, combine: combine, combinesLast: last)
         }
-        let line = CGRect(x: list.area.minX + 16, y: y - 3, width: list.area.width - 27.5, height: 6)
+        let line = CGRect(x: list.area.minX + 16, y: y - 4, width: list.area.width - 27, height: 8)
         return Target(section: section, index: index, line: line)
     }
 
@@ -500,14 +500,15 @@ struct SidebarDragLayer: View {
     }
 }
 
-/// Arc's drop line: 2 pt with a 6 pt ring at its leading end, in Arc's `dropHighlightColor` as measured.
+/// Arc's drop line: 2 pt with an 8 pt ring at its leading end, in the Space's `maxContrastColor`, which Arc's tab list
+/// takes as its `dropHighlightColor` on every palette change.
 private struct SidebarDropLine: View {
-    private static let color = Color(.sRGB, red: 0x1E / 255, green: 0x29 / 255, blue: 1)
+    @Environment(\.theme) private var theme
 
     var body: some View {
-        HStack(spacing: 0) {
-            Circle().strokeBorder(Self.color, lineWidth: 2).frame(width: 6, height: 6)
-            Rectangle().fill(Self.color).frame(height: 2)
+        ZStack(alignment: .leading) {
+            Rectangle().fill(theme.maxContrast).frame(height: 2).padding(.leading, 6)
+            Circle().strokeBorder(theme.maxContrast, lineWidth: 2).frame(width: 8, height: 8)
         }
     }
 }
