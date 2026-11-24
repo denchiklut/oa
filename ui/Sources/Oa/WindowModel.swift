@@ -83,6 +83,8 @@ final class WindowModel {
     private(set) var toast: WindowToast?
     /// By page: the find bars this window has open.
     var findInPage: [UUID: FindInPage.State] = [:]
+    /// Arc's `WindowState.findInPageQuery`: what was last put in this window's find field, kept in memory only.
+    @ObservationIgnored var findInPageQuery: String?
     /// Arc's `WindowState.queuedHotkey`: the menu item a consumed shortcut asked about, while its toast is up.
     @ObservationIgnored private weak var queuedHotkey: NSMenuItem?
     @ObservationIgnored private var toastRemoval: Task<Void, Never>?
