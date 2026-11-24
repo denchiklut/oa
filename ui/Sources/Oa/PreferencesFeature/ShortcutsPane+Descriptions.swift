@@ -57,6 +57,7 @@ extension ShortcutsPane {
             Copies the current URL to your clipboard without any trackers as a markdown string.
             i.e. [Page Title](www.arc.net).
             """
+        case "pasteAndMatchStyle": "Pastes the selected text and matches the current text styling."
         case "addSplitView": "Adds a new page to your current Split View."
         case "removeSplitView": "Closes the Split View page that’s currently in focus."
         case "separateTabFromSplitView": "Separate Page from Split View."

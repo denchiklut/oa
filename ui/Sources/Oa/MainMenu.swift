@@ -79,6 +79,10 @@ final class MainMenu {
                 "Copy URL as Markdown", #selector(BrowserWindowController.copyCurrentURLAsMarkdown(_:)), key: "c",
                 modifiers: [.command, .shift, .option], id: "copyCurrentURLMarkdown", priority: .overrideWebView))
         edit.addItem(item("Paste", #selector(NSText.paste(_:)), key: "v"))
+        edit.addItem(
+            item(
+                "Paste and Match Style", #selector(NSTextView.pasteAsPlainText(_:)), key: "v",
+                modifiers: [.command, .shift], id: "pasteAndMatchStyle"))
         edit.addItem(item("Select All", #selector(NSText.selectAll(_:)), key: "a"))
 
         let view = submenu("View", in: menu)
