@@ -428,7 +428,6 @@ struct CommandBarView: View {
     /// not the theme's, and only the chosen row takes the theme, its `focus`.
     private func card(_ rows: [CommandBar.Row]) -> some View {
         let isDark = colorScheme == .dark
-        let shape = RoundedRectangle(cornerRadius: 10)
         return VStack(spacing: 0) {
             HStack(spacing: 10) {
                 if let scope = bar.scope {
@@ -466,12 +465,9 @@ struct CommandBarView: View {
                     .padding(.bottom, 9.5)
             }
         }
-        .background {
-            // Nearly opaque, so the theme behind only tints it. Whether Arc blurs what is behind isn't known.
-            shape.fill(isDark ? Color(white: 0.1).opacity(0.875) : .white.opacity(0.9))
-        }
-        .overlay(shape.strokeBorder(CommandBarInk.color(isDark, 0.35, 0.2), lineWidth: 0.5))
-        .background { ShadowView(shape: shape, color: .black.opacity(0.25), radius: 24, y: 8) }
+        // As Arc: `CommandBarConstants.cornerRadius` and the floating bar's shadow.
+        .modifier(
+            PopoverBackgroundView(cornerRadius: 12, shadowColor: .black.opacity(0.5), shadowRadius: 48, shadowY: 24))
     }
 
     private func list(_ rows: [CommandBar.Row]) -> some View {
