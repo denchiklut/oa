@@ -220,6 +220,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
     @objc func viewHistory(_ sender: Any?) { model.viewHistory() }
 
+    @objc func toggleLibrary(_ sender: Any?) {
+        if model.library != nil { model.exitLibrary() } else { model.viewLibrary() }
+    }
+
     @objc func toggleDownloads(_ sender: Any?) {
         if model.showingDownloads { model.exitLibrary() } else { model.viewLibrary(.downloads) }
     }
@@ -325,6 +329,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         if item.action == #selector(toggleSidebarMode(_:)) {
             item.title = model.sidebarMode == .anchored ? "Hide Sidebar" : "Show Sidebar"
+            return true
+        }
+        if item.action == #selector(toggleLibrary(_:)) {
+            item.title = model.library != nil ? "Close Library" : "Open Library…"
             return true
         }
         if item.action == #selector(toggleDownloads(_:)) {
