@@ -384,7 +384,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         ]
         if model.spaceCreation != nil, let action = item.action, editsSpace.contains(action) { return false }
         // As seen in Arc: a window with a sidebar of its own has no Spaces to edit or move between and no pins, and
-        // no Change Profile or New Profile at all. Favorite Tab off is Oa's own, as it shows no Favorites.
+        // no Change Profile or New Profile at all. Favorite Tab, which Arc has in no menu, is off as Arc's command
+        // bar offers none there.
         if model.sidebarContext != .global, let action = item.action {
             let hidden = [#selector(changeProfile(_:)), #selector(newProfile(_:))]
             if hidden.contains(action) {

@@ -300,8 +300,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
 
     /// As Arc: Settings closes, except for Advanced's More Settings…, then the page opens as a new tab at the top of a Space of the profile, in a window
-    /// showing one, else in the frontmost window, which moves to one. A profile without a Space gets no page. Which
-    /// of its Spaces, and a new window when none is open, are Oa's own.
+    /// showing one, else in the frontmost window, which moves to one, and never a window with a sidebar of its own,
+    /// as Arc's `openURLInStandardWindow` picks. A profile without a Space gets no page. Which of its Spaces, and a
+    /// new window when none is open, are Oa's own.
     private func openSettings(_ page: ChromiumSettings, in profileID: UUID) {
         if page != .settings { settings.close() }
         guard let space = store.state.spaces.first(where: { $0.profileID == profileID }) else { return }
@@ -392,10 +393,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         controller.model.openLinkInIncognitoWindow = { [weak self] url, profileID in
             self?.openLinkInIncognitoWindow(url, profileID: profileID)
         }
-        // As seen in Arc: from the key window.
         controller.model.openURLInNewWindow = { [weak self, weak model = controller.model] url in
             if let model { self?.openURLInNewWindow(url, from: model) }
         }
+        // As seen in Arc: from the key window.
         let previous = (windows.first { $0.model === source } ?? key)?.window
         windows.append(controller)
         controller.open(cascadingFrom: previous)
