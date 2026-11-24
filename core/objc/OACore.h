@@ -156,6 +156,11 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)page:(OAPage*)page
         didConsumeKey:(unsigned short)keyCode
     withModifierFlags:(NSEventModifierFlags)modifierFlags;
+// Each result of the page's find, as ArcCore's ArcFindResult: -1 for what
+// Chrome doesn't know yet.
+- (void)page:(OAPage*)page
+        didFindMatches:(int)numberOfMatches
+    activeMatchOrdinal:(int)activeMatchOrdinal;
 - (void)pageDidCancelClose:(OAPage*)page;
 // `sessionID` is -1 when Chrome kept no record of the tab.
 - (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;
@@ -185,6 +190,8 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 // Kept until the page is set, as ADK's initiallyMuted.
 @property(nonatomic, getter=isMuted) BOOL muted;
 @property(nonatomic, readonly) BOOL hasFocus;
+// As ArcCore's cached selectedText; empty when the user selected nothing.
+@property(nonatomic, readonly) NSString* selectedText;
 // None while the page has no media session.
 @property(nonatomic, readonly) OAPageMediaSessionStatus mediaSessionStatus;
 @property(nonatomic, readonly) OAPageMediaContentType mediaContentType;
@@ -198,6 +205,11 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)reloadBypassingCache;
 - (void)stopLoading;
 - (void)activate;
+// As ArcCore's find:forward:matchCase:findMatch:, never case-sensitive.
+- (void)findText:(NSString*)text
+         forward:(BOOL)forward
+       findMatch:(BOOL)findMatch;
+- (void)stopFinding;
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
 - (nullable OAPage*)clonePage;
 // Nil while the page has nothing drawn, for example when no window shows it.

@@ -47,6 +47,7 @@ struct PeekView: View {
                     .transition(.identity)
             }
             PageContentView(page: page)
+                .findInPage(of: model, on: page)
         }
         .pageRootBackground(page)
         .toast(of: model, on: page)

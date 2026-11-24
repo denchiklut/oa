@@ -219,6 +219,7 @@ import AppKit
     var isAudible: Bool { get }
     var muted: Bool { @objc(isMuted) get set }
     var hasFocus: Bool { get }
+    var selectedText: String { get }
     var mediaSessionStatus: Int { get }
     var mediaContentType: Int { get }
     var keepsAddress: Bool { get set }
@@ -229,6 +230,8 @@ import AppKit
     func reloadBypassingCache()
     func stopLoading()
     func activate()
+    @objc(findText:forward:findMatch:) func find(_ text: String, forward: Bool, findMatch: Bool)
+    func stopFinding()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
     func clonePage() -> CorePage?
     @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
@@ -290,6 +293,8 @@ import AppKit
     @objc(page:thumbnailReady:) func page(_ page: CorePage, thumbnailReady thumbnail: NSImage)
     @objc(page:didConsumeKey:withModifierFlags:)
     func page(_ page: CorePage, didConsumeKey keyCode: UInt16, withModifierFlags modifierFlags: NSEvent.ModifierFlags)
+    @objc(page:didFindMatches:activeMatchOrdinal:)
+    func page(_ page: CorePage, didFindMatches numberOfMatches: Int32, activeMatchOrdinal: Int32)
     @objc(pageDidCancelClose:) func pageDidCancelClose(_ page: CorePage)
     @objc(page:didCloseWithSessionID:) func page(_ page: CorePage, didCloseWithSessionID sessionID: Int32)
 }

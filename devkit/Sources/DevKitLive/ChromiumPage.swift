@@ -41,6 +41,7 @@ final class ChromiumPage: Page, MediaSession {
     var view: NSView { hostingView }
     var tabSessionID: Int32 { page?.tabSessionID ?? -1 }
     var mediaSession: any MediaSession { self }
+    var selectedText: String { page?.selectedText ?? "" }
 
     var isMuted: Bool {
         get { muted }
@@ -75,6 +76,10 @@ final class ChromiumPage: Page, MediaSession {
     func reloadBypassingCache() { page?.reloadBypassingCache() }
     func stopLoading() { page?.stopLoading() }
     func activate() { page?.activate() }
+    func find(_ text: String, direction: FindDirection, findMatch: Bool) {
+        page?.find(text, forward: direction != .backward, findMatch: findMatch)
+    }
+    func stopFinding() { page?.stopFinding() }
     func move(toWindow windowID: UUID) { page?.move(toWindowIdentifier: windowID.uuidString) }
 
     func duplicate() -> (any Page)? {
@@ -223,6 +228,10 @@ final class ChromiumPage: Page, MediaSession {
         if page != nil { continuation.yield(.consumedKey(keyCode: keyCode, modifierFlags: modifierFlags)) }
     }
 
+    fileprivate func found(_ result: FindResult) {
+        if page != nil { continuation.yield(.findResult(result)) }
+    }
+
     fileprivate func closeCancelled() {
         if page != nil { continuation.yield(.closeCancelled) }
     }
@@ -313,6 +322,10 @@ final class PageDelegate: NSObject, CorePageDelegate {
 
     func page(_ page: CorePage, didConsumeKey keyCode: UInt16, withModifierFlags modifierFlags: NSEvent.ModifierFlags) {
         content?.consumedKey(keyCode, modifierFlags: modifierFlags)
+    }
+
+    func page(_ page: CorePage, didFindMatches numberOfMatches: Int32, activeMatchOrdinal: Int32) {
+        content?.found(FindResult(numberOfMatches: Int(numberOfMatches), activeMatchOrdinal: Int(activeMatchOrdinal)))
     }
 
     func pageDidCancelClose(_ page: CorePage) { content?.closeCancelled() }

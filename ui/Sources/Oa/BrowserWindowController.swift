@@ -242,6 +242,30 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func clearTabs(_ sender: Any?) { model.clearTabs() }
     @objc func copyCurrentURL(_ sender: Any?) { model.copyCurrentURLs() }
     @objc func copyCurrentURLAsMarkdown(_ sender: Any?) { model.copyCurrentURLs(asMarkdown: true) }
+
+    /// Arc's one action for the Find items, told apart by their `NSTextFinder.Action` tags; Find and Replace and Jump
+    /// to Selection do nothing, as in Arc.
+    @objc(arc_performFindPanelAction:) func arcPerformFindPanelAction(_ sender: Any?) {
+        switch (sender as? NSMenuItem).flatMap({ NSTextFinder.Action(rawValue: $0.tag) }) {
+        case .showFindInterface?: model.beginFindInPage()
+        case .nextMatch?: model.findNext(forward: true)
+        case .previousMatch?: model.findNext(forward: false)
+        case .setSearchString?: model.useSelectionForFind()
+        default: break
+        }
+    }
+
+    /// Arc's `canConsumeArrowEvents`, negated: the first responder is in AppKit text that can be edited.
+    private var firstResponderEditsText: Bool {
+        var view = window?.firstResponder as? NSView
+        while let current = view {
+            if let text = current as? NSTextView, text.isEditable { return true }
+            if let field = current as? NSTextField, field.isEditable { return true }
+            view = current.superview
+        }
+        return false
+    }
+
     @objc func addExtension(_ sender: Any?) { model.addExtension() }
     @objc func manageExtensions(_ sender: Any?) { model.manageExtensions() }
 
@@ -374,6 +398,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                 ? "Close Peek"
                 : !model.multiSelectedTabIDs.isEmpty ? "Archive Tabs" : archives ? "Archive Tab" : "Close Tab"
             return true
+        }
+        if item.action == #selector(arcPerformFindPanelAction(_:)) {
+            guard model.frontPage != nil else { return false }
+            return switch NSTextFinder.Action(rawValue: item.tag) {
+            case .showFindInterface?: true
+            case .nextMatch?, .previousMatch?: model.isFindInPageVisible && !firstResponderEditsText
+            case .setSearchString?: model.canUseSelectionForFind
+            default: false
+            }
         }
         return switch item.action {
         case #selector(goBack(_:)): model.frontPage?.canGoBack ?? false

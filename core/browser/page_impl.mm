@@ -29,6 +29,8 @@
 #include "chrome/browser/ui/tabs/tab_muted_utils.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_tab_helper.h"
 #include "components/favicon/content/content_favicon_driver.h"
+#include "components/find_in_page/find_notification_details.h"
+#include "components/find_in_page/find_types.h"
 #include "components/security_state/core/security_state.h"
 #include "components/sessions/content/content_live_tab.h"
 #include "components/sessions/content/session_tab_helper.h"
@@ -265,6 +267,8 @@ void PageImpl::Bind(content::WebContents* contents) {
 
 void PageImpl::Unbind() {
   favicon_observation_.Reset();
+  find_observation_.Reset();
+  finding_ = false;
   thumbnail_subscription_.reset();
   StopObservingMainWidget();
   if (content::WebContents* contents = web_contents()) {
@@ -405,6 +409,10 @@ bool PageImpl::HasFocus() const {
   return has_focus_;
 }
 
+std::string PageImpl::SelectedText() const {
+  return base::UTF16ToUTF8(selected_text_);
+}
+
 std::optional<MediaSessionState> PageImpl::GetMediaSessionState() const {
   content::MediaSession* session =
       web_contents() ? content::MediaSession::GetIfExists(web_contents())
@@ -509,6 +517,41 @@ void PageImpl::Activate() {
   NSWindow* window = window_browser_->GetNativeWindow().GetNativeNSWindow();
   if (window.isKeyWindow) {
     web_contents()->Focus();
+  }
+}
+
+void PageImpl::Find(const std::string& text, bool forward, bool find_match) {
+  auto* helper =
+      web_contents()
+          ? find_in_page::FindTabHelper::FromWebContents(web_contents())
+          : nullptr;
+  if (!helper) {
+    return;
+  }
+  if (!find_observation_.IsObservingSource(helper)) {
+    find_observation_.Reset();
+    find_observation_.Observe(helper);
+  }
+  if (text.empty()) {
+    finding_ = false;
+    helper->StopFinding(find_in_page::SelectionAction::kClear);
+    if (observer_) {
+      observer_->OnPageFindResult(0, -1);
+    }
+    return;
+  }
+  finding_ = true;
+  helper->StartFinding(base::UTF8ToUTF16(text), forward,
+                       /*case_sensitive=*/false, find_match);
+}
+
+void PageImpl::StopFinding() {
+  finding_ = false;
+  if (auto* helper =
+          web_contents()
+              ? find_in_page::FindTabHelper::FromWebContents(web_contents())
+              : nullptr) {
+    helper->StopFinding(find_in_page::SelectionAction::kKeep);
   }
 }
 
@@ -1012,6 +1055,28 @@ void PageImpl::OnAudioStateChanged(bool audible) {
 
 void PageImpl::DidUpdateAudioMutingState(bool muted) {
   NotifyStateChanged();
+}
+
+// Chromium sends a frame's selection to the browser only for input, so a
+// script's selection isn't seen, as in Arc.
+void PageImpl::OnTextSelectionChanged(
+    content::RenderFrameHost* render_frame_host,
+    std::u16string_view selected_text) {
+  selected_text_ = std::u16string(selected_text);
+}
+
+void PageImpl::OnFindResultAvailable(content::WebContents* contents) {
+  if (!finding_ || !observer_) {
+    return;
+  }
+  const find_in_page::FindNotificationDetails& result =
+      find_in_page::FindTabHelper::FromWebContents(contents)->find_result();
+  observer_->OnPageFindResult(result.number_of_matches(),
+                              result.active_match_ordinal());
+}
+
+void PageImpl::OnFindTabHelperDestroyed(find_in_page::FindTabHelper* helper) {
+  find_observation_.Reset();
 }
 
 void PageImpl::OnIsCapturingVideoChanged(content::WebContents* contents,

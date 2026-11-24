@@ -32,6 +32,7 @@
 #include "ui/color/color_provider_key.h"
 #include "ui/color/color_provider_manager.h"
 #include "ui/gfx/mac/coordinate_conversion.h"
+#include "ui/gfx/range/range.h"
 #include "ui/native_theme/native_theme.h"
 
 namespace oa {
@@ -99,6 +100,46 @@ namespace {
 NSWindow* AppWindow(const WindowBrowser* window_browser) {
   return window_browser->GetNativeWindow().GetNativeNSWindow();
 }
+
+// Chrome makes its find bar when a page joins a Browser whose active page is
+// mid-find, and can't run without one. The app draws the find bar, so this one
+// is never shown.
+class HiddenFindBar : public FindBar {
+ public:
+  FindBarController* GetFindBarController() const override {
+    return controller_;
+  }
+  void SetFindBarController(FindBarController* controller) override {
+    controller_ = controller;
+  }
+  void Show(bool animate, bool focus) override {}
+  void Hide(bool animate) override {}
+  void SetFocusAndSelection() override {}
+  void ClearResults(
+      const find_in_page::FindNotificationDetails& results) override {}
+  void StopAnimation() override {}
+  void MoveWindowIfNecessary() override {}
+  void SetFindTextAndSelectedRange(const std::u16string& find_text,
+                                   const gfx::Range& selected_range) override {}
+  std::u16string_view GetFindText() const override { return {}; }
+  gfx::Range GetSelectedRange() const override { return gfx::Range(); }
+  void UpdateUIForFindResult(
+      const find_in_page::FindNotificationDetails& result,
+      const std::u16string& find_text) override {}
+  void AudibleAlert() override {}
+  bool IsFindBarVisible() const override { return false; }
+  void RestoreSavedFocus() override {}
+  bool HasGlobalFindPasteboard() const override { return false; }
+  void UpdateFindBarForChangedWebContents() override {}
+  bool CanPopulateFromSelectedText() override { return false; }
+  const FindBarTesting* GetFindBarTesting() const override { return nullptr; }
+  bool HasFocus() const override { return false; }
+  void CloseOverlappingBubbles() override {}
+  views::Widget* GetHostWidget() override { return nullptr; }
+
+ private:
+  raw_ptr<FindBarController> controller_ = nullptr;
+};
 
 }  // namespace
 
@@ -522,7 +563,7 @@ void BrowserWindowImpl::ConfirmBrowserCloseWithPendingDownloads(
 }
 
 std::unique_ptr<FindBar> BrowserWindowImpl::CreateFindBar() {
-  return nullptr;
+  return std::make_unique<HiddenFindBar>();
 }
 
 web_modal::WebContentsModalDialogHost*
