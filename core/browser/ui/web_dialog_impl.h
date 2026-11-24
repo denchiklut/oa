@@ -11,7 +11,6 @@
 #include "chrome/browser/ui/webui/constrained_web_dialog_ui.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "oa/public/page.h"
-#include "ui/gfx/geometry/size.h"
 #include "ui/web_dialogs/web_dialog_web_contents_delegate.h"
 
 namespace oa {
@@ -19,16 +18,14 @@ namespace oa {
 class PageImpl;
 
 // A WebUI dialog Chrome shows over a page, such as print preview, as
-// ArcCore's constrained dialog delegate: the page's observer shows the
-// dialog's view. It owns itself and the dialog's WebContents, unless Chrome
-// takes that back, until it closes. It observes the page it is over.
+// ArcCore's constrained dialog delegate, made by //oa's
+// ShowConstrainedWebDialog(): the page's observer shows the dialog's view. It
+// owns itself and the dialog's WebContents, unless Chrome takes that back,
+// until it closes. It observes the page it is over.
 class WebDialogImpl : public ConstrainedWebDialogDelegate,
                       public ui::WebDialogWebContentsDelegate,
                       public content::WebContentsObserver {
  public:
-  // Before the browser starts.
-  static void InstallFactory();
-
   WebDialogImpl(const WebDialogImpl&) = delete;
   WebDialogImpl& operator=(const WebDialogImpl&) = delete;
 
@@ -53,19 +50,14 @@ class WebDialogImpl : public ConstrainedWebDialogDelegate,
 
  private:
   friend class base::DeleteHelper<WebDialogImpl>;
-
-  static ConstrainedWebDialogDelegate* Create(
+  friend ConstrainedWebDialogDelegate* ::ShowConstrainedWebDialog(
       content::BrowserContext* browser_context,
       std::unique_ptr<ui::WebDialogDelegate> delegate,
-      content::WebContents* initiator,
-      const gfx::Size& min_size,
-      const gfx::Size& max_size);
+      content::WebContents* overshadowed);
 
   WebDialogImpl(content::BrowserContext* browser_context,
                 std::unique_ptr<ui::WebDialogDelegate> delegate,
-                content::WebContents* initiator,
-                const gfx::Size& min_size,
-                const gfx::Size& max_size);
+                content::WebContents* initiator);
   ~WebDialogImpl() override;
 
   void Show();
@@ -75,8 +67,6 @@ class WebDialogImpl : public ConstrainedWebDialogDelegate,
   std::unique_ptr<content::WebContents> owned_contents_;
   base::WeakPtr<content::WebContents> contents_;
   base::WeakPtr<PageImpl> page_;
-  const gfx::Size min_size_;
-  const gfx::Size max_size_;
   WebDialog dialog_;
   bool closed_via_web_ui_ = false;
   bool closed_ = false;
