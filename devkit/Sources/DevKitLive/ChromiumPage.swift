@@ -78,6 +78,7 @@ final class ChromiumPage: Page, MediaSession {
     func reloadBypassingCache() { page?.reloadBypassingCache() }
     func setZoomFactor(_ factor: Float) { page?.zoomFactor = factor }
     func resetZoomAndScaleFactors() { page?.resetZoomAndScaleFactors() }
+    func savePage() { page?.savePage() }
     func stopLoading() { page?.stopLoading() }
     func activate() { page?.activate() }
     func find(_ text: String, direction: FindDirection, findMatch: Bool) {

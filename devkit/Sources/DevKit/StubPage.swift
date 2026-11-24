@@ -186,6 +186,8 @@ final class StubPage: Page, MediaSession {
 
     func pinch() { isPageScaled = true }
 
+    func savePage() {}
+
     func stopLoading() { finishLoading() }
 
     /// As Chromium's tab strip: one active page per window, and only it shows its permission request.

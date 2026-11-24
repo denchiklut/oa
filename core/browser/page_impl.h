@@ -120,6 +120,7 @@ class PageImpl : public Page,
   void GoForward() override;
   void Reload() override;
   void ReloadBypassingCache() override;
+  void SavePage() override;
   void Stop() override;
   void Activate() override;
   void Find(const std::string& text, bool forward, bool find_match) override;
