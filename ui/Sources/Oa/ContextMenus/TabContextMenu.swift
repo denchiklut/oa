@@ -58,9 +58,8 @@ struct TabContextMenu {
                 })
         }
         menu.addItem(MenuActionItem("Duplicate") { [model, tab] in model.duplicate(tab.id) })
-        // As seen in Arc, an incognito window has none. A Blank Window's lists the global Spaces in Arc; what moving
-        // from it does wasn't seen, so Oa leaves it out there.
-        if model.sidebarContext == .global { menu.addItem(move([tab.id], favorite: favorite)) }
+        // As seen in Arc, an incognito window has none.
+        if model.sidebarContext != .incognito { menu.addItem(move([tab.id], favorite: favorite)) }
         menu.addItem(.separator())
         for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
         return menu
@@ -87,7 +86,7 @@ struct TabContextMenu {
                 model.openInSplitView(tabIDs)
             })
         menu.addItem(MenuActionItem("Duplicate") { [model] in for tabID in tabIDs { model.duplicate(tabID) } })
-        if model.sidebarContext == .global { menu.addItem(move(tabIDs, favorite: false)) }
+        if model.sidebarContext != .incognito { menu.addItem(move(tabIDs, favorite: false)) }
         menu.addItem(.separator())
         let pinned = tabIDs.filter(state.isPinned)
         if pinned.count == tabIDs.count {
@@ -167,8 +166,9 @@ struct TabContextMenu {
         return MenuActionItem("Share", submenu: submenu)
     }
 
-    /// Every Space, the tab's own ticked, then New Space…; for a Favorite, as Arc's, a Profile submenu of every
-    /// profile with a Space, its own ticked.
+    /// Every global Space, the tab's own ticked, then New Space…, which does nothing in a Blank Window as Arc's
+    /// `showSpaceCreationFlow` there; for a Favorite, as Arc's, a Profile submenu of every profile with a Space, its
+    /// own ticked.
     private func move(_ tabIDs: [UUID], favorite: Bool) -> NSMenuItem {
         let submenu = NSMenu()
         submenu.autoenablesItems = false

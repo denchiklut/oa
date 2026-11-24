@@ -312,6 +312,13 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         ProfileDialogUtils.createProfile(in: model)
     }
 
+    /// As Arc's `moveItemsToGlobalDestination`, in the windows' front-to-back order: the first global window on the
+    /// Space, else the first global one, else a new one on the Space with nothing selected and no command bar.
+    private func globalWindow(for spaceID: UUID) -> WindowModel {
+        let global = frontWindows.filter { $0.sidebarContext == .global }
+        return global.first { $0.selectedSpaceID == spaceID } ?? global.first ?? openWindow(on: spaceID, empty: true)
+    }
+
     private var frontWindows: [WindowModel] {
         NSApplication.shared.orderedWindows.compactMap { window in windows.first { $0.window === window }?.model }
     }
@@ -344,7 +351,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @discardableResult
     private func openWindow(
         restoring record: WindowRecord? = nil, selecting tabID: UUID? = nil, from source: WindowModel? = nil,
-        on spaceID: UUID? = nil, context: SidebarContext = .global, profileID: UUID? = nil
+        on spaceID: UUID? = nil, context: SidebarContext = .global, profileID: UUID? = nil, empty: Bool = false
     ) -> WindowModel {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
         let id = record?.id ?? UUID()
@@ -373,6 +380,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         controller.model.openWindow = { [weak self, weak model = controller.model] tabID in
             self?.openWindow(selecting: tabID, from: model)
         }
+        controller.model.globalWindow = { [weak self] spaceID in self?.globalWindow(for: spaceID) }
         controller.model.openLinkInIncognitoWindow = { [weak self] url, profileID in
             self?.openLinkInIncognitoWindow(url, profileID: profileID)
         }
@@ -388,7 +396,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
                 controller.model.openCommandBar(.newTab)
             } else if let tabID {
                 controller.model.select(tabID)
-            } else {
+            } else if !empty {
                 controller.model.showFirst(isOnlyWindow: windows.count == 1)
             }
         }
