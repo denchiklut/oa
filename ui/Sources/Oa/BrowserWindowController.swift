@@ -188,9 +188,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func reload(_ sender: Any?) { model.frontPage?.reload() }
     @objc func forceReload(_ sender: Any?) { model.frontPage?.reloadBypassingCache() }
     @objc func stopLoading(_ sender: Any?) { model.frontPage?.stopLoading() }
-    @objc func resetZoom(_ sender: Any?) { zoom(.reset) }
-    @objc func zoomIn(_ sender: Any?) { zoom(.in) }
-    @objc func zoomOut(_ sender: Any?) { zoom(.out) }
+    @objc func resetZoom(_ sender: Any?) { model.zoom(.reset) }
+    @objc func zoomIn(_ sender: Any?) { model.zoom(.in) }
+    @objc func zoomOut(_ sender: Any?) { model.zoom(.out) }
     @objc func savePageAs(_ sender: Any?) { model.frontPage?.savePage() }
     @objc func printPage(_ sender: Any?) { model.frontPage?.print() }
     @objc func viewSource(_ sender: Any?) { model.viewSource() }
@@ -335,10 +335,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         } else {
             window?.performClose(sender)
         }
-    }
-
-    private func zoom(_ type: ZoomActionType) {
-        model.zoom(type, fromKey: NSApplication.shared.currentEvent?.type == .keyDown)
     }
 
     @objc func selectTab(_ sender: NSMenuItem) {

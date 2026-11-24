@@ -16,9 +16,8 @@ extension WindowModel {
         }
     }
 
-    /// As Arc's: the next preset, or 100 % with the pinch undone, and its toast on the page for a key, on the
-    /// window for a menu click.
-    func zoom(_ type: ZoomActionType, fromKey: Bool) {
+    /// As Arc's: the next preset, or 100 % with the pinch undone, and its toast on the page, from a key or the menu.
+    func zoom(_ type: ZoomActionType) {
         guard let page = frontPage else { return }
         var state = ZoomState(factor: page.zoomFactor)
         switch type {
@@ -32,6 +31,6 @@ extension WindowModel {
             state = ZoomState()
             page.resetZoomAndScaleFactors()
         }
-        present(.zoomChanged("\(Int(state.factor * 100))%"), at: fromKey ? .windowContent(page.id) : .window)
+        present(.zoomChanged("\(Int(state.factor * 100))%"), at: .windowContent(page.id))
     }
 }
