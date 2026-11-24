@@ -52,6 +52,7 @@ struct SplitViewCellView: View {
                                 renaming = false
                             }
                             .onExitCommand { renaming = false }
+                            .endsOnClickAway { _ in renaming = false }
                             // After the menu has closed and given the window back its first responder.
                             .task {
                                 try? await Task.sleep(for: .milliseconds(100))

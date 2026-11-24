@@ -718,6 +718,10 @@ struct TabRow: View {
     @State private var bounces = 0
     @State private var renaming = false
     @State private var draft = ""
+    /// The press that closed the field, so it doesn't open it again as a second click on the tab.
+    @State private var renameEndingClick: TimeInterval?
+    /// A plain press on the current tab, which opens the field on mouse-up unless it drags.
+    @State private var clickRenames = false
     @State private var pickingIcon = false
     /// A ⌘- or ⇧-click, which changes the multi-selection and drags nothing.
     @State private var picking = false
@@ -791,6 +795,10 @@ struct TabRow: View {
                     if !pressed {
                         pressed = true
                         previousTabID = model.selectedTabIDs[spaceID]
+                        // As the author has seen in Arc: a click on the current tab renames it.
+                        clickRenames =
+                            !inCard && selected && model.multiSelectedTabIDs.isEmpty
+                            && NSApp.currentEvent?.timestamp != renameEndingClick
                         if !inCard { press() }
                     }
                     guard !inCard, !picking else { return }
@@ -803,6 +811,8 @@ struct TabRow: View {
                     pressed = false
                     let members = heldMembers
                     heldMembers = []
+                    let renames = clickRenames
+                    clickRenames = false
                     guard !picking else {
                         picking = false
                         return
@@ -811,6 +821,7 @@ struct TabRow: View {
                         let dragging = drag?.entry?.id == tab.id
                         drag?.finish(model: model, layout: layout)
                         if !members.isEmpty, !dragging { model.select(tab.id) }
+                        if renames, members.isEmpty, !dragging { beginRename() }
                         return
                     }
                     guard CGRect(origin: .zero, size: size).contains(value.location) else { return }
@@ -901,20 +912,24 @@ struct TabRow: View {
         renaming = true
     }
 
-    /// As Arc's: Return or a click away keeps the name and Escape gives the old one back. Oa's own: a name left as it
-    /// was isn't stored as the tab's.
+    /// As Arc's: Return keeps the name, and Escape or, as the author has seen, a click away gives the old one back.
+    /// Oa's own: a name left as it was isn't stored as the tab's.
     private var renameField: some View {
         TextField("Title", text: $draft)
             .textFieldStyle(.plain)
             .focused($renameFocused)
             .onSubmit { commitRename() }
             .onExitCommand { renaming = false }
+            .endsOnClickAway {
+                renameEndingClick = $0.timestamp
+                renaming = false
+            }
             // After the menu has closed and given the window back its first responder.
             .task {
                 try? await Task.sleep(for: .milliseconds(100))
                 renameFocused = true
             }
-            .onChange(of: renameFocused) { _, focused in if !focused { commitRename() } }
+            .onChange(of: renameFocused) { _, focused in if !focused { renaming = false } }
     }
 
     private func commitRename() {
