@@ -13,6 +13,7 @@
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/strings/sys_string_conversions.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
@@ -27,7 +28,9 @@
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/window_metadata/window_metadata_controller.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "oa/browser/browser_impl.h"
 #include "oa/browser/page_impl.h"
 #include "oa/browser/session_restoration.h"
@@ -80,6 +83,40 @@ void AskPagesToLeave(std::vector<base::WeakPtr<PageImpl>> pages,
     AskPagesToLeave(std::move(pages), index + 1, std::move(completion));
   });
 }
+
+// As UnloadController's kRunningUnload: the next page is closed once the last
+// one is gone. Owns itself until the list ends.
+class QuitUnloader : public content::WebContentsObserver {
+ public:
+  static void Start(std::vector<base::WeakPtr<content::WebContents>> pages) {
+    (new QuitUnloader(std::move(pages)))->Next();
+  }
+
+ private:
+  explicit QuitUnloader(std::vector<base::WeakPtr<content::WebContents>> pages)
+      : pages_(std::move(pages)) {}
+
+  void Next() {
+    while (next_ < pages_.size()) {
+      content::WebContents* contents = pages_[next_++].get();
+      if (contents && contents->GetPrimaryMainFrame()->GetRenderViewHost()) {
+        Observe(contents);
+        contents->ClosePage();
+        return;
+      }
+    }
+    delete this;
+  }
+
+  void WebContentsDestroyed() override {
+    Observe(nullptr);
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&QuitUnloader::Next, base::Unretained(this)));
+  }
+
+  std::vector<base::WeakPtr<content::WebContents>> pages_;
+  size_t next_ = 0;
+};
 
 void RemoveAllTabs(base::WeakPtr<WindowBrowser> window_browser) {
   while (window_browser) {
@@ -176,6 +213,22 @@ void WindowBrowser::CloseAll() {
   for (base::WeakPtr<WindowBrowser>& window_browser :
        OpenWindowBrowsers(nullptr)) {
     RemoveAllTabs(window_browser);
+  }
+}
+
+// static
+void WindowBrowser::UnloadForQuit() {
+  for (base::WeakPtr<WindowBrowser>& window_browser :
+       OpenWindowBrowsers(nullptr)) {
+    std::vector<base::WeakPtr<content::WebContents>> pages;
+    TabStripModel* model = window_browser->browser()->GetTabStripModel();
+    for (int index = 0; index < model->count(); ++index) {
+      content::WebContents* contents = model->GetWebContentsAt(index);
+      if (contents->NeedToFireBeforeUnloadOrUnloadEvents()) {
+        pages.push_back(contents->GetWeakPtr());
+      }
+    }
+    QuitUnloader::Start(std::move(pages));
   }
 }
 

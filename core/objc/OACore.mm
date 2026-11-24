@@ -1745,9 +1745,9 @@ class BrowserObserverBridge : public oa::Browser::Observer {
   oa::SaveSessionsForQuit();
 }
 
-- (void)flushForQuit:(void (^)(void))completion {
+- (void)shutDownForQuit:(void (^)(void))completion {
   void (^handler)(void) = [completion copy];
-  oa::FlushForQuit([handler] { handler(); });
+  oa::ShutDownForQuit([handler] { handler(); });
 }
 
 - (void)setBlockLists:(NSArray<NSString*>*)lists

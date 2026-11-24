@@ -150,6 +150,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
                     return sender.reply(toApplicationShouldTerminate: false)
                 }
             }
+            store.quitting = true
             engine.saveSessionsForQuit()
             store.saveSessionRestorationAndFreeze()
             for window in windows { window.model.archivePeeks() }

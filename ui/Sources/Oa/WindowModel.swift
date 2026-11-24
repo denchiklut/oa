@@ -2351,6 +2351,8 @@ final class WindowModel {
     }
 
     private func handle(_ event: PageEvent, for pageID: UUID) {
+        // As Arc's quit recording: pages that unload on quit leave the sidebar as it is.
+        if case .closed = event, store.quitting { return }
         switch event {
         case .dialog(let dialog):
             // As Arc: a page asks to be shown first, and a "Leave site?" its window still can't show leaves unasked.

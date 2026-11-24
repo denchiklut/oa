@@ -40,6 +40,9 @@ class WindowBrowser : public TabStripModelObserver {
   static void AskToLeave(const std::string& window_id,
                          std::function<void(bool leave)> completion);
   static void CloseAll();
+  // As ArcCore's quit: every page with a beforeunload or unload handler runs
+  // its unload handler and closes, one at a time in each Browser.
+  static void UnloadForQuit();
   // Closes each Browser Chrome restored for a window the app hasn't attached.
   static void CloseUnclaimed();
   // The active page of the Browser the app's `window` has for `profile`; of

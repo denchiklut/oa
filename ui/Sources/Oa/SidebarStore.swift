@@ -29,6 +29,8 @@ final class SidebarStore {
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
     @ObservationIgnored private var sweep: Task<Void, Never>?
     @ObservationIgnored private var frozen = false
+    /// Set once quitting is certain.
+    @ObservationIgnored var quitting = false
     /// Pages asked to close, by page ID, until the page reports closed or kept.
     @ObservationIgnored var closing: [UUID: CloseRequest] = [:]
     @ObservationIgnored var archivingPins: Set<UUID> = []
@@ -219,7 +221,7 @@ final class SidebarStore {
         }
     }
 
-    /// As Arc's, written before quitting drops the pages; nothing is written after it.
+    /// As Arc's, written before quitting unloads pages; nothing is written after it.
     func saveSessionRestorationAndFreeze() {
         sessionRestoration.saveAndFreeze(sessionRestorationMapping)
     }
