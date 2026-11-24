@@ -29,6 +29,8 @@ final class StubPage: Page, MediaSession {
     private(set) var isMicrophoneOn = false
     private(set) var hasFocus = false
     private(set) var selectedText = ""
+    private(set) var zoomFactor: Float = 1
+    private(set) var isPageScaled = false
     var keepsAddress = false
     /// A video with sound, playing: what the engine's media session reports as active audio and video.
     var isPlayingVideo = false
@@ -166,6 +168,23 @@ final class StubPage: Page, MediaSession {
 
     /// Stands for the user selecting the page's title.
     func selectTitle() { selectedText = title }
+
+    // As Chromium's host zoom map: a level per host, which every page of the host follows; 100 % is no entry.
+    private static var zoomFactors: [String: Float] = [:]
+    private var zoomHost: String? { url.map { $0.host() ?? $0.absoluteString } }
+
+    func setZoomFactor(_ factor: Float) {
+        guard let host = zoomHost else { return }
+        Self.zoomFactors[host] = factor == 1 ? nil : factor
+        for page in Self.arrivals.compactMap(\.page) where page.zoomHost == host { page.zoomFactor = factor }
+    }
+
+    func resetZoomAndScaleFactors() {
+        setZoomFactor(1)
+        isPageScaled = false
+    }
+
+    func pinch() { isPageScaled = true }
 
     func stopLoading() { finishLoading() }
 
@@ -540,6 +559,8 @@ final class StubPage: Page, MediaSession {
 
     private func show(_ url: URL) {
         self.url = url
+        zoomFactor = zoomHost.flatMap { Self.zoomFactors[$0] } ?? 1
+        isPageScaled = false
         startLoading()
     }
 
@@ -720,6 +741,7 @@ private struct StubPageView: View {
                             Button("Add an extension") { page.addExtension() }
                             Button(page.isPlayingVideo ? "Pause the video" : "Play a video") { page.toggleVideo() }
                             Button("Ask for picture-in-picture") { _ = page.requestPictureInPicture() }
+                            Button("Pinch to zoom") { page.pinch() }
                         }
                     }
                     .buttonStyle(.link)
@@ -728,7 +750,9 @@ private struct StubPageView: View {
                 }
             }
         }
+        .scaleEffect(CGFloat(page.map { $0.zoomFactor * ($0.isPageScaled ? 1.5 : 1) } ?? 1))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .background(Color(nsColor: page?.rootBackgroundColor ?? .textBackgroundColor))
         .environment(\.colorScheme, page?.rootBackgroundColor == nil ? colorScheme : .light)
     }

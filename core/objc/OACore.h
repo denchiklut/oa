@@ -192,6 +192,9 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 @property(nonatomic, readonly) BOOL hasFocus;
 // As ArcCore's cached selectedText; empty when the user selected nothing.
 @property(nonatomic, readonly) NSString* selectedText;
+// As ADK's zoomLevel, a factor; kept for the page's host in its profile.
+@property(nonatomic) float zoomFactor;
+@property(nonatomic, readonly, getter=isPageScaled) BOOL pageScaled;
 // None while the page has no media session.
 @property(nonatomic, readonly) OAPageMediaSessionStatus mediaSessionStatus;
 @property(nonatomic, readonly) OAPageMediaContentType mediaContentType;
@@ -203,6 +206,7 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)goForward;
 - (void)reload;
 - (void)reloadBypassingCache;
+- (void)resetZoomAndScaleFactors;
 - (void)stopLoading;
 - (void)activate;
 // As ArcCore's find:forward:matchCase:findMatch:, never case-sensitive.

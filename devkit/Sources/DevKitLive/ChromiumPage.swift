@@ -22,6 +22,8 @@ final class ChromiumPage: Page, MediaSession {
     private(set) var isAudible = false
     private var muted = false
     private(set) var hasFocus = false
+    private(set) var zoomFactor: Float = 1
+    private(set) var isPageScaled = false
     private(set) var crash: PageCrash?
     var keepsAddress = false {
         didSet { page?.keepsAddress = keepsAddress }
@@ -74,6 +76,8 @@ final class ChromiumPage: Page, MediaSession {
     func goForward() { page?.goForward() }
     func reload() { page?.reload() }
     func reloadBypassingCache() { page?.reloadBypassingCache() }
+    func setZoomFactor(_ factor: Float) { page?.zoomFactor = factor }
+    func resetZoomAndScaleFactors() { page?.resetZoomAndScaleFactors() }
     func stopLoading() { page?.stopLoading() }
     func activate() { page?.activate() }
     func find(_ text: String, direction: FindDirection, findMatch: Bool) {
@@ -139,6 +143,8 @@ final class ChromiumPage: Page, MediaSession {
         if page.isAudible != isAudible { isAudible = page.isAudible }
         if page.muted != muted { muted = page.muted }
         if page.hasFocus != hasFocus { hasFocus = page.hasFocus }
+        if page.zoomFactor != zoomFactor { zoomFactor = page.zoomFactor }
+        if page.isPageScaled != isPageScaled { isPageScaled = page.isPageScaled }
         updateHostedView()
     }
 

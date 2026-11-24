@@ -104,6 +104,7 @@ source_set("oa") {
     "//components/subresource_filter/tools/ruleset_converter:support",
     "//components/viz/common",
     "//components/web_modal",
+    "//components/zoom",
     "//content/public/app",
     "//content/public/browser",
     "//content/public/common",

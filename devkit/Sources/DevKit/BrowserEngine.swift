@@ -583,6 +583,11 @@ public protocol Page: AnyObject, Observable {
     /// What the user last selected in the page, as ArcCore's cached `selectedText`: a script's selection doesn't count
     /// and a navigation keeps it. Empty when nothing was selected.
     var selectedText: String { get }
+    /// As ADK's `zoomLevel`, a factor: the engine's zoom for the page's host in its profile, so every page of the
+    /// host follows a change.
+    var zoomFactor: Float { get }
+    /// While a pinch has scaled the page.
+    var isPageScaled: Bool { get }
     /// The page's media, as ADK's media session.
     var mediaSession: any MediaSession { get }
     /// Why the renderer is gone, nil once a new one is ready, as after a reload.
@@ -600,6 +605,10 @@ public protocol Page: AnyObject, Observable {
     func reload()
     /// As Chrome's ⇧⌘R: the page and its resources from the network, not the cache.
     func reloadBypassingCache()
+    /// As ADK's `setZoomFactor`: kept for the page's host in its profile.
+    func setZoomFactor(_ factor: Float)
+    /// As ADK's `resetZoomAndScaleFactors`: 100 %, not the profile's default zoom, and the pinch undone.
+    func resetZoomAndScaleFactors()
     func stopLoading()
     func activate()
     /// As ADK's `performFindInPage`: never case-sensitive, scrolling to the active match, its results as `findResult`
