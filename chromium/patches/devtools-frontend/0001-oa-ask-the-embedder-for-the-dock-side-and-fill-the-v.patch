@@ -5,19 +5,44 @@ Subject: [PATCH] oa: ask the embedder for the dock side and fill the view on
  every side, as ArcCore's frontend does
 
 ---
- .../core/host/InspectorFrontendHostAPI.ts     |  4 ++++
+ .../core/host/InspectorFrontendHostAPI.ts     |  7 +++++
  .../core/host/InspectorFrontendHostStub.ts    |  6 +++++
- front_end/devtools_compatibility.js           | 14 +++++++++++
+ front_end/devtools_compatibility.js           | 26 +++++++++++++++++++
  .../elements/InspectElementModeController.ts  |  2 ++
- front_end/panels/emulation/AdvancedApp.ts     | 23 ++++---------------
+ front_end/panels/emulation/AdvancedApp.ts     |  7 ++---
  front_end/ui/legacy/DockController.ts         |  2 ++
- 6 files changed, 33 insertions(+), 18 deletions(-)
+ front_end/ui/legacy/InspectorView.ts          |  8 ++++++
+ 7 files changed, 53 insertions(+), 5 deletions(-)
 
 diff --git a/front_end/core/host/InspectorFrontendHostAPI.ts b/front_end/core/host/InspectorFrontendHostAPI.ts
-index 4ef5dd627102a50029b13d8a8b019286de338eb6..32ebad168f2af8b47b18e7a6dc71fec019902323 100644
+index 4ef5dd627102a50029b13d8a8b019286de338eb6..33d8599e622521100e86b9ff3c8e5b17c2f6564f 100644
 --- a/front_end/core/host/InspectorFrontendHostAPI.ts
 +++ b/front_end/core/host/InspectorFrontendHostAPI.ts
-@@ -424,6 +424,10 @@ export interface InspectorFrontendHostAPI {
+@@ -44,6 +44,7 @@ export enum Events {
+   SetInspectedTabId = 'setInspectedTabId',
+   SetUseSoftMenu = 'setUseSoftMenu',
+   ShowPanel = 'showPanel',
++  CurrentPanel = 'currentPanel',
+   /* eslint-enable @typescript-eslint/naming-convention */
+ }
+ 
+@@ -76,6 +77,7 @@ export const EventDescriptors: ReadonlyArray<readonly[Events, readonly string[],
+   [Events.SetInspectedTabId, ['tabId']],
+   [Events.SetUseSoftMenu, ['useSoftMenu']],
+   [Events.ShowPanel, ['panelName']],
++  [Events.CurrentPanel, ['currentPanelEvent']],
+ ] as const;
+ 
+ export interface DispatchMessageChunkEvent {
+@@ -269,6 +271,7 @@ export interface EventTypes {
+   [Events.SetInspectedTabId]: string;
+   [Events.SetUseSoftMenu]: boolean;
+   [Events.ShowPanel]: string;
++  [Events.CurrentPanel]: {panelName: string};
+ }
+ 
+ export type DispatchHttpRequestRequest = {
+@@ -424,6 +427,10 @@ export interface InspectorFrontendHostAPI {
  
    setIsDocked(isDocked: boolean, callback: () => void): void;
  
@@ -46,30 +71,49 @@ index 1437b6938e08714937dfcd00f88fc445ed2fe150..c8bca2151bbdfc743ca6ec0bad5cf6a5
      globalThis.setTimeout(() => callback({surveyShown: false}), 0);
    }
 diff --git a/front_end/devtools_compatibility.js b/front_end/devtools_compatibility.js
-index cd487260aeb4db92f47404190e5e608156b1a914..9c33cdc641efe1878757fd23e22aa3a062237209 100644
+index cd487260aeb4db92f47404190e5e608156b1a914..9dfdb534512fe9c4e9f255d44bca11a18d0fcedd 100644
 --- a/front_end/devtools_compatibility.js
 +++ b/front_end/devtools_compatibility.js
-@@ -1406,6 +1406,20 @@
-       DevToolsAPI.sendMessageToEmbedder('setIsDocked', [isDocked], callback);
+@@ -378,6 +378,26 @@
+       this._dispatchOnInspectorFrontendAPI('showPanel', [panelName]);
      }
  
++  /**
++   * @return {string} name of the current panel
++   */
++  currentPanel() {
 +    /**
-+     * @param dockPosition
++     * Lets define the class inside the function itself to scope limit it and
++     * keep the patch with minimal hunks. In JavaScript, all the classes and
++     * functions are passed-by-reference. We are passing the CurrentPanelEvent
++     * as an object that will be updated by the event handler inside inspector
 +     */
-+    requestDockPosition(dockPosition) {
-+      DevToolsAPI.sendMessageToEmbedder('requestDockPosition', [dockPosition], null);
++    class CurrentPanelEvent {
++      constructor() {
++        this.panelName = '';
++      }
 +    }
++    const event = new CurrentPanelEvent();
++    this._dispatchOnInspectorFrontendAPI('currentPanel', [event]);
++    return event.panelName;
++  }
 +
-+    /**
-+     * @param inspectMode
-+     */
+     /**
+      * @param {number} id
+      * @param {string} chunk
+@@ -1405,6 +1425,12 @@
+     setIsDocked(isDocked, callback) {
+       DevToolsAPI.sendMessageToEmbedder('setIsDocked', [isDocked], callback);
+     }
++    requestDockPosition(dockPosition) {
++      DevToolsAPI.sendMessageToEmbedder('requestDockPosition', [dockPosition]);
++    }
 +    inspectModeChanged(inspectMode) {
 +      DevToolsAPI.sendMessageToEmbedder('inspectModeChanged', [inspectMode], null);
 +    }
-+
+ 
      /**
       * @param trigger
-      * @param {(param: object) => unknown} callback
 diff --git a/front_end/panels/elements/InspectElementModeController.ts b/front_end/panels/elements/InspectElementModeController.ts
 index 0502e24162f1e1e10fa9f172997a9e61d303007f..e7be76d909a53ca12300842296e454c240b3d9d9 100644
 --- a/front_end/panels/elements/InspectElementModeController.ts
@@ -91,36 +135,19 @@ index 0502e24162f1e1e10fa9f172997a9e61d303007f..e7be76d909a53ca12300842296e454c2
  
    private suspendStateChanged(): void {
 diff --git a/front_end/panels/emulation/AdvancedApp.ts b/front_end/panels/emulation/AdvancedApp.ts
-index 199ae25afcc0fd42a3b6189ff7359fcb09ea155f..0f8393505aca9b5a0cc7d3ca298fa7cd1d3181a5 100644
+index 199ae25afcc0fd42a3b6189ff7359fcb09ea155f..2b42fa32f75ebbe0a245e5ff77b31eb008fd9f74 100644
 --- a/front_end/panels/emulation/AdvancedApp.ts
 +++ b/front_end/panels/emulation/AdvancedApp.ts
-@@ -118,21 +118,11 @@ export class AdvancedApp implements UI.App.App {
-     this.changingDockSide = true;
-   }
- 
--  private onDockSideChange(event?: Common.EventTarget.EventTargetEvent<UI.DockController.ChangeEvent>): void {
-+  // The embedder lays out the page beside DevTools on every dock side, so DevTools always fills its own view, as
-+  // ArcCore's frontend does.
-+  private onDockSideChange(): void {
+@@ -121,7 +121,7 @@ export class AdvancedApp implements UI.App.App {
+   private onDockSideChange(event?: Common.EventTarget.EventTargetEvent<UI.DockController.ChangeEvent>): void {
      this.updateDeviceModeView();
--
--    const toDockSide = event ? event.data.to : UI.DockController.DockController.instance().dockSide();
--    if (toDockSide === undefined) {
--      throw new Error('Got onDockSideChange event with unexpected undefined for dockSide()');
--    }
--    if (toDockSide === UI.DockController.DockState.UNDOCKED) {
--      this.updateForUndocked();
--    } else if (this.toolboxRootView && event && event.data.from === UI.DockController.DockState.UNDOCKED) {
--      // Don't update yet for smooth transition.
--      this.rootSplitWidget.hideSidebar();
--    } else {
--      this.updateForDocked(toDockSide);
--    }
-+    this.updateForUndocked();
-   }
  
-   private onAfterDockSideChange(event: Common.EventTarget.EventTargetEvent<UI.DockController.ChangeEvent>): void {
-@@ -140,9 +130,6 @@ export class AdvancedApp implements UI.App.App {
+-    const toDockSide = event ? event.data.to : UI.DockController.DockController.instance().dockSide();
++    const toDockSide = UI.DockController.DockState.UNDOCKED;
+     if (toDockSide === undefined) {
+       throw new Error('Got onDockSideChange event with unexpected undefined for dockSide()');
+     }
+@@ -140,9 +140,6 @@ export class AdvancedApp implements UI.App.App {
      if (!this.changingDockSide) {
        return;
      }
@@ -130,7 +157,7 @@ index 199ae25afcc0fd42a3b6189ff7359fcb09ea155f..0f8393505aca9b5a0cc7d3ca298fa7cd
      this.changingDockSide = false;
      this.inspectedPagePlaceholder.update();
    }
-@@ -169,7 +156,7 @@ export class AdvancedApp implements UI.App.App {
+@@ -169,7 +166,7 @@ export class AdvancedApp implements UI.App.App {
    }
  
    private isDocked(): boolean {
@@ -159,3 +186,27 @@ index ca6d6b5743bb0a9677d3a04cb3f24b6697b17841..b80992ef24984058ae97ade516bac672
      if (this.#dockSide !== undefined) {
        document.body.classList.remove(this.#dockSide);
      }
+diff --git a/front_end/ui/legacy/InspectorView.ts b/front_end/ui/legacy/InspectorView.ts
+index 22fe7ccdbf6193f71f27a7105c1da61956348094..f6535aa70e16fb3cf6f0c8a0b7dc08fc803d5db1 100644
+--- a/front_end/ui/legacy/InspectorView.ts
++++ b/front_end/ui/legacy/InspectorView.ts
+@@ -271,11 +271,19 @@ export class InspectorView extends VBox implements ViewLocationResolver {
+     this.keyDownBound = this.keyDown.bind(this);
+     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
+         Host.InspectorFrontendHostAPI.Events.ShowPanel, showPanel.bind(this));
++    Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
++        Host.InspectorFrontendHostAPI.Events.CurrentPanel, currentPanel.bind(this));
+ 
+     function showPanel(this: InspectorView, {data: panelName}: Common.EventTarget.EventTargetEvent<string>): void {
+       void this.showPanel(panelName);
+     }
+ 
++    function currentPanel(
++        this: InspectorView, {data: event}: Common.EventTarget.EventTargetEvent<{panelName: string}>): void {
++      const panel = this.currentPanelDeprecated() as Panel;
++      event.panelName = panel.name;
++    }
++
+     if (shouldShowLocaleInfobar()) {
+       const infobar = createLocaleInfobar();
+       infobar.setParentView(this);

@@ -55,7 +55,6 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/main_function_params.h"
 #include "oa/browser/ad_blocker_service.h"
-#include "oa/browser/devtools_impl.h"
 #include "oa/browser/page_impl.h"
 #include "oa/browser/profile_services.h"
 #include "oa/browser/session_restoration.h"
@@ -258,7 +257,6 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
   PermissionPromptImpl::InstallFactory();
   SadTabImpl::InstallFactory();
   PageImpl::InstallFrameMetadataObserver();
-  DevToolsImpl::InstallEmbedder();
   InstallContextMenuEditor();
   InstallExtensionDialogs();
 

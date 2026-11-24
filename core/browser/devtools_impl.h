@@ -4,31 +4,33 @@
 #include <string>
 
 #include "base/memory/raw_ptr.h"
+#include "chrome/browser/devtools/devtools_window.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "oa/public/devtools.h"
-
-struct DevToolsToggleAction;
 
 namespace oa {
 
 class PageImpl;
 
-// A page's DevTools, as ArcCore's arc::WebContents::DevTools::Impl. Owned by
-// its page; observes the frontend's WebContents from its first display.
-class DevToolsImpl : public DevTools, public content::WebContentsObserver {
+// A page's DevTools, as ArcCore's arc::WebContents::DevTools::Impl, which
+// Chrome's entry points for the page find on its WebContents. Owned by its
+// page; observes the frontend's WebContents from its first display.
+class DevToolsImpl : public DevTools,
+                     public DevToolsWindow::Embedder,
+                     public content::WebContentsObserver {
  public:
-  // Before the browser starts.
-  static void InstallEmbedder();
-
   explicit DevToolsImpl(PageImpl* page);
   DevToolsImpl(const DevToolsImpl&) = delete;
   DevToolsImpl& operator=(const DevToolsImpl&) = delete;
   ~DevToolsImpl() override;
 
-  // As ArcCore's Impl::Toggle, for Chrome's own entry points, as the page
-  // menu's Inspect.
-  void Toggle(bool force_open, const DevToolsToggleAction& action);
-  void DockSideRequested(const std::string& dock_side);
+  // DevToolsWindow::Embedder:
+  void Toggle(bool force_open, const DevToolsToggleAction& action) override;
+  void InspectElement(content::RenderFrameHost* inspected_frame_host,
+                      int x,
+                      int y) override;
+  void DockSideRequested(const std::string& dock_side) override;
+  void NeedsFocus() override;
 
   // DevTools:
   void SetObserver(Observer* observer) override;
