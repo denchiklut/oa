@@ -313,10 +313,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         model.newTab(page.url)
     }
 
-    /// As Arc's + in Settings: the create sheet goes on the last key browser window, which comes forward. With no
-    /// browser window there is none. Oa's own: a window with a sidebar of its own is passed over.
+    /// As Arc's + in Settings: the create sheet goes on the last key browser window, which comes forward, a Blank or
+    /// incognito one too, as seen in Arc. With no browser window there is none.
     private func createProfile() {
-        guard let model = frontWindows.first(where: { $0.sidebarContext == .global }) else { return }
+        guard let model = frontWindows.first else { return }
         model.bringToFront()
         ProfileDialogUtils.createProfile(in: model)
     }
