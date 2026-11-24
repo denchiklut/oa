@@ -37,6 +37,12 @@ final class KeyBindingMenuManager {
         }
         client.registerUserOverrides()
         applyBindings()
+        // As Arc's, the bindings come once more through the debounce, after AppKit's launch moved Enter Full
+        // Screen's key to fn-F.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.1))
+            applyBindings()
+        }
         observeBindings()
     }
 

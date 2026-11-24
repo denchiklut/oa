@@ -139,6 +139,12 @@ final class MainMenu {
             view.addItem(pane)
         }
 
+        view.addItem(.separator())
+        view.addItem(
+            item(
+                "Enter/Exit Full Screen", #selector(NSWindow.toggleFullScreen(_:)), key: "f",
+                modifiers: [.command, .control], id: "fullscreen", priority: .promptAfterConsumedByWebView))
+
         let archive = submenu("Archive", in: menu)
         archive.addItem(
             item(
