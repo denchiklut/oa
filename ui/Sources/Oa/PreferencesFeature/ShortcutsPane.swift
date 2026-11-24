@@ -42,9 +42,8 @@ struct ShortcutsPane: View {
 
     private var list: some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        let bindings = keyBindings.state.bindings.values.matching(searchQuery).sorted {
-            $0.action.name < $1.action.name
-        }
+        let bindings = keyBindings.state.bindings.values.matching(searchQuery).sorted(by: Self.rowOrder)
+        let names = Self.rowNames(for: keyBindings.state.bindings.values)
         let customized = bindings.filter { $0.source == .userDefined }
         return VStack(spacing: 0) {
             HStack(spacing: 4.5) {
@@ -69,9 +68,10 @@ struct ShortcutsPane: View {
             .background(scheme == .dark ? Color.white.opacity(0.10) : .clear)
             ScrollView {
                 VStack(spacing: 0) {
-                    section("Customized Shortcuts", customized, isFirst: true)
+                    section("Customized Shortcuts", customized, names: names, isFirst: true)
                     section(
-                        "Default Shortcuts", bindings.filter { $0.source == .default }, isFirst: customized.isEmpty)
+                        "Default Shortcuts", bindings.filter { $0.source == .default }, names: names,
+                        isFirst: customized.isEmpty)
                 }
             }
         }
@@ -83,7 +83,8 @@ struct ShortcutsPane: View {
     /// As measured in Arc: the title under the search field sits between two lines, a later one has none and
     /// stands closer to its rows.
     @ViewBuilder
-    private func section(_ title: String, _ bindings: [KeyBinding], isFirst: Bool) -> some View {
+    private func section(_ title: String, _ bindings: [KeyBinding], names: [String: String], isFirst: Bool) -> some View
+    {
         if !bindings.isEmpty {
             if isFirst { line }
             Text(title)
@@ -94,7 +95,9 @@ struct ShortcutsPane: View {
             if isFirst { line }
             VStack(spacing: 0) {
                 ForEach(bindings) { binding in
-                    row(binding, isLast: binding.id == bindings.last?.id)
+                    row(
+                        binding, name: names[binding.id] ?? binding.action.name, isLast: binding.id == bindings.last?.id
+                    )
                 }
             }
             .padding(.top, isFirst ? 10 : 4.5)
@@ -104,7 +107,7 @@ struct ShortcutsPane: View {
 
     private var line: some View { tone(0.93, 0.30).frame(height: 1) }
 
-    private func row(_ binding: KeyBinding, isLast: Bool) -> some View {
+    private func row(_ binding: KeyBinding, name: String, isLast: Bool) -> some View {
         let isSelected = binding.id == state.selectedKeyBindableActionIdentifier
         let inConflict = !binding.conflictingActions.isEmpty
         return HStack(spacing: 10) {
@@ -112,7 +115,7 @@ struct ShortcutsPane: View {
                 NSApplication.shared.keyWindow?.makeFirstResponder(nil)
                 state.selectedKeyBindableActionIdentifier = binding.id
             } label: {
-                Text(Self.rowName(for: binding)).font(.system(size: 13)).lineLimit(1)
+                Text(name).font(.system(size: 13)).lineLimit(1)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
@@ -214,7 +217,8 @@ struct ShortcutsPane: View {
                         ? Array(ARCKeyboardShortcut(key: "", modifiers: heldModifiers).symbols.dropLast())
                         : binding.unvalidatedShortcut?.symbols ?? [],
                     inConflict: !binding.conflictingActions.isEmpty)
-                Text(Self.rowName(for: binding)).font(.system(size: 14, weight: .semibold)).padding(.top, 23)
+                Text(Self.rowNames(for: keyBindings.state.bindings.values)[binding.id] ?? binding.action.name)
+                    .font(.system(size: 14, weight: .semibold)).padding(.top, 23)
                 caption(Self.description(for: binding.id)).padding(.top, 8)
                 if binding.unvalidatedShortcut != nil {
                     line.padding(.top, 16)

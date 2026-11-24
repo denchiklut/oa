@@ -1,9 +1,24 @@
 import Foundation
 
 extension ShortcutsPane {
-    /// As Arc's row name: a Space's binding reads as going to it.
-    static func rowName(for binding: KeyBinding) -> String {
-        SpacesMainMenuProvider.position(of: binding.id) != nil ? "Go to “\(binding.action.name)”" : binding.action.name
+    /// As Arc's rows, by name, then by ID where Arc's order of two same-named rows isn't stable.
+    static func rowOrder(_ first: KeyBinding, _ second: KeyBinding) -> Bool {
+        (first.action.name, first.id) < (second.action.name, second.id)
+    }
+
+    /// As Arc's row names, by ID: a Space's binding reads as going to it, and a row named as the one before it is an
+    /// alternate.
+    static func rowNames(for bindings: some Collection<KeyBinding>) -> [String: String] {
+        var names: [String: String] = [:]
+        var previous: String?
+        for binding in bindings.sorted(by: rowOrder) {
+            let name =
+                SpacesMainMenuProvider.position(of: binding.id) != nil
+                ? "Go to “\(binding.action.name)”" : binding.action.name
+            names[binding.id] = name == previous ? "\(name) (Alternate)" : name
+            previous = name
+        }
+        return names
     }
 
     /// Arc's sentences for the actions Oa has, with its words for one without.
@@ -51,8 +66,9 @@ extension ShortcutsPane {
         case "switchToWindowPane4": "Jumps to the fourth Split View page in your current window."
         case "switchToNextWindowPane": "Jumps to the next Split View page in your current window."
         case "switchToPreviousWindowPane": "Jumps to the previous Split View page in your current window."
-        case "goBack": "Goes back to the last page you visited in this tab."
-        case "goForward": "Goes forward to page you had previously visited in this tab."
+        case "goBack", "goBack_Alternate": "Goes back to the last page you visited in this tab."
+        case "goForward", "goForward_Alternate": "Goes forward to page you had previously visited in this tab."
+        case "focusSidebar": "Reveals the current tab in your Sidebar."
         case "viewHistory": "Opens your History in a new Today tab."
         case "viewArchive": "Opens the Archive, where all your closed tabs live."
         case "clearArchive": "Clears all tabs in the Archive."
