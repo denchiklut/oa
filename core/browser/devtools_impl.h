@@ -30,6 +30,7 @@ class DevToolsImpl : public DevTools,
                       int x,
                       int y) override;
   void DockSideRequested(const std::string& dock_side) override;
+  void InspectModeChanged(const std::string& inspect_mode) override;
   void NeedsFocus() override;
 
   // DevTools:
@@ -51,6 +52,7 @@ class DevToolsImpl : public DevTools,
 
   raw_ptr<PageImpl> page_;
   raw_ptr<Observer> observer_ = nullptr;
+  bool picking_element_ = false;
 };
 
 }  // namespace oa
