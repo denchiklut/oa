@@ -102,9 +102,9 @@ NSWindow* AppWindow(const WindowBrowser* window_browser) {
   return window_browser->GetNativeWindow().GetNativeNSWindow();
 }
 
-// Chrome makes its find bar when a page joins a Browser whose active page is
-// mid-find, and can't run without one. The app draws the find bar, so this one
-// is never shown.
+// As ArcCore's Window::CreateFindBar: Chrome makes its find bar when a page
+// joins a Browser whose active page is mid-find, and can't run without one, so
+// it gets one that only keeps its controller and is never shown.
 class HiddenFindBar : public FindBar {
  public:
   FindBarController* GetFindBarController() const override {
