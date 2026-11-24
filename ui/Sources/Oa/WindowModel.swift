@@ -497,7 +497,7 @@ final class WindowModel {
         let bar = CommandBar(
             destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
             currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks,
-            recordsPicks: sidebarContext != .incognito,
+            usesPicks: sidebarContext != .incognito,
             searchEngines: { preferences.activeSearchEngines },
             dominantColor: { await context.siteSearchDominantColor(host: $0) }
         ) { [weak self] in self?.commandBarTabs ?? [] }
