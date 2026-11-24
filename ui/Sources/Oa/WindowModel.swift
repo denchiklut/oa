@@ -2576,6 +2576,9 @@ final class WindowModel {
         guard let page = peeks.removeValue(forKey: ownerID) else { return }
         dialogs[page.id] = nil
         permissionRequests[page.id] = nil
+        // Oa's own until Arc's is seen: a window with a sidebar of its own keeps the link's tab, selected, as no
+        // other window has its tabs.
+        let leavesWindow = inWindow && sidebarContext == .global
         extensionRequests[page.id] = nil
         if let request = store.closing.removeValue(forKey: page.id), state.tree.tab(ownerID) != nil {
             archivePeek(page, of: ownerID, saving: true)
@@ -2608,7 +2611,7 @@ final class WindowModel {
             createdDates[tab.id] = .now
             install(page, for: tab.id)
             listen(to: page)
-            return inWindow ? openWindow(tab.id) : select(tab.id)
+            return leavesWindow ? openWindow(tab.id) : select(tab.id)
         }
         let background = disposition == .backgroundTab
         let split = disposition == .splitView
@@ -2637,7 +2640,7 @@ final class WindowModel {
         install(page, for: tab.id)
         listen(to: page)
         guard state.isSelectable(tab.id, in: selectedSpaceID) else { return }
-        if inWindow { openWindow(tab.id) } else if !background { select(tab.id) }
+        if leavesWindow { openWindow(tab.id) } else if !background { select(tab.id) }
     }
 
     /// Oa's own: a new Peek replaces the tab's current one, archived at once.
