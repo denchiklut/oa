@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "oa/public/devtools.h"
+
 namespace oa {
 
 enum class OpenDisposition {
@@ -367,6 +369,8 @@ class Page {
   virtual void Close() = 0;
   // Destroys the page without unload handlers or a closed-tab entry.
   virtual void Drop() = 0;
+  // Lives as long as the page.
+  virtual DevTools* GetDevTools() = 0;
 };
 
 }  // namespace oa

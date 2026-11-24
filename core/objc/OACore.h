@@ -132,6 +132,40 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (instancetype)init NS_UNAVAILABLE;
 @end
 
+typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
+  OAPageDevToolsDisplayUndocked,
+  OAPageDevToolsDisplayLeft,
+  OAPageDevToolsDisplayRight,
+  OAPageDevToolsDisplayBottom,
+};
+
+@class OAPageDevTools;
+
+@protocol OAPageDevToolsDelegate <NSObject>
+// As ArcCore's webContentsDevTools:displayAs:, as the frontend opens and
+// whenever its dock side changes.
+- (void)devTools:(OAPageDevTools*)devTools
+       displayAs:(OAPageDevToolsDisplay)display;
+- (void)devToolsDidClose:(OAPageDevTools*)devTools;
+@end
+
+// A page's DevTools, as ArcCore's ArcWebContentsDevTools.
+@interface OAPageDevTools : NSObject
+@property(nonatomic, weak, nullable) id<OAPageDevToolsDelegate> delegate;
+// The frontend's view, from the first display until closed.
+@property(nonatomic, readonly, nullable) NSView* view;
+- (instancetype)init NS_UNAVAILABLE;
+- (void)open;
+- (void)openInspectView;
+- (void)openConsoleView;
+- (void)openNetworkView;
+- (void)close;
+// Once its view is in a window.
+- (void)focus;
+// Empty while closed.
+- (void)currentPanelWithCompletion:(void (^)(NSString* panel))completion;
+@end
+
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
 // `openedPage` has no delegate yet; releasing it drops the page.
@@ -215,6 +249,7 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 @property(nonatomic, readonly) OAPageMediaContentType mediaContentType;
 // Links to another host open a new page instead of navigating this one.
 @property(nonatomic) BOOL keepsAddress;
+@property(nonatomic, readonly) OAPageDevTools* devTools;
 - (instancetype)init NS_UNAVAILABLE;
 - (void)loadURL:(NSURL*)url;
 - (void)goBack;

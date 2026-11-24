@@ -38,6 +38,7 @@ class WebContents;
 
 namespace oa {
 
+class DevToolsImpl;
 class WindowBrowser;
 
 // One of the app's pages: a //chrome tab in its window's Browser. The
@@ -95,6 +96,7 @@ class PageImpl : public Page,
   // way. A handler-less page answers at once.
   void AskToLeave(std::function<void(bool leave)> callback);
   base::WeakPtr<PageImpl> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
+  DevToolsImpl* devtools() const { return devtools_.get(); }
 
   // Page:
   void SetObserver(Page::Observer* observer) override;
@@ -144,6 +146,7 @@ class PageImpl : public Page,
   bool EndPictureInPicture(bool pause_video) override;
   void Close() override;
   void Drop() override;
+  DevTools* GetDevTools() override;
 
   // content::WebContentsDelegate:
   content::WebContents* OpenURLFromTab(
@@ -286,6 +289,7 @@ class PageImpl : public Page,
       zoom_observation_{this};
   bool observing_thumbnails_ = false;
   std::unique_ptr<ThumbnailImage::Subscription> thumbnail_subscription_;
+  std::unique_ptr<DevToolsImpl> devtools_;
   base::WeakPtrFactory<PageImpl> weak_factory_{this};
 };
 

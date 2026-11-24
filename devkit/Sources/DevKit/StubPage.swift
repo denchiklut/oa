@@ -37,6 +37,7 @@ final class StubPage: Page, MediaSession {
     var isAudible: Bool { isPlayingVideo }
     var isMuted = false
     var mediaSession: any MediaSession { self }
+    let devTools: any PageDevTools = StubPageDevTools()
     var state: MediaSessionState? {
         hasPlayedVideo
             ? MediaSessionState(status: isPlayingVideo ? .active : .suspended, contentType: .audioVideo) : nil
