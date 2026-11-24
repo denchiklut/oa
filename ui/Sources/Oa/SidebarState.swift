@@ -95,13 +95,19 @@ struct SidebarTab: Identifiable, Hashable {
 struct SidebarArchivedTab: Identifiable, Hashable, Codable {
     enum Reason: String, Codable { case manual, auto }
 
+    /// Arc's `ArchivedItemSource`, stored as Arc's is, without its Little Arc: the Space the item was in, or a Blank
+    /// Window's own sidebar, which is gone with its window.
+    enum Source: Hashable, Codable { case space(UUID), standaloneSidebar }
+
     let id: UUID
     var title: String
     var url: URL?
     /// Nil for a Favorite's, which belongs to the profile: Arc files them under no Space.
-    let spaceID: UUID?
+    let source: Source?
     let archivedAt: Date
     let reason: Reason
+
+    var spaceID: UUID? { if case .space(let id) = source { id } else { nil } }
 
     var displayTitle: String { title.isEmpty ? url?.host() ?? "Untitled" : title }
 
@@ -110,6 +116,22 @@ struct SidebarArchivedTab: Identifiable, Hashable, Codable {
         var text = url.absoluteString
         if let scheme = url.scheme { text = String(text.dropFirst(scheme.count + 3)) }
         return text.hasSuffix("/") ? String(text.dropLast()) : text
+    }
+}
+
+extension SidebarArchivedTab {
+    private enum EarlierKey: String, CodingKey { case spaceID }
+
+    /// A file from before `source` has the Space's ID alone.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        url = try values.decodeIfPresent(URL.self, forKey: .url)
+        let earlier = try decoder.container(keyedBy: EarlierKey.self).decodeIfPresent(UUID.self, forKey: .spaceID)
+        source = try values.decodeIfPresent(Source.self, forKey: .source) ?? earlier.map(Source.space)
+        archivedAt = try values.decode(Date.self, forKey: .archivedAt)
+        reason = try values.decode(Reason.self, forKey: .reason)
     }
 }
 
@@ -453,18 +475,24 @@ struct SidebarState {
     /// As Arc: the next tab below with the same opener, else the nearest above, else the opener.
     mutating func archiveTab(_ id: UUID, reason: SidebarArchivedTab.Reason, at date: Date = .now) {
         guard let tab = tree.tab(id) else { return }
-        let space = space(containing: id)
+        let source = archiveSource(space(containing: id)?.id)
         tree.remove(id)
         archive.append(
             SidebarArchivedTab(
-                id: id, title: tab.customTitle ?? tab.title, url: tab.url, spaceID: space?.id, archivedAt: date,
+                id: id, title: tab.customTitle ?? tab.title, url: tab.url, source: source, archivedAt: date,
                 reason: reason))
     }
 
     /// A page without a row, a Peek's.
     mutating func archivePage(id: UUID, title: String, url: URL?, in spaceID: UUID?, at date: Date = .now) {
         archive.append(
-            SidebarArchivedTab(id: id, title: title, url: url, spaceID: spaceID, archivedAt: date, reason: .manual))
+            SidebarArchivedTab(
+                id: id, title: title, url: url, source: archiveSource(spaceID), archivedAt: date, reason: .manual))
+    }
+
+    /// As Arc picks it by the window's style: a Blank Window's items are filed under its sidebar, not its Space.
+    private func archiveSource(_ spaceID: UUID?) -> SidebarArchivedTab.Source? {
+        spaceID.map { isGlobal($0) ? .space($0) : .standaloneSidebar }
     }
 
     /// To the top of the Space's unpinned tabs, as Arc's Restore.
