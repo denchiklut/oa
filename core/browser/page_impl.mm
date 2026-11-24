@@ -54,6 +54,7 @@
 #include "skia/ext/skia_utils_mac.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/common/input/web_keyboard_event.h"
+#include "third_party/blink/public/common/page/page_zoom.h"
 #include "third_party/blink/public/common/renderer_preferences/renderer_preferences.h"
 #include "third_party/blink/public/mojom/input/input_event_result.mojom-shared.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -258,6 +259,10 @@ void PageImpl::Bind(content::WebContents* contents) {
   if (auto* driver = favicon::ContentFaviconDriver::FromWebContents(contents)) {
     favicon_observation_.Observe(driver);
   }
+  zoom_observation_.Reset();
+  if (zoom::ZoomController* zoom = GetZoomController()) {
+    zoom_observation_.Observe(zoom);
+  }
   // As ArcCore subscribes again where a page's WebContents is replaced.
   if (observing_thumbnails_) {
     SubscribeToThumbnail();
@@ -269,6 +274,7 @@ void PageImpl::Unbind() {
   favicon_observation_.Reset();
   find_observation_.Reset();
   finding_ = false;
+  zoom_observation_.Reset();
   thumbnail_subscription_.reset();
   StopObservingMainWidget();
   if (content::WebContents* contents = web_contents()) {
@@ -461,6 +467,34 @@ std::optional<MediaSessionState> PageImpl::GetMediaSessionState() const {
     }
   }
   return state;
+}
+
+zoom::ZoomController* PageImpl::GetZoomController() const {
+  return web_contents() ? zoom::ZoomController::FromWebContents(web_contents())
+                        : nullptr;
+}
+
+float PageImpl::ZoomFactor() const {
+  zoom::ZoomController* zoom = GetZoomController();
+  return zoom ? blink::ZoomLevelToZoomFactor(zoom->GetZoomLevel()) : 1;
+}
+
+bool PageImpl::IsPageScaled() const {
+  zoom::ZoomController* zoom = GetZoomController();
+  return zoom && !zoom->PageScaleFactorIsOne();
+}
+
+void PageImpl::SetZoomFactor(float factor) {
+  if (zoom::ZoomController* zoom = GetZoomController()) {
+    zoom->SetZoomLevelByClient(blink::ZoomFactorToZoomLevel(factor), nullptr);
+  }
+}
+
+void PageImpl::ResetZoomAndScaleFactors() {
+  if (zoom::ZoomController* zoom = GetZoomController()) {
+    zoom->SetZoomLevelByClient(0, nullptr);
+    web_contents()->SetPageScale(1);
+  }
 }
 
 void PageImpl::Load(const std::string& url) {
@@ -1091,6 +1125,18 @@ void PageImpl::OnIsCapturingAudioChanged(content::WebContents* contents,
   if (contents == web_contents()) {
     NotifyStateChanged();
   }
+}
+
+void PageImpl::OnZoomControllerDestroyed(
+    zoom::ZoomController* zoom_controller) {
+  zoom_observation_.Reset();
+}
+
+// Also when a pinch first scales the page or ends at 1, and after a
+// navigation.
+void PageImpl::OnZoomChanged(
+    const zoom::ZoomController::ZoomChangedEventData& data) {
+  NotifyStateChanged();
 }
 
 // static

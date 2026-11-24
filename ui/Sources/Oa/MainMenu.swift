@@ -171,6 +171,23 @@ final class MainMenu {
         }
 
         view.addItem(.separator())
+        let zoomIn = #selector(BrowserWindowController.zoomIn(_:))
+        let zoomOut = #selector(BrowserWindowController.zoomOut(_:))
+        // The alternates are hidden with their keys kept, as in Arc's menu, which has the ⌘= one twice.
+        let zoomAlternates = [
+            item("Zoom In", zoomIn, key: "="), item("Zoom Out", zoomOut, key: "-", modifiers: [.command, .shift]),
+        ]
+        for alternate in zoomAlternates {
+            alternate.isHidden = true
+            alternate.allowsKeyEquivalentWhenHidden = true
+        }
+        view.addItem(
+            item("Zoom to Actual Size", #selector(BrowserWindowController.resetZoom(_:)), key: "0", id: "resetZoom"))
+        view.addItem(item("Zoom In", zoomIn, key: "+", id: "zoomIn"))
+        view.addItem(zoomAlternates[0])
+        view.addItem(item("Zoom Out", zoomOut, key: "-", id: "zoomOut"))
+        view.addItem(zoomAlternates[1])
+        view.addItem(.separator())
         view.addItem(
             item(
                 "Enter/Exit Full Screen", #selector(NSWindow.toggleFullScreen(_:)), key: "f",

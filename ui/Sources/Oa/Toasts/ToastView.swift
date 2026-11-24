@@ -101,6 +101,9 @@ struct ToastView: View {
         case .itemsMoved:
             label("Tab moved! Click to go there.")
                 .padding(.horizontal, 12)
+        case .zoomChanged(let text):
+            label(text)
+                .padding(.horizontal, 12)
         }
     }
 
