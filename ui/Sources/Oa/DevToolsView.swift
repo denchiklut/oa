@@ -2,8 +2,8 @@ import AppKit
 import DevKit
 import SwiftUI
 
-/// As Arc's `WebContentViewControllerSplitView`: a page and its docked DevTools side by side, with a 10 pt splitter
-/// drawn as a line. The page stays the same view whatever the side, so docking never moves it out of its window.
+/// As Arc's `WebContentViewControllerSplitView`: a page and its docked DevTools side by side, with AppKit's 10 pt pane
+/// splitter between them. The page stays the same view whatever the side, so docking never moves it out of its window.
 struct WebContentSplitView<Content: View>: View {
     static var splitterThickness: CGFloat { 10 }
 
@@ -46,10 +46,10 @@ struct WebContentSplitView<Content: View>: View {
 
     private func splitter(side: DevToolsDisplay, length: CGFloat) -> some View {
         DevToolsSplitter(horizontal: side == .bottom) { location in
-            // Oa's own limits, as Arc's weren't measured: each side keeps 50 pt.
+            // As Arc's split view: either side can be dragged down to nothing.
             let devToolsLength =
                 side == .left ? location + Self.splitterThickness / 2 : length - location + Self.splitterThickness / 2
-            let clamped = min(max(devToolsLength, 50 + Self.splitterThickness), length - 50)
+            let clamped = min(max(devToolsLength, Self.splitterThickness), length)
             DevToolsState.shared.sizePreferences[side] = clamped / length
         }
     }
@@ -65,11 +65,7 @@ private struct DevToolsSplitter: View {
         let thickness = WebContentSplitView<EmptyView>.splitterThickness
         Color.clear
             .frame(width: horizontal ? nil : thickness, height: horizontal ? thickness : nil)
-            .overlay {
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: horizontal ? nil : 1, height: horizontal ? 1 : nil)
-            }
+            .overlay { PaneSplitterDivider(vertical: !horizontal).allowsHitTesting(false) }
             .contentShape(Rectangle())
             .onHover { inside in
                 if inside {
@@ -85,5 +81,25 @@ private struct DevToolsSplitter: View {
             )
             .accessibilityElement()
             .accessibilityLabel("Splitter")
+    }
+}
+
+/// Draws the divider as Arc's `NSSplitView` does, in its `.paneSplitter` style.
+private struct PaneSplitterDivider: NSViewRepresentable {
+    let vertical: Bool
+
+    func makeNSView(context: Context) -> DividerView {
+        let view = DividerView()
+        view.dividerStyle = .paneSplitter
+        return view
+    }
+
+    func updateNSView(_ view: DividerView, context: Context) {
+        view.isVertical = vertical
+        view.needsDisplay = true
+    }
+
+    final class DividerView: NSSplitView {
+        override func draw(_ dirtyRect: NSRect) { drawDivider(in: bounds) }
     }
 }
