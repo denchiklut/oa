@@ -153,6 +153,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowDidBecomeKey(_ notification: Notification) {
         model.showSelected()
+        // As Arc's: the find bar's field keeps the keyboard.
+        if (window?.firstResponder as? NSText)?.delegate is FindInPageTextField { return }
         if model.dialog == nil { model.page?.activate() }
     }
 
