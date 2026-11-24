@@ -39,14 +39,23 @@ final class DevToolsWindowController: NSWindowController, NSWindowDelegate {
 
     private init(page: any Page) {
         self.page = page
+        // As Arc's: a 1 × 1 window, as its hosting view makes it, centred unless a frame was saved, then grown to
+        // 512 × 544 from its top left, so a first window opens a little right of the screen's middle.
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 512, height: 544),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered,
+            defer: false)
+        window.isOpaque = false
+        window.collectionBehavior = .fullScreenAuxiliary
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
         window.title = "Developer Tools"
         window.isReleasedWhenClosed = false
-        // As measured in Arc: 512 × 544 until moved or resized, then the last frame of any page's window.
-        window.setFrame(NSRect(x: 0, y: 0, width: 512, height: 544), display: false)
-        if !window.setFrameUsingName(Self.frameName) { window.center() }
+        if !window.setFrameUsingName(Self.frameName) {
+            window.center()
+            let top = window.frame.maxY
+            window.setFrame(NSRect(x: window.frame.minX, y: top - 544, width: 512, height: 544), display: false)
+        }
         super.init(window: window)
         window.delegate = self
     }
@@ -58,7 +67,7 @@ final class DevToolsWindowController: NSWindowController, NSWindowDelegate {
         if view.superview !== content {
             view.removeFromSuperview()
             view.translatesAutoresizingMaskIntoConstraints = true
-            view.frame = content.bounds
+            view.frame = content.convert(window.contentLayoutRect, from: nil)
             view.autoresizingMask = [.width, .height]
             content.addSubview(view)
         }
