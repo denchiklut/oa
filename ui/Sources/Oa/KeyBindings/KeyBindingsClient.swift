@@ -29,6 +29,15 @@ final class KeyBindingsClient {
         set(shortcut, for: action.identifier, source: .default)
     }
 
+    /// For an action that goes while Oa runs, as a Space's place in the Spaces menu does.
+    func unregisterAction(_ identifier: String) {
+        guard states.removeValue(forKey: identifier) != nil else { return }
+        actions[identifier] = nil
+        defaults[identifier] = nil
+        resolveConflicts()
+        publish()
+    }
+
     func setShortcut(_ shortcut: ARCKeyboardShortcut?, for identifier: String) {
         set(shortcut, for: identifier, source: .userDefined)
     }

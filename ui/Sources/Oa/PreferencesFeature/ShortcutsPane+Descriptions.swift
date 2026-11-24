@@ -1,6 +1,11 @@
 import Foundation
 
 extension ShortcutsPane {
+    /// As Arc's row name: a Space's binding reads as going to it.
+    static func rowName(for binding: KeyBinding) -> String {
+        SpacesMainMenuProvider.position(of: binding.id) != nil ? "Go to “\(binding.action.name)”" : binding.action.name
+    }
+
     /// Arc's sentences for the actions Oa has, with its words for one without.
     static func description(for identifier: String) -> String {
         let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa"
@@ -9,6 +14,10 @@ extension ShortcutsPane {
             return position <= ordinals.count
                 ? "Jumps to the \(ordinals[position - 1]) item in your Sidebar, starting with your Favorites at the top."
                 : "Jumps to the last item at the bottom of your Sidebar."
+        }
+        if let position = SpacesMainMenuProvider.position(of: identifier) {
+            let ordinal = NumberFormatter.localizedString(from: position as NSNumber, number: .ordinal)
+            return "Jumps over to your \(ordinal) Space without needing to swipe."
         }
         return switch identifier {
         case "viewPreferences":
@@ -54,6 +63,8 @@ extension ShortcutsPane {
         // Oa's own words: Arc's are about Little Arc, which this action also serves there.
         case "openTabIn": "Opens the Peek that’s in focus as a tab."
         case "newSpace": "Creates a new Space — for your work tabs, personal tabs, or otherwise."
+        case "focusNextSpace": "Slides to the next Space in your Sidebar."
+        case "focusPreviousSpace": "Slides to the previous Space in your Sidebar."
         case "minimize": "Minimizes the current window."
         case "viewDownloads": "Opens the Downloads section of your Library."
         case "viewLibrary":

@@ -215,6 +215,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if let space = model.space { SpaceDeletion.confirm(space, in: model) }
     }
 
+    @objc func nextSpace(_ sender: Any?) { model.selectAdjacentSpace(1) }
+    @objc func previousSpace(_ sender: Any?) { model.selectAdjacentSpace(-1) }
+    @objc func focusSpace(_ sender: NSMenuItem) { model.selectSpace(at: sender.tag - 1) }
+
     @objc func toggleArchive(_ sender: Any?) {
         if model.showingArchive { model.exitLibrary() } else { model.viewLibrary(.archive) }
     }
@@ -329,6 +333,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         if item.action == #selector(toggleSidebarMode(_:)) {
             item.title = model.sidebarMode == .anchored ? "Hide Sidebar" : "Show Sidebar"
+            return true
+        }
+        if item.action == #selector(focusSpace(_:)) {
+            // As seen in Arc: the window's Space is ticked.
+            let spaces = model.state.spaces
+            item.state =
+                spaces.indices.contains(item.tag - 1) && spaces[item.tag - 1].id == model.selectedSpaceID ? .on : .off
             return true
         }
         if item.action == #selector(toggleLibrary(_:)) {

@@ -5,8 +5,9 @@ final class MainMenu {
     static let lastTabTag = 9
     private let extensionsMenu = ExtensionsMenu()
     private var keyBindingMenuManager: KeyBindingMenuManager?
+    private var spacesMainMenuProvider: SpacesMainMenuProvider?
 
-    func install(in application: NSApplication, keyBindings: KeyBindingsClient) {
+    func install(in application: NSApplication, store: SidebarStore) {
         let menu = NSMenu()
         let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Oa"
 
@@ -214,6 +215,18 @@ final class MainMenu {
         spaces.addItem(item("Edit Theme…", #selector(BrowserWindowController.editTheme(_:))))
         spaces.addItem(item("Change Profile", #selector(BrowserWindowController.changeProfile(_:))))
         spaces.addItem(item("Delete Space", #selector(BrowserWindowController.deleteSpace(_:))))
+        spaces.addItem(.separator())
+        spaces.addItem(
+            item(
+                "Next Space", #selector(BrowserWindowController.nextSpace(_:)), key: "\u{F703}",
+                modifiers: [.command, .option], id: "focusNextSpace"))
+        spaces.addItem(
+            item(
+                "Previous Space", #selector(BrowserWindowController.previousSpace(_:)), key: "\u{F702}",
+                modifiers: [.command, .option], id: "focusPreviousSpace"))
+        let spaceItems = NSMenuItem.separator()
+        spaces.addItem(spaceItems)
+        spacesMainMenuProvider = SpacesMainMenuProvider(menu: spaces, after: spaceItems, store: store)
 
         submenu("Extensions", in: menu).delegate = extensionsMenu
 
@@ -241,7 +254,7 @@ final class MainMenu {
         application.helpMenu = help
 
         application.mainMenu = menu
-        keyBindingMenuManager = KeyBindingMenuManager(menu: menu, client: keyBindings)
+        keyBindingMenuManager = KeyBindingMenuManager(menu: menu, client: store.keyBindings)
     }
 
     private func submenu(_ title: String, in menu: NSMenu) -> NSMenu {
