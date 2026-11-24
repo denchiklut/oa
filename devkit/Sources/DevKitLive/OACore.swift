@@ -220,6 +220,8 @@ import AppKit
     var muted: Bool { @objc(isMuted) get set }
     var hasFocus: Bool { get }
     var selectedText: String { get }
+    var zoomFactor: Float { get set }
+    var isPageScaled: Bool { get }
     var mediaSessionStatus: Int { get }
     var mediaContentType: Int { get }
     var keepsAddress: Bool { get set }
@@ -228,6 +230,7 @@ import AppKit
     func goForward()
     func reload()
     func reloadBypassingCache()
+    func resetZoomAndScaleFactors()
     func stopLoading()
     func activate()
     @objc(findText:forward:findMatch:) func find(_ text: String, forward: Bool, findMatch: Bool)

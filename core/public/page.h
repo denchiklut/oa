@@ -284,6 +284,11 @@ class Page {
   // the page's frames. A script's selection doesn't count, and a navigation
   // keeps it.
   virtual std::string SelectedText() const = 0;
+  // As ADK's zoomLevel, a factor: Chrome's zoom level for the page's host in
+  // its profile, so every page of the host follows a change.
+  virtual float ZoomFactor() const = 0;
+  // While a pinch has scaled the page.
+  virtual bool IsPageScaled() const = 0;
 
   virtual void Load(const std::string& url) = 0;
   virtual void GoBack() = 0;
@@ -303,6 +308,11 @@ class Page {
   virtual void SetKeepsAddress(bool keeps_address) = 0;
   // As ADK's setWebContentsMuted: the page stays muted across navigations.
   virtual void SetMuted(bool muted) = 0;
+  // As ADK's setZoomFactor: kept for the page's host in its profile.
+  virtual void SetZoomFactor(float factor) = 0;
+  // As ADK's resetZoomAndScaleFactors: 100 %, not the profile's default zoom,
+  // and the pinch undone.
+  virtual void ResetZoomAndScaleFactors() = 0;
   // A new background page in this page's window with a copy of its history,
   // loading its current entry, as ADK's cloneWebContent. Null without a page.
   virtual std::unique_ptr<Page> Clone() = 0;

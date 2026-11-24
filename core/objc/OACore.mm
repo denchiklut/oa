@@ -562,6 +562,20 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   return _page ? ToNSString(_page->SelectedText()) : @"";
 }
 
+- (float)zoomFactor {
+  return _page ? _page->ZoomFactor() : 1;
+}
+
+- (void)setZoomFactor:(float)zoomFactor {
+  if (_page) {
+    _page->SetZoomFactor(zoomFactor);
+  }
+}
+
+- (BOOL)isPageScaled {
+  return _page && _page->IsPageScaled();
+}
+
 - (OAPageMediaSessionStatus)mediaSessionStatus {
   std::optional<oa::MediaSessionState> state;
   if (_page) {
@@ -651,6 +665,12 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 - (void)stopFinding {
   if (_page) {
     _page->StopFinding();
+  }
+}
+
+- (void)resetZoomAndScaleFactors {
+  if (_page) {
+    _page->ResetZoomAndScaleFactors();
   }
 }
 

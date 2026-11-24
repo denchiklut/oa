@@ -17,6 +17,8 @@
 #include "components/find_in_page/find_result_observer.h"
 #include "components/find_in_page/find_tab_helper.h"
 #include "components/sessions/core/session_id.h"
+#include "components/zoom/zoom_controller.h"
+#include "components/zoom/zoom_observer.h"
 #include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/render_widget_host_observer.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -48,7 +50,8 @@ class PageImpl : public Page,
                  public content::RenderWidgetHostObserver,
                  public favicon::FaviconDriverObserver,
                  public find_in_page::FindResultObserver,
-                 public MediaStreamCaptureIndicator::Observer {
+                 public MediaStreamCaptureIndicator::Observer,
+                 public zoom::ZoomObserver {
  public:
   static std::unique_ptr<PageImpl> Create(WindowBrowser* window_browser,
                                           Page::Observer* observer);
@@ -110,6 +113,8 @@ class PageImpl : public Page,
   bool HasFocus() const override;
   std::optional<MediaSessionState> GetMediaSessionState() const override;
   std::string SelectedText() const override;
+  float ZoomFactor() const override;
+  bool IsPageScaled() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -121,6 +126,8 @@ class PageImpl : public Page,
   void StopFinding() override;
   void SetKeepsAddress(bool keeps_address) override;
   void SetMuted(bool muted) override;
+  void SetZoomFactor(float factor) override;
+  void ResetZoomAndScaleFactors() override;
   std::unique_ptr<Page> Clone() override;
   void MoveToWindow(const std::string& window_id) override;
   void Snapshot(SnapshotCallback callback) override;
@@ -214,6 +221,12 @@ class PageImpl : public Page,
   void OnIsCapturingAudioChanged(content::WebContents* contents,
                                  bool is_capturing_audio) override;
 
+  // zoom::ZoomObserver:
+  void OnZoomControllerDestroyed(
+      zoom::ZoomController* zoom_controller) override;
+  void OnZoomChanged(
+      const zoom::ZoomController::ZoomChangedEventData& data) override;
+
  private:
   PageImpl(WindowBrowser* window_browser, Page::Observer* observer);
 
@@ -222,6 +235,7 @@ class PageImpl : public Page,
   std::unique_ptr<PageImpl> Wrap(
       std::unique_ptr<content::WebContents> contents);
   void Bind(content::WebContents* contents);
+  zoom::ZoomController* GetZoomController() const;
   bool KeepsAddressAgainst(const content::OpenURLParams& params) const;
   void Unbind();
   static void OnFrameMetadata(content::RenderWidgetHost* widget_host,
@@ -262,6 +276,8 @@ class PageImpl : public Page,
   base::ScopedObservation<content::RenderWidgetHost,
                           content::RenderWidgetHostObserver>
       main_widget_observation_{this};
+  base::ScopedObservation<zoom::ZoomController, zoom::ZoomObserver>
+      zoom_observation_{this};
   bool observing_thumbnails_ = false;
   std::unique_ptr<ThumbnailImage::Subscription> thumbnail_subscription_;
   base::WeakPtrFactory<PageImpl> weak_factory_{this};
