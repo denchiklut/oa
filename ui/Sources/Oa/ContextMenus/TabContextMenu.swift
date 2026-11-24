@@ -56,7 +56,8 @@ struct TabContextMenu {
                 })
         }
         menu.addItem(MenuActionItem("Duplicate") { [model, tab] in model.duplicate(tab.id) })
-        menu.addItem(move([tab.id], favorite: favorite))
+        // Oa's own: a window with a sidebar of its own keeps its tabs, as it has no Spaces to move them to.
+        if model.sidebarContext == .global { menu.addItem(move([tab.id], favorite: favorite)) }
         menu.addItem(.separator())
         for item in removal(favorite: favorite, current: current) { menu.addItem(item) }
         return menu
@@ -83,7 +84,7 @@ struct TabContextMenu {
                 model.openInSplitView(tabIDs)
             })
         menu.addItem(MenuActionItem("Duplicate") { [model] in for tabID in tabIDs { model.duplicate(tabID) } })
-        menu.addItem(move(tabIDs, favorite: false))
+        if model.sidebarContext == .global { menu.addItem(move(tabIDs, favorite: false)) }
         menu.addItem(.separator())
         let pinned = tabIDs.filter(state.isPinned)
         if pinned.count == tabIDs.count {

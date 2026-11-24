@@ -79,10 +79,10 @@ final class SidebarStore {
         let known = Set(
             engine.allProfiles() + state.profiles.filter { $0.pendingName != nil }.map(\.id)
                 + [SidebarProfile.defaultID])
-        let missing = state.spaces.filter { !known.contains($0.profileID) }
+        let missing = state.allSpaces.filter { !known.contains($0.profileID) }
         guard !missing.isEmpty else { return [] }
         edit { $0.setProfile(SidebarProfile.defaultID, forSpaces: missing.map(\.id)) }
-        return missing.map(\.name)
+        return missing.filter { state.isGlobal($0.id) }.map(\.name)
     }
 
     /// The engine owns profile names, as Arc's does. Once, it takes those an older sidebar.json kept and a new
@@ -101,7 +101,7 @@ final class SidebarStore {
     /// As Arc: never the default profile, and the UI offers it only for a profile without a Space. Every window lets
     /// go of the profile first, as ADK does, so the engine can delete its data at once.
     func deleteProfile(_ id: UUID, from engine: any BrowserApplication) -> Bool {
-        guard id != SidebarProfile.defaultID, !state.spaces.contains(where: { $0.profileID == id }) else {
+        guard id != SidebarProfile.defaultID, !state.allSpaces.contains(where: { $0.profileID == id }) else {
             return false
         }
         for window in windows { window.forgetProfile(id) }
@@ -182,9 +182,22 @@ final class SidebarStore {
         scheduleSave()
     }
 
+    /// A window's own container goes with it, as seen in Arc when its last tab closes it. Oa's own: closing it by
+    /// its button does the same, unseen in Arc.
     func removeWindow(_ window: WindowModel) {
         windows.removeAll { $0 === window }
+        if !quitting, let container = window.sidebarContext.container(of: window.id) {
+            edit { $0.removeContainer(container) }
+        }
         scheduleSave()
+    }
+
+    /// Oa's own: once the windows are back, a container whose window didn't come back goes.
+    func removeContainersWithoutWindows() {
+        let open = Set(windows.compactMap { $0.sidebarContext.container(of: $0.id) })
+        let orphans = state.containers.keys.filter { !open.contains($0) }
+        guard !orphans.isEmpty else { return }
+        edit { state in orphans.forEach { state.removeContainer($0) } }
     }
 
     func windowStateChanged() {
