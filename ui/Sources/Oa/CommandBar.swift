@@ -321,7 +321,8 @@ final class CommandBar {
     private func act(_ modifiers: NSEvent.ModifierFlags) {
         guard rows.indices.contains(selectedIndex) else { return }
         let row = rows[selectedIndex]
-        // Oa's own: an incognito window's bar reads the profile's picks and records none.
+        // As seen in Arc, where a pick made in an incognito window wasn't recorded. Reading the profile's picks there
+        // is Oa's own, as Arc's isn't known.
         if !text.isEmpty, recordsPicks { picks.record(row.id, for: text, in: profileID) }
         switch row.source {
         case .tab(let tab): perform(.switchTo(tab.tab.id))

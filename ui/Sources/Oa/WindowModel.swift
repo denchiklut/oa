@@ -2077,7 +2077,7 @@ final class WindowModel {
         }
     }
 
-    /// Oa's own, as an incognito tab's close seen in Arc: an incognito window's Peek leaves no Archive entry.
+    /// As Arc's `beginCloseWindowContent`, which archives nothing of an incognito window: its Peek leaves no entry.
     /// `saving` is for a caller outside an edit and a reconcile, where the entry needs its own save.
     private func archivePeek(_ page: any Page, of ownerID: UUID, saving: Bool = false) {
         guard sidebarContext != .incognito else { return }
@@ -2691,7 +2691,7 @@ final class WindowModel {
     /// loses its own.
     private func save(_ page: any Page, for tabID: UUID) {
         store.setSavedPage(tabID, title: page.title, url: page.url)
-        // Oa's own: nothing of an incognito page goes to disk.
+        // As seen in Arc: nothing of an incognito page goes to disk.
         guard sidebarContext != .incognito else { return }
         let favicon = page.favicon
         let hasLoaded = page.navigationResult == .loaded
