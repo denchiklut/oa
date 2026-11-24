@@ -237,8 +237,14 @@ void BrowserWindowImpl::DeleteBrowserWindow() {
 // ui::BaseWindow: the app's NSWindow, when one is attached. The app owns its
 // window, so nothing here opens, moves or closes it.
 
+// A window already on screen stays where it is: DevTools that Chrome shows
+// for one of its pages stay in front of it in a window of their own, as Arc's
+// do.
 void BrowserWindowImpl::Show() {
-  [AppWindow(window_browser_.get()) makeKeyAndOrderFront:nil];
+  NSWindow* window = AppWindow(window_browser_.get());
+  if (!window.visible) {
+    [window makeKeyAndOrderFront:nil];
+  }
 }
 
 void BrowserWindowImpl::ShowInactive() {
