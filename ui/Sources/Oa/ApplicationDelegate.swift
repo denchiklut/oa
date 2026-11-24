@@ -127,7 +127,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// As seen in Arc: in the last key window, switched to the routed Space, Most Recent being the one it shows.
     private func openExternalLinks(_ links: [URL]) {
         guard !links.isEmpty else { return }
-        // Oa's own: a window with a sidebar of its own doesn't take them, as it can't switch Space.
+        // As seen in Arc: never a Blank or incognito window, even a key one.
         let front = frontWindows.first { $0.sidebarContext == .global } ?? openWindow()
         for url in links {
             front.openRoutedLink(url, in: store.routedSpace(for: url, recent: front.selectedSpaceID))
