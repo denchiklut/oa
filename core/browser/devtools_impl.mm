@@ -14,15 +14,6 @@
 #include "oa/browser/page_impl.h"
 
 namespace oa {
-namespace {
-
-// Oa's own, as ArcCore's is not traced: the frontend has no call for its
-// shown panel, so it is read off the panel its main tab strip shows.
-constexpr char16_t kCurrentPanelScript[] =
-    uR"(document.querySelector('.main-tabbed-pane > .view-container .panel')
-    ?.getAttribute('jslog')?.match(/context: ([^;]+)/)?.[1] ?? '')";
-
-}  // namespace
 
 DevToolsImpl::DevToolsImpl(PageImpl* page) : page_(page) {}
 
@@ -132,13 +123,14 @@ void DevToolsImpl::Focus() {
   }
 }
 
+// As ArcCore's: the frontend's own DevToolsAPI.currentPanel() answers.
 void DevToolsImpl::CurrentPanel(PanelCallback callback) {
-  if (!web_contents()) {
+  if (!page_->web_contents()) {
     callback(std::string());
     return;
   }
-  web_contents()->GetPrimaryMainFrame()->ExecuteJavaScript(
-      kCurrentPanelScript,
+  DevToolsWindow::CallDevToolsAPIForEmbedder(
+      page_->web_contents(), "currentPanel",
       base::BindOnce(
           [](PanelCallback callback, base::Value result) {
             callback(result.is_string() ? result.GetString() : std::string());
