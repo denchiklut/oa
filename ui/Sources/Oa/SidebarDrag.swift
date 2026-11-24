@@ -21,7 +21,7 @@ final class SidebarDrag {
         var index: Int
         var line: CGRect?
         /// The row whose middle the tab is held on, which it would make a split with or join, last when held on the
-        /// right half of a split's cell.
+        /// row's right half.
         var combine: UUID?
         var combinesLast = false
     }
@@ -386,7 +386,8 @@ final class SidebarDrag {
             }
         let section = pinned ? Section.pinned : .today
         if let combine = combineTarget(at: point, among: ids, model: model) {
-            let last = model.state.splitView(combine) != nil && point.x > rows[combine]?.rect.midX ?? .infinity
+            // As measured on Arc: the row's middle decides, for a tab's row as for a split's cell.
+            let last = point.x > rows[combine]?.rect.midX ?? .infinity
             return Target(section: section, index: index, combine: combine, combinesLast: last)
         }
         let line = CGRect(x: list.area.minX + 16, y: y - 3, width: list.area.width - 27.5, height: 6)
@@ -478,8 +479,8 @@ struct SidebarDragLayer: View {
                     .frame(width: line.width, height: line.height)
                     .offset(x: line.minX, y: line.minY)
             }
-            // As seen in Arc: held on a tab's row, the copy is gone into the row's preview of the split.
-            if let entry = drag.entry, drag.target?.combine.map({ model.state.splitView($0) != nil }) ?? true {
+            // As seen in Arc: the copy stays over a row's preview of the split it would make.
+            if let entry = drag.entry {
                 if drag.stack.isEmpty {
                     SidebarDragPreview(model: model, drag: drag, entry: entry, morph: drag.morph, card: drag.pageCard)
                 } else {

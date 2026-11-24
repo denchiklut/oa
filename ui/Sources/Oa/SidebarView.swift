@@ -768,9 +768,9 @@ struct TabRow: View {
         }
         .opacity(combining ? 0 : 1)
         .overlay {
-            if combining, let drag, let held = drag.entry?.tabs.first {
-                let members = model.combinedTabIDs(drag.memberIDs, onto: tab.id).compactMap { model.state.tree.tab($0) }
-                SplitViewCombinePreview(model: model, tabs: (drag.memberIDs.isEmpty ? [held] : members) + [tab])
+            if combining, let drag {
+                let held = drag.memberIDs.isEmpty ? 1 : model.combinedTabIDs(drag.memberIDs, onto: tab.id).count
+                SplitViewCombinePreview(model: model, tab: tab, held: held, last: drag.target?.combinesLast == true)
             }
         }
         .contentShape(card)

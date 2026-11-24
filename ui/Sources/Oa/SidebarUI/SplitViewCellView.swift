@@ -228,20 +228,24 @@ struct SplitViewCellView: View {
     }
 }
 
-/// As seen in Arc: the row a tab is held on, drawn as the split the drop would make, the held tab first and lit, with
-/// one ✕.
+/// As seen in Arc: the row a tab is held on, drawn as the split the drop would make, with one ✕: the row's tab keeps
+/// its card, and the held tabs' places are lit and empty, before it from the row's left half and after it from its
+/// right half. The held copy stays over them. The lit cards' fill is LIKELY the selected card's: Arc's lay under the
+/// copy in every capture.
 struct SplitViewCombinePreview: View {
     let model: WindowModel
-    let tabs: [SidebarTab]
+    let tab: SidebarTab
+    let held: Int
+    let last: Bool
     @Environment(\.theme) private var theme
 
     var body: some View {
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
-                if index > 0 { Color.clear.frame(width: 8.5) }
-                SplitViewCellView.ChildItem(model: model, tab: tab, isSelected: index == 0, showsClose: false)
-            }
+        let lit = RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.selectedCard).frame(height: 28)
+        HStack(spacing: 8.5) {
+            if !last { ForEach(0..<held, id: \.self) { _ in lit } }
+            SplitViewCellView.ChildItem(model: model, tab: tab, isSelected: false, showsClose: false)
+            if last { ForEach(0..<held, id: \.self) { _ in lit } }
         }
         .padding(.leading, 4)
         .padding(.trailing, 34)
