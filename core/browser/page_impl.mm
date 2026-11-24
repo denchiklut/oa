@@ -535,6 +535,14 @@ void PageImpl::ReloadBypassingCache() {
   }
 }
 
+// As ArcCore: the WebContents' own save, not chrome::SavePage, so a PDF
+// viewer gets no save event first.
+void PageImpl::SavePage() {
+  if (web_contents()) {
+    web_contents()->OnSavePage();
+  }
+}
+
 void PageImpl::Stop() {
   if (web_contents()) {
     web_contents()->Stop();

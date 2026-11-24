@@ -207,6 +207,7 @@ typedef NS_ENUM(NSInteger, OAPageExtensionRequestKind) {
 - (void)reload;
 - (void)reloadBypassingCache;
 - (void)resetZoomAndScaleFactors;
+- (void)savePage;
 - (void)stopLoading;
 - (void)activate;
 // As ArcCore's find:forward:matchCase:findMatch:, never case-sensitive.

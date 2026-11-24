@@ -231,6 +231,7 @@ import AppKit
     func reload()
     func reloadBypassingCache()
     func resetZoomAndScaleFactors()
+    func savePage()
     func stopLoading()
     func activate()
     @objc(findText:forward:findMatch:) func find(_ text: String, forward: Bool, findMatch: Bool)
