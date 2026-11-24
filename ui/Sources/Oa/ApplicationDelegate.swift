@@ -193,14 +193,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         frontWindows.first { $0.sidebarContext != .incognito }?.space?.profileID ?? SidebarProfile.defaultID
     }
 
-    /// As Arc's `newIncognitoWindow:`: a window on the incognito context of the key window's Space's profile, with
-    /// its own sidebar kept in memory; the command bar opens, as for any new window. Arc's profile with no browser
-    /// window key isn't known; Oa's own takes the last window's then, else the default profile.
+    /// As Arc's `newIncognitoWindow:`: a window on the incognito context of the last focused profile, as Arc's
+    /// `createWindow` takes it for the incognito style, with its own sidebar kept in memory; the command bar opens,
+    /// as for any new window.
     @objc func newIncognitoWindow(_ sender: Any?) {
         guard !engine.incognitoDisabled else {
             return NSLog("Oa: attempted to create an incognito window but incognito is disabled.")
         }
-        openWindow(context: .incognito, profileID: incognitoProfileID)
+        openWindow(context: .incognito, profileID: lastFocusedProfileID)
     }
 
     /// As Arc's `onOpenLinkInIncognitoWindow`: a new tab in the open incognito window, which comes forward, else in a
