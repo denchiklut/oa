@@ -112,7 +112,7 @@ struct ShortcutsPane: View {
                 NSApplication.shared.keyWindow?.makeFirstResponder(nil)
                 state.selectedKeyBindableActionIdentifier = binding.id
             } label: {
-                Text(binding.action.name).font(.system(size: 13)).lineLimit(1)
+                Text(Self.rowName(for: binding)).font(.system(size: 13)).lineLimit(1)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
@@ -214,7 +214,7 @@ struct ShortcutsPane: View {
                         ? Array(ARCKeyboardShortcut(key: "", modifiers: heldModifiers).symbols.dropLast())
                         : binding.unvalidatedShortcut?.symbols ?? [],
                     inConflict: !binding.conflictingActions.isEmpty)
-                Text(binding.action.name).font(.system(size: 14, weight: .semibold)).padding(.top, 23)
+                Text(Self.rowName(for: binding)).font(.system(size: 14, weight: .semibold)).padding(.top, 23)
                 caption(Self.description(for: binding.id)).padding(.top, 8)
                 if binding.unvalidatedShortcut != nil {
                     line.padding(.top, 16)
