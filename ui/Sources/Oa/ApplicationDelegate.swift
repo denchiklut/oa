@@ -214,16 +214,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         model.newTab(url)
     }
 
-    /// As Arc's `createTabInNewWindow(url:isIncognito:)` from a window with a sidebar of its own, as seen in Arc:
-    /// an incognito window's link opens a new incognito window, and a Blank Window's a global one on the last key
-    /// global window's Space, at the top of its tabs. Either way selected, with no command bar, cascaded from the
-    /// source. With no global window open, the first Space is Oa's own.
+    /// As Arc's `createTabInNewWindow(url:isIncognito:)`, as seen in Arc: an incognito window's link opens a new
+    /// incognito window; a global window's, from inside a Peek, a global one on its Space; and a Blank Window's a
+    /// global one on the last key global window's Space. At the top of its tabs, selected, with no command bar,
+    /// cascaded from the source. With no global window open, the first Space is Oa's own.
     private func openURLInNewWindow(_ url: URL, from source: WindowModel) {
         if source.sidebarContext == .incognito {
             openWindow(from: source, context: .incognito, profileID: source.space?.profileID, empty: true).newTab(url)
         } else {
-            let spaceID = frontWindows.first { $0.sidebarContext == .global }?.selectedSpaceID
-            openWindow(from: source, on: spaceID ?? store.state.spaces[0].id, empty: true).newTab(url)
+            let global = source.sidebarContext == .global ? source : frontWindows.first { $0.sidebarContext == .global }
+            openWindow(from: source, on: global?.selectedSpaceID ?? store.state.spaces[0].id, empty: true).newTab(url)
         }
     }
 
