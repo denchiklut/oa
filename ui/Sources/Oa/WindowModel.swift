@@ -2091,7 +2091,19 @@ final class WindowModel {
     /// As Arc: closing the window or quitting archives each Peek's page.
     func archivePeeks() {
         for (ownerID, page) in peeks where ownerID != archivePeekID && state.tree.tab(ownerID) != nil {
-            store.archivePage(page, in: spaceID(ofPeekOwner: ownerID))
+            archivePeek(page, of: ownerID)
+        }
+    }
+
+    /// Oa's own, as an incognito tab's close seen in Arc: an incognito window's Peek leaves no Archive entry.
+    /// `saving` is for a caller outside an edit and a reconcile, where the entry needs its own save.
+    private func archivePeek(_ page: any Page, of ownerID: UUID, saving: Bool = false) {
+        guard sidebarContext != .incognito else { return }
+        let spaceID = spaceID(ofPeekOwner: ownerID)
+        if saving {
+            store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
+        } else {
+            store.archivePage(page, in: spaceID)
         }
     }
 
@@ -2117,7 +2129,7 @@ final class WindowModel {
         updateLinkRouting()
         for (ownerID, page) in peeks where ownerID != archivePeekID && state.tree.tab(ownerID) == nil {
             peeks[ownerID] = nil
-            store.archivePage(page, in: spaceID(ofPeekOwner: ownerID))
+            archivePeek(page, of: ownerID)
             page.close()
         }
         for tabID in Array(creating.keys) where state.tree.tab(tabID) == nil { release(tabID) }
@@ -2563,8 +2575,7 @@ final class WindowModel {
         permissionRequests[page.id] = nil
         extensionRequests[page.id] = nil
         if let request = store.closing.removeValue(forKey: page.id), state.tree.tab(ownerID) != nil {
-            let spaceID = state.space(containing: ownerID)?.id
-            store.edit { $0.archivePage(id: page.id, title: page.title, url: page.url, in: spaceID) }
+            archivePeek(page, of: ownerID, saving: true)
             store.windows.first { $0.id == request.windowID }?.remember(
                 ClosedPage(
                     id: page.id, title: page.title, url: page.url, place: .peek(ownerID: ownerID),
@@ -2629,8 +2640,7 @@ final class WindowModel {
     /// Oa's own: a new Peek replaces the tab's current one, archived at once.
     private func peek(_ page: any Page, from openerID: UUID) {
         if let current = peeks[openerID] {
-            let spaceID = state.space(containing: openerID)?.id
-            store.edit { $0.archivePage(id: current.id, title: current.title, url: current.url, in: spaceID) }
+            archivePeek(current, of: openerID, saving: true)
             current.close()
         }
         peeks[openerID] = page
