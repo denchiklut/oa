@@ -25,6 +25,8 @@ public protocol BrowserApplication: AnyObject {
     func terminate()
     /// As ADK's `BrowserContextID`: the profile's own context, or its incognito one, which shares its downloads,
     /// preferences and extensions, reads its history and keeps nothing once its last window has closed.
+    /// As ADK's `incognitoDisabled`: the app's `IncognitoModeAvailability` default is 1, as read at launch.
+    var incognitoDisabled: Bool { get }
     func browserContext(id: UUID, type: BrowserContextType) -> any BrowserContext
     /// The profiles the engine has, loaded or not, in the engine's own order, as ADK's `allProfiles()`.
     func allProfiles() -> [UUID]
@@ -66,9 +68,6 @@ public enum BrowserProfile {
 @MainActor
 public protocol BrowserContext: AnyObject {
     var id: UUID { get }
-    /// As ADK's `incognitoDisabled`: whether the engine's incognito availability policy keeps the profile from opening
-    /// an incognito window. False until the profile has loaded.
-    var incognitoDisabled: Bool { get }
     /// Without an event back, as ADK's: the next `userVisibleName(of:)` reads it.
     func setUserVisibleName(_ name: String)
     /// A page with an `id` of its own in the app's window `windowID`, in the background; nil if the engine can't.

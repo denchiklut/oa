@@ -18,11 +18,6 @@ struct ProfileAttributes {
 // which is the profile's primary off-the-record profile.
 enum class BrowserContextType { kNormal, kIncognito };
 
-// Whether Chrome's incognito availability policy keeps the profile from
-// opening an incognito window, as ADK's incognitoDisabled. False until the
-// profile has loaded.
-bool IsIncognitoDisabled(const std::string& profile_id);
-
 // Every app profile Chromium has attributes for, loaded or not, in its
 // storage's order, as ArcCore's availableBrowserContextAttributes.
 std::vector<ProfileAttributes> GetAvailableProfileAttributes();
