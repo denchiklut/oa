@@ -104,6 +104,8 @@ final class WindowModel {
     /// The global window a Blank Window's tabs go to for a Space, opened when there is none.
     @ObservationIgnored var globalWindow: (_ spaceID: UUID) -> WindowModel? = { _ in nil }
     @ObservationIgnored var openLinkInIncognitoWindow: (_ url: URL, _ profileID: UUID) -> Void = { _, _ in }
+    /// A link's new window from a window with a sidebar of its own, which holds none of another window's tabs.
+    @ObservationIgnored var openURLInNewWindow: (_ url: URL) -> Void = { _ in }
     @ObservationIgnored let downloads: DownloadsStore
     @ObservationIgnored private let pictureInPicture: PictureInPicture
     @ObservationIgnored private var presentedPage: (any Page)?
@@ -2575,10 +2577,15 @@ final class WindowModel {
         // ⌘ is Arc's Little Arc, which Oa doesn't have, so a background page, Oa's own.
         let held = NSEvent.modifierFlags.intersection([.option, .command, .shift, .control])
         let disposition = disposition == .backgroundTab && held == .option ? .splitView : disposition
-        let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick)
-        // Oa's own until Arc's is seen: a window with a sidebar of its own keeps the link's tab, selected, as no
-        // other window has its tabs.
-        let leavesWindow = inWindow && sidebarContext == .global
+        // As seen in Arc from a Blank Window's Peek: a Shift-click inside it opens no second Peek but a window.
+        let ownSidebar = sidebarContext != .global
+        let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick || (insidePeek && ownSidebar))
+        // As Arc's `createTabInNewWindow(url:isIncognito:)`: only the address goes, and loads afresh there.
+        if inWindow, ownSidebar {
+            page.drop()
+            if let url { openURLInNewWindow(url) }
+            return
+        }
         guard state.tree.tab(openerID) != nil else {
             guard insidePeek, openerID == archivePeekID else { return page.drop() }
             let tab = makeTab(url: url)
@@ -2586,7 +2593,7 @@ final class WindowModel {
             createdDates[tab.id] = .now
             install(page, for: tab.id)
             listen(to: page)
-            return leavesWindow ? openWindow(tab.id) : select(tab.id)
+            return inWindow ? openWindow(tab.id) : select(tab.id)
         }
         let background = disposition == .backgroundTab
         let split = disposition == .splitView
@@ -2615,7 +2622,7 @@ final class WindowModel {
         install(page, for: tab.id)
         listen(to: page)
         guard state.isSelectable(tab.id, in: selectedSpaceID) else { return }
-        if leavesWindow { openWindow(tab.id) } else if !background { select(tab.id) }
+        if inWindow { openWindow(tab.id) } else if !background { select(tab.id) }
     }
 
     /// Oa's own: a new Peek replaces the tab's current one, archived at once.
