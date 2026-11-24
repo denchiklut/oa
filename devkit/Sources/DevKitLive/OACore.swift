@@ -226,6 +226,7 @@ import AppKit
     func goBack()
     func goForward()
     func reload()
+    func reloadBypassingCache()
     func stopLoading()
     func activate()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)

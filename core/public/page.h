@@ -281,6 +281,7 @@ class Page {
   virtual void GoBack() = 0;
   virtual void GoForward() = 0;
   virtual void Reload() = 0;
+  virtual void ReloadBypassingCache() = 0;
   virtual void Stop() = 0;
   virtual void Activate() = 0;
   // As a pinned tab: a link to another host opens a new page, reported

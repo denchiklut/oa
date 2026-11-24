@@ -110,6 +110,7 @@ class PageImpl : public Page,
   void GoBack() override;
   void GoForward() override;
   void Reload() override;
+  void ReloadBypassingCache() override;
   void Stop() override;
   void Activate() override;
   void SetKeepsAddress(bool keeps_address) override;
