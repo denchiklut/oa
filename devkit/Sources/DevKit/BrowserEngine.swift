@@ -580,6 +580,9 @@ public protocol Page: AnyObject, Observable {
     var isMuted: Bool { get set }
     /// While the page has the keyboard, as ADK's `hasFocus`: false again once its window isn't key.
     var hasFocus: Bool { get }
+    /// What the user last selected in the page, as ArcCore's cached `selectedText`: a script's selection doesn't count
+    /// and a navigation keeps it. Empty when nothing was selected.
+    var selectedText: String { get }
     /// The page's media, as ADK's media session.
     var mediaSession: any MediaSession { get }
     /// Why the renderer is gone, nil once a new one is ready, as after a reload.
@@ -599,6 +602,11 @@ public protocol Page: AnyObject, Observable {
     func reloadBypassingCache()
     func stopLoading()
     func activate()
+    /// As ADK's `performFindInPage`: never case-sensitive, scrolling to the active match, its results as `findResult`
+    /// events. Empty text clears the find.
+    func find(_ text: String, direction: FindDirection, findMatch: Bool)
+    /// As ADK's `stopFindInPage`: the active match stays selected.
+    func stopFinding()
     /// A new page with this one's history, as ADK's `cloneWebContent`: in the same window, hidden, loading its entry at
     /// once. Nil once the page is gone.
     func duplicate() -> (any Page)?
@@ -652,6 +660,8 @@ public enum PageEvent {
     /// A thumbnail the engine made of the page, at one pixel a point, as ADK's thumbnail listeners get every one:
     /// the answer to `requestThumbnail()`, or one the engine made by itself while observed.
     case thumbnail(NSImage)
+    /// A result of the page's find, as ADK's `onFindInPageResult`: each one the engine has.
+    case findResult(FindResult)
     /// A `beforeunload` handler kept the page after `close()`.
     case closeCancelled
     /// The page is gone, after `close()` or without the app asking, with the engine's record of it if it kept one.
@@ -877,6 +887,22 @@ public enum OpenDisposition: Sendable, Equatable {
 }
 
 /// Why a page's renderer is gone.
+/// ADK's `FindInPageDirection`; ADK searches forward for `current`.
+public enum FindDirection: Sendable {
+    case backward, current, forward
+}
+
+/// ADK's `FindInPageResult`: -1 for what the engine doesn't know yet.
+public struct FindResult: Sendable, Equatable {
+    public var numberOfMatches: Int
+    public var activeMatchOrdinal: Int
+
+    public init(numberOfMatches: Int, activeMatchOrdinal: Int) {
+        self.numberOfMatches = numberOfMatches
+        self.activeMatchOrdinal = activeMatchOrdinal
+    }
+}
+
 public enum PageCrash: Sendable, Equatable {
     case crashed
     case killed

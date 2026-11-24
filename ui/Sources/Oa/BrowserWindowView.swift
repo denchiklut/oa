@@ -183,7 +183,9 @@ struct BrowserWindowView: View {
             // strip takes as much of the page as Arc's.
             .windowContentGrabber(
                 model: model, hasContent: model.placeholder != nil || model.page != nil,
-                barHeight: showsToolbar ? 32 : 0)
+                barHeight: showsToolbar ? 32 : 0
+            )
+            .findInPage(of: model, on: model.placeholder == nil ? model.page : nil)
         }
         .toast(of: model, on: model.page)
         .onChange(of: showsToolbar ? model.page?.id : nil, initial: true) { _, _ in

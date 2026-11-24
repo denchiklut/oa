@@ -57,6 +57,11 @@ extension ShortcutsPane {
             Copies the current URL to your clipboard without any trackers as a markdown string.
             i.e. [Page Title](www.arc.net).
             """
+        case "find": "Opens a search box to find words on the current page."
+        case "findAndReplace": "Finds text on a page with the option to replace it."
+        case "findNext": "Jumps to the next time your search query appears on the page."
+        case "findPrevious": "Jumps to the previous time your search query appears on the page."
+        case "useSelectionForFind": "Opens a search box to find the words you’ve highlighted on the current page."
         case "pasteAndMatchStyle": "Pastes the selected text and matches the current text styling."
         case "addSplitView": "Adds a new page to your current Split View."
         case "removeSplitView": "Closes the Split View page that’s currently in focus."

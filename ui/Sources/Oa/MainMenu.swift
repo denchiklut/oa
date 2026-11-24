@@ -84,6 +84,23 @@ final class MainMenu {
                 "Paste and Match Style", #selector(NSTextView.pasteAsPlainText(_:)), key: "v",
                 modifiers: [.command, .shift], id: "pasteAndMatchStyle"))
         edit.addItem(item("Select All", #selector(NSText.selectAll(_:)), key: "a"))
+        edit.addItem(.separator())
+        let find = submenu("Find", in: edit)
+        let findAction = #selector(BrowserWindowController.arcPerformFindPanelAction(_:))
+        let findItems: [(String, String, NSEvent.ModifierFlags, String, NSTextFinder.Action?)] = [
+            ("Find…", "f", .command, "find", .showFindInterface),
+            ("Find and Replace", "f", [.command, .option], "findAndReplace", .showReplaceInterface),
+            ("Find Next", "g", .command, "findNext", .nextMatch),
+            ("Find Previous", "g", [.command, .shift], "findPrevious", .previousMatch),
+            ("Use Selection to Find", "", .command, "useSelectionForFind", .setSearchString),
+            // Arc's tag 0, which no handler answers.
+            ("Jump to Selection", "j", .command, "jumpToSelection", nil),
+        ]
+        for (title, key, modifiers, id, action) in findItems {
+            let findItem = item(title, findAction, key: key, modifiers: modifiers, id: id)
+            findItem.tag = action?.rawValue ?? 0
+            find.addItem(findItem)
+        }
 
         let view = submenu("View", in: menu)
         let appearance = submenu("Appearance", in: view)

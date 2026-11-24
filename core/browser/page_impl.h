@@ -14,6 +14,8 @@
 #include "chrome/browser/ui/thumbnails/thumbnail_image.h"
 #include "components/favicon/core/favicon_driver.h"
 #include "components/favicon/core/favicon_driver_observer.h"
+#include "components/find_in_page/find_result_observer.h"
+#include "components/find_in_page/find_tab_helper.h"
 #include "components/sessions/core/session_id.h"
 #include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/render_widget_host_observer.h"
@@ -45,6 +47,7 @@ class PageImpl : public Page,
                  public content::RenderWidgetHost::InputEventObserver,
                  public content::RenderWidgetHostObserver,
                  public favicon::FaviconDriverObserver,
+                 public find_in_page::FindResultObserver,
                  public MediaStreamCaptureIndicator::Observer {
  public:
   static std::unique_ptr<PageImpl> Create(WindowBrowser* window_browser,
@@ -106,6 +109,7 @@ class PageImpl : public Page,
   bool IsMuted() const override;
   bool HasFocus() const override;
   std::optional<MediaSessionState> GetMediaSessionState() const override;
+  std::string SelectedText() const override;
   void Load(const std::string& url) override;
   void GoBack() override;
   void GoForward() override;
@@ -113,6 +117,8 @@ class PageImpl : public Page,
   void ReloadBypassingCache() override;
   void Stop() override;
   void Activate() override;
+  void Find(const std::string& text, bool forward, bool find_match) override;
+  void StopFinding() override;
   void SetKeepsAddress(bool keeps_address) override;
   void SetMuted(bool muted) override;
   std::unique_ptr<Page> Clone() override;
@@ -178,6 +184,8 @@ class PageImpl : public Page,
   void WebContentsDestroyed() override;
   void OnAudioStateChanged(bool audible) override;
   void DidUpdateAudioMutingState(bool muted) override;
+  void OnTextSelectionChanged(content::RenderFrameHost* render_frame_host,
+                              std::u16string_view selected_text) override;
 
   // content::RenderWidgetHost::InputEventObserver:
   void OnInputEventAck(const content::RenderWidgetHost& widget_host,
@@ -195,6 +203,10 @@ class PageImpl : public Page,
                         const GURL& icon_url,
                         bool icon_url_changed,
                         const gfx::Image& image) override;
+
+  // find_in_page::FindResultObserver:
+  void OnFindResultAvailable(content::WebContents* web_contents) override;
+  void OnFindTabHelperDestroyed(find_in_page::FindTabHelper* helper) override;
 
   // MediaStreamCaptureIndicator::Observer:
   void OnIsCapturingVideoChanged(content::WebContents* contents,
@@ -234,6 +246,13 @@ class PageImpl : public Page,
   NavigationResult navigation_result_ = NavigationResult::kNone;
   std::optional<SkColor4f> root_background_color_;
   bool has_focus_ = false;
+  std::u16string selected_text_;
+  // As ArcCore drops its find completion on stopFind: results that come after
+  // aren't reported.
+  bool finding_ = false;
+  base::ScopedObservation<find_in_page::FindTabHelper,
+                          find_in_page::FindResultObserver>
+      find_observation_{this};
   base::ScopedObservation<favicon::FaviconDriver,
                           favicon::FaviconDriverObserver>
       favicon_observation_{this};
