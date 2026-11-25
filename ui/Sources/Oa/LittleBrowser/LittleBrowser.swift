@@ -13,12 +13,15 @@ struct LittleBrowserState: Codable {
     /// As Arc's: whether more than one profile was in use when the window was made.
     var shouldShowProfileIndicators: Bool
     var modalState: ModalState
+    var downloads = LittleBrowserDownloads()
     /// Arc's `moveToListDestinationInfo`: the Space "Open in" names.
     var destinationSpaceID: UUID?
     var showsMoveMenu = false
     var showsTip = false
 
-    private enum CodingKeys: String, CodingKey { case session, profile, shouldShowProfileIndicators, modalState }
+    private enum CodingKeys: String, CodingKey {
+        case session, profile, shouldShowProfileIndicators, modalState, downloads
+    }
 
     var isPresented: Bool { modalState == .presented }
 }

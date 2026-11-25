@@ -167,6 +167,7 @@ final class WindowModel {
     /// By profile: ArcCore keeps one omnibox per window.
     @ObservationIgnored private var autocompletes: [UUID: any Autocomplete] = [:]
     @ObservationIgnored private var browserListeners: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var littleDownloadsListener: Task<Void, Never>?
     /// As Arc's `ClosedSidebarItemsCache`: what the user closed from this window, a group for each close with a step
     /// for each tab, the last ten, in memory and gone with the window.
     @ObservationIgnored private var closedGroups: [ClosedGroup] = []
@@ -435,6 +436,24 @@ final class WindowModel {
     /// As Arc's `ensureBrowsersCreated`, as the window appears: its browser in every profile it has a Space of.
     func ensureBrowsersCreated() {
         for profileID in Set(spaces.map(\.profileID)) { ensureBrowser(for: profileID) }
+        subscribeToLittleDownloads()
+    }
+
+    /// As Arc's `setupSubscriptions`: a Little window hears of every download of its profile from then on,
+    /// whichever window starts it, and of none of an incognito context.
+    private func subscribeToLittleDownloads() {
+        guard isLittle, let profileID = space?.profileID else { return }
+        littleDownloadsListener?.cancel()
+        let events = engine.browserContext(id: profileID, type: .normal).downloads.events
+        littleDownloadsListener = Task { [weak self] in
+            for await event in events { self?.receiveLittleDownload(event) }
+        }
+    }
+
+    /// As Arc's, of the profile the window has now: a card kept from another profile only goes.
+    func cancelLittleDownload(_ id: Download.ID) {
+        guard let profileID = space?.profileID else { return }
+        engine.browserContext(id: profileID, type: .normal).downloads.cancel(id)
     }
 
     private func ensureBrowser(for profileID: UUID) {
@@ -1510,6 +1529,7 @@ final class WindowModel {
         dropPages(of: state.tabs(in: space.id).map(\.id))
         store.edit { $0.setProfile(profileID, forSpaces: [space.id]) }
         little?.profile = profileID
+        subscribeToLittleDownloads()
         loadExtensions()
         ensurePresentedPages()
         if let url { LittleBrowserPreferences.setPreferredProfile(profileID, for: url) }
@@ -2171,6 +2191,7 @@ final class WindowModel {
         closeExtensionPopup()
         browserListeners.values.forEach { $0.cancel() }
         browserListeners = [:]
+        littleDownloadsListener?.cancel()
         browsers = [:]
         archivePeekID = nil
         creating = [:]
