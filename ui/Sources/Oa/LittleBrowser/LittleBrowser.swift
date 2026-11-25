@@ -1,48 +1,114 @@
 import AppKit
 import Foundation
 
-/// Arc's `LittleBrowser.State`, the part a Little window's model keeps. Arc saves it with the window for the
-/// relaunch after an update; Oa has no such relaunch, so it lives with the window.
-struct LittleBrowserState {
-    /// Arc's `LittleBrowserEntryPoint`, the cases Oa has callers for.
-    enum EntryPoint: Equatable {
-        case mainMenu
-        case globalHotkey
-        case externalLink(URL)
-        case internalLink(URL)
-        case browserPopup(URL)
+/// Arc's `LittleBrowser.State`. What Arc's `PersistedLittleBrowserState` codes is saved with the window, under
+/// Arc's keys; the rest is rebuilt.
+struct LittleBrowserState: Codable {
+    /// Arc's `ModalContent.PresentationState`: `initial` while the window is its command bar alone.
+    enum ModalState: Codable { case initial, presented }
 
-        /// As Arc's: what a later link is matched against, which a ⌘⌥-click's window never is.
-        var reusableURL: URL? {
-            switch self {
-            case .externalLink(let url), .internalLink(let url): url
-            case .mainMenu, .globalHotkey, .browserPopup: nil
-            }
-        }
-
-        var url: URL? {
-            switch self {
-            case .externalLink(let url), .internalLink(let url), .browserPopup(let url): url
-            case .mainMenu, .globalHotkey: nil
-            }
-        }
-
-        /// As seen in Arc: shown for a link from another app and the File menu's item, not the hot key's.
-        var showsTip: Bool {
-            switch self {
-            case .externalLink, .mainMenu: true
-            case .globalHotkey, .internalLink, .browserPopup: false
-            }
-        }
-    }
-
-    var entryPoint: EntryPoint
-    /// Arc's `modalState`: `initial` while the window is its command bar alone.
-    var isPresented: Bool
+    var session: LittleBrowserSession
+    /// Oa's profile ID, where Arc writes its own profile value.
+    var profile: UUID
+    /// As Arc's: whether more than one profile was in use when the window was made.
+    var shouldShowProfileIndicators: Bool
+    var modalState: ModalState
     /// Arc's `moveToListDestinationInfo`: the Space "Open in" names.
     var destinationSpaceID: UUID?
     var showsMoveMenu = false
     var showsTip = false
+
+    private enum CodingKeys: String, CodingKey { case session, profile, shouldShowProfileIndicators, modalState }
+
+    var isPresented: Bool { modalState == .presented }
+}
+
+/// Arc's `LittleBrowserSession`, replaced when a link reuses the window.
+struct LittleBrowserSession: Codable {
+    var id = UUID()
+    var entryPoint: LittleBrowserEntryPoint
+    var preferredFrame: WindowFrame
+    var startTime = Date.now
+
+    /// As Arc's `createLittleBrowserSession`: a link's window is anchored on the pointer, the others at the top
+    /// right of the pointer's screen.
+    init(entryPoint: LittleBrowserEntryPoint) {
+        self.entryPoint = entryPoint
+        let pointer = NSEvent.mouseLocation
+        switch entryPoint {
+        case .externalLink, .internalLink, .browserPopup: preferredFrame = WindowFrame(anchor: .center(pointer))
+        case .mainMenu, .globalHotkey:
+            let visible =
+                (NSScreen.screens.first { $0.frame.contains(pointer) } ?? NSScreen.main)?.visibleFrame ?? .zero
+            preferredFrame = WindowFrame(
+                size: LittleBrowserFrame.preferredBarSize,
+                anchor: .topRight(
+                    NSPoint(
+                        x: visible.maxX - LittleBrowserFrame.preferredMargin,
+                        y: visible.maxY - LittleBrowserFrame.preferredMargin)))
+        }
+    }
+}
+
+/// Arc's `WindowFrame`, the anchors Oa has callers for.
+struct WindowFrame: Codable {
+    enum Anchor: Codable { case center(NSPoint), topRight(NSPoint) }
+
+    var size: NSSize?
+    var anchor: Anchor
+}
+
+/// Arc's `LittleBrowserEntryPoint`, the cases Oa has callers for.
+enum LittleBrowserEntryPoint: Equatable, Codable {
+    case mainMenu
+    case globalHotkey
+    case externalLink(URL)
+    case internalLink(URL)
+    case browserPopup
+
+    private enum Key: String, CodingKey { case mainMenu, globalHotkey, externalLink, internalLink, browserPopup }
+
+    /// As Arc's: what a later link is matched against, which a ⌘⌥-click's window never is.
+    var url: URL? {
+        switch self {
+        case .externalLink(let url), .internalLink(let url): url
+        case .mainMenu, .globalHotkey, .browserPopup: nil
+        }
+    }
+
+    /// As seen in Arc: shown for a link from another app and the File menu's item, not the hot key's.
+    var showsTip: Bool {
+        switch self {
+        case .externalLink, .mainMenu: true
+        case .globalHotkey, .internalLink, .browserPopup: false
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: Key.self)
+        switch values.allKeys.first {
+        case .mainMenu: self = .mainMenu
+        case .globalHotkey: self = .globalHotkey
+        case .externalLink: self = .externalLink(try values.decode(URL.self, forKey: .externalLink))
+        case .internalLink: self = .internalLink(try values.decode(URL.self, forKey: .internalLink))
+        case .browserPopup: self = .browserPopup
+        case nil:
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "no entry point"))
+        }
+    }
+
+    /// As Arc's coding: the hot key is written as a link with no address, which doesn't read back, so its window's
+    /// style reads as a standard one.
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: Key.self)
+        switch self {
+        case .mainMenu: try values.encode(true, forKey: .mainMenu)
+        case .globalHotkey: try values.encode(true, forKey: .externalLink)
+        case .externalLink(let url): try values.encode(url, forKey: .externalLink)
+        case .internalLink(let url): try values.encode(url, forKey: .internalLink)
+        case .browserPopup: try values.encode(true, forKey: .browserPopup)
+        }
+    }
 }
 
 /// Arc's defaults for Little Arc, under its keys.
@@ -120,6 +186,9 @@ enum LittleBrowserFrame {
     static let minSize = NSSize(width: 300, height: 360)
     static let screenMargin: CGFloat = 20
     static let cascade: CGFloat = 30
+    /// Arc's session keeps these for its bar, though the bar is laid out at `barSize` inside `screenMargin`.
+    static let preferredBarSize = NSSize(width: 500, height: 300)
+    static let preferredMargin: CGFloat = 16
     /// Arc's key, which its Peek windows share: the last page window's frame, written when one is moved or its
     /// resize ends.
     static let savedRectKey = "ModalWindowController_rect"
@@ -134,11 +203,20 @@ enum LittleBrowserFrame {
         UserDefaults.standard.set(NSStringFromRect(frame), forKey: savedRectKey)
     }
 
-    static func bar(on screen: NSScreen?) -> NSRect {
-        let visible = (screen ?? NSScreen.main)?.visibleFrame ?? .zero
-        return NSRect(
-            x: visible.maxX - screenMargin - barSize.width, y: visible.maxY - screenMargin - barSize.height,
-            width: barSize.width, height: barSize.height)
+    /// As Arc's first frame, from the session's anchor: a bar under its top right corner; a link's window down and
+    /// right of the newest other Little window, at its size, else the saved size about the anchor.
+    static func first(for session: LittleBrowserSession, after newest: NSWindow?) -> NSRect {
+        switch session.preferredFrame.anchor {
+        case .topRight(let corner):
+            return constrained(
+                NSRect(
+                    x: corner.x - barSize.width, y: corner.y - barSize.height, width: barSize.width,
+                    height: barSize.height),
+                to: screen(at: corner))
+        case .center(let point):
+            guard let newest else { return centered(savedSize, on: point, screen: screen(at: point)) }
+            return constrained(newest.frame.offsetBy(dx: cascade, dy: -cascade), to: newest.screen)
+        }
     }
 
     /// As seen in Arc: a bar grows into the saved size about its own centre.
@@ -146,11 +224,8 @@ enum LittleBrowserFrame {
         centered(savedSize, on: NSPoint(x: bar.midX, y: bar.midY), screen: screen)
     }
 
-    /// As seen in Arc: a link's window is down and right of the newest other Little window, at its size, else the
-    /// saved size about the pointer.
-    static func page(after newest: NSRect?, pointer: NSPoint, on screen: NSScreen?) -> NSRect {
-        guard let newest else { return centered(savedSize, on: pointer, screen: screen) }
-        return constrained(newest.offsetBy(dx: cascade, dy: -cascade), to: screen)
+    private static func screen(at point: NSPoint) -> NSScreen? {
+        NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) }
     }
 
     private static func centered(_ size: NSSize, on point: NSPoint, screen: NSScreen?) -> NSRect {

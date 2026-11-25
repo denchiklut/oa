@@ -63,6 +63,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         completionHandler: @escaping (NSWindow?, (any Error)?) -> Void
     ) {
         guard let current, let id = UUID(uuidString: identifier.rawValue) else { return completionHandler(nil, nil) }
+        // As Arc's: a Little window comes back only on the relaunch after an automatic update, which Oa hasn't.
+        guard !state.decodeBool(forKey: BrowserWindowController.isLittleArcKey) else {
+            NSLog("Oa: Little Oa window %@ will not be restored.", id.uuidString)
+            return completionHandler(nil, nil)
+        }
         NSApplication.shared.extendStateRestoration()
         current.pendingRestorations.append((id, completionHandler))
     }
@@ -87,14 +92,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         }
         let defaults = UserDefaults.standard
         if windows.isEmpty {
-            if defaults.bool(forKey: Self.restoresWindowsThroughAppKitKey) || saved.isEmpty {
+            let standard = saved.filter { $0.style.sidebarContext != nil }
+            if defaults.bool(forKey: Self.restoresWindowsThroughAppKitKey) || standard.isEmpty {
                 openWindow()
             } else {
-                saved.forEach { openWindow(restoring: $0) }
+                standard.forEach { openWindow(restoring: $0) }
             }
         }
         defaults.set(true, forKey: Self.restoresWindowsThroughAppKitKey)
-        store.removeContainersWithoutWindows()
         engine.finishedRestoringWindows()
         openExternalLinks(pendingLinks)
         pendingLinks.removeAll()
@@ -171,7 +176,6 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             engine.saveSessionsForQuit()
             store.saveSessionRestorationAndFreeze()
             for window in windows { window.model.archivePeeks() }
-            store.archiveLittlePagesForQuit()
             store.saveAndFreeze()
             engine.terminate()
         }
@@ -200,7 +204,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// As Arc's `onCreateNewBlankWindow`: a window on a sidebar of its own, one Space on the last focused profile;
     /// the command bar opens, as for any new window.
     @objc func blankWindow(_ sender: Any?) {
-        openWindow(context: .standalone, profileID: lastFocusedProfileID)
+        openWindow(style: .standard(sidebarContext: .standalone), profileID: lastFocusedProfileID)
     }
 
     /// Arc's `newLittleBrowserWindow:`.
@@ -212,13 +216,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// the engine's first. A link's window opens on its page, the others on the command bar alone.
     @discardableResult
     private func createOrFocusLittleWindow(
-        _ entryPoint: LittleBrowserState.EntryPoint, profileID: UUID?, page: (any Page)? = nil
+        _ entryPoint: LittleBrowserEntryPoint, profileID: UUID?, page: (page: any Page, url: URL)? = nil
     ) -> WindowModel {
-        if let url = entryPoint.reusableURL,
-            let open = frontLittleWindows.first(where: { $0.reusesLittleWindow(for: url) })
-        {
-            open.little?.entryPoint = entryPoint
+        let session = LittleBrowserSession(entryPoint: entryPoint)
+        if let url = entryPoint.url, let open = frontLittleWindows.first(where: { $0.reusesLittleWindow(for: url) }) {
             open.openLittleLink(url)
+            // As Arc's `updateSession`: the window takes the new session, and its tip is looked at again.
+            open.little?.session = session
+            open.showLittleTipIfDue()
             open.bringToFront()
             return open
         }
@@ -226,11 +231,16 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         let profileID =
             profileID.flatMap { store.state.profile($0)?.id } ?? standard?.space?.profileID
             ?? engine.allProfiles().first ?? SidebarProfile.defaultID
+        let opensPage = entryPoint.url != nil || page != nil
         let model = openWindow(
-            context: .little, profileID: profileID, empty: entryPoint.url != nil,
-            little: LittleBrowserState(entryPoint: entryPoint, isPresented: entryPoint.url != nil))
-        if let page, let url = entryPoint.url {
-            model.adoptLittlePage(page, url: url)
+            style: .little(
+                LittleBrowserState(
+                    session: session, profile: profileID,
+                    shouldShowProfileIndicators: store.state.hasMultipleProfilesInUse,
+                    modalState: opensPage ? .presented : .initial)),
+            profileID: profileID, empty: opensPage)
+        if let page {
+            model.adoptLittlePage(page.page, url: page.url)
         } else if let url = entryPoint.url {
             model.newTab(url)
         }
@@ -242,16 +252,6 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private func littleDestination(for profileID: UUID) -> UUID? {
         frontWindows.first { $0.sidebarContext == .global && $0.space?.profileID == profileID }?.selectedSpaceID
             ?? store.state.spaces.first { $0.profileID == profileID }?.id
-    }
-
-    /// As seen in Arc: a link's window opens down and right of the newest other Little window, else about the pointer,
-    /// and a bar at the top right of the pointer's screen.
-    private func littleFrame(for little: LittleBrowserState) -> NSRect {
-        let pointer = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(pointer) }
-        guard little.isPresented else { return LittleBrowserFrame.bar(on: screen) }
-        let newest = windows.last { $0.model.little?.isPresented == true }?.window
-        return LittleBrowserFrame.page(after: newest?.frame, pointer: pointer, on: newest?.screen ?? screen)
     }
 
     /// As Arc's `WindowsData.lastFocusedProfile`: the Space's profile of the frontmost window that isn't incognito,
@@ -267,7 +267,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         guard !engine.incognitoDisabled else {
             return NSLog("Oa: attempted to create an incognito window but incognito is disabled.")
         }
-        openWindow(context: .incognito, profileID: lastFocusedProfileID)
+        openWindow(style: .standard(sidebarContext: .incognito), profileID: lastFocusedProfileID)
     }
 
     /// As Arc's `onOpenLinkInIncognitoWindow`: a new tab at the top of the newest incognito window, whatever its
@@ -276,7 +276,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         guard !engine.incognitoDisabled else { return }
         let model =
             windows.last { $0.model.sidebarContext == .incognito }?.model
-            ?? openWindow(context: .incognito, profileID: profileID, empty: true)
+            ?? openWindow(style: .standard(sidebarContext: .incognito), profileID: profileID, empty: true)
         model.bringToFront()
         model.newTab(url)
     }
@@ -287,7 +287,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// cascaded from the source. With no global window open, the first Space is Oa's own.
     private func openURLInNewWindow(_ url: URL, from source: WindowModel) {
         if source.sidebarContext == .incognito {
-            openWindow(from: source, context: .incognito, profileID: source.space?.profileID, empty: true).newTab(url)
+            openWindow(
+                from: source, style: .standard(sidebarContext: .incognito), profileID: source.space?.profileID,
+                empty: true
+            ).newTab(url)
         } else {
             let global = source.sidebarContext == .global ? source : frontWindows.first { $0.sidebarContext == .global }
             openWindow(from: source, on: global?.selectedSpaceID ?? store.state.spaces[0].id, empty: true).newTab(url)
@@ -328,6 +331,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// As Arc: ⌘Q and Quit ask first while the warning is on, before any page is asked; quitting from the Dock or
     /// at logout doesn't.
     @objc func quit(_ sender: Any?) {
+        // As Arc's `userQuitApp:`: a key Little window that is its bar alone closes first.
+        if let key = windows.first(where: { $0.window?.isKeyWindow == true }), key.model.little?.isPresented == false {
+            key.window?.close()
+        }
         guard QuitWarning.isOn else { return terminateFromRunLoop() }
         guard !askingToQuit else { return }
         askingToQuit = true
@@ -402,7 +409,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// Front to back, by window number: `orderedWindows` has no panels, which Little windows are.
     private var frontLittleWindows: [WindowModel] {
         (NSWindow.windowNumbers(options: []) ?? []).compactMap { number in
-            windows.first { $0.window?.windowNumber == number.intValue && $0.model.sidebarContext == .little }?.model
+            windows.first { $0.window?.windowNumber == number.intValue && $0.model.isLittle }?.model
         }
     }
 
@@ -434,14 +441,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @discardableResult
     private func openWindow(
         restoring record: WindowRecord? = nil, selecting tabID: UUID? = nil, from source: WindowModel? = nil,
-        on spaceID: UUID? = nil, context: SidebarContext = .global, profileID: UUID? = nil, empty: Bool = false,
-        little: LittleBrowserState? = nil
+        on spaceID: UUID? = nil, style: WindowStyle = .standard(sidebarContext: .global), profileID: UUID? = nil,
+        empty: Bool = false
     ) -> WindowModel {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
         let id = record?.id ?? UUID()
-        var context = record?.sidebarContext ?? context
+        var style = record?.style ?? style
         var spaceID = spaceID
-        if let container = context.container(of: id) {
+        if let container = style.container(of: id) {
             if let space = store.state.containers[container] {
                 spaceID = space.id
             } else if record == nil {
@@ -449,14 +456,14 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
                 store.edit { space = $0.addContainer(container, profileID: profileID ?? SidebarProfile.defaultID) }
                 spaceID = space?.id
             } else {
-                context = .global
+                style = .standard(sidebarContext: .global)
             }
         }
         let openerSpaceID = (source ?? key?.model).flatMap {
             $0.sidebarContext == .global ? $0.selectedSpaceID : nil
         }
         let controller = BrowserWindowController(
-            id: id, sidebarContext: context, engine: engine, store: store, downloads: downloads,
+            id: id, style: style, engine: engine, store: store, downloads: downloads,
             pictureInPicture: pictureInPicture, spaceID: spaceID ?? openerSpaceID ?? store.state.spaces[0].id
         ) { [weak self] closed in
             self?.windows.removeAll { $0 === closed }
@@ -475,19 +482,24 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             self?.createOrFocusLittleWindow(entryPoint, profileID: profileID, page: page)
         }
         controller.model.littleDestination = { [weak self] profileID in self?.littleDestination(for: profileID) }
-        controller.model.little = little
         // As seen in Arc: from the key window.
         let previous = (windows.first { $0.model === source } ?? key)?.window
-        let littleFrame = little.map(littleFrame(for:))
+        let little = controller.model.little
+        let littleFrame = little.map { little in
+            LittleBrowserFrame.first(
+                for: little.session, after: windows.last { $0.model.little?.isPresented == true }?.window)
+        }
         windows.append(controller)
         controller.open(cascadingFrom: previous, littleFrame: littleFrame)
         controller.model.updateLittleDestination()
-        if little?.isPresented == true { controller.zoomLittleWindow(from: NSEvent.mouseLocation) }
+        if case .center(let pointer) = little?.session.preferredFrame.anchor {
+            controller.zoomLittleWindow(from: pointer)
+        }
         if let record {
             controller.model.restore(record)
         } else {
             if let opener = source ?? key?.model { controller.model.inheritCollapsedPinnedSpaces(from: opener) }
-            if context != .global {
+            if style.sidebarContext != .global {
                 if !empty { controller.model.openCommandBar(.newTab) }
             } else if let tabID {
                 controller.model.select(tabID)

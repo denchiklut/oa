@@ -152,7 +152,7 @@ struct LittleBrowserToolbar: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 110)
             HStack(spacing: 0) {
-                profileChip
+                if model.little?.shouldShowProfileIndicators == true { profileChip }
                 Spacer(minLength: 0)
                 CopyLinkButton(model: model, size: 16)
                     .help("Copy URL")
