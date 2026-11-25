@@ -15,7 +15,7 @@ struct SidebarPagingContainerView: View {
         let width = layout.sidebarWidth
         let offset = layout.sidebarScrollOffset
         let fade = layout.spaceCreationFade
-        let hidesScrollIndicators = layout.libraryProgress > 0
+        let hidesScrollIndicators = layout.isPaging || layout.libraryProgress > 0
         // The URL field takes no room while the panel comes or goes, so the Space's page keeps its place below it.
         let below: CGFloat = layout.addressFieldShift != nil && !PageToolbar.isShown ? SidebarAddressField.height : 0
         // The Create a Space page has no Space, and breaks a profile's run of Spaces as another profile's would.
@@ -189,7 +189,7 @@ private struct SidebarSpacePage: View {
             )
             // As measured on Arc: an archived row fades where it is while the rows below close up.
             .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
-            // Oa's own: hide the scrollbar as soon as the Space starts blending into the background under the Library.
+            // Oa's own: hide the scrollbar while paging between Spaces or into the Library.
             .background { VerticalScrollerHiding(hidesScroller: hidesScrollIndicators) }
         }
         // As Arc's: the list's empty space and its rows without a menu of their own give the Space's.
