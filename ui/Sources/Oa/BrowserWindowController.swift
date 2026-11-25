@@ -11,6 +11,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let store: SidebarStore
     private let didClose: (BrowserWindowController) -> Void
     private var asking = false
+    private var isClosing = false
     private let downloadPreview = DownloadPreviewWindow()
     private let extensionPopup = ExtensionPopupWindow()
     private var modalItemSwitcher: (state: ModalItemSwitcher, controller: ModalItemSwitcherWindowController)?
@@ -266,6 +267,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if model.dialog == nil { model.page?.activate() }
     }
 
+    /// As Arc's: a Little window that is still its bar alone closes when it stops being key, whatever took the key.
+    func windowDidResignKey(_ notification: Notification) {
+        if model.little?.isPresented == false, !isClosing { window?.close() }
+    }
+
     /// Only the last window asks, as Arc's does: another one takes the pages over.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard store.windows.count == 1 else { return true }
@@ -279,6 +285,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        isClosing = true
         viewTimer?.cancel()
         model.dismissModalItemSwitcher()
         modalItemSwitcher?.controller.close()
