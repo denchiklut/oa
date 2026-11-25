@@ -51,6 +51,13 @@ struct LittleBrowserSession: Codable {
                         y: visible.maxY - LittleBrowserFrame.preferredMargin)))
         }
     }
+
+    /// As Arc's: the screen that holds the anchor.
+    var screen: NSScreen? {
+        switch preferredFrame.anchor {
+        case .center(let point), .topRight(let point): LittleBrowserFrame.screen(at: point)
+        }
+    }
 }
 
 /// Arc's `WindowFrame`, the anchors Oa has callers for.
@@ -227,7 +234,7 @@ enum LittleBrowserFrame {
         centered(savedSize, on: NSPoint(x: bar.midX, y: bar.midY), screen: screen)
     }
 
-    private static func screen(at point: NSPoint) -> NSScreen? {
+    static func screen(at point: NSPoint) -> NSScreen? {
         NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) }
     }
 

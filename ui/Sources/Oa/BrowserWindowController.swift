@@ -60,7 +60,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         if !isLittle { window.setContentSize(NSSize(width: 1100, height: 760)) }
         window.delegate = self
         (window as? LittleBrowserWindow)?.onCancel = { [weak model] in model?.little?.showsMoveMenu = false }
-        model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
+        model.bringToFront = { [weak window, weak model] in
+            if let little = window as? LittleBrowserWindow {
+                little.show(on: model?.little?.session.screen, isNew: false)
+            } else {
+                window?.makeKeyAndOrderFront(nil)
+            }
+        }
         model.window = window
         model.undoManager = ArcUndoManager(window.undoManager) { [weak model] in model?.perform($0) }
     }
@@ -82,7 +88,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         } else {
             window.center()
         }
-        window.makeKeyAndOrderFront(nil)
+        if let little = window as? LittleBrowserWindow {
+            little.show(on: model.little?.session.screen, isNew: true)
+        } else {
+            window.makeKeyAndOrderFront(nil)
+        }
         observeTitle()
         observeDownloadPreview()
         observeExtensionPopup()

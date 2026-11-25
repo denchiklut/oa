@@ -244,7 +244,6 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         } else if let url = entryPoint.url {
             model.newTab(url)
         }
-        NSApplication.shared.activate()
         return model
     }
 
