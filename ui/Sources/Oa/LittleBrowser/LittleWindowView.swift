@@ -16,7 +16,7 @@ struct LittleWindowView: View {
                 VStack(spacing: 0) {
                     LittleBrowserToolbar(model: model)
                         .environment(\.colorScheme, appearance.colorScheme)
-                    content
+                    content(palette: theme.semanticColorPalette[appearance.colorScheme])
                 }
                 .background { WindowSurface(background: background, next: nil) }
                 .overlay(alignment: .topTrailing) {
@@ -64,7 +64,7 @@ struct LittleWindowView: View {
         .ignoresSafeArea()
     }
 
-    private var content: some View {
+    private func content(palette: WindowTheme.SemanticColorPalette) -> some View {
         Group {
             if let page = model.page {
                 Group {
@@ -85,19 +85,24 @@ struct LittleWindowView: View {
         }
         .findInPage(of: model, on: model.page, hasTopBar: false)
         .toast(of: model, on: model.page)
+        // As Arc's cards: they grow from 0.8 out of the window's edge and fade, in a tenth of a second.
         .overlay(alignment: .topLeading) {
             if let request = model.permissionRequest {
-                LittlePermissionRequestView(model: model, request: request)
+                LittlePermissionRequestView(model: model, request: request, palette: palette)
                     .id(ObjectIdentifier(request))
                     .padding(8)
+                    .transition(.scale(scale: 0.8, anchor: .leading).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.1), value: model.permissionRequest == nil)
         .overlay(alignment: .topTrailing) {
             if model.little?.showsTip == true {
                 LittleBrowserTip { model.little?.showsTip = false }
                     .padding(8)
+                    .transition(.scale(scale: 0.8, anchor: .trailing).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.1), value: model.little?.showsTip)
         .overlay(alignment: .top) {
             LoadingIndicator(isLoading: model.page?.isLoading == true)
         }
@@ -357,81 +362,113 @@ struct LittleBrowserMoveMenu: View {
     }
 }
 
-/// Arc's `PermissionRequestDialogView`, which only its Little window shows: a card under the bar that only its
-/// buttons end.
+/// Arc's `PermissionRequestDialogView`, which only its Little window shows: a card under the bar, in the window's
+/// palette, that only its buttons end.
 struct LittlePermissionRequestView: View {
     let model: WindowModel
     let request: PagePermissionRequest
+    let palette: WindowTheme.SemanticColorPalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(PermissionRequestView.question(for: request, site: "this website"))
-                .font(.system(size: 13, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 4) {
-                Image(systemName: "lock.fill").font(.system(size: 9))
-                Text("Click the lock to change this any time").font(.system(size: 11))
+            HStack(spacing: 8) {
+                Image(systemName: request.kinds.first?.symbol ?? "hand.raised.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(palette.maxContrastColor.color)
+                    .frame(width: 24, height: 24)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(palette.background.color))
+                Text(PermissionRequestView.question(for: request, site: "this website"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(.secondary)
+            Text("Click the \(Image(systemName: "lock.fill")) to change this any time").font(.system(size: 11))
             HStack(spacing: 8) {
                 Button("Not Now") { model.respond(to: request, with: .deny) }
-                    .buttonStyle(Style(fill: 0.06))
+                    .buttonStyle(Style(fill: palette.backgroundExtra.color))
                 Button("Allow") { model.respond(to: request, with: .allow) }
-                    .buttonStyle(Style(fill: 0.16))
+                    .buttonStyle(Style(fill: palette.focus.color))
             }
-            .padding(.top, 4)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(minWidth: 232, maxWidth: 280, alignment: .leading)
-        .modifier(
-            PopoverBackgroundView(cornerRadius: 8, shadowColor: .black.opacity(0.25), shadowRadius: 12, shadowY: 4)
+        .foregroundStyle(.white)
+        .padding(16)
+        .frame(width: 232, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(palette.backgroundExtra.color)
+                .shadow(color: .black.opacity(0.2), radius: 5, y: 3)
         )
+        .padding(4)
         .onDisappear { model.permissionPromptClosed() }
     }
 
+    /// As seen in Arc: each button stands on a line a point below it.
     private struct Style: ButtonStyle {
-        let fill: Double
+        let fill: Color
 
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
                 .font(.system(size: 13, weight: .semibold))
                 .frame(maxWidth: .infinity, minHeight: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(.primary.opacity(configuration.isPressed ? fill + 0.08 : fill))
-                )
+                .background(RoundedRectangle(cornerRadius: 4).fill(fill))
+                .background(RoundedRectangle(cornerRadius: 4).fill(.white.opacity(0.13)).offset(y: 1))
+                .opacity(configuration.isPressed ? 0.8 : 1)
                 .contentShape(Rectangle())
         }
     }
 }
 
+/// Arc's `LittleBrowserNUXView`, in its `BrandBlue` whatever the appearance.
 struct LittleBrowserTip: View {
     let dismiss: () -> Void
+    @State private var isCloseHovered = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
-                (Text("Links Open in ") + Text("Little Oa").italic())
-                    .font(.system(size: 13, weight: .bold))
+        VStack(alignment: .leading, spacing: 4) {
+            (Text("Links Open in ") + Text("Little Oa").font(.system(size: 13, weight: .bold)).italic())
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+            WrappedLabel(maxWidth: 260) {
                 Text("Click “Open in” to move this page in a full window, or ⌘W to close")
-                    .font(.system(size: 12))
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
             }
+        }
+        .padding([.leading, .vertical], 10)
+        .padding(.trailing, 27)
+        .overlay(alignment: .topTrailing) {
             Button(action: dismiss) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .frame(width: 16, height: 16)
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .frame(width: 27, height: 27)
+                    .background(
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(.white.opacity(isCloseHovered ? 0.15 : 0))
+                            .padding(4)
+                    )
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { isCloseHovered = $0 }
             .accessibilityLabel("Close")
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(width: 260, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(red: 0.2, green: 0.36, blue: 0.96)))
-        .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(.displayP3, red: 0.192, green: 0.224, blue: 0.984))
+                .shadow(color: .black.opacity(0.3), radius: 5, y: 1)
+        )
+    }
+}
+
+/// As an AppKit label with a preferred maximum width: as wide as its longest line once wrapped there.
+private struct WrappedLabel: Layout {
+    let maxWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        subviews.first?.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil)) ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
     }
 }
