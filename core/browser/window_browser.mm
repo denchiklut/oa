@@ -3,7 +3,6 @@
 #import <AppKit/AppKit.h>
 
 #include <optional>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -52,11 +51,6 @@ NSMapTable<NSString*, NSWindow*>* AttachedWindows() {
   static NSMapTable<NSString*, NSWindow*>* windows =
       [NSMapTable strongToWeakObjectsMapTable];
   return windows;
-}
-
-std::set<std::string>& PopupWindows() {
-  static base::NoDestructor<std::set<std::string>> windows;
-  return *windows;
 }
 
 std::vector<base::WeakPtr<WindowBrowser>> OpenWindowBrowsers(
@@ -158,13 +152,9 @@ WindowBrowser* WindowBrowser::Find(const std::string& window_id,
 }
 
 // static
-void WindowBrowser::MarkPopup(const std::string& window_id) {
-  PopupWindows().insert(window_id);
-}
-
-// static
 WindowBrowser* WindowBrowser::GetOrCreate(const std::string& window_id,
-                                          Profile* profile) {
+                                          Profile* profile,
+                                          BrowserType type) {
   if (WindowBrowser* window_browser = Find(window_id, profile)) {
     return window_browser;
   }
@@ -173,7 +163,7 @@ WindowBrowser* WindowBrowser::GetOrCreate(const std::string& window_id,
     LOG(ERROR) << "oa: can't create a Browser for this profile now";
     return nullptr;
   }
-  BrowserWindowCreateParams params(PopupWindows().contains(window_id)
+  BrowserWindowCreateParams params(type == BrowserType::kPopup
                                        ? BrowserWindowInterface::TYPE_POPUP
                                        : BrowserWindowInterface::TYPE_NORMAL,
                                    *profile, /*from_user_gesture=*/false);
@@ -203,7 +193,6 @@ void WindowBrowser::CloseWindow(const std::string& window_id) {
        OpenWindowBrowsers(&window_id)) {
     RemoveAllTabs(window_browser);
   }
-  PopupWindows().erase(window_id);
 }
 
 // static

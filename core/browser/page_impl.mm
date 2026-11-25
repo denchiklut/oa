@@ -661,8 +661,11 @@ void PageImpl::MoveToWindow(const std::string& window_id) {
   if (!contents || !window_browser_) {
     return;
   }
+  // A little window's Browser is made with the window, so one made here is a
+  // standard window's.
   WindowBrowser* target = WindowBrowser::GetOrCreate(
-      window_id, window_browser_->browser()->GetProfile());
+      window_id, window_browser_->browser()->GetProfile(),
+      BrowserType::kNormal);
   if (!target || target == window_browser_.get()) {
     return;
   }

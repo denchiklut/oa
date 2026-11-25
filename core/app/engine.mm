@@ -294,8 +294,10 @@ void CreatePage(
               completion(nullptr, false);
               return;
             }
-            WindowBrowser* browser =
-                WindowBrowser::GetOrCreate(window_id, profile);
+            // The app makes a little window's Browser before its pages, as
+            // ADK does, so one made here is a standard window's.
+            WindowBrowser* browser = WindowBrowser::GetOrCreate(
+                window_id, profile, BrowserType::kNormal);
             if (!browser) {
               completion(nullptr, false);
               return;
