@@ -40,12 +40,10 @@ class BrowserImpl : public Browser {
               Browser::Observer* observer)
       : window_id_(window_id),
         profile_id_(profile_id),
+        browser_type_(browser_type),
         restores_(type == BrowserContextType::kNormal),
         observer_(observer) {
     AllBrowsers().push_back(this);
-    if (browser_type == BrowserType::kPopup) {
-      WindowBrowser::MarkPopup(window_id);
-    }
     // As ADK's: the profile is expected to restore before its Browser is
     // asked for, so the first Browser's own restored tabs are parked too. An
     // incognito context never restores.
@@ -122,7 +120,7 @@ class BrowserImpl : public Browser {
     if (profile) {
       profile_ = profile->GetWeakPtr();
       // The profile's first Browser starts Chrome's restore of its session.
-      WindowBrowser::GetOrCreate(window_id_, profile);
+      WindowBrowser::GetOrCreate(window_id_, profile, browser_type_);
     }
     if (restores_) {
       SessionRestoration::Resolve(profile_id_, profile);
@@ -143,6 +141,7 @@ class BrowserImpl : public Browser {
 
   const std::string window_id_;
   const std::string profile_id_;
+  const BrowserType browser_type_;
   const bool restores_;
   bool started_ = false;
   bool awaits_restored_pages_ = true;

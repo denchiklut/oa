@@ -32,12 +32,12 @@ class PageImpl;
 // BrowserWindowImpl, so it lives exactly as long as the Browser.
 class WindowBrowser : public TabStripModelObserver {
  public:
+  // As ArcCore's two creators: a little window's Browser is Chrome's popup.
+  // `type` is read only when the Browser is made.
   static WindowBrowser* GetOrCreate(const std::string& window_id,
-                                    Profile* profile);
+                                    Profile* profile,
+                                    BrowserType type);
   static WindowBrowser* Find(const std::string& window_id, Profile* profile);
-  // The window's Browsers are Chrome's popups from here on, as ArcCore's for a
-  // little window. Told before any of them is made.
-  static void MarkPopup(const std::string& window_id);
   static void AttachWindow(const std::string& window_id, void* ns_window);
   static void CloseWindow(const std::string& window_id);
   static void AskToLeave(const std::string& window_id,
