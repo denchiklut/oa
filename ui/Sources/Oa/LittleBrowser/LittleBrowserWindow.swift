@@ -36,6 +36,13 @@ final class LittleBrowserWindow: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
+    /// While the window covers its screen for a present or a dismiss, menu bar included as Arc's does.
+    var coversScreen = false
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        coversScreen ? frameRect : super.constrainFrameRect(frameRect, to: screen)
+    }
+
     /// Arc's show. Over a full-screen window on the session's screen the panel joins that Space and leaves the app
     /// as it is; anywhere else it is an ordinary window and the app comes forward on the next turn. Either way it
     /// comes to the active Space, which `makeKey` undoes.

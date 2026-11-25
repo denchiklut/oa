@@ -163,19 +163,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
     }
 
-    /// As Arc's close: a link's window puts its card back into the point it came from, floating meanwhile if it is
-    /// key; one from the menu or the hot key just goes.
+    /// As Arc's close: the window floats if it is key, and a link's puts its card back towards the point it came
+    /// from; one from the menu or the hot key just goes.
     private func dismissLittleWindow(_ finish: @escaping () -> Void) {
         guard let window, let littleLayout, window.isVisible, !window.isMiniaturized,
-            !window.styleMask.contains(.fullScreen),
-            case .center(let source) = model.little?.session.preferredFrame.anchor
+            !window.styleMask.contains(.fullScreen)
         else { return finish() }
-        isPlacingLittleWindow = true
-        if !littleLayout.isScreenSized { littleLayout.apply(.screen(contentRect: window.frame)) }
         if window.isKeyWindow {
             window.level = .floating
             (window as? NSPanel)?.isFloatingPanel = true
         }
+        guard case .center(let source) = model.little?.session.preferredFrame.anchor else { return finish() }
+        isPlacingLittleWindow = true
+        if !littleLayout.isScreenSized { littleLayout.apply(.screen(contentRect: window.frame)) }
         littleLayout.dismiss(to: source, completion: finish)
     }
 

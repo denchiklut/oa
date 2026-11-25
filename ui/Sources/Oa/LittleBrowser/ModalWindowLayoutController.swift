@@ -2,7 +2,8 @@ import AppKit
 
 /// Arc's `ModalWindowLayoutMode`.
 enum ModalWindowLayoutMode {
-    /// See-through, without a shadow and as big as its screen, the card at `contentRect` on the screen.
+    /// See-through, without a shadow and as big as its screen, the card at `contentRect` on the screen. As seen in
+    /// Arc, it takes the clicks that miss the card.
     case screen(contentRect: NSRect)
     case intrinsic(rect: NSRect)
 }
@@ -19,7 +20,7 @@ final class ModalV2HostView: NSView {
 /// frame it ends in.
 @MainActor
 final class ModalWindowLayoutController {
-    private weak var window: NSWindow?
+    private weak var window: LittleBrowserWindow?
     private let card: ModalV2HostView
     private var background: NSColor?
     private(set) var isScreenSized = false
@@ -31,7 +32,7 @@ final class ModalWindowLayoutController {
     /// Arc's `tweenFromSource`: the card starts as wide as this, at its own proportions.
     private static let sourceWidth: CGFloat = 20
 
-    init(window: NSWindow, card: ModalV2HostView) {
+    init(window: LittleBrowserWindow, card: ModalV2HostView) {
         self.window = window
         self.card = card
         card.layer?.shadowColor = .black
@@ -49,9 +50,11 @@ final class ModalWindowLayoutController {
         case .screen(let contentRect):
             if !isScreenSized { background = window.backgroundColor }
             isScreenSized = true
+            window.coversScreen = true
             window.hasShadow = false
             window.isOpaque = false
             window.backgroundColor = .clear
+            window.ignoresMouseEvents = false
             // Arc takes the window's screen, which a window not yet shown hasn't.
             let screen = NSScreen.screens.max {
                 $0.frame.intersection(contentRect).width < $1.frame.intersection(contentRect).width
@@ -66,6 +69,7 @@ final class ModalWindowLayoutController {
             card.layer?.shadowOpacity = Self.shadowOpacity
         case .intrinsic(let rect):
             isScreenSized = false
+            window.coversScreen = false
             if window.frame != rect { window.setFrame(rect, display: true) }
             card.frame = root.bounds
             card.autoresizingMask = [.width, .height]
@@ -123,6 +127,12 @@ final class ModalWindowLayoutController {
                 let spring = Self.spring(keyPath, expanding: expanding)
                 (spring.fromValue, spring.toValue) = expanding ? values : (values.1, values.0)
                 layer.add(held(spring), forKey: "modal-\(keyPath)")
+            }
+            // As seen in Arc: a closing card is gone well before it reaches the point.
+            if !expanding {
+                let fade = CABasicAnimation(keyPath: "opacity")
+                (fade.fromValue, fade.toValue, fade.duration) = (1, 0, 0.1)
+                layer.add(held(fade), forKey: "modalFade")
             }
         }
         CATransaction.commit()
