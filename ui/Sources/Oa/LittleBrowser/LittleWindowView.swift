@@ -61,14 +61,9 @@ struct LittleWindowView: View {
     private func content(palette: WindowTheme.SemanticColorPalette) -> some View {
         Group {
             if let page = model.page {
-                Group {
-                    if page.crash != nil {
-                        CrashedPageView(page: page)
-                    } else {
-                        PageHostView(view: page.view)
-                    }
-                }
-                .pageRootBackground(page)
+                // As Arc's: the Little window's page has the docked layout too, which its DevTools' own shortcut reaches.
+                PageContentView(page: page)
+                    .pageRootBackground(page)
             } else {
                 Color.clear
             }
