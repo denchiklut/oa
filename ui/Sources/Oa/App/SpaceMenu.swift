@@ -3,6 +3,9 @@ import SwiftUI
 
 /// Arc's Space menu, in its order. AppKit's, as Arc's is: a SwiftUI menu can't show a submenu disabled. A Library
 /// card's leaves out Manage Spaces…, as Arc's does. What Oa doesn't have yet is listed disabled.
+///
+/// As seen in Arc, the card of a window's own Space lists them all enabled too, with Show Space Header where Export
+/// is. Oa's own: what acts on the Space is off there, as what Arc's do to such a Space wasn't tried.
 @MainActor
 struct SpaceMenu {
     let model: WindowModel
@@ -13,27 +16,34 @@ struct SpaceMenu {
     let editTheme: () -> Void
 
     func make() -> NSMenu {
+        let global = model.state.isGlobal(space.id)
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.items = [
-            MenuActionItem("Change Space Icon…", changeIcon),
-            MenuActionItem("Rename Space…", rename),
-            MenuActionItem("Edit Theme Color…", editTheme),
-            MenuActionItem("Set Profile", submenu: profiles()),
+            MenuActionItem("Change Space Icon…", global ? changeIcon : nil),
+            MenuActionItem("Rename Space…", global ? rename : nil),
+            MenuActionItem("Edit Theme Color…", global ? editTheme : nil),
+            MenuActionItem("Set Profile", submenu: profiles(), enabled: global),
             .separator(),
             MenuActionItem("New Folder"),
             MenuActionItem("Live Folders", submenu: NSMenu(), enabled: false),
             .separator(),
             MenuActionItem("Share Space…"),
-            MenuActionItem("Export “\(space.name)” into Folder", submenu: NSMenu(), enabled: false),
-            .separator(),
         ]
+        if global {
+            menu.addItem(
+                MenuActionItem("Export “\(space.name)” into Folder", submenu: NSMenu(), enabled: false))
+        } else {
+            menu.addItem(.separator())
+            menu.addItem(MenuActionItem("Show Space Header"))
+        }
+        menu.addItem(.separator())
         if !inLibrary {
             menu.addItem(MenuActionItem("Manage Spaces…") { [model] in model.viewLibrary(.spaces) })
             menu.addItem(.separator())
         }
         let delete = MenuActionItem("Delete Space") { [model, space] in SpaceDeletion.confirm(space, in: model) }
-        delete.isEnabled = model.state.spaces.count > 1
+        delete.isEnabled = global && model.state.spaces.count > 1
         menu.addItem(delete)
         return menu
     }

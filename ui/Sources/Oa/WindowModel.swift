@@ -1284,7 +1284,8 @@ final class WindowModel {
     }
 
     /// Arc's Create a Space panel, on the window's Space's profile, after `spaceID` or, as Arc's `.absolute(-1)`, at
-    /// the end. As Arc, it leaves the Library and changes neither the Space nor the selection.
+    /// the end. As Arc, it leaves the Library and changes neither the Space nor the selection. As seen in Arc, the
+    /// Library's + of a window with a sidebar of its own does nothing.
     func beginSpaceCreation(after spaceID: UUID? = nil, moving itemIDs: [UUID] = []) {
         guard spaceCreation == nil, sidebarContext == .global, let space else { return }
         closeCommandBar()
@@ -1347,7 +1348,7 @@ final class WindowModel {
     }
 
     func moveSpace(_ spaceID: UUID, to index: Int) {
-        guard state.spaces.firstIndex(where: { $0.id == spaceID }) != index else { return }
+        guard let current = state.spaces.firstIndex(where: { $0.id == spaceID }), current != index else { return }
         store.edit { $0.moveSpace(spaceID, to: index) }
     }
 

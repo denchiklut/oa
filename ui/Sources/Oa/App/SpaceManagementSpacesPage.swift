@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Arc's Spaces page of the Library: a card for each Space in a row that scrolls sideways, 24 pt apart and 24 pt in,
-/// each 240 pt wide and 96 pt shorter than the row, then the item that adds a Space. A row that fits is centred.
+/// each 240 pt wide and 96 pt shorter than the row, then the item that adds a Space. A row that fits is centred. As
+/// seen in Arc, a window with a sidebar of its own has only its own Space's card.
 struct SpaceManagementSpacesPage: View {
     /// What the page asks of the Library's width for a count of Spaces, as Arc's: the cards, the item that adds one,
     /// and room for the rail.
@@ -28,11 +29,11 @@ struct SpaceManagementSpacesPage: View {
     var body: some View {
         GeometryReader { geometry in
             let viewport = SpaceManagementViewport(
-                width: geometry.size.width, spaces: model.state.spaces.count, scroll: scroll, pageInset: pageInset,
+                width: geometry.size.width, spaces: model.spaces.count, scroll: scroll, pageInset: pageInset,
                 progress: progress)
             ScrollView(.horizontal) {
                 HStack(spacing: 24) {
-                    ForEach(Array(model.state.spaces.enumerated()), id: \.element.id) { index, space in
+                    ForEach(Array(model.spaces.enumerated()), id: \.element.id) { index, space in
                         let isDragged = drag?.spaceID == space.id
                         SpaceManagementCollectionViewItem(model: model, layout: layout, space: space) {
                             move(space.id, from: index, by: $0)
@@ -84,7 +85,7 @@ struct SpaceManagementSpacesPage: View {
         guard drag?.spaceID == spaceID else { return }
         drag?.translation = translation
         let slots = Int((translation.width / 264).rounded())
-        drag?.target = min(max(index + slots, 0), model.state.spaces.count - 1)
+        drag?.target = min(max(index + slots, 0), model.spaces.count - 1)
     }
 
     private func drop() {
@@ -204,16 +205,25 @@ private struct SpaceManagementCollectionViewItem: View {
         let appearance = background.contentOverBackgroundAppearance
         let theme = Theme(palette: spaceTheme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         let unpinned = model.state.tabs(in: space.id, pinned: false)
+        let global = model.state.isGlobal(space.id)
         VStack(alignment: .leading, spacing: 0) {
-            SpaceManagementCardHeader(
-                model: model, space: space, isPickingIcon: $isPickingIcon, isEditingName: $isEditingName
-            )
-            .padding([.horizontal, .top], 8)
+            if global {
+                SpaceManagementCardHeader(
+                    model: model, space: space, isPickingIcon: $isPickingIcon, isEditingName: $isEditingName
+                )
+                .padding([.horizontal, .top], 8)
+            } else {
+                // As measured on Arc: the pill 15 pt and the rows 45 pt below the card's top. Oa's own: Move to…
+                // shows under the pointer here, where Arc's card only keeps it as the sidebar's header left it.
+                ProfileIndicatorView(model: model, space: space)
+                    .frame(height: 37, alignment: .top)
+                    .padding([.horizontal, .top], 8)
+            }
             ScrollView {
                 VStack(spacing: 1) {
                     ForEach(model.state.tabs(in: space.id, pinned: true)) { row($0) }
-                    // As Arc's card: Clear shows without the pointer over it.
-                    if !unpinned.isEmpty {
+                    // As Arc's card: Clear shows without the pointer over it. None for a window's own Space.
+                    if global, !unpinned.isEmpty {
                         ClearDivider(model: model, spaceID: space.id, showsClear: true, inCard: true)
                     }
                     ForEach(unpinned) { row($0) }
