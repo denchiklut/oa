@@ -6,7 +6,7 @@ extension WindowModel {
 
     /// As Arc's: worked out as the window is made and each time it becomes key, and not when its profile changes.
     func updateLittleDestination() {
-        guard sidebarContext == .little, let profileID = space?.profileID else { return }
+        guard isLittle, let profileID = space?.profileID else { return }
         little?.destinationSpaceID = littleDestination(profileID)
     }
 
@@ -18,7 +18,7 @@ extension WindowModel {
     /// window the app picks for it.
     func moveLittlePage(toSpace spaceID: UUID) {
         little?.showsMoveMenu = false
-        guard sidebarContext == .little, let tabID = selectedTabID else { return }
+        guard isLittle, let tabID = selectedTabID else { return }
         moveItems([tabID], toSpace: spaceID)
     }
 
@@ -30,7 +30,7 @@ extension WindowModel {
     /// As seen in Arc: the tip counts each showing, twice at most, and only its ✕ takes it away.
     func showLittleTipIfDue() {
         let count = UserDefaults.standard.integer(forKey: LittleBrowserPreferences.tipCountKey)
-        guard let little, little.entryPoint.showsTip, !little.showsTip, count < 2 else { return }
+        guard let little, little.session.entryPoint.showsTip, !little.showsTip, count < 2 else { return }
         UserDefaults.standard.set(count + 1, forKey: LittleBrowserPreferences.tipCountKey)
         self.little?.showsTip = true
     }

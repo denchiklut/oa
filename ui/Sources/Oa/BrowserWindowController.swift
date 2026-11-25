@@ -22,7 +22,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let windowButtons: [NSButton]
 
     init(
-        id: UUID, sidebarContext: SidebarContext, engine: any BrowserApplication, store: SidebarStore,
+        id: UUID, style: WindowStyle, engine: any BrowserApplication, store: SidebarStore,
         downloads: DownloadsStore, pictureInPicture: PictureInPicture, spaceID: UUID,
         didClose: @escaping (BrowserWindowController) -> Void
     ) {
@@ -30,9 +30,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         self.store = store
         self.didClose = didClose
         model = WindowModel(
-            id: id, sidebarContext: sidebarContext, engine: engine, store: store, downloads: downloads,
+            id: id, style: style, engine: engine, store: store, downloads: downloads,
             pictureInPicture: pictureInPicture, spaceID: spaceID)
-        let isLittle = sidebarContext == .little
+        let isLittle = model.isLittle
         layout = isLittle ? nil : WindowLayoutController(model: model)
         let window: NSWindow =
             isLittle
@@ -51,8 +51,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // As Arc's browser windows: AppKit keeps them across a quit and hands them back by the window's ID.
         window.identifier = NSUserInterfaceItemIdentifier(id.uuidString)
         window.restorationClass = ApplicationDelegate.self
-        // As Arc's: an incognito window never comes back, nor a Little one without an update's relaunch.
-        window.isRestorable = sidebarContext != .incognito && !isLittle
+        // As Arc's: an incognito window is never handed back. A Little one is, and is refused there.
+        window.isRestorable = model.sidebarContext != .incognito
         windowButtons = [.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
         windowButtons.forEach { $0.isHidden = true }
         super.init(window: window)
@@ -165,6 +165,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         LittleBrowserFrame.save(window.frame)
     }
 
+    /// Arc's `WindowConstants.isLittleArc`, which its restore reads to refuse a Little window.
+    static let isLittleArcKey = "isLittleArc"
+
+    func window(_ window: NSWindow, willEncodeRestorableState state: NSCoder) {
+        state.encode(model.isLittle, forKey: Self.isLittleArcKey)
+    }
+
     func windowDidMove(_ notification: Notification) { saveLittleFrame() }
     func windowDidEndLiveResize(_ notification: Notification) { saveLittleFrame() }
 
@@ -227,7 +234,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeTitle() }
         }
-        if model.sidebarContext == .little {
+        if model.isLittle {
             // As seen in Arc's Window menu.
             window?.title = title.isEmpty ? "Little Oa" : "Little Oa — \(title)"
         } else {
@@ -293,7 +300,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func networkInspector(_ sender: Any?) { model.frontPage?.devTools.toggleNetwork() }
     /// Arc's `openInCurrentSpace:`, which a Little window answers too.
     @objc func expandPeek(_ sender: Any?) {
-        if model.sidebarContext == .little { model.openInLittleDestination() } else { model.expandPeek() }
+        if model.isLittle { model.openInLittleDestination() } else { model.expandPeek() }
     }
     @objc func showLittleMoveMenu(_ sender: Any?) { model.little?.showsMoveMenu = true }
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
@@ -451,7 +458,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// The window's commands wait while a dialog is up, as Arc swallows them; other windows and quit stay usable.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(showLittleMoveMenu(_:)) { return model.littleDestinationSpace != nil }
-        if item.action == #selector(expandPeek(_:)), model.sidebarContext == .little {
+        if item.action == #selector(expandPeek(_:)), model.isLittle {
             // As seen in Arc: the Tabs menu names the Space the button does.
             item.title = "Open in \(model.littleDestinationSpace?.name ?? "")"
             return model.littleDestinationSpace != nil && model.frontPage != nil
@@ -503,7 +510,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                 #selector(restoreLastClosed(_:)), #selector(toggleLibrary(_:)), #selector(toggleDownloads(_:)),
                 #selector(selectTab(_:)),
             ]
-            if model.sidebarContext == .little, little.contains(action) { return false }
+            if model.isLittle, little.contains(action) { return false }
             // As seen in Arc: an incognito window's menus have Extensions, Library, Downloads, Archive and Clear
             // Today off; its Library still opens from the sidebar.
             let incognito = [

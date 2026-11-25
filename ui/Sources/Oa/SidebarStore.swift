@@ -168,14 +168,29 @@ final class SidebarStore {
         }
     }
 
-    /// As Arc's sweep of its Little windows, every 300 s.
+    /// As Arc's sweep of its Little windows, a second after launch and every 300 s.
     func startLittleAutoArchive() {
         littleSweep = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
             while let self, !Task.isCancelled {
+                archiveIdleLittlePages()
                 try? await Task.sleep(for: .seconds(300))
-                let before = Date.now.addingTimeInterval(-LittleBrowserPreferences.autoArchiveThreshold.seconds)
-                for window in windows where window.isLittleIdle(since: before) { window.archiveLittlePages() }
             }
+        }
+    }
+
+    /// As Arc's, by container: one whose window didn't come back after the last quit is swept too, by the dates its
+    /// record kept. Oa's own: its rows are filed under Little Arc, where Arc's source for them is unknown.
+    private func archiveIdleLittlePages() {
+        let before = Date.now.addingTimeInterval(-LittleBrowserPreferences.autoArchiveThreshold.seconds)
+        for window in windows where window.isLittleIdle(since: before) { window.archiveLittlePages() }
+        let open = Set(windows.map(\.id))
+        for (container, space) in state.containers {
+            guard case .littleBrowser(let windowID) = container, !open.contains(windowID) else { continue }
+            let tabIDs = state.tabs(in: space.id).map(\.id)
+            let dates = savedWindows.first { $0.id == windowID }?.lastActiveDates ?? [:]
+            guard !tabIDs.isEmpty, tabIDs.allSatisfy({ dates[$0].map { $0 < before } ?? false }) else { continue }
+            edit { state in tabIDs.forEach { state.archiveTab($0, reason: .auto) } }
         }
     }
 
@@ -203,36 +218,19 @@ final class SidebarStore {
         scheduleSave()
     }
 
-    /// A window's own container goes with it, its tabs unarchived, as seen in Arc when its last tab closes it and
-    /// when it is closed by its button. A Little window's pages are archived first, as seen in Arc; at a quit too,
-    /// Oa's own, as its Little windows don't come back.
+    /// As seen in Arc: a Little window's pages are archived as it closes. Then, as Arc's `WindowsData.clean`, the
+    /// containers with no window go, their tabs unarchived: this window's own, and one a window left at the last
+    /// quit without coming back. Nothing is closed at a quit, so nothing goes then.
     func removeWindow(_ window: WindowModel) {
         windows.removeAll { $0 === window }
-        if case .littleBrowser? = window.sidebarContext.container(of: window.id) {
-            let tabIDs = state.tabs(in: window.selectedSpaceID).map(\.id)
-            edit { state in
-                for tabID in tabIDs { state.archiveTab(tabID, reason: .manual) }
-                state.removeContainer(.littleBrowser(window.id))
-            }
-        } else if !quitting, let container = window.sidebarContext.container(of: window.id) {
-            edit { $0.removeContainer(container) }
+        guard !quitting else { return }
+        let open = Set(windows.compactMap { $0.style.container(of: $0.id) })
+        let littleTabIDs = window.isLittle ? state.tabs(in: window.selectedSpaceID).map(\.id) : []
+        edit { state in
+            for tabID in littleTabIDs { state.archiveTab(tabID, reason: .manual) }
+            for container in state.containers.keys where !open.contains(container) { state.removeContainer(container) }
         }
         scheduleSave()
-    }
-
-    /// Oa's own, as its Little windows don't come back: their pages go to the Archive at a quit.
-    func archiveLittlePagesForQuit() {
-        for window in windows where window.sidebarContext == .little {
-            for tab in state.tabs(in: window.selectedSpaceID) { state.archiveTab(tab.id, reason: .manual) }
-        }
-    }
-
-    /// Oa's own: once the windows are back, a container whose window didn't come back goes.
-    func removeContainersWithoutWindows() {
-        let open = Set(windows.compactMap { $0.sidebarContext.container(of: $0.id) })
-        let orphans = state.containers.keys.filter { !open.contains($0) }
-        guard !orphans.isEmpty else { return }
-        edit { state in orphans.forEach { state.removeContainer($0) } }
     }
 
     func windowStateChanged() {
@@ -276,7 +274,7 @@ final class SidebarStore {
 
     private var sessionRestorationMapping: [SessionRestorationClient.Key: Int32] {
         var mapping: [SessionRestorationClient.Key: Int32] = [:]
-        for window in windows where window.sidebarContext != .incognito && window.sidebarContext != .little {
+        for window in windows where window.sidebarContext != nil && window.sidebarContext != .incognito {
             for (tabID, page) in window.pages where page.tabSessionID >= 0 {
                 guard let profile = state.profile(containing: tabID) else { continue }
                 mapping[.init(itemId: tabID, browser: .init(windowID: window.id, contextID: profile.id))] =
@@ -291,8 +289,7 @@ final class SidebarStore {
             state,
             windows: WindowsSnapshot(
                 sidebarViewPreferences: sidebarViewPreferences,
-                windows: windows.filter { $0.sidebarContext != .incognito && $0.sidebarContext != .little }
-                    .map(\.record)))
+                windows: windows.filter { $0.sidebarContext != .incognito }.map(\.record)))
         sessionRestoration.save(sessionRestorationMapping)
         favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
     }

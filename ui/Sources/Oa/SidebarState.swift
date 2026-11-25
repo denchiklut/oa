@@ -6,7 +6,6 @@ enum SidebarContainerType: Hashable, Codable {
     case standalone(UUID)
     /// Never saved, as Arc's.
     case incognito(UUID)
-    /// Arc saves it for the relaunch after an update, which Oa hasn't: never saved.
     case littleBrowser(UUID)
 }
 
@@ -15,15 +14,46 @@ enum SidebarContext: Codable {
     case global
     case standalone
     case incognito
-    /// Arc's `WindowStyle.little`, which is no sidebar context there: a Little window has no sidebar to show.
-    case little
+}
+
+/// Arc's `WindowStyle`, coded as Arc's: the case's name over its state.
+enum WindowStyle: Codable {
+    case standard(sidebarContext: SidebarContext)
+    case little(LittleBrowserState)
+
+    private enum Key: String, CodingKey { case standard, little }
+    private enum StandardKey: String, CodingKey { case sidebarContext }
+
+    var sidebarContext: SidebarContext? {
+        if case .standard(let context) = self { context } else { nil }
+    }
 
     func container(of windowID: UUID) -> SidebarContainerType? {
         switch self {
-        case .global: nil
-        case .standalone: .standalone(windowID)
-        case .incognito: .incognito(windowID)
+        case .standard(.global): nil
+        case .standard(.standalone): .standalone(windowID)
+        case .standard(.incognito): .incognito(windowID)
         case .little: .littleBrowser(windowID)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: Key.self)
+        if values.contains(.little) {
+            self = .little(try values.decode(LittleBrowserState.self, forKey: .little))
+        } else {
+            let standard = try values.nestedContainer(keyedBy: StandardKey.self, forKey: .standard)
+            self = .standard(sidebarContext: try standard.decode(SidebarContext.self, forKey: .sidebarContext))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: Key.self)
+        switch self {
+        case .standard(let context):
+            var standard = values.nestedContainer(keyedBy: StandardKey.self, forKey: .standard)
+            try standard.encode(context, forKey: .sidebarContext)
+        case .little(let state): try values.encode(state, forKey: .little)
         }
     }
 }
@@ -289,6 +319,9 @@ struct SidebarState {
     }
 
     func profile(_ id: UUID) -> SidebarProfile? { profiles.first { $0.id == id } }
+
+    /// Arc's `hasMultipleProfilesInUse`.
+    var hasMultipleProfilesInUse: Bool { Set(spaces.map(\.profileID)).count > 1 }
 
     var tabCount: Int { tree.items.values.filter { $0.tab != nil }.count }
 

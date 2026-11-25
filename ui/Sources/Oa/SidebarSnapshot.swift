@@ -160,7 +160,7 @@ struct SidebarSnapshot: Codable {
             return Tree(rootIDs: rootIDs, items: items.map(Item.init))
         }
         let saved = state.containers.filter {
-            if case .standalone = $0.key { true } else { false }
+            if case .incognito = $0.key { false } else { true }
         }
         .sorted { $0.value.id.uuidString < $1.value.id.uuidString }
         let containerRootIDs = Set(state.containers.values.map(\.unpinnedRootID))
@@ -248,25 +248,20 @@ struct WindowRecord: Codable {
     var collapsedPinnedSpaces: Set<UUID>
     /// Oa's own key: the tab the window showed, which comes back shown with its page when the last session does.
     var selectedTabID: UUID?
-    var sidebarContext: SidebarContext
+    var style: WindowStyle
 
     private enum Key: String, CodingKey {
         case id, selectedSpaceID, sidebarMode, sidebarWidth, lastActiveDates, createdDates, selectedTabID, style
         case collapsedPinnedSpaces = "spacesWithCollapsedPinnedSections"
     }
 
-    /// Arc's `WindowCreationOptions.Style` as `StorableWindows` keeps it.
-    private enum Style: Codable {
-        case standard(sidebarContext: SidebarContext)
-    }
-
     init(
-        id: UUID, sidebarContext: SidebarContext, selectedSpaceID: UUID, sidebarMode: SidebarMode,
+        id: UUID, style: WindowStyle, selectedSpaceID: UUID, sidebarMode: SidebarMode,
         sidebarWidth: CGFloat, lastActiveDates: [UUID: Date], createdDates: [UUID: Date],
         collapsedPinnedSpaces: Set<UUID>, selectedTabID: UUID?
     ) {
         self.id = id
-        self.sidebarContext = sidebarContext
+        self.style = style
         self.selectedSpaceID = selectedSpaceID
         self.sidebarMode = sidebarMode
         self.sidebarWidth = sidebarWidth
@@ -293,10 +288,8 @@ struct WindowRecord: Codable {
         createdDates = try dates(.createdDates)
         collapsedPinnedSpaces = try values.decodeIfPresent(Set<UUID>.self, forKey: .collapsedPinnedSpaces) ?? []
         selectedTabID = try values.decodeIfPresent(UUID.self, forKey: .selectedTabID)
-        switch try values.decodeIfPresent(Style.self, forKey: .style) {
-        case .standard(let context): sidebarContext = context
-        case nil: sidebarContext = .global
-        }
+        // As Arc's: a style that doesn't read, as a hot key's Little window's, is a standard window's.
+        style = (try? values.decode(WindowStyle.self, forKey: .style)) ?? .standard(sidebarContext: .global)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -313,7 +306,7 @@ struct WindowRecord: Codable {
         try values.encode(
             collapsedPinnedSpaces.sorted { $0.uuidString < $1.uuidString }, forKey: .collapsedPinnedSpaces)
         try values.encodeIfPresent(selectedTabID, forKey: .selectedTabID)
-        try values.encode(Style.standard(sidebarContext: sidebarContext), forKey: .style)
+        try values.encode(style, forKey: .style)
     }
 }
 
