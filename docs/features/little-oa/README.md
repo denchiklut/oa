@@ -55,8 +55,10 @@ the window opens and each time it becomes key. A Space of another profile asks
 first and loads the page again there. A Little window left without pages fades
 away.
 
-The profile chip lists the profiles that have a Space. Switching asks, loads the
-shown page again in that profile, and remembers the profile for the page's host.
+The profile chip lists the profiles that have a Space, and shows only in a
+window made while more than one profile was in use, as Arc's. Switching asks,
+loads the shown page again in that profile, and remembers the profile for the
+page's host.
 
 ⌘W closes one page into the Archive and the window goes with its last one; the
 red button archives them all. Restore Last Closed Tab has nothing to bring back
@@ -69,6 +71,29 @@ A permission request is a card under the bar with Not Now and Allow, ended only
 by its buttons. Developer Tools open in their own window. The first two windows
 opened by the File menu or a link from another app carry a tip.
 
+## Saved state
+
+A Little window is a window style, as Arc's: its record in `windows.json` has
+`style.little` where a standard window has `style.standard`, under Arc's keys.
+It holds the session (id, entry point, preferred frame, start time), the
+profile, whether to show the profile chip, and whether the window is its bar or
+a page. Its pages are in a `littleBrowser` container in `sidebar.json`. Both
+files are saved together a few seconds after a change. The frame is not in the
+record; the open Open in menu, the tip and the Open in target are rebuilt.
+
+The entry point is coded as Arc codes it, the hot key's case included: Arc
+writes it as a link with no address, which doesn't read back, so that record
+reads as a standard window's.
+
+At a quit nothing is closed or archived. A key Little window that is its bar
+alone closes first when Quit is chosen; the others are written to the files as
+they stand. At the next launch AppKit hands a Little window back and it is
+refused: Arc restores one only on the relaunch after an automatic update, which
+Oa hasn't. Its record goes at the first save. Its container and pages stay
+until some window closes, then go without an Archive row. The idle sweep runs a
+second after launch and takes such a container's pages into the Archive first
+when they were all inactive for the set time.
+
 ## Engine
 
 A Little window's Browser is Chromium's popup type. Patches 0026 to 0029 give
@@ -79,9 +104,13 @@ opens its own window. Blink's ⌘⌥-click reaches the app as a background page.
 
 ## Oa's own
 
-- Little windows never come back after a quit: Arc brings them back only after
-  an update's relaunch, which Oa hasn't. Their pages go to the Archive at a
-  quit.
+- The record's profile is Oa's profile ID, and its dates are in the file's
+  date form, as everywhere in Oa's files.
+- The record has no `downloads`: a Little window has no downloads tray yet.
+- The pages the sweep archives from a window that didn't come back are filed
+  under Little Arc; Arc's source for them is unknown.
+- AppKit's saved state says only that the window is a Little one; Arc's also
+  says minimised and full screen, for every window.
 - Escape keeps a page window; what Arc's does wasn't seen.
 - A ⌘⌥-click's page is the engine's, moved to the Little window on the opener's
   profile; who makes it in Arc is unknown.
