@@ -185,8 +185,8 @@ struct BrowserWindowView: View {
                 model: model, hasContent: model.placeholder != nil || model.page != nil,
                 barHeight: showsToolbar ? 32 : 0
             )
-            .findInPage(of: model, on: model.placeholder == nil ? model.page : nil)
         }
+        .findInPage(of: model, on: model.placeholder == nil ? model.page : nil, hasTopBar: showsToolbar)
         .toast(of: model, on: model.page)
         .onChange(of: showsToolbar ? model.page?.id : nil, initial: true) { _, _ in
             model.trackToolbarPage(showsToolbar)

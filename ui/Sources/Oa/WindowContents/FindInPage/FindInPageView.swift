@@ -3,14 +3,17 @@ import DevKit
 import SwiftUI
 
 extension View {
-    /// As Arc's `WindowContentViewController` places `FindInPageView`: 10 pt in from the page's top right, 300 pt wide
-    /// and narrower in a slim pane.
-    func findInPage(of model: WindowModel, on page: (any Page)?) -> some View {
+    /// As Arc's `WindowContentViewController` places `FindInPageView`: 10 pt in from the top right of the content and
+    /// its bar, 300 pt wide and narrower in a slim pane.
+    func findInPage(of model: WindowModel, on page: (any Page)?, hasTopBar: Bool) -> some View {
         overlay(alignment: .topTrailing) {
             if let page, let state = model.findInPageState(of: page) {
                 FindInPageView(model: model, page: page, state: state)
                     .frame(maxWidth: 300)
-                    .padding([.top, .leading, .trailing], 10)
+                    .padding([.leading, .trailing], 10)
+                    // Arc sets the top to 50 while a toolbar or a pane's `ContentPanel` bar is up, which leaves a
+                    // page's toast (8 pt down, 42 pt high) clear of the bar.
+                    .padding(.top, hasTopBar ? 50 : 10)
             }
         }
         .onChange(of: page.map { PageAddress(id: $0.id, url: $0.url) }) { old, new in

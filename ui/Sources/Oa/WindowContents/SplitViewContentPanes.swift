@@ -206,8 +206,8 @@ private struct SplitViewContentPane: View {
                 model: model, hasContent: page != nil || model.placeholder(for: tabID) != nil,
                 barHeight: splitID == nil ? 0 : 32
             )
-            .findInPage(of: model, on: model.placeholder(for: tabID) == nil ? page : nil)
         }
+        .findInPage(of: model, on: model.placeholder(for: tabID) == nil ? page : nil, hasTopBar: splitID != nil)
         .toast(of: model, on: page)
         .background(dark ? Color.black : .white)
         .clipShape(shape)
