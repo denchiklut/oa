@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 24 Nov 2026 23:24:29 -0700
+Subject: [PATCH] oa: keep a new tab in the browser it is asked of, as ArcCore
+ does
+
+---
+ chrome/browser/ui/navigator/browser_navigator.cc | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+index 1e98a3d7cba4e7913cb67741a36d19c8ce493885..2ccc0eee3e6909acd06b72079b7858cfea885a97 100644
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -298,6 +298,11 @@ std::tuple<BrowserWindowInterface*, int> GetBrowserAndTabForDisposition(
+     case WindowOpenDisposition::NEW_FOREGROUND_TAB:
+     case WindowOpenDisposition::NEW_BACKGROUND_TAB:
+     case WindowOpenDisposition::NEW_SPLIT_VIEW:
++      // Oa: as ArcCore, a tab stays in the browser it is asked of, a popup's
++      // too: an embedder's little window holds several pages.
++      if (params.browser) {
++        return {params.browser, -1};
++      }
+       // See if we can open the tab in the window this navigator is bound to.
+       if (WindowCanOpenTabs(params)) {
+         return {params.browser, -1};

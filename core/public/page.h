@@ -18,7 +18,8 @@ enum class OpenDisposition {
   kNewWindow,
   kPopup,
   // The app's own split view, as ArcCore's split view disposition: from the
-  // page menu's Open Link in Split View.
+  // page menu's Open Link in Split View. Blink's own, a ⌘⌥-click, is a
+  // background tab, as ArcCore's.
   kSplitView,
 };
 
@@ -219,6 +220,10 @@ class Page {
     // The page menu's Open Link in Incognito Window, as ArcCore's: only the
     // address, which the app opens in its profile's incognito window.
     virtual void OnPageOpenLinkInIncognitoWindow(const std::string& url) = 0;
+    // The page menu's Open Link in Little Oa, as ArcCore's little window
+    // disposition, which the app answers by opening its own window: only the
+    // address.
+    virtual void OnPageOpenLinkInLittleWindow(const std::string& url) = 0;
     // The app decides which exits show the page as crashed, as Arc's does.
     virtual void OnPageRendererGone(RendererExit exit) = 0;
     // Also after a reload of a page whose renderer was gone.

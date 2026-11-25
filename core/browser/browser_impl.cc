@@ -36,12 +36,16 @@ class BrowserImpl : public Browser {
   BrowserImpl(const std::string& window_id,
               const std::string& profile_id,
               BrowserContextType type,
+              BrowserType browser_type,
               Browser::Observer* observer)
       : window_id_(window_id),
         profile_id_(profile_id),
         restores_(type == BrowserContextType::kNormal),
         observer_(observer) {
     AllBrowsers().push_back(this);
+    if (browser_type == BrowserType::kPopup) {
+      WindowBrowser::MarkPopup(window_id);
+    }
     // As ADK's: the profile is expected to restore before its Browser is
     // asked for, so the first Browser's own restored tabs are parked too. An
     // incognito context never restores.
@@ -174,8 +178,10 @@ void HandOffRestoredPages() {
 std::unique_ptr<Browser> ObserveBrowser(const std::string& window_id,
                                         const std::string& profile_id,
                                         BrowserContextType type,
+                                        BrowserType browser_type,
                                         Browser::Observer* observer) {
-  return std::make_unique<BrowserImpl>(window_id, profile_id, type, observer);
+  return std::make_unique<BrowserImpl>(window_id, profile_id, type,
+                                       browser_type, observer);
 }
 
 }  // namespace oa

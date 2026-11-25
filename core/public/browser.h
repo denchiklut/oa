@@ -82,13 +82,20 @@ class Browser {
   virtual void CloseExtensionPopup() = 0;
 };
 
+// As ADK's browser type: a little window's Browser is Chrome's popup.
+enum class BrowserType {
+  kNormal,
+  kPopup,
+};
+
 // Loads the app profile `profile_id` if needed, makes `window_id`'s Browser
-// for its context of `type`, and reports that Browser to `observer` until the
-// result is destroyed. As Arc's, the Browser stays while the result does, with
-// pages or without.
+// of `browser_type` for its context of `type`, and reports that Browser to
+// `observer` until the result is destroyed. As Arc's, the Browser stays while
+// the result does, with pages or without.
 std::unique_ptr<Browser> ObserveBrowser(const std::string& window_id,
                                         const std::string& profile_id,
                                         BrowserContextType type,
+                                        BrowserType browser_type,
                                         Browser::Observer* observer);
 
 }  // namespace oa

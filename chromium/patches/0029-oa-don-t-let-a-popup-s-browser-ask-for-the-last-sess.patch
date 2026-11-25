@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Tue, 24 Nov 2026 23:24:32 -0700
+Subject: [PATCH] oa: don't let a popup's browser ask for the last session, as
+ ArcCore does
+
+---
+ chrome/browser/sessions/session_service.cc | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
+index 2135e46f4fc34934255d6bd840be971d2355afa8..af66c3236ce781c80998db6f0a4605f4096397d9 100644
+--- a/chrome/browser/sessions/session_service.cc
++++ b/chrome/browser/sessions/session_service.cc
+@@ -626,6 +626,11 @@ bool SessionService::RestoreIfNecessary(const StartupTabs& startup_tabs,
+   // asks: an embedder's Browser goes with its last page, and the one after it
+   // must not bring the session back.
+   if (const std::optional<bool>& restores = LastSessionRestoreForEmbedder()) {
++    // As ArcCore's: a popup's Browser never asks, so it leaves the one
++    // request to a normal one.
++    if (browser && browser->GetType() != BrowserWindowInterface::TYPE_NORMAL) {
++      return false;
++    }
+     if (std::exchange(asked_to_restore_for_embedder_, true) || !*restores) {
+       return false;
+     }

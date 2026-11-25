@@ -179,6 +179,8 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
 - (void)pageWantsActivation:(OAPage*)page;
 // The page menu's Open Link in Incognito Window, as ArcCore's.
 - (void)page:(OAPage*)page openLinkInIncognitoWindow:(NSURL*)url;
+// The page menu's Open Link in Little Oa, as ArcCore's.
+- (void)page:(OAPage*)page openLinkInLittleWindow:(NSURL*)url;
 - (void)page:(OAPage*)page rendererGone:(OAPageRendererExit)exit;
 - (void)pageRendererReady:(OAPage*)page;
 - (void)page:(OAPage*)page didRequestDialog:(OAPageDialog*)dialog;
@@ -567,8 +569,10 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // Loads the profile if needed. ArcCore keeps one per window.
 - (OAAutocomplete*)makeAutocomplete;
 // Loads the profile if needed and reports to `delegate`, held weakly, until
-// the result is released. The app keeps one per window and profile.
+// the result is released. The app keeps one per window and profile. A little
+// window's is a `popup`, as ADK's.
 - (OABrowser*)browserInWindow:(NSString*)windowIdentifier
+                        popup:(BOOL)popup
                      delegate:(id<OABrowserDelegate>)delegate;
 // Creates a page in the window's Browser for this profile, loading the profile
 // first if needed. The page starts in the background with nothing loaded, or
