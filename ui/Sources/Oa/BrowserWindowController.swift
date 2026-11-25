@@ -5,7 +5,8 @@ import SwiftUI
 @MainActor
 final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     let model: WindowModel
-    private let layout: WindowLayoutController
+    /// None in a Little window, which has no sidebar to lay out.
+    private let layout: WindowLayoutController?
     private let engine: any BrowserApplication
     private let store: SidebarStore
     private let didClose: (BrowserWindowController) -> Void
@@ -15,6 +16,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private var modalItemSwitcher: (state: ModalItemSwitcher, controller: ModalItemSwitcherWindowController)?
     private var webDialog: WebDialogWindowController?
     private var viewTimer: Task<Void, Never>?
+    private var isPlacingLittleWindow = false
     /// As Arc's `BrowserWindow.windowButtons`: the title bar's own, taken before the sidebar's header makes its set,
     /// which the window would hand out in their place. They show only in full screen.
     private let windowButtons: [NSButton]
@@ -30,29 +32,34 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         model = WindowModel(
             id: id, sidebarContext: sidebarContext, engine: engine, store: store, downloads: downloads,
             pictureInPicture: pictureInPicture, spaceID: spaceID)
-        layout = WindowLayoutController(model: model)
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
+        let isLittle = sidebarContext == .little
+        layout = isLittle ? nil : WindowLayoutController(model: model)
+        let window: NSWindow =
+            isLittle
+            ? LittleBrowserWindow()
+            : NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.contentMinSize = NSSize(width: 640, height: 320)
+        if !isLittle { window.contentMinSize = NSSize(width: 640, height: 320) }
         // As Arc's browser windows: AppKit keeps them across a quit and hands them back by the window's ID.
         window.identifier = NSUserInterfaceItemIdentifier(id.uuidString)
         window.restorationClass = ApplicationDelegate.self
-        // As Arc's: an incognito window never comes back.
-        window.isRestorable = sidebarContext != .incognito
+        // As Arc's: an incognito window never comes back, nor a Little one without an update's relaunch.
+        window.isRestorable = sidebarContext != .incognito && !isLittle
         windowButtons = [.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
         windowButtons.forEach { $0.isHidden = true }
         super.init(window: window)
-        window.contentViewController = layout
-        window.setContentSize(NSSize(width: 1100, height: 760))
+        window.contentViewController = layout ?? LittleWindowViewController(model: model)
+        if !isLittle { window.setContentSize(NSSize(width: 1100, height: 760)) }
         window.delegate = self
+        (window as? LittleBrowserWindow)?.onCancel = { [weak model] in model?.little?.showsMoveMenu = false }
         model.bringToFront = { [weak window] in window?.makeKeyAndOrderFront(nil) }
         model.window = window
         model.undoManager = ArcUndoManager(window.undoManager) { [weak model] in model?.perform($0) }
@@ -61,12 +68,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    func open(cascadingFrom previous: NSWindow?) {
+    func open(cascadingFrom previous: NSWindow?, littleFrame: NSRect? = nil) {
         guard let window else { return }
         engine.attachWindow(window, id: model.id)
         store.addWindow(model)
         model.ensureBrowsersCreated()
-        if let previous {
+        if let littleFrame {
+            placeLittleWindow(at: littleFrame)
+            observeLittlePresentation()
+        } else if let previous {
             window.setFrameTopLeftPoint(
                 window.cascadeTopLeft(from: NSPoint(x: previous.frame.minX, y: previous.frame.maxY)))
         } else {
@@ -87,6 +97,76 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             }
         }
     }
+
+    private func placeLittleWindow(at frame: NSRect) {
+        isPlacingLittleWindow = true
+        window?.setFrame(frame, display: true)
+        isPlacingLittleWindow = false
+    }
+
+    /// As seen in Arc: the bar's window becomes the page's in one step, about the bar's centre, and takes its
+    /// smallest size from then on.
+    private func observeLittlePresentation() {
+        let presented = withObservationTracking {
+            model.little?.isPresented == true
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeLittlePresentation() }
+        }
+        guard let window, presented, window.minSize != LittleBrowserFrame.minSize else { return }
+        if window.frame.size == LittleBrowserFrame.barSize {
+            placeLittleWindow(at: LittleBrowserFrame.page(growingFrom: window.frame, on: window.screen))
+        }
+        window.minSize = LittleBrowserFrame.minSize
+        Task { [weak model] in
+            try? await Task.sleep(for: .seconds(0.3))
+            model?.showLittleTipIfDue()
+        }
+    }
+
+    /// As Arc presents a link's Little window: see-through and without its shadow while its card grows out of the
+    /// pointer on Peek's expansion spring. Arc's window covers the screen meanwhile; Oa's is at its frame already.
+    func zoomLittleWindow(from pointer: NSPoint) {
+        guard let window, let view = window.contentView else { return }
+        view.wantsLayer = true
+        guard let layer = view.layer else { return }
+        let origin = window.convertPoint(fromScreen: pointer)
+        let anchor = CGPoint(
+            x: origin.x - layer.anchorPoint.x * layer.bounds.width,
+            y: origin.y - layer.anchorPoint.y * layer.bounds.height)
+        var start = CATransform3DMakeTranslation(anchor.x, anchor.y, 0)
+        start = CATransform3DScale(start, 0.01, 0.01, 1)
+        start = CATransform3DTranslate(start, -anchor.x, -anchor.y, 0)
+        let (opaque, color) = (window.isOpaque, window.backgroundColor)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+        let response = 0.245
+        let spring = CASpringAnimation(keyPath: "transform")
+        spring.fromValue = start
+        spring.toValue = CATransform3DIdentity
+        spring.stiffness = pow(2 * .pi / response, 2)
+        spring.damping = 4 * .pi * 0.865 / response
+        spring.duration = spring.settlingDuration
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak window] in
+            window?.isOpaque = opaque
+            window?.backgroundColor = color
+            window?.hasShadow = true
+        }
+        layer.add(spring, forKey: "littleZoom")
+        CATransaction.commit()
+    }
+
+    /// As Arc's Peek layout controller: the frame is kept when a page window is moved or its resize ends.
+    private func saveLittleFrame() {
+        guard let window, model.little?.isPresented == true, !isPlacingLittleWindow,
+            !window.styleMask.contains(.fullScreen)
+        else { return }
+        LittleBrowserFrame.save(window.frame)
+    }
+
+    func windowDidMove(_ notification: Notification) { saveLittleFrame() }
+    func windowDidEndLiveResize(_ notification: Notification) { saveLittleFrame() }
 
     private func observeDownloadPreview() {
         let shown = withObservationTracking {
@@ -147,13 +227,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeTitle() }
         }
-        window?.title = model.peek != nil ? model.space?.name ?? "Oa" : title.isEmpty ? "Oa" : title
+        if model.sidebarContext == .little {
+            // As seen in Arc's Window menu.
+            window?.title = title.isEmpty ? "Little Oa" : "Little Oa — \(title)"
+        } else {
+            window?.title = model.peek != nil ? model.space?.name ?? "Oa" : title.isEmpty ? "Oa" : title
+        }
     }
 
     func windowDidEnterFullScreen(_ notification: Notification) { windowButtons.forEach { $0.isHidden = false } }
     func windowWillExitFullScreen(_ notification: Notification) { windowButtons.forEach { $0.isHidden = true } }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        model.updateLittleDestination()
         model.showSelected()
         // As Arc's: DevTools that had the keyboard keep it.
         let devTools = model.page?.devTools.view
@@ -205,7 +291,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func inspectElements(_ sender: Any?) { model.frontPage?.devTools.inspect() }
     @objc func javaScriptConsole(_ sender: Any?) { model.frontPage?.devTools.toggleConsole() }
     @objc func networkInspector(_ sender: Any?) { model.frontPage?.devTools.toggleNetwork() }
-    @objc func expandPeek(_ sender: Any?) { model.expandPeek() }
+    /// Arc's `openInCurrentSpace:`, which a Little window answers too.
+    @objc func expandPeek(_ sender: Any?) {
+        if model.sidebarContext == .little { model.openInLittleDestination() } else { model.expandPeek() }
+    }
+    @objc func showLittleMoveMenu(_ sender: Any?) { model.little?.showsMoveMenu = true }
     @objc func openLocation(_ sender: Any?) { model.openCommandBar(.currentTab) }
     @objc func newTab(_ sender: Any?) { model.openCommandBar(.newTab) }
     @objc func addSplitView(_ sender: Any?) { model.addSplitViewPane() }
@@ -220,7 +310,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func cycleToNextRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.next) }
     @objc func cycleToPreviousRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.previous) }
     @objc func togglePin(_ sender: Any?) { model.togglePin() }
-    @objc func focusSidebar(_ sender: Any?) { layout.revealCurrentTab() }
+    @objc func focusSidebar(_ sender: Any?) { layout?.revealCurrentTab() }
     @objc func toggleFavorite(_ sender: Any?) { model.toggleFavorite() }
 
     /// As Arc's File ▸ New Profile: the create sheet with the window's Space ticked.
@@ -273,7 +363,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func toggleSidebarMode(_ sender: Any?) {
         // Oa's own: Spaces takes over the sidebar's spot, so dismiss it to reveal the result of the toggle.
         if model.library == .spaces { model.exitLibrary() }
-        layout.toggleSidebar()
+        layout?.toggleSidebar()
     }
     @objc func restoreLastClosed(_ sender: Any?) { model.restoreLastClosed() }
     @objc func clearTabs(_ sender: Any?) { model.clearTabs() }
@@ -360,6 +450,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     /// The window's commands wait while a dialog is up, as Arc swallows them; other windows and quit stay usable.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(showLittleMoveMenu(_:)) { return model.littleDestinationSpace != nil }
+        if item.action == #selector(expandPeek(_:)), model.sidebarContext == .little {
+            // As seen in Arc: the Tabs menu names the Space the button does.
+            item.title = "Open in \(model.littleDestinationSpace?.name ?? "")"
+            return model.littleDestinationSpace != nil && model.frontPage != nil
+        }
         // Arc takes Archive Tab out of the menu while a download's preview shows.
         if item.action == #selector(expandPeek(_:)) {
             // As seen in Arc: the shown Space's name, wherever Air Traffic Control sends it.
@@ -399,6 +495,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                 #selector(togglePinnedSection(_:)),
             ]
             if spaces.contains(action) { return false }
+            // As seen in Arc: a Little window has no sidebar, Library, Archive or closed pages to bring back. Its
+            // Library and Downloads items are off as Oa's own: Arc's weren't read.
+            let little = [
+                #selector(selectNextTab(_:)), #selector(selectPreviousTab(_:)), #selector(focusSidebar(_:)),
+                #selector(clearTabs(_:)), #selector(toggleSidebarMode(_:)), #selector(toggleArchive(_:)),
+                #selector(restoreLastClosed(_:)), #selector(toggleLibrary(_:)), #selector(toggleDownloads(_:)),
+                #selector(selectTab(_:)),
+            ]
+            if model.sidebarContext == .little, little.contains(action) { return false }
             // As seen in Arc: an incognito window's menus have Extensions, Library, Downloads, Archive and Clear
             // Today off; its Library still opens from the sidebar.
             let incognito = [

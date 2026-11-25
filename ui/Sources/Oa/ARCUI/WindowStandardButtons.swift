@@ -7,8 +7,11 @@ import SwiftUI
 final class WindowStandardButtons: NSView {
     private let group = Group()
     private var covers: [NSView] = []
+    /// What the green button does in place of AppKit's zoom: a Little window's moves its page out, as Arc's.
+    private let zoomAction: (() -> Void)?
 
-    init() {
+    init(zoomAction: (() -> Void)? = nil) {
+        self.zoomAction = zoomAction
         super.init(frame: .zero)
         addSubview(group)
         addTrackingArea(
@@ -30,6 +33,10 @@ final class WindowStandardButtons: NSView {
         guard let window, group.subviews.isEmpty else { return }
         for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             guard let button = NSWindow.standardWindowButton(kind, for: window.styleMask) else { continue }
+            if kind == .zoomButton, zoomAction != nil {
+                button.target = self
+                button.action = #selector(performZoomAction)
+            }
             group.addSubview(button)
             let cover = NSView()
             cover.wantsLayer = true
@@ -60,6 +67,8 @@ final class WindowStandardButtons: NSView {
         super.viewDidChangeEffectiveAppearance()
         update()
     }
+
+    @objc private func performZoomAction() { zoomAction?() }
 
     override func mouseEntered(with event: NSEvent) {
         group.mouseInside = true
@@ -92,7 +101,9 @@ final class WindowStandardButtons: NSView {
 }
 
 struct WindowStandardButtonsView: NSViewRepresentable {
-    func makeNSView(context: Context) -> WindowStandardButtons { WindowStandardButtons() }
+    var zoomAction: (() -> Void)?
+
+    func makeNSView(context: Context) -> WindowStandardButtons { WindowStandardButtons(zoomAction: zoomAction) }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: WindowStandardButtons, context: Context) -> CGSize? {
         nsView.intrinsicContentSize

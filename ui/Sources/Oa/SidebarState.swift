@@ -6,6 +6,8 @@ enum SidebarContainerType: Hashable, Codable {
     case standalone(UUID)
     /// Never saved, as Arc's.
     case incognito(UUID)
+    /// Arc saves it for the relaunch after an update, which Oa hasn't: never saved.
+    case littleBrowser(UUID)
 }
 
 /// Arc's `StandardWindowState.SidebarContext`: the sidebar a window shows.
@@ -13,12 +15,15 @@ enum SidebarContext: Codable {
     case global
     case standalone
     case incognito
+    /// Arc's `WindowStyle.little`, which is no sidebar context there: a Little window has no sidebar to show.
+    case little
 
     func container(of windowID: UUID) -> SidebarContainerType? {
         switch self {
         case .global: nil
         case .standalone: .standalone(windowID)
         case .incognito: .incognito(windowID)
+        case .little: .littleBrowser(windowID)
         }
     }
 }
@@ -98,9 +103,9 @@ struct SidebarTab: Identifiable, Hashable {
 struct SidebarArchivedTab: Identifiable, Hashable, Codable {
     enum Reason: String, Codable { case manual, auto }
 
-    /// Arc's `ArchivedItemSource`, stored as Arc's is, without its Little Arc: the Space the item was in, or a Blank
-    /// Window's own sidebar, which is gone with its window.
-    enum Source: Hashable, Codable { case space(UUID), standaloneSidebar }
+    /// Arc's `ArchivedItemSource`, stored as Arc's is: the Space the item was in, or a Blank Window's own sidebar or
+    /// a Little window, which are gone with their windows.
+    enum Source: Hashable, Codable { case space(UUID), standaloneSidebar, littleArc }
 
     let id: UUID
     var title: String
@@ -491,9 +496,13 @@ struct SidebarState {
                 id: id, title: title, url: url, source: archiveSource(spaceID), archivedAt: date, reason: .manual))
     }
 
-    /// As Arc picks it by the window's style: a Blank Window's items are filed under its sidebar, not its Space.
+    /// As Arc picks it by the window's style: a Blank Window's items are filed under its sidebar and a Little
+    /// window's under Little Arc, not their Space.
     private func archiveSource(_ spaceID: UUID?) -> SidebarArchivedTab.Source? {
-        spaceID.map { isGlobal($0) ? .space($0) : .standaloneSidebar }
+        guard let spaceID else { return nil }
+        if isGlobal(spaceID) { return .space(spaceID) }
+        if case .littleBrowser = containers.first(where: { $0.value.id == spaceID })?.key { return .littleArc }
+        return .standaloneSidebar
     }
 
     /// To the top of the Space's unpinned tabs, as Arc's Restore.

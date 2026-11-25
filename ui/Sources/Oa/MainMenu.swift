@@ -46,6 +46,10 @@ final class MainMenu {
                 modifiers: [.command, .shift], id: "newIncognitoWindow", priority: .overrideWebView))
         file.addItem(
             item(
+                "New Little Oa Window", #selector(ApplicationDelegate.newLittleBrowserWindow(_:)), key: "n",
+                modifiers: [.command, .option], id: "showLittleArc", priority: .overrideWebView))
+        file.addItem(
+            item(
                 "New Tab", #selector(BrowserWindowController.newTab(_:)), key: "t", id: "newTab",
                 priority: .overrideWebView))
         file.addItem(item("New Profile", #selector(BrowserWindowController.newProfile(_:))))
@@ -315,6 +319,13 @@ final class MainMenu {
             item(
                 "Expand Peek", #selector(BrowserWindowController.expandPeek(_:)), key: "o", id: "openTabIn",
                 priority: .promptAfterConsumedByWebView))
+        // Arc registers this one in code, with no menu item; Oa's bindings are its menu's, so a hidden item.
+        let moveMenu = item(
+            "Show Little Oa “Open In” Menu", #selector(BrowserWindowController.showLittleMoveMenu(_:)), key: "o",
+            modifiers: [.command, .shift], id: "showLittleArcOpenInMenu")
+        moveMenu.isHidden = true
+        moveMenu.allowsKeyEquivalentWhenHidden = true
+        tabs.addItem(moveMenu)
 
         let spaces = submenu("Spaces", in: menu)
         spaces.addItem(item("New Space…", #selector(BrowserWindowController.newSpace(_:)), id: "newSpace"))

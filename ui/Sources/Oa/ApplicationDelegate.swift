@@ -51,6 +51,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppAppearance.restore()
         RestoreWindowsPreference.registerAtLaunch()
+        LittleBrowserPreferences.register()
         engine.setRestoresLastSession(RestoreWindowsPreference.restoresLastSession)
     }
 
@@ -97,6 +98,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         openExternalLinks(pendingLinks)
         pendingLinks.removeAll()
         store.startAutoArchive()
+        store.startLittleAutoArchive()
         NSApplication.shared.activate(ignoringOtherApps: true)
         // From the run loop, so the pages go on working under the alert: they run on the main queue.
         if !spaceNamesWithMissingProfiles.isEmpty {
@@ -124,12 +126,21 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         if isLaunching { pendingLinks.append(contentsOf: links) } else { openExternalLinks(links) }
     }
 
-    /// As seen in Arc: in the last key window, switched to the routed Space, Most Recent being the one it shows.
+    /// As seen in Arc: in the last key window, switched to the routed Space, Most Recent being the one it shows. A
+    /// link routed to Little Arc, or with no route while its switch is on, opens in a Little window, on the profile
+    /// its host was last switched to there.
     private func openExternalLinks(_ links: [URL]) {
-        guard !links.isEmpty else { return }
+        let (little, routed) = (
+            links.filter(store.routesToLittleWindow), links.filter { !store.routesToLittleWindow($0) }
+        )
+        for url in little {
+            createOrFocusLittleWindow(
+                .externalLink(url), profileID: LittleBrowserPreferences.preferredProfile(for: url))
+        }
+        guard !routed.isEmpty else { return }
         // As seen in Arc: never a Blank or incognito window, even a key one.
         let front = frontWindows.first { $0.sidebarContext == .global } ?? openWindow()
-        for url in links {
+        for url in routed {
             front.openRoutedLink(url, in: store.routedSpace(for: url, recent: front.selectedSpaceID))
         }
         front.bringToFront()
@@ -156,6 +167,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
             engine.saveSessionsForQuit()
             store.saveSessionRestorationAndFreeze()
             for window in windows { window.model.archivePeeks() }
+            store.archiveLittlePagesForQuit()
             store.saveAndFreeze()
             engine.terminate()
         }
@@ -185,6 +197,57 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     /// the command bar opens, as for any new window.
     @objc func blankWindow(_ sender: Any?) {
         openWindow(context: .standalone, profileID: lastFocusedProfileID)
+    }
+
+    /// Arc's `newLittleBrowserWindow:`.
+    @objc func newLittleBrowserWindow(_ sender: Any?) { createOrFocusLittleWindow(.mainMenu, profileID: nil) }
+
+    /// As Arc's `createOrFocusLittleBrowserWindow`. A link goes to the Little window that was opened on that very
+    /// address, as a new page in front; anything else makes a window, on the profile given or, as Arc's
+    /// `lastUsedProfileFromStandardWindow`, the one of the last key window that is neither incognito nor Little, else
+    /// the engine's first. A link's window opens on its page, the others on the command bar alone.
+    @discardableResult
+    private func createOrFocusLittleWindow(
+        _ entryPoint: LittleBrowserState.EntryPoint, profileID: UUID?, page: (any Page)? = nil
+    ) -> WindowModel {
+        if let url = entryPoint.reusableURL,
+            let open = frontLittleWindows.first(where: { $0.reusesLittleWindow(for: url) })
+        {
+            open.little?.entryPoint = entryPoint
+            open.openLittleLink(url)
+            open.bringToFront()
+            return open
+        }
+        let standard = frontWindows.first { $0.sidebarContext == .global || $0.sidebarContext == .standalone }
+        let profileID =
+            profileID.flatMap { store.state.profile($0)?.id } ?? standard?.space?.profileID
+            ?? engine.allProfiles().first ?? SidebarProfile.defaultID
+        let model = openWindow(
+            context: .little, profileID: profileID, empty: entryPoint.url != nil,
+            little: LittleBrowserState(entryPoint: entryPoint, isPresented: entryPoint.url != nil))
+        if let page, let url = entryPoint.url {
+            model.adoptLittlePage(page, url: url)
+        } else if let url = entryPoint.url {
+            model.newTab(url)
+        }
+        NSApplication.shared.activate()
+        return model
+    }
+
+    /// As Arc's: the Space the front-most standard window of the profile shows, else the profile's first.
+    private func littleDestination(for profileID: UUID) -> UUID? {
+        frontWindows.first { $0.sidebarContext == .global && $0.space?.profileID == profileID }?.selectedSpaceID
+            ?? store.state.spaces.first { $0.profileID == profileID }?.id
+    }
+
+    /// As seen in Arc: a link's window opens down and right of the newest other Little window, else about the pointer,
+    /// and a bar at the top right of the pointer's screen.
+    private func littleFrame(for little: LittleBrowserState) -> NSRect {
+        let pointer = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(pointer) }
+        guard little.isPresented else { return LittleBrowserFrame.bar(on: screen) }
+        let newest = windows.last { $0.model.little?.isPresented == true }?.window
+        return LittleBrowserFrame.page(after: newest?.frame, pointer: pointer, on: newest?.screen ?? screen)
     }
 
     /// As Arc's `WindowsData.lastFocusedProfile`: the Space's profile of the frontmost window that isn't incognito,
@@ -332,6 +395,13 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         NSApplication.shared.orderedWindows.compactMap { window in windows.first { $0.window === window }?.model }
     }
 
+    /// Front to back, by window number: `orderedWindows` has no panels, which Little windows are.
+    private var frontLittleWindows: [WindowModel] {
+        (NSWindow.windowNumbers(options: []) ?? []).compactMap { number in
+            windows.first { $0.window?.windowNumber == number.intValue && $0.model.sidebarContext == .little }?.model
+        }
+    }
+
     /// Quits and opens the bundle again once this process is gone, with the engine and data directory it was
     /// given, as Arc does after a restore.
     private static func relaunch() {
@@ -360,7 +430,8 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     @discardableResult
     private func openWindow(
         restoring record: WindowRecord? = nil, selecting tabID: UUID? = nil, from source: WindowModel? = nil,
-        on spaceID: UUID? = nil, context: SidebarContext = .global, profileID: UUID? = nil, empty: Bool = false
+        on spaceID: UUID? = nil, context: SidebarContext = .global, profileID: UUID? = nil, empty: Bool = false,
+        little: LittleBrowserState? = nil
     ) -> WindowModel {
         let key = windows.first { $0.window?.isKeyWindow == true } ?? windows.last
         let id = record?.id ?? UUID()
@@ -396,10 +467,18 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         controller.model.openURLInNewWindow = { [weak self, weak model = controller.model] url in
             if let model { self?.openURLInNewWindow(url, from: model) }
         }
+        controller.model.openLittleWindow = { [weak self] entryPoint, profileID, page in
+            self?.createOrFocusLittleWindow(entryPoint, profileID: profileID, page: page)
+        }
+        controller.model.littleDestination = { [weak self] profileID in self?.littleDestination(for: profileID) }
+        controller.model.little = little
         // As seen in Arc: from the key window.
         let previous = (windows.first { $0.model === source } ?? key)?.window
+        let littleFrame = little.map(littleFrame(for:))
         windows.append(controller)
-        controller.open(cascadingFrom: previous)
+        controller.open(cascadingFrom: previous, littleFrame: littleFrame)
+        controller.model.updateLittleDestination()
+        if little?.isPresented == true { controller.zoomLittleWindow(from: NSEvent.mouseLocation) }
         if let record {
             controller.model.restore(record)
         } else {

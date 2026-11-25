@@ -22,6 +22,7 @@ final class WindowModel {
     private(set) var selectedTabIDs: [UUID: UUID] = [:] {
         didSet {
             selectionCount += 1
+            if little?.isPresented == false, selectedTabID != nil { little?.isPresented = true }
             // A close's replacement in a split is the pane the window comes back to, as one clicked is.
             for tabID in selectedTabIDs.values {
                 if let splitID = state.splitViewID(containing: tabID) { focusedPaneIDs[splitID] = tabID }
@@ -79,6 +80,8 @@ final class WindowModel {
     /// By profile, as ADK keeps a browser per window and profile: from the window's first page in the profile on.
     private(set) var browsers: [UUID: any Browser] = [:]
     private(set) var commandBar: CommandBar?
+    /// Set once, as the window is made, for a Little window.
+    var little: LittleBrowserState?
     /// When this window last showed a tab and when a tab was made through it, as Arc's per-window
     /// `itemLastActiveDates` and `itemCreatedDates`, which order its empty command bar.
     private(set) var lastActiveDates: [UUID: Date] = [:]
@@ -107,6 +110,12 @@ final class WindowModel {
     @ObservationIgnored var openLinkInIncognitoWindow: (_ url: URL, _ profileID: UUID) -> Void = { _, _ in }
     /// A link's new window from a window with a sidebar of its own, which holds none of another window's tabs.
     @ObservationIgnored var openURLInNewWindow: (_ url: URL) -> Void = { _ in }
+    /// As Arc's `createOrFocusLittleBrowserWindow`, on the profile given or the last used one.
+    /// A page the engine already made for the link goes there live.
+    @ObservationIgnored var openLittleWindow:
+        (_ entryPoint: LittleBrowserState.EntryPoint, _ profileID: UUID?, _ page: (any Page)?) -> Void = { _, _, _ in }
+    /// The Space a Little window of the profile would move its page to.
+    @ObservationIgnored var littleDestination: (_ profileID: UUID) -> UUID? = { _ in nil }
     @ObservationIgnored let downloads: DownloadsStore
     @ObservationIgnored private let pictureInPicture: PictureInPicture
     @ObservationIgnored private var presentedPage: (any Page)?
@@ -212,6 +221,16 @@ final class WindowModel {
         }
     }
     var canRestoreLastClosed: Bool { closedGroups.contains { !$0.steps.isEmpty } }
+    /// As Arc's sweep reads a Little window: every page was last active before `date`, and none plays or records.
+    func isLittleIdle(since date: Date) -> Bool {
+        let tabs = state.tabs(in: selectedSpaceID)
+        guard sidebarContext == .little, !tabs.isEmpty else { return false }
+        return tabs.allSatisfy { tab in
+            guard let active = lastActiveDates[tab.id], active < date else { return false }
+            guard let page = pages[tab.id] else { return true }
+            return !page.isAudible && !page.isCameraOn && !page.isMicrophoneOn
+        }
+    }
 
     var record: WindowRecord {
         WindowRecord(
@@ -407,7 +426,7 @@ final class WindowModel {
 
     private func ensureBrowser(for profileID: UUID) {
         guard browsers[profileID] == nil else { return }
-        let browser = context(for: profileID).browser(windowID: id, type: .normal)
+        let browser = context(for: profileID).browser(windowID: id, type: sidebarContext == .little ? .popup : .normal)
         browsers[profileID] = browser
         browserListeners[profileID] = Task { [weak self] in
             for await event in browser.events {
@@ -461,6 +480,34 @@ final class WindowModel {
     /// As Arc: at the top of the Space's unpinned tabs.
     func newTab(_ url: URL) {
         let tab = makeTab(url: url)
+        store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
+        createdDates[tab.id] = .now
+        select(tab.id)
+    }
+
+    /// As Arc's reuse of a Little window: it was opened on this very address, shows a page of its host, and that
+    /// page can't go back, by its history or to the page that opened it.
+    func reusesLittleWindow(for url: URL) -> Bool {
+        guard let page, let tab = selectedTab, little?.entryPoint.reusableURL == url, page.url?.host() == url.host(),
+            !page.canGoBack
+        else { return false }
+        return tab.openerID.flatMap { state.tree.tab($0) } == nil
+    }
+
+    /// The page the engine made for a ⌘⌥-click, moved here live.
+    func adoptLittlePage(_ page: any Page, url: URL) {
+        let tab = makeTab(url: url)
+        store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
+        createdDates[tab.id] = .now
+        page.move(toWindow: id)
+        install(page, for: tab.id)
+        listen(to: page)
+        select(tab.id)
+    }
+
+    /// As Arc's, on a match: a new page in front, opened from the one shown.
+    func openLittleLink(_ url: URL) {
+        let tab = makeTab(url: url, opener: selectedTabID)
         store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
         createdDates[tab.id] = .now
         select(tab.id)
@@ -530,7 +577,13 @@ final class WindowModel {
         case pane(UUID, UUID)
     }
 
+    /// As seen in Arc: a Little window that is its bar alone goes with it.
     func closeCommandBar() {
+        endCommandBar()
+        if little?.isPresented == false { window?.close() }
+    }
+
+    private func endCommandBar() {
         guard let bar = commandBar else { return }
         bar.autocomplete.stop()
         commandBar = nil
@@ -551,7 +604,8 @@ final class WindowModel {
     /// As Arc's command bar: the profile's Favorites and the tabs of all its Spaces but the selected tab, each with
     /// an address.
     var commandBarTabs: [CommandBarRanking.Tab] {
-        guard let space else { return [] }
+        // As seen in Arc: a Little window's bar offers no tab.
+        guard let space, sidebarContext != .little else { return [] }
         // As seen in Arc: a Blank Window offers only its own tabs.
         let others = spaces.filter { $0.profileID == space.profileID && $0.id != space.id }
         let tabs: [(SidebarTab, String?)] =
@@ -589,7 +643,7 @@ final class WindowModel {
     private func perform(_ action: CommandBar.Action, in destination: CommandBar.Destination) {
         let paneIndex = emptySplitViewPaneIndex
         let orientation = emptySplitViewPaneOrientation
-        closeCommandBar()
+        endCommandBar()
         switch action {
         case .switchTo(let tabID):
             // As seen in Arc: Switch to Tab from the empty pane moves that tab into it. Oa's own: a split's row
@@ -604,7 +658,8 @@ final class WindowModel {
             select(tabID)
         case .open(let url, background: false) where paneIndex != nil, .openInSplitView(let url):
             // Oa's own where the tab can't take a pane, as a full split: a new tab.
-            guard let anchorID = selectedTabID, state.canAddSplitViewPane(beside: anchorID, in: selectedSpaceID)
+            guard sidebarContext != .little, let anchorID = selectedTabID,
+                state.canAddSplitViewPane(beside: anchorID, in: selectedSpaceID)
             else { return newTab(url) }
             let tab = makeTab(url: url)
             let spaceID = selectedSpaceID
@@ -614,12 +669,12 @@ final class WindowModel {
             }
             createdDates[tab.id] = .now
             select(tab.id)
-        case .open(let url, background: true):
+        case .open(let url, background: true) where sidebarContext != .little:
             let tab = makeTab(url: url)
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
             createdDates[tab.id] = .now
             ensurePage(tab.id)
-        case .open(let url, background: false):
+        case .open(let url, _):
             guard destination == .currentTab, let tabID = selectedTabID else { return newTab(url) }
             if let peek {
                 peek.load(url)
@@ -933,7 +988,7 @@ final class WindowModel {
     /// (Arc's `hasCloseWindowIntent`, the header's Move to…). As Arc's `beginMoveItems`, a Space of another profile
     /// asks first, and as seen in Arc on that window, which comes forward for it; a sheet there is Oa's own.
     func moveItems(_ itemIDs: [UUID], toSpace spaceID: UUID, closingWindow: Bool = false) {
-        let standalone = sidebarContext == .standalone
+        let standalone = sidebarContext == .standalone || sidebarContext == .little
         let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
         guard !itemIDs.isEmpty, let space = state.space(spaceID), !standalone || state.isGlobal(spaceID) else { return }
         let tabIDs = itemIDs.flatMap { state.splitView($0) != nil ? state.tree[$0]?.childIDs ?? [] : [$0] }
@@ -962,6 +1017,7 @@ final class WindowModel {
             guard standalone else { return }
             destination.bringToFront()
             if closingWindow { Task { [weak window] in window?.close() } }
+            if sidebarContext == .little { littlePageMoved(from: sourceSpaceID) }
         }
         if crossesProfile {
             if standalone { destination.bringToFront() }
@@ -1054,7 +1110,7 @@ final class WindowModel {
     }
 
     var canAddSplitViewPane: Bool {
-        emptySplitViewPaneIndex == nil
+        emptySplitViewPaneIndex == nil && sidebarContext != .little
             && selectedTabID.map { state.canAddSplitViewPane(beside: $0, in: selectedSpaceID) } ?? false
     }
 
@@ -1428,6 +1484,40 @@ final class WindowModel {
             window.closeCommandBar()
             window.selectedTabIDs[window.selectedSpaceID] = nil
             if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last { window.select(bottom.id) }
+        }
+    }
+
+    /// As Arc's `changeProfileInLittleBrowser`: the shown page loads again in the profile, and the host's links from
+    /// other apps open in it from then on. Oa's own: the window's hidden pages follow when they are next shown, where
+    /// Arc's keep running in the old profile.
+    func setLittleProfile(_ profileID: UUID) {
+        guard sidebarContext == .little, let space, space.profileID != profileID else { return }
+        let url = address
+        endCommandBar()
+        dropPages(of: state.tabs(in: space.id).map(\.id))
+        store.edit { $0.setProfile(profileID, forSpaces: [space.id]) }
+        loadExtensions()
+        ensurePresentedPages()
+        if let url { LittleBrowserPreferences.setPreferredProfile(profileID, for: url) }
+    }
+
+    /// As seen in Arc: the window closes at once, a page at a time into the Archive, with no stack and no toast.
+    func archiveLittlePages() {
+        guard sidebarContext == .little else { return }
+        for tab in state.tabs(in: selectedSpaceID) {
+            end(tab.id, reason: .auto, closedBy: .auto) { page, _ in page.drop() }
+        }
+    }
+
+    /// As seen in Arc: a Little window whose last page moved out fades away.
+    private func littlePageMoved(from spaceID: UUID) {
+        if let next = state.tabs(in: spaceID).first { return select(next.id) }
+        guard let window else { return }
+        NSAnimationContext.runAnimationGroup {
+            $0.duration = 0.11
+            window.animator().alphaValue = 0
+        } completionHandler: {
+            window.close()
         }
     }
 
@@ -2180,9 +2270,12 @@ final class WindowModel {
             // As Arc's close: a pinned tab keeps when a window last showed it, not when one made it.
             window.createdDates[tabID] = nil
         }
-        // As seen in Arc: a Blank Window's last tab goes unarchived, and the window closes with it.
-        let closesWindow = sidebarContext == .standalone && state.tabs(in: spaceID).map(\.id) == [tabID]
-        if closesWindow {
+        // As seen in Arc: a Blank Window's last tab goes unarchived, and the window closes with it; a Little window's
+        // last page is archived as its others are, and the window closes too.
+        let closesWindow =
+            (sidebarContext == .standalone || sidebarContext == .little)
+            && state.tabs(in: spaceID).map(\.id) == [tabID]
+        if closesWindow, sidebarContext == .standalone {
             store.edit { $0.removeTab(tabID) }
         } else if !pinned || store.archivingPins.remove(tabID) != nil {
             archive(tabID, reason: reason, closedBy: request, sessionID: sessionID)
@@ -2215,7 +2308,8 @@ final class WindowModel {
         } else {
             store.edit { $0.archiveTab(tabID, reason: reason) }
         }
-        if let closed {
+        // As Arc's: a Little window has no stack of closed pages.
+        if let closed, requester?.sidebarContext != .little {
             requester?.remember(
                 closed,
                 in: request?.group
@@ -2414,7 +2508,7 @@ final class WindowModel {
         let store = store
         let pictureInPicture = pictureInPicture
         let pageID = page.id
-        DevToolsWindowController.follow(page)
+        DevToolsWindowController.follow(page, inWindowOnly: sidebarContext == .little)
         Task {
             for await event in page.events {
                 // The app's one window for it, whichever window holds the page, or none any more.
@@ -2510,6 +2604,9 @@ final class WindowModel {
             let ownerID = tabID(of: pageID) ?? peekOwner(of: pageID)
             if let profile = ownerID.flatMap(state.profile(containing:)) { openLinkInIncognitoWindow(url, profile.id) }
             return
+        case .openLinkInLittleWindow(let url):
+            // As Arc's `littleWindow(profile: nil)`.
+            return openLittleWindow(.internalLink(url), nil, nil)
         default:
             break
         }
@@ -2578,12 +2675,29 @@ final class WindowModel {
         _ page: any Page, url: URL?, disposition: OpenDisposition, byPage: Bool, from openerID: UUID,
         insidePeek: Bool
     ) {
-        // As seen in Arc: a background page opened while ⌥ alone is held, as an ⌥-clicked link, goes in a split; ⌥ with
-        // ⌘ is Arc's Little Arc, which Oa doesn't have, so a background page, Oa's own.
+        // As Arc's policy for a background page: with ⌘⌥ held and its switch on, a Little window; with ⌥ held
+        // otherwise, as an ⌥-clicked link, a split. The engine's page goes to the Little window, on the opener's
+        // profile, Oa's own: who makes its page in Arc is unknown.
         let held = NSEvent.modifierFlags.intersection([.option, .command, .shift, .control])
-        let disposition = disposition == .backgroundTab && held == .option ? .splitView : disposition
+        if disposition == .backgroundTab, held == [.command, .option], sidebarContext != .incognito,
+            LittleBrowserPreferences.opensOnOptionCommandClick, let url,
+            let profile = state.profile(containing: openerID)
+        {
+            return openLittleWindow(.browserPopup(url), profile.id, page)
+        }
+        // As seen in Arc: a ⌘-click or middle click in a Little window loads in the page it shows.
+        if sidebarContext == .little, disposition == .backgroundTab || disposition == .splitView {
+            page.drop()
+            if let url { frontPage?.load(url) }
+            return
+        }
+        let splits = held == .option || held == [.command, .option]
+        let disposition = disposition == .backgroundTab && splits ? .splitView : disposition
         // As seen in Arc, in any window: a Shift-click inside a Peek opens no second Peek but a window.
-        let inWindow = disposition == .newWindow && (!byPage || !store.peekOnShiftClick || insidePeek)
+        // A Little window has no Peek, as Arc's: its Shift-click is a window too.
+        let inWindow =
+            disposition == .newWindow
+            && (!byPage || !store.peekOnShiftClick || insidePeek || sidebarContext == .little)
         // As Arc's `createTabInNewWindow(url:isIncognito:)`: only the address goes, and loads afresh there.
         if inWindow, insidePeek || sidebarContext != .global {
             page.drop()
