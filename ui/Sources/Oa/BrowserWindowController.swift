@@ -22,6 +22,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// which the window would hand out in their place. They show only in full screen.
     private let windowButtons: [NSButton]
     private var littleLayout: ModalWindowLayoutController?
+    private let littleMoveMenu = LittleBrowserMoveMenuWindowController()
 
     init(
         id: UUID, style: WindowStyle, engine: any BrowserApplication, store: SidebarStore,
@@ -123,6 +124,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         observeTitle()
         observeDownloadPreview()
+        observeLittleMoveMenu()
         observeExtensionPopup()
         observeModalItemSwitcher()
         observeWebDialog()
@@ -203,6 +205,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
         guard let window else { return }
         if shown { downloadPreview.show(over: window, model: model) } else { downloadPreview.close() }
+    }
+
+    private func observeLittleMoveMenu() {
+        let shown = withObservationTracking {
+            model.little?.showsMoveMenu == true
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeLittleMoveMenu() }
+        }
+        guard let window else { return }
+        if shown { littleMoveMenu.show(over: window, model: model) } else { littleMoveMenu.close() }
     }
 
     private func observeExtensionPopup() {
@@ -299,6 +311,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         model.dismissModalItemSwitcher()
         modalItemSwitcher?.controller.close()
         downloadPreview.close()
+        littleMoveMenu.close()
         extensionPopup.close()
         webDialog?.end()
         model.dropAll()
