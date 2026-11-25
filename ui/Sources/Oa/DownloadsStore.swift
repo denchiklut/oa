@@ -1,7 +1,6 @@
 import AppKit
 import DevKit
 import Foundation
-import Network
 import Observation
 import UniformTypeIdentifiers
 
@@ -138,13 +137,9 @@ final class DownloadsStore {
 
 extension DownloadsStore.Entry {
     var name: String { download.file?.lastPathComponent ?? "" }
-    /// As Arc names it; it names none for a bare address such as 127.0.0.1.
-    var host: String? {
-        guard let host = download.sourceURL?.host(), IPv4Address(host) == nil, IPv6Address(host) == nil else {
-            return nil
-        }
-        return host
-    }
+    /// As Arc names it, by the registrable domain of the download's address; it names none for a bare address such
+    /// as 127.0.0.1.
+    var host: String? { download.sourceDomain }
     var isRunning: Bool { download.status == .inProgress || download.status == .paused }
     var fileExists: Bool { download.file.map { FileManager.default.fileExists(atPath: $0.path) } ?? false }
 
@@ -183,8 +178,12 @@ enum DownloadText {
     static func subtitle(_ entry: DownloadsStore.Entry, opening: Bool) -> String {
         let from = entry.host.map { "from \($0)" }
         switch entry.download.status {
-        case .inProgress, .notStarted: return opening ? self.opening(entry) : progress(entry.download)
-        case .paused: return "Paused"
+        case .notStarted: return ""
+        case .inProgress:
+            if opening { return self.opening(entry) }
+            // As Arc's: nothing while the size is unknown.
+            return (entry.download.totalBytes ?? 0) > 0 ? progress(entry.download) : ""
+        case .paused: return ["Paused", from].compactMap { $0 }.joined(separator: " · ")
         case .failed: return "Failed to Download"
         case .cancelled: return ["Cancelled", from].compactMap { $0 }.joined(separator: " · ")
         case .finished: return [entry.kind ?? "Download", from].compactMap { $0 }.joined(separator: " ")

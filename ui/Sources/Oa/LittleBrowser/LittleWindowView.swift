@@ -79,6 +79,10 @@ struct LittleWindowView: View {
                 Color.clear
             }
         }
+        .overlay(alignment: .bottom) {
+            // As seen in Arc: the cards follow the window's appearance, not the page's.
+            LittleBrowserDownloadsTray(model: model).environment(\.colorScheme, colorScheme)
+        }
         .findInPage(of: model, on: model.page, hasTopBar: false)
         .toast(of: model, on: model.page)
         .overlay(alignment: .topLeading) {
