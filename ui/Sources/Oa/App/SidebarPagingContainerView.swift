@@ -317,7 +317,7 @@ private struct SpaceNameRow: View {
 /// Arc's profile indicator, where a window with a sidebar of its own has its Space's name: the profile's icon and
 /// name in a pill, or in an incognito window "Incognito" with Clear beside it while it has tabs. Oa has no profile
 /// icons yet, so the icon is the one the Spaces cards give a profile.
-private struct ProfileIndicatorView: View {
+struct ProfileIndicatorView: View {
     let model: WindowModel
     let space: SidebarSpace
     @State private var hovering = false

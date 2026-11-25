@@ -512,7 +512,7 @@ final class WindowLayoutController: NSViewController {
     var sidebarWidth: CGFloat { resizingWidth ?? model.sidebarWidth }
 
     func libraryWidth(for section: LibrarySection) -> CGFloat {
-        LibraryView.width(for: section, spaces: model.state.spaces.count, in: size.width)
+        LibraryView.width(for: section, spaces: model.spaces.count, in: size.width)
     }
 
     func resizeSidebar(by translation: CGFloat, velocity: CGFloat) {
