@@ -62,7 +62,11 @@ pages go on running in the profile they were made in, with their own Browser,
 and show as they are when they are next shown; a link from one stays in its
 profile. A window opened on a link also remembers the profile for the link's
 host. Choosing the profile the window has does nothing. Open in tells another
-profile by the window's profile, not the page's.
+profile by the window's profile, not the page's. So a page left in the old
+profile, moved to a Space of the new one, isn't asked about and, as in Arc, is
+lost: it shows in the standard window for a moment, closes with the Little
+window and is archived from that Space, after the window's other pages. Doing
+this Oa's own way is [#169](https://github.com/denchiklut/oa/issues/169).
 
 ⌘W closes one page into the Archive and the window goes with its last one; the
 red button archives them all. Restore Last Closed Tab has nothing to bring back
