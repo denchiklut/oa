@@ -51,8 +51,9 @@ see [Split View](../split-view/README.md).
 
 Removed until Oa has the feature behind them: Open
 Link in Incognito Window, Inspect, Print…, Cast…, Translate and Picture in
-Picture. Arc also has Open Link in Little Arc and Capture Image…, which are its
-own additions to Chrome's model and aren't added. Removed as Arc removes them:
+Picture. Arc also has Capture Image…, its own addition to Chrome's model, which
+isn't added; its Open Link in Little Arc is Oa's
+[Open Link in Little Oa](../little-oa/README.md). Removed as Arc removes them:
 Create QR Code, Send to Your Devices and Open Link as ‹profile›, along with
 Chrome's Lens, reading mode, Glic and password items, and Dictation, which
 Arc's menus don't have. Use Enhanced Spell Check is removed too, Oa's own

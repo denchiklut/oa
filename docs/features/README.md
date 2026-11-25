@@ -33,6 +33,7 @@ that every online integration still works.
 - [Sidebar state](sidebar/README.md)
 - [Sidebar motion](sidebar-motion/README.md)
 - [Peek](peek/README.md)
+- [Little Oa](little-oa/README.md)
 - [Favorites](favorites/README.md)
 - [Profiles](profiles/README.md)
 - [Saved state and recovery](saved-state/README.md)
@@ -201,14 +202,14 @@ Little Arc is a separate small browser window, not an overlay or summary card.
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Little Arc / quick browsing window | ✅ | ☐ |
-| Enable/disable opening external links in Little Arc | ✅ | ☐ |
-| Open the quick-window page in a Space | ✅ | ☐ |
+| Little Arc / quick browsing window | ✅ | ✅ |
+| Enable/disable opening external links in Little Arc | ✅ | ✅ |
+| Open the quick-window page in a Space | ✅ | ✅ |
 | Launch Little Arc globally from another app | ✅ | ☐ |
-| Option-Command-click a link to open Little Arc | ✅ | ☐ |
+| Option-Command-click a link to open Little Arc | ✅ | ✅ |
 | Configure Little Arc auto-archive interval | ✅ | ☐ |
-| Multiple simultaneous Little Arc windows † | ✅ | ☐ |
-| Reuse an identical external-link Little Arc window † | ✅ | ☐ |
+| Multiple simultaneous Little Arc windows † | ✅ | ✅ |
+| Reuse an identical external-link Little Arc window † | ✅ | ✅ |
 | Remember domain-specific profile selection † | ✅ | ☐ |
 | Filter Archive to Little Arc † | ✅ | ☐ |
 | Show/hide all Little Arc windows from the Dock † | ✅ | ☐ |
