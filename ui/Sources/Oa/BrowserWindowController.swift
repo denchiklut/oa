@@ -21,6 +21,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     /// As Arc's `BrowserWindow.windowButtons`: the title bar's own, taken before the sidebar's header makes its set,
     /// which the window would hand out in their place. They show only in full screen.
     private let windowButtons: [NSButton]
+    private var littleLayout: ModalWindowLayoutController?
 
     init(
         id: UUID, style: WindowStyle, engine: any BrowserApplication, store: SidebarStore,
@@ -60,7 +61,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.contentViewController = layout ?? LittleWindowViewController(model: model)
         if !isLittle { window.setContentSize(NSSize(width: 1100, height: 760)) }
         window.delegate = self
-        (window as? LittleBrowserWindow)?.onCancel = { [weak model] in model?.little?.showsMoveMenu = false }
+        if let little = window as? LittleBrowserWindow,
+            let content = little.contentViewController as? LittleWindowViewController
+        {
+            little.onCancel = { [weak model] in model?.little?.showsMoveMenu = false }
+            little.dismiss = { [weak self] finish in
+                if let self { dismissLittleWindow(finish) } else { finish() }
+            }
+            content.loadViewIfNeeded()
+            littleLayout = ModalWindowLayoutController(window: little, card: content.card)
+        }
         model.bringToFront = { [weak window, weak model] in
             if let little = window as? LittleBrowserWindow {
                 little.show(on: model?.little?.session.screen, isNew: false)
@@ -80,8 +90,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         engine.attachWindow(window, id: model.id)
         store.addWindow(model)
         model.ensureBrowsersCreated()
+        // As Arc's: a link's window opens covering its screen, its card growing out of the pointer, and takes its
+        // frame once the card has settled. One from the menu or the hot key is at its frame at once.
+        var presentation: (source: NSPoint, frame: NSRect)?
         if let littleFrame {
-            placeLittleWindow(at: littleFrame)
+            if case .center(let source) = model.little?.session.preferredFrame.anchor, let littleLayout {
+                isPlacingLittleWindow = true
+                littleLayout.apply(.screen(contentRect: littleFrame))
+                presentation = (source, littleFrame)
+            } else {
+                placeLittleWindow(at: littleFrame)
+            }
             observeLittlePresentation()
         } else if let previous {
             window.setFrameTopLeftPoint(
@@ -93,6 +112,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             little.show(on: model.little?.session.screen, isNew: true)
         } else {
             window.makeKeyAndOrderFront(nil)
+        }
+        if let presentation, let littleLayout {
+            littleLayout.apply(.screen(contentRect: presentation.frame))
+            littleLayout.present(from: presentation.source) { [weak self] in
+                littleLayout.apply(.intrinsic(rect: presentation.frame))
+                littleLayout.endTransition()
+                self?.isPlacingLittleWindow = false
+            }
         }
         observeTitle()
         observeDownloadPreview()
@@ -134,38 +161,20 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         }
     }
 
-    /// As Arc presents a link's Little window: see-through and without its shadow while its card grows out of the
-    /// pointer on Peek's expansion spring. Arc's window covers the screen meanwhile; Oa's is at its frame already.
-    func zoomLittleWindow(from pointer: NSPoint) {
-        guard let window, let view = window.contentView else { return }
-        view.wantsLayer = true
-        guard let layer = view.layer else { return }
-        let origin = window.convertPoint(fromScreen: pointer)
-        let anchor = CGPoint(
-            x: origin.x - layer.anchorPoint.x * layer.bounds.width,
-            y: origin.y - layer.anchorPoint.y * layer.bounds.height)
-        var start = CATransform3DMakeTranslation(anchor.x, anchor.y, 0)
-        start = CATransform3DScale(start, 0.01, 0.01, 1)
-        start = CATransform3DTranslate(start, -anchor.x, -anchor.y, 0)
-        let (opaque, color) = (window.isOpaque, window.backgroundColor)
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = false
-        let response = 0.245
-        let spring = CASpringAnimation(keyPath: "transform")
-        spring.fromValue = start
-        spring.toValue = CATransform3DIdentity
-        spring.stiffness = pow(2 * .pi / response, 2)
-        spring.damping = 4 * .pi * 0.865 / response
-        spring.duration = spring.settlingDuration
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { [weak window] in
-            window?.isOpaque = opaque
-            window?.backgroundColor = color
-            window?.hasShadow = true
+    /// As Arc's close: a link's window puts its card back into the point it came from, floating meanwhile if it is
+    /// key; one from the menu or the hot key just goes.
+    private func dismissLittleWindow(_ finish: @escaping () -> Void) {
+        guard let window, let littleLayout, window.isVisible, !window.isMiniaturized,
+            !window.styleMask.contains(.fullScreen),
+            case .center(let source) = model.little?.session.preferredFrame.anchor
+        else { return finish() }
+        isPlacingLittleWindow = true
+        if !littleLayout.isScreenSized { littleLayout.apply(.screen(contentRect: window.frame)) }
+        if window.isKeyWindow {
+            window.level = .floating
+            (window as? NSPanel)?.isFloatingPanel = true
         }
-        layer.add(spring, forKey: "littleZoom")
-        CATransaction.commit()
+        littleLayout.dismiss(to: source, completion: finish)
     }
 
     /// As Arc's Peek layout controller: the frame is kept when a page window is moved or its resize ends.
@@ -296,6 +305,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         store.removeWindow(model)
         engine.closeWindow(id: model.id)
         didClose(self)
+        model.afterClose?()
     }
 
     @objc func goBack(_ sender: Any?) { model.frontPage?.goBack() }
