@@ -1197,6 +1197,8 @@ class DownloadsObserverBridge : public oa::Downloads::Observer {
 @synthesize remainingSeconds = _remainingSeconds;
 @synthesize targetFileURL = _targetFileURL;
 @synthesize sourceURL = _sourceURL;
+@synthesize sourceDomain = _sourceDomain;
+@synthesize tabURL = _tabURL;
 @synthesize startTime = _startTime;
 @synthesize paused = _paused;
 @synthesize done = _done;
@@ -1220,6 +1222,12 @@ class DownloadsObserverBridge : public oa::Downloads::Observer {
     _sourceURL = download.source_url.empty()
                      ? nil
                      : [NSURL URLWithString:ToNSString(download.source_url)];
+    _sourceDomain = download.source_domain.empty()
+                        ? nil
+                        : ToNSString(download.source_domain);
+    _tabURL = download.tab_url.empty()
+                  ? nil
+                  : [NSURL URLWithString:ToNSString(download.tab_url)];
     _startTime = [NSDate dateWithTimeIntervalSince1970:download.start_time];
     _paused = download.is_paused;
     _done = download.is_done;
