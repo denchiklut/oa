@@ -5,8 +5,8 @@ Shift-click Peek off, Oa honors Chromium’s request for a new browser window.
 That fallback is Oa’s choice.
 Turning off automatic Peek for Favorites and Pinned tabs lets ordinary links
 navigate those tabs in place and lets links requesting a new tab open one.
-Both switches apply across windows and profiles. The Little Oa controls in the
-same pane are disabled until Oa supports that window.
+Both switches apply across windows and profiles. The pane's other controls are
+[Little Oa](../little-oa/README.md)'s.
 
 A Peek shows a page over the window as part of the tab it was opened from.
 By default, a pinned tab's cross-host link clicks, `target=_blank` links,
@@ -106,8 +106,8 @@ Arc's copy-link icon doesn't exist in Oa yet.
 In Settings → Links, choose **Air Traffic Control…**. As in Arc, **New Route**
 adds a row at the bottom: **Contains** or **Is equal to**, a URL pattern, and
 the Space it opens in. The **Default** menu handles links no route matches.
-Both menus list every Space as "Space (Profile)", then **Most Recent Space**;
-Little Oa is disabled. Edits apply when the dialog closes with ✕ or Escape, and
+Both menus list every Space as "Space (Profile)", then **Most Recent Space**
+and **Little Oa**, which takes links from other apps. Edits apply when the dialog closes with ✕ or Escape, and
 blank routes are dropped then. Routes are kept in `StorableLinkRouting.json`,
 in Arc's format.
 

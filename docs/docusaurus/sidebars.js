@@ -24,6 +24,7 @@ const sidebars = {
         { type: "doc", id: "features/sidebar/README", label: "Sidebar state" },
         { type: "doc", id: "features/sidebar-motion/README", label: "Sidebar motion" },
         { type: "doc", id: "features/peek/README", label: "Peek" },
+        { type: "doc", id: "features/little-oa/README", label: "Little Oa" },
         { type: "doc", id: "features/favorites/README", label: "Favorites" },
         { type: "doc", id: "features/profiles/README", label: "Profiles" },
         { type: "doc", id: "features/saved-state/README", label: "Saved state and recovery" },

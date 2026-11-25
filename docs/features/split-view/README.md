@@ -207,8 +207,6 @@ Oa's own:
 - A link held on a plain row opens at the line. Arc's goes into that tab's
   item, out of sight, which looks like a bug. A link dropped on a pane isn't
   handled by the app; Arc's opens as a tab after the split.
-- ⌘⌥ on a link opens a background page; Arc opens Little Arc, which Oa doesn't
-  have.
 - A split's row in the command bar takes its focused pane's title; Arc's row
   title wasn't recorded. Picking it from an empty pane switches to the split;
   Arc's rule there wasn't made out.
