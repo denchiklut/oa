@@ -71,19 +71,49 @@ A permission request is a card under the bar with Not Now and Allow, ended only
 by its buttons. Developer Tools open in their own window. The first two windows
 opened by the File menu or a link from another app carry a tip.
 
+## Downloads
+
+A Little window has its own downloads tray, as Arc's: a row of cards along the
+bottom of the page, the oldest on the left. From the moment the window is made
+it hears of every new download of its profile, whichever window starts it, and
+of none that was there before or that an incognito window starts. Each window
+keeps its own list.
+
+A card is 250 × 56 with the file's icon, its name and the Library's line under
+it; while the download runs the icon has a ring that fills clockwise. The row
+is 20 pt in from the left and bottom, has no cap, and scrolls sideways when
+the cards outgrow the window; a new card isn't scrolled into view. Only the
+cards take clicks and scrolls: the strip around them leaves them to the page.
+Nothing is animated. The tray doesn't show while the window is its bar alone,
+and a download that started meanwhile has its card once the window is a page.
+
+A click on a finished card opens the file; on any other card it does nothing.
+A second click on the same card does nothing either until another card is
+clicked or the row changes, as in Arc. The ✕, which shows with the hover
+colour only under the pointer, removes the card and cancels the download
+unless it finished or was already cancelled; a finished file stays. A card
+never goes by itself.
+
+As in Arc, the tray takes no failed or paused event, so such a card stays as
+its last update left it. A download cancelled elsewhere reads "Cancelled · from
+‹site›", and one removed from the Library leaves the tray. While the engine
+asks where to save, there is no card, and cancelling there leaves none.
+Several downloads from one page raise the permission card.
+
 ## Saved state
 
 A Little window is a window style, as Arc's: its record in `windows.json` has
 `style.little` where a standard window has `style.standard`, under Arc's keys.
 It holds the session (id, entry point, preferred frame, start time), the
-profile, whether to show the profile chip, and whether the window is its bar or
-a page. Its pages are in a `littleBrowser` container in `sidebar.json`. Both
+profile, whether to show the profile chip, whether the window is its bar or a
+page, and the tray's downloads as Arc's `DownloadData`, the ones still running
+as they last progressed. Its pages are in a `littleBrowser` container in `sidebar.json`. Both
 files are saved together a few seconds after a change. The frame is not in the
 record; the open Open in menu, the tip and the Open in target are rebuilt.
 
 The entry point is coded as Arc codes it, the hot key's case included: Arc
 writes it as a link with no address, which doesn't read back, so that record
-reads as a standard window's.
+reads as a standard window's. A paused download is written the same way.
 
 At a quit nothing is closed or archived. A key Little window that is its bar
 alone closes first when Quit is chosen; the others are written to the files as
@@ -106,7 +136,10 @@ opens its own window. Blink's ⌘⌥-click reaches the app as a background page.
 
 - The record's profile is Oa's profile ID, and its dates are in the file's
   date form, as everywhere in Oa's files.
-- The record has no `downloads`: a Little window has no downloads tray yet.
+- A card in a light window: its text and the ✕'s hover disc mirror the dark
+  one, which is the only one seen in Arc.
+- The icon of a download that still runs is drawn large in its circle, as
+  seen in Arc, at a size and offset read off a capture.
 - The pages the sweep archives from a window that didn't come back are filed
   under Little Arc; Arc's source for them is unknown.
 - AppKit's saved state says only that the window is a Little one; Arc's also
@@ -125,7 +158,7 @@ opens its own window. Blink's ⌘⌥-click reaches the app as a background page.
 
 ## Not here
 
-The Archive's Little Arc filter, the downloads tray card, extensions in the bar,
+The Archive's Little Arc filter, extensions in the bar,
 the Dock menu's rows, a menu-bar launcher, Arc's panel over another app's full
 screen, and back with no history closing a page to its opener, which is Arc's
 rule in every window.

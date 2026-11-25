@@ -14,8 +14,9 @@ an observer of every item of the profile's download manager, which reports the
 downloads Chromium's history brought back, then each one created, updated and
 removed, each as a snapshot of what ArcCore's download item reads: the item's
 GUID, state, bytes received and expected, speed, seconds left (−1 while there is
-no estimate), target path, source URL, start time, whether it is paused, done
-or resumable, and the page that started it. It pauses, resumes, cancels and
+no estimate), target path, source URL and its registrable domain, the address
+of the page that started it, start time, whether it is paused, done or
+resumable, and the page that started it. It pauses, resumes, cancels and
 removes by GUID. Every event is posted, as ArcCore posts its delegate's. This
 Chromium loads the history only when a download UI asks for it, so the object
 asks when it starts, as Chrome's bubble and downloads page do. ArcCore's hook
@@ -25,6 +26,9 @@ DevKit carries that on the profile's `BrowserContext` as `downloads`, an
 observable list of `Download` values kept current by those events, never
 polled, with Arc's statuses: not started until Chromium has chosen the file,
 in progress, paused, finished, failed for an interrupted download, cancelled.
+Beside the list it has `events`, a stream per caller shaped as ADK's download
+manager sends them: `initialized`, `create`, `update`, `failed`, `cancel` and
+`paused`. A Little window's tray is built from it.
 Opening, revealing, copying and trashing a file stay in the app, as in Arc. The
 stub engine's pages have "Download a file" and "Download a file that fails",
 which run for fifteen seconds and leave a small text file in a temporary folder.
@@ -37,7 +41,7 @@ all of them, as Arc's does; its symbol is Oa's own. Hovering it shows Arc's
 flyout: the four most recent downloads, the newest at the bottom, each with its
 Quick Look thumbnail or file icon, name and age; a running one with its own
 ring, "32.6/94.4 MB · 1m 1s" and an ✕ that cancels; a cancelled one as
-"Cancelled · from ‹host›" and a failed one as "Failed to Download", both
+"Cancelled · from ‹site›" and a failed one as "Failed to Download", both
 without an icon. A finished one whose file is gone is left out, as in Arc. A
 finished row drags out as a file. Arc's flyout also lists its Library's other
 files, which Oa doesn't have.
@@ -49,12 +53,14 @@ comes in, and its Spaces section, are in
 [Sidebar motion](../sidebar-motion/README.md).
 The list merges every profile's downloads, newest first, under Today,
 Yesterday, N days ago, 1 week ago and N weeks ago. A row has the thumbnail or
-icon, the name and Arc's line under it: "‹Kind› from ‹host›" with Arc's type
+icon, the name and Arc's line under it: "‹Kind› from ‹site›" with Arc's type
 words (Image, Disk Image, PDF, Video, Movie, Audio, Zip Archive, Archive) and
 "Download" for the rest, "50.8/94.4 MB · 45s" with the ring while it runs,
-"Opening… (24%)" once it is set to open, "Paused", "Failed to Download" and
-"Cancelled" greyed. A source that is a bare address, such as 127.0.0.1, isn't
-named, as in Arc. What was cancelled, failed or lost its file before the
+"Opening… (24%)" once it is set to open, "Paused · from ‹site›", "Failed to
+Download" and "Cancelled" greyed; nothing while the size is unknown. The site
+is the registrable domain of the download's address, so a file from
+files.example.com reads "from example.com". A source that is a bare address,
+such as 127.0.0.1, isn't named, as in Arc. What was cancelled, failed or lost its file before the
 Library opened isn't listed; one that ends so while it shows stays until the
 next time, as in Arc. "Search Downloads…" narrows the list by name, and Filter
 opens "Filter Downloads…" with a chip per profile. An empty list reads
