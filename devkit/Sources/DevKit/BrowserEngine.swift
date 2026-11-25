@@ -509,15 +509,15 @@ public struct Download: Identifiable, Sendable, Equatable {
     public var secondsRemaining: Int?
     /// Where the file goes, nil until the engine has chosen.
     public var file: URL?
+    /// As ADK's: the address the page that started it shows, while that page is open, else the file's.
     public var sourceURL: URL?
     /// The registrable domain of `sourceURL`, nil for an address without one, as an IP.
     public var sourceDomain: String?
     public var startedAt: Date
     /// The page that started it, while that page is open.
     public var pageID: UUID?
-    /// That page's address when it started, kept after the page has gone.
+    /// That page's address, title and the engine's session ID for it, while it is open.
     public var pageURL: URL?
-    /// Its title and the engine's session ID for it, while that page is open.
     public var pageTitle: String?
     public var pageSessionID: Int32?
 
