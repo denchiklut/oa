@@ -82,12 +82,24 @@ void EditModel(const content::ContextMenuParams& params,
     }
   }
   // As Arc's item: its label, no icon and no layout submenu. Chromium runs it
-  // as an open with the split view disposition (patch 0019).
+  // as an open with the split view disposition (patches 0019 and 0026).
   if (const std::optional<size_t> split =
           model->GetIndexOfCommandId(IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW)) {
     model->RemoveItemAt(*split);
     model->InsertItemAt(*split, IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW,
                         u"Open Link in Split View");
+  }
+  // As ArcCore's item and place: after Split View, which Chrome leaves out
+  // of a popup's menu, else after New Window. Chromium enables and runs it
+  // (patch 0027).
+  std::optional<size_t> before =
+      model->GetIndexOfCommandId(IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW);
+  if (!before) {
+    before = model->GetIndexOfCommandId(IDC_CONTENT_CONTEXT_OPENLINKNEWWINDOW);
+  }
+  if (before) {
+    model->InsertItemAt(*before + 1, IDC_CONTENT_CONTEXT_OPENLINKLITTLEWINDOW,
+                        u"Open Link in Little Oa");
   }
   if (const std::optional<size_t> incognito = model->GetIndexOfCommandId(
           IDC_CONTENT_CONTEXT_OPENLINKOFFTHERECORD)) {

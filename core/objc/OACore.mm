@@ -49,6 +49,7 @@
                 byPage:(BOOL)byPage;
 - (void)pageWantsActivation;
 - (void)pageOpenLinkInIncognitoWindow:(const std::string&)url;
+- (void)pageOpenLinkInLittleWindow:(const std::string&)url;
 - (void)pageRendererGone:(oa::RendererExit)exit;
 - (void)pageRendererReady;
 - (void)pageClosedWithSessionID:(int32_t)sessionID;
@@ -115,6 +116,7 @@
 - (instancetype)initWithWindowIdentifier:(NSString*)windowIdentifier
                        profileIdentifier:(NSString*)profileIdentifier
                                     type:(oa::BrowserContextType)type
+                                   popup:(BOOL)popup
                                 delegate:(id<OABrowserDelegate>)delegate;
 - (id<OABrowserDelegate>)target;
 @end
@@ -234,6 +236,9 @@ class PageObserverBridge : public oa::Page::Observer {
   void OnPageWantsActivation() override { [page_ pageWantsActivation]; }
   void OnPageOpenLinkInIncognitoWindow(const std::string& url) override {
     [page_ pageOpenLinkInIncognitoWindow:url];
+  }
+  void OnPageOpenLinkInLittleWindow(const std::string& url) override {
+    [page_ pageOpenLinkInLittleWindow:url];
   }
   void OnPageRendererGone(oa::RendererExit exit) override {
     [page_ pageRendererGone:exit];
@@ -957,6 +962,12 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 - (void)pageOpenLinkInIncognitoWindow:(const std::string&)url {
   if (NSURL* link = [NSURL URLWithString:ToNSString(url)]) {
     [self.delegate page:self openLinkInIncognitoWindow:link];
+  }
+}
+
+- (void)pageOpenLinkInLittleWindow:(const std::string&)url {
+  if (NSURL* link = [NSURL URLWithString:ToNSString(url)]) {
+    [self.delegate page:self openLinkInLittleWindow:link];
   }
 }
 
@@ -1789,13 +1800,15 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 - (instancetype)initWithWindowIdentifier:(NSString*)windowIdentifier
                        profileIdentifier:(NSString*)profileIdentifier
                                     type:(oa::BrowserContextType)type
+                                   popup:(BOOL)popup
                                 delegate:(id<OABrowserDelegate>)delegate {
   if ((self = [super init])) {
     _delegate = delegate;
     _observer = std::make_unique<BrowserObserverBridge>(self);
-    _browser = oa::ObserveBrowser(windowIdentifier.UTF8String ?: "",
-                                  profileIdentifier.UTF8String ?: "", type,
-                                  _observer.get());
+    _browser = oa::ObserveBrowser(
+        windowIdentifier.UTF8String ?: "", profileIdentifier.UTF8String ?: "",
+        type, popup ? oa::BrowserType::kPopup : oa::BrowserType::kNormal,
+        _observer.get());
   }
   return self;
 }
@@ -1912,10 +1925,12 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 }
 
 - (OABrowser*)browserInWindow:(NSString*)windowIdentifier
+                        popup:(BOOL)popup
                      delegate:(id<OABrowserDelegate>)delegate {
   return [[OABrowser alloc] initWithWindowIdentifier:windowIdentifier
                                    profileIdentifier:_identifier
                                                 type:_type
+                                               popup:popup
                                             delegate:delegate];
 }
 

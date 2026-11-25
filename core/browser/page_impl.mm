@@ -109,6 +109,9 @@ bool ToOpenDisposition(WindowOpenDisposition disposition,
       *result = OpenDisposition::kPopup;
       return true;
     case WindowOpenDisposition::NEW_SPLIT_VIEW:
+      *result = OpenDisposition::kBackgroundTab;
+      return true;
+    case WindowOpenDisposition::SPLIT_VIEW:
       *result = OpenDisposition::kSplitView;
       return true;
     default:
@@ -927,6 +930,11 @@ content::WebContents* PageImpl::OpenURLFromTab(
   } else if (params.disposition == WindowOpenDisposition::OFF_THE_RECORD) {
     if (observer_) {
       observer_->OnPageOpenLinkInIncognitoWindow(params.url.spec());
+    }
+    return nullptr;
+  } else if (params.disposition == WindowOpenDisposition::LITTLE_WINDOW) {
+    if (observer_) {
+      observer_->OnPageOpenLinkInLittleWindow(params.url.spec());
     }
     return nullptr;
   } else if (params.disposition == WindowOpenDisposition::SAVE_TO_DISK &&
