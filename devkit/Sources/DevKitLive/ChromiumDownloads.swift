@@ -75,7 +75,7 @@ extension Download {
             totalBytes: core.totalBytes > 0 ? core.totalBytes : nil, bytesPerSecond: core.bytesPerSecond,
             secondsRemaining: core.remainingSeconds < 0 ? nil : Int(core.remainingSeconds), file: core.targetFileURL,
             sourceURL: core.sourceURL, sourceDomain: core.sourceDomain, startedAt: core.startTime, pageID: page?.id,
-            pageURL: core.tabURL,
+            pageURL: page?.url,
             pageTitle: page?.title, pageSessionID: page?.tabSessionID)
     }
 }

@@ -21,7 +21,7 @@ final class StubDownloads: Downloads {
         let download = Download(
             id: id, status: .inProgress, totalBytes: Self.size,
             file: folder.appendingPathComponent("stub-download-\(Self.count).txt"),
-            sourceURL: page.url?.appendingPathComponent("file.txt"),
+            sourceURL: page.url,
             sourceDomain: page.url?.host().map { $0.split(separator: ".").suffix(2).joined(separator: ".") },
             pageID: page.id, pageURL: page.url,
             pageTitle: page.title, pageSessionID: page.tabSessionID)
