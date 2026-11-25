@@ -179,6 +179,14 @@ void CreateProfile(const std::string& name,
                          identifier, std::move(completion)));
 }
 
+std::string GetBrowserProfileIdentifier(Profile* context) {
+  const std::string name =
+      context->GetOriginalProfile()->GetBaseName().AsUTF8Unsafe();
+  return base::StartsWith(name, kDirectoryPrefix)
+             ? name.substr(std::size(kDirectoryPrefix) - 1)
+             : std::string();
+}
+
 void SetProfileName(const std::string& profile_id, const std::string& name) {
   if (!IsValidIdentifier(profile_id)) {
     return;

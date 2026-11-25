@@ -54,6 +54,7 @@
 #include "content/public/common/referrer.h"
 #include "content/public/common/url_constants.h"
 #include "oa/browser/devtools_impl.h"
+#include "oa/browser/profile_services.h"
 #include "oa/browser/window_browser.h"
 #include "services/media_session/public/mojom/media_session.mojom.h"
 #include "skia/ext/skia_utils_mac.h"
@@ -346,6 +347,13 @@ int32_t PageImpl::GetTabSessionID() const {
   return web_contents()
              ? sessions::SessionTabHelper::IdForTab(web_contents()).id()
              : SessionID::InvalidValue().id();
+}
+
+std::string PageImpl::GetProfileID() const {
+  return web_contents()
+             ? GetBrowserProfileIdentifier(Profile::FromBrowserContext(
+                   web_contents()->GetBrowserContext()))
+             : std::string();
 }
 
 bool PageImpl::CanGoBack() const {

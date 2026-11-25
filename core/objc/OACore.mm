@@ -680,6 +680,10 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   return _page ? _page->GetTabSessionID() : -1;
 }
 
+- (NSString*)profileID {
+  return _page ? ToNSString(_page->GetProfileID()) : @"";
+}
+
 - (BOOL)canGoBack {
   return _page && _page->CanGoBack();
 }
