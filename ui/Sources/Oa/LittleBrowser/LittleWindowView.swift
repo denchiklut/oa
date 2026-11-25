@@ -105,7 +105,15 @@ struct LittleWindowView: View {
 
 struct LittleBrowserToolbar: View {
     let model: WindowModel
+    @State private var hoveredSegment: Segment?
     @Environment(\.theme) private var theme
+
+    private enum Segment { case move, menu }
+
+    /// As measured on Arc's bar: its greys are plain black or white, whatever the palette.
+    private func ink(_ light: Double, _ dark: Double) -> Color {
+        theme.isDark ? .white.opacity(dark) : .black.opacity(light)
+    }
 
     var body: some View {
         let canGoBack = model.page?.canGoBack == true
@@ -118,53 +126,73 @@ struct LittleBrowserToolbar: View {
                     model.page?.goBack()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(ink(0.3, 0.3))
                         .frame(width: 29.5, height: 31)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(ChromeButtonStyle())
+                .buttonStyle(.plain)
                 .accessibilityLabel("Back")
-                .padding(.leading, 13.5)
+                .padding(.leading, 9.5)
             }
             field
-                .padding(.leading, canGoBack ? 0 : 13.5)
+                .padding(.leading, canGoBack ? 4 : 13.5)
             moveButton
+                .fixedSize()
+                .layoutPriority(1)
                 .padding(.leading, 8.5)
                 .padding(.trailing, 7.5)
+                .offset(y: -0.5)
         }
         .frame(height: 47)
         .background(WindowDragRegion())
     }
 
+    /// As seen in Arc: the host sits midway between the chip and Copy URL, and both give way in a narrow window.
     private var field: some View {
-        ZStack {
+        HStack(spacing: 0) {
+            if model.little?.shouldShowProfileIndicators == true { profileChip }
             // As Arc: the URL opens the command bar to edit it.
             Button {
                 model.openCommandBar(.currentTab)
             } label: {
                 HStack(spacing: 5) {
                     if let page = model.page, page.url?.scheme != nil {
-                        Image(systemName: page.securityLevel == .secure ? "lock.fill" : "lock.slash.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(page.securityLevel == .secure ? theme.secondaryGlyph : .orange)
+                        if page.securityLevel == .secure {
+                            Image(systemName: "lock.fill").font(.system(size: 10)).foregroundStyle(ink(0.5, 0.5))
+                        } else {
+                            Image(systemName: "lock.slash.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(
+                                    Color(.displayP3, red: 0xD8 / 255, green: 0x48 / 255, blue: 0x06 / 255))
+                        }
                     }
-                    ToolbarAddressLabel(url: model.address, placeholder: "Search or Enter URL…")
+                    ToolbarAddressLabel(
+                        url: model.address, placeholder: "Search or Enter URL…", hostWeight: .regular,
+                        color: ink(0.85, 0.8))
                 }
+                .padding(.horizontal, 6)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 110)
-            HStack(spacing: 0) {
-                if model.little?.shouldShowProfileIndicators == true { profileChip }
-                Spacer(minLength: 0)
-                CopyLinkButton(model: model, size: 16)
-                    .help("Copy URL")
-                    .opacity(model.address == nil ? 0 : 1)
-                    .padding(.trailing, 7)
+            Button {
+                model.copyCurrentURLs()
+            } label: {
+                Image(systemName: "link")
+                    .font(.system(size: 13))
+                    .foregroundStyle(ink(0.3, 0.32))
+                    .frame(width: 16, height: 16)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Copy Current URL")
+            .help("Copy URL")
+            .opacity(model.address == nil ? 0 : 1)
+            .padding(.trailing, 7)
         }
         .frame(height: 31)
-        .background(RoundedRectangle(cornerRadius: 5).fill(theme.fieldFill))
+        .background(RoundedRectangle(cornerRadius: 5).fill(ink(0.05, 0.1)))
     }
 
     private var profileChip: some View {
@@ -180,25 +208,33 @@ struct LittleBrowserToolbar: View {
                     })
             }
         } label: {
-            HStack(spacing: 3) {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 12))
+            HStack(spacing: 3.5) {
+                // Oa's own glyph: Arc draws the profile's icon here, and Oa's profiles have none yet.
+                Image(systemName: "person.fill")
+                    .font(.system(size: 8))
                     .frame(width: 14, height: 14)
+                    .background(Circle().fill(ink(0.1, 0.1)))
                 Text(profileID.map(model.profileName) ?? "")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
             }
-            .foregroundStyle(theme.addressText)
-            .padding(.horizontal, 9)
-            .frame(height: 23)
-            .background(RoundedRectangle(cornerRadius: 5).fill(theme.itemFill))
+            .foregroundStyle(ink(0.85, 0.8))
+            .padding(.leading, 6.5)
+            .padding(.trailing, 8)
+            .frame(height: 22)
+            .background(Capsule().fill(theme.isDark ? .black.opacity(0.19) : .white.opacity(0.27)))
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
-        .fixedSize()
         .help("Change profile")
-        .padding(.leading, 4)
+        .padding(.leading, 7.5)
+    }
+
+    /// As seen in Arc: only the Space's name takes a colour, its own Space's in a light bar.
+    private var destinationInk: Color {
+        guard !theme.isDark, let space = model.littleDestinationSpace else { return theme.modalButtonGlyph }
+        return model.theme(of: space).primaryColorPalette.shadedDark.color
     }
 
     private var moveButton: some View {
@@ -207,42 +243,45 @@ struct LittleBrowserToolbar: View {
                 model.openInLittleDestination()
             } label: {
                 HStack(spacing: 4) {
-                    Text("Open in").foregroundStyle(theme.modalButtonGlyph.opacity(0.6))
+                    Text("Open in").foregroundStyle(ink(0.5, 0.5))
                     Text(model.littleDestinationSpace?.name ?? "")
-                        .fontWeight(.bold)
-                        .foregroundStyle(theme.modalButtonGlyph)
+                        .foregroundStyle(destinationInk)
                         .lineLimit(1)
                     Text("⌘O")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(theme.modalButtonGlyph.opacity(0.6))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(RoundedRectangle(cornerRadius: 4).fill(theme.modalButtonGlyph.opacity(0.1)))
-                        .padding(.leading, 4)
+                        .foregroundStyle(ink(0.54, 0.53))
+                        .padding(.horizontal, 3.75)
+                        .frame(height: 17)
+                        .background(RoundedRectangle(cornerRadius: 3).fill(ink(0.08, 0.07)))
+                        .padding(.leading, 2.5)
                 }
                 .font(.system(size: 13, weight: .medium))
-                .padding(.leading, 6)
-                .padding(.trailing, 8)
+                .padding(.horizontal, 6)
                 .frame(maxHeight: .infinity)
+                .background(ink(0.07, 0.07).opacity(hoveredSegment == .move ? 1 : 0))
                 .contentShape(Rectangle())
             }
             .disabled(model.page == nil)
-            theme.modalButtonGlyph.opacity(0.15).frame(width: 1, height: 16)
+            .onHover { hoveredSegment = $0 ? .move : hoveredSegment == .move ? nil : hoveredSegment }
+            ink(0.1, 0.1).frame(width: 1, height: 18).opacity(hoveredSegment == nil ? 1 : 0)
             Button {
                 model.little?.showsMoveMenu = true
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(theme.modalButtonGlyph.opacity(0.6))
+                    .foregroundStyle(hoveredSegment == .menu ? ink(0.4, 0.33) : ink(0.3, 0.25))
                     .frame(width: 28.5)
                     .frame(maxHeight: .infinity)
+                    .background(ink(0.07, 0.07).opacity(hoveredSegment == .menu ? 1 : 0))
                     .contentShape(Rectangle())
             }
             .help("More Spaces")
+            .onHover { hoveredSegment = $0 ? .menu : hoveredSegment == .menu ? nil : hoveredSegment }
         }
         .buttonStyle(.plain)
         .frame(height: 30)
-        .background(RoundedRectangle(cornerRadius: 5).fill(theme.modalButtonFill))
+        .background(theme.modalButtonFill)
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(ink(0.06, 0.1), lineWidth: 0.5))
         .opacity(model.littleDestinationSpace == nil ? 0 : 1)
         .onGeometryChange(for: CGRect.self) {
             $0.frame(in: .global)
