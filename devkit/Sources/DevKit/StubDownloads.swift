@@ -7,20 +7,26 @@ import Observation
 @Observable
 final class StubDownloads: Downloads {
     private(set) var items: [Download] = []
+    var events: AsyncStream<DownloadEvent> { downloadEvents.stream(initial: items) }
+    @ObservationIgnored private let downloadEvents = DownloadEvents()
     @ObservationIgnored private var running: [Download.ID: Task<Void, Never>] = [:]
     @ObservationIgnored private var paused: Set<Download.ID> = []
     private static var count = 0
     private static let size: Int64 = 94_400_000
 
-    func start(from page: URL?, pageID: UUID, failing: Bool) {
+    func start(from page: any Page, failing: Bool) {
         Self.count += 1
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("OaStubDownloads")
         let id = UUID().uuidString
-        items.append(
-            Download(
-                id: id, status: .inProgress, totalBytes: Self.size,
-                file: folder.appendingPathComponent("stub-download-\(Self.count).txt"),
-                sourceURL: page?.appendingPathComponent("file.txt"), pageID: pageID))
+        let download = Download(
+            id: id, status: .inProgress, totalBytes: Self.size,
+            file: folder.appendingPathComponent("stub-download-\(Self.count).txt"),
+            sourceURL: page.url?.appendingPathComponent("file.txt"),
+            sourceDomain: page.url?.host().map { $0.split(separator: ".").suffix(2).joined(separator: ".") },
+            pageID: page.id, pageURL: page.url,
+            pageTitle: page.title, pageSessionID: page.tabSessionID)
+        items.append(download)
+        downloadEvents.send(.create(download))
         running[id] = Task { [weak self] in
             for step in 1...30 {
                 try? await Task.sleep(for: .milliseconds(500))
@@ -54,7 +60,8 @@ final class StubDownloads: Downloads {
 
     func remove(_ id: Download.ID) {
         cancel(id)
-        items.removeAll { $0.id == id }
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        downloadEvents.send(.cancel(items.remove(at: index), shouldRemove: true))
     }
 
     private func finish(_ id: Download.ID, as status: Download.Status) {
@@ -74,5 +81,6 @@ final class StubDownloads: Downloads {
     private func change(_ id: Download.ID, _ change: (inout Download) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         change(&items[index])
+        downloadEvents.sendUpdate(items[index])
     }
 }

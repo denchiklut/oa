@@ -7,6 +7,9 @@ import Observation
 @Observable
 final class ChromiumDownloads: Downloads {
     private(set) var items: [Download] = []
+    var events: AsyncStream<DownloadEvent> { downloadEvents.stream(initial: isInitialized ? items : nil) }
+    @ObservationIgnored private let downloadEvents = DownloadEvents()
+    @ObservationIgnored private var isInitialized = false
     @ObservationIgnored private let core: CoreDownloads?
     @ObservationIgnored private let delegate = DownloadsDelegate()
 
@@ -23,19 +26,23 @@ final class ChromiumDownloads: Downloads {
 
     fileprivate func initialized(_ downloads: [Download]) {
         items = downloads.sorted { $0.startedAt < $1.startedAt }
+        isInitialized = true
+        downloadEvents.send(.initialized(items))
     }
 
     /// An event for a download the list lacks adds it: Chromium creates some before its history has loaded.
-    fileprivate func changed(_ download: Download) {
+    fileprivate func changed(_ download: Download, created: Bool) {
         if let index = items.firstIndex(where: { $0.id == download.id }) {
             if items[index] != download { items[index] = download }
         } else {
             items.append(download)
         }
+        if created { downloadEvents.send(.create(download)) } else { downloadEvents.sendUpdate(download) }
     }
 
     fileprivate func removed(_ id: Download.ID) {
-        items.removeAll { $0.id == id }
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        downloadEvents.send(.cancel(items.remove(at: index), shouldRemove: true))
     }
 }
 
@@ -47,8 +54,8 @@ private final class DownloadsDelegate: NSObject, CoreDownloadsDelegate {
         self.downloads?.initialized(downloads.map { Download(core: unsafeBitCast($0, to: CoreDownload.self)) })
     }
 
-    func downloadWasCreated(_ download: CoreDownload) { downloads?.changed(Download(core: download)) }
-    func downloadWasUpdated(_ download: CoreDownload) { downloads?.changed(Download(core: download)) }
+    func downloadWasCreated(_ download: CoreDownload) { downloads?.changed(Download(core: download), created: true) }
+    func downloadWasUpdated(_ download: CoreDownload) { downloads?.changed(Download(core: download), created: false) }
     func downloadWasRemoved(identifier: String) { downloads?.removed(identifier) }
 }
 
@@ -62,11 +69,13 @@ extension Download {
             case 3: .failed
             default: core.targetFileURL == nil ? .notStarted : core.isPaused ? .paused : .inProgress
             }
+        let page = (core.page?.delegate as? PageDelegate)?.content
         self.init(
             id: core.identifier, status: status, receivedBytes: core.receivedBytes,
             totalBytes: core.totalBytes > 0 ? core.totalBytes : nil, bytesPerSecond: core.bytesPerSecond,
             secondsRemaining: core.remainingSeconds < 0 ? nil : Int(core.remainingSeconds), file: core.targetFileURL,
-            sourceURL: core.sourceURL, startedAt: core.startTime,
-            pageID: (core.page?.delegate as? PageDelegate)?.content?.id)
+            sourceURL: core.sourceURL, sourceDomain: core.sourceDomain, startedAt: core.startTime, pageID: page?.id,
+            pageURL: core.tabURL,
+            pageTitle: page?.title, pageSessionID: page?.tabSessionID)
     }
 }

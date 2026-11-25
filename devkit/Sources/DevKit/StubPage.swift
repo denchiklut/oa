@@ -383,7 +383,7 @@ final class StubPage: Page, MediaSession {
     }
 
     func download(failing: Bool = false) {
-        downloads.start(from: url, pageID: id, failing: failing)
+        downloads.start(from: self, failing: failing)
     }
 
     /// As the Chrome Web Store's Add button: the engine asks through the page before it installs.

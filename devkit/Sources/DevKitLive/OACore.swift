@@ -45,6 +45,8 @@ import AppKit
     var remainingSeconds: Int64 { get }
     var targetFileURL: URL? { get }
     var sourceURL: URL? { get }
+    var sourceDomain: String? { get }
+    var tabURL: URL? { get }
     var startTime: Date { get }
     var isPaused: Bool { get }
     var page: CorePage? { get }

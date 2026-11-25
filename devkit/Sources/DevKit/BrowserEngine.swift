@@ -480,6 +480,9 @@ public struct AutocompleteMatch: Identifiable, Sendable, Equatable {
 public protocol Downloads: AnyObject, Observable {
     /// Oldest first; empty until the engine has read the profile's history.
     var items: [Download] { get }
+    /// What happens to the context's downloads from now on, a stream per caller, as ADK's `downloadActions`: it
+    /// starts with `initialized` once the engine has read the history.
+    var events: AsyncStream<DownloadEvent> { get }
     func pause(_ id: Download.ID)
     func resume(_ id: Download.ID)
     /// The partial file goes.
@@ -507,14 +510,22 @@ public struct Download: Identifiable, Sendable, Equatable {
     /// Where the file goes, nil until the engine has chosen.
     public var file: URL?
     public var sourceURL: URL?
+    /// The registrable domain of `sourceURL`, nil for an address without one, as an IP.
+    public var sourceDomain: String?
     public var startedAt: Date
     /// The page that started it, while that page is open.
     public var pageID: UUID?
+    /// That page's address when it started, kept after the page has gone.
+    public var pageURL: URL?
+    /// Its title and the engine's session ID for it, while that page is open.
+    public var pageTitle: String?
+    public var pageSessionID: Int32?
 
     public init(
         id: String, status: Status, receivedBytes: Int64 = 0, totalBytes: Int64? = nil, bytesPerSecond: Int64 = 0,
-        secondsRemaining: Int? = nil, file: URL? = nil, sourceURL: URL? = nil, startedAt: Date = .now,
-        pageID: UUID? = nil
+        secondsRemaining: Int? = nil, file: URL? = nil, sourceURL: URL? = nil, sourceDomain: String? = nil,
+        startedAt: Date = .now, pageID: UUID? = nil, pageURL: URL? = nil, pageTitle: String? = nil,
+        pageSessionID: Int32? = nil
     ) {
         self.id = id
         self.status = status
@@ -524,8 +535,59 @@ public struct Download: Identifiable, Sendable, Equatable {
         self.secondsRemaining = secondsRemaining
         self.file = file
         self.sourceURL = sourceURL
+        self.sourceDomain = sourceDomain
         self.startedAt = startedAt
         self.pageID = pageID
+        self.pageURL = pageURL
+        self.pageTitle = pageTitle
+        self.pageSessionID = pageSessionID
+    }
+}
+
+/// As ADK's download manager reports a context's downloads.
+public enum DownloadEvent: Sendable {
+    /// Every download the context has, sent first.
+    case initialized([Download])
+    case create(Download)
+    /// It progressed or finished.
+    case update(Download)
+    case failed(Download)
+    /// Cancelled, or with `shouldRemove` forgotten by the engine.
+    case cancel(Download, shouldRemove: Bool)
+    case paused(Download)
+}
+
+/// The event streams a `Downloads` hands out.
+@MainActor
+public final class DownloadEvents {
+    private var continuations: [UUID: AsyncStream<DownloadEvent>.Continuation] = [:]
+
+    public init() {}
+
+    /// `initial` is nil until the engine has read the history; `initialize` sends it then.
+    public func stream(initial: [Download]?) -> AsyncStream<DownloadEvent> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<DownloadEvent>.makeStream()
+        continuations[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { @MainActor in self?.continuations[id] = nil }
+        }
+        if let initial { continuation.yield(.initialized(initial)) }
+        return stream
+    }
+
+    public func send(_ event: DownloadEvent) {
+        continuations.values.forEach { $0.yield(event) }
+    }
+
+    /// As ADK's `onDownloadUpdated` picks the event by the download's status.
+    public func sendUpdate(_ download: Download) {
+        switch download.status {
+        case .notStarted, .inProgress, .finished: send(.update(download))
+        case .failed: send(.failed(download))
+        case .cancelled: send(.cancel(download, shouldRemove: false))
+        case .paused: send(.paused(download))
+        }
     }
 }
 
