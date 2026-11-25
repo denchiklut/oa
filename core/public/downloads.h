@@ -40,13 +40,12 @@ struct Download {
   int64_t remaining_seconds = -1;
   // Empty until Chromium has chosen where the file goes.
   std::string target_path;
+  // As ArcCore's: the address the page that started it shows, while that page
+  // is open, else the file's.
   std::string source_url;
   // The registrable domain of `source_url`; empty for an address without
   // one, as an IP.
   std::string source_domain;
-  // The address of the page that started it, as Chromium keeps it with the
-  // download; empty when it had none.
-  std::string tab_url;
   // Seconds since 1970.
   double start_time = 0;
   bool is_paused = false;
