@@ -20,6 +20,7 @@
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/download_item_utils.h"
 #include "content/public/browser/download_manager.h"
+#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "oa/browser/page_impl.h"
 #include "oa/browser/profile_services.h"
 #include "oa/public/downloads.h"
@@ -54,6 +55,11 @@ Download ToDownload(download::DownloadItem* item) {
   }
   download.target_path = item->GetTargetFilePath().value();
   download.source_url = item->GetURL().spec();
+  download.source_domain =
+      net::registry_controlled_domains::GetDomainAndRegistry(
+          item->GetURL(),
+          net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
+  download.tab_url = item->GetTabUrl().spec();
   download.start_time = item->GetStartTime().InSecondsFSinceUnixEpoch();
   download.is_paused = item->IsPaused();
   download.is_done = item->IsDone();
