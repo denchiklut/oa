@@ -43,6 +43,7 @@ final class ChromiumPage: Page, MediaSession {
 
     var view: NSView { hostingView }
     var tabSessionID: Int32 { page?.tabSessionID ?? -1 }
+    let profileID: UUID
     var mediaSession: any MediaSession { self }
     var selectedText: String { page?.selectedText ?? "" }
     let devTools: any PageDevTools
@@ -67,6 +68,7 @@ final class ChromiumPage: Page, MediaSession {
         self.id = id
         self.page = page
         self.delegate = delegate
+        profileID = UUID(uuidString: page.profileID) ?? BrowserProfile.initialID
         devTools = ChromiumPageDevTools(core: page.devTools)
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
         delegate.content = self

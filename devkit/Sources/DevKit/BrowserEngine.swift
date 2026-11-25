@@ -647,6 +647,9 @@ public protocol Page: AnyObject, Observable {
     var canGoForward: Bool { get }
     /// The engine's session ID of the page's tab, kept while the page lives, as Arc's restoration data stores it.
     var tabSessionID: Int32 { get }
+    /// The profile whose context the page was made in, its own or its incognito one, as ADK's `BrowserContextID`.
+    /// A move to another window keeps it.
+    var profileID: UUID { get }
     /// The icon the engine's favicon driver chose for the page, nil until it has one.
     var favicon: NSImage? { get }
     var securityLevel: SecurityLevel { get }

@@ -71,9 +71,11 @@ final class StubBrowser: Browser {
     @ObservationIgnored private let extensions: StubExtensions
     @ObservationIgnored private let downloads: StubDownloads
     @ObservationIgnored private let windowID: UUID
+    @ObservationIgnored private let profileID: UUID
 
-    init(windowID: UUID, extensions: StubExtensions, downloads: StubDownloads) {
+    init(windowID: UUID, profileID: UUID, extensions: StubExtensions, downloads: StubDownloads) {
         self.windowID = windowID
+        self.profileID = profileID
         self.extensions = extensions
         self.downloads = downloads
         (events, continuation) = AsyncStream<BrowserEvent>.makeStream()
@@ -121,7 +123,8 @@ final class StubBrowser: Browser {
 
     private func openTab(_ path: String, of id: String) {
         guard let url = URL(string: "https://\(id).stub\(path)") else { return }
-        let page = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
+        let page = StubPage(
+            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
         page.load(url)
         continuation.yield(.opened(page, isActive: true))
     }

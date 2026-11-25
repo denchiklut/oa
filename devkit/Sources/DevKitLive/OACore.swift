@@ -209,6 +209,7 @@ import AppKit
     var isLoading: Bool { get }
     var loadProgress: Double { get }
     var tabSessionID: Int32 { get }
+    var profileID: String { get }
     var canGoBack: Bool { get }
     var canGoForward: Bool { get }
     var favicon: NSImage? { get }

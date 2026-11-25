@@ -14,6 +14,7 @@ final class StubPage: Page, MediaSession {
     var canGoBack: Bool { position > 0 }
     var canGoForward: Bool { position < history.count - 1 }
     let tabSessionID = StubPage.nextTabSessionID()
+    let profileID: UUID
     private(set) var favicon: NSImage?
     private(set) var rootBackgroundColor: NSColor?
     private(set) var navigationResult: NavigationResult?
@@ -86,9 +87,10 @@ final class StubPage: Page, MediaSession {
     @ObservationIgnored private let extensions: StubExtensions
     @ObservationIgnored var isIncognito = false
 
-    init(id: UUID, windowID: UUID, downloads: StubDownloads, extensions: StubExtensions) {
+    init(id: UUID, windowID: UUID, profileID: UUID, downloads: StubDownloads, extensions: StubExtensions) {
         self.id = id
         self.windowID = windowID
+        self.profileID = profileID
         self.downloads = downloads
         self.extensions = extensions
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
@@ -332,7 +334,8 @@ final class StubPage: Page, MediaSession {
         components.path = "/opened-\(StubPage.openedCount)"
         components.query = nil
         guard let target = components.url else { return }
-        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
+        let opened = StubPage(
+            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
         opened.isIncognito = isIncognito
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(disposition), byPage: byPage))
@@ -344,7 +347,8 @@ final class StubPage: Page, MediaSession {
         components.path = "/linked"
         guard let target = components.url else { return }
         guard keepsAddress else { return load(target) }
-        let opened = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
+        let opened = StubPage(
+            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(.foregroundTab), byPage: true))
     }
@@ -433,7 +437,8 @@ final class StubPage: Page, MediaSession {
 
     func duplicate() -> (any Page)? {
         guard history.indices.contains(position) else { return nil }
-        let page = StubPage(id: UUID(), windowID: windowID, downloads: downloads, extensions: extensions)
+        let page = StubPage(
+            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
         page.history = history
         page.position = position
         page.show(history[position])
@@ -441,11 +446,13 @@ final class StubPage: Page, MediaSession {
     }
 
     static func restore(
-        _ sessionID: PageSessionID, id: UUID, windowID: UUID, downloads: StubDownloads, extensions: StubExtensions
+        _ sessionID: PageSessionID, id: UUID, windowID: UUID, profileID: UUID, downloads: StubDownloads,
+        extensions: StubExtensions
     ) -> StubPage? {
         guard let record = records.removeValue(forKey: sessionID), record.history.indices.contains(record.position)
         else { return nil }
-        let page = StubPage(id: id, windowID: windowID, downloads: downloads, extensions: extensions)
+        let page = StubPage(
+            id: id, windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
         page.history = record.history
         page.position = record.position
         page.show(record.history[record.position])
