@@ -48,7 +48,8 @@ enum LinkDestination: Codable, Hashable {
     case space(ProfileDestination)
     case littleArc(ProfileDestination)
 
-    /// Arc opens Little Arc for `littleArc`; Oa has none, so it opens where the inner destination would.
+    /// A link from another app routed to `littleArc` opens a Little window; one inside the app, Oa's own, opens
+    /// where the inner destination would.
     var target: ProfileDestination {
         switch self {
         case .space(let destination), .littleArc(let destination): destination
