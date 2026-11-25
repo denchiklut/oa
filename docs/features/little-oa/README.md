@@ -8,7 +8,8 @@ with a sidebar container of its own that holds its pages and never shows.
 
 - **File ▸ New Little Oa Window** (⌥⌘N) opens the command bar alone, 490 × 329
   at the top right of the pointer's screen. Return grows that window into the
-  page window about the bar's centre; Escape closes it.
+  page window about the bar's centre; Escape closes it, and so does losing the
+  keyboard to any other window or app, as in Arc.
 - The same shortcut works **from any app** while Settings ▸ Links ▸ "Open Little
   Oa when I press ⌥⌘N in any app" is on. It is a Carbon hot key, as Arc's, and
   follows the shortcut New Little Oa Window has in Settings ▸ Shortcuts.
@@ -22,8 +23,29 @@ with a sidebar container of its own that holds its pages and never shows.
 A window opened on a link is the last Little window's size (1185 × 832 until one
 has been moved or resized) and sits 30 pt right and down of the newest other
 Little window, or about the pointer when there is none, always 20 pt inside the
-screen. It grows out of the pointer on Peek's spring. The frame is saved when a
-page window is moved or its resize ends.
+screen. The frame is saved when a page window is moved or its resize ends.
+
+A link's window opens and closes as Arc's does. It first covers its whole
+screen, clear and without a shadow, while its card grows out of a 20 pt
+rectangle at the pointer on Peek's expansion spring, so the card is never cut
+to the frame it ends in; then the window takes that frame. Closing it, by ⌘W,
+the red button or Open in, covers the screen again, floats the window if it is
+key, and sends the card back towards the point it came from on the collapse
+spring, fading on the way. A click that misses the card meanwhile is kept, not
+passed to the window behind. With Reduce Motion the card fades where it is. A
+window from the menu or the hot key does neither: it is at its frame at once
+and just goes.
+
+## Showing one
+
+Every Little window is shown the way Arc shows one. If a window covers the
+screen it opens on, another app's in full screen or one of Oa's own, the
+Little window is a panel on that Space that doesn't activate Oa: the other app
+stays in front with its menus, and the bar still takes typing. Anywhere else
+it is an ordinary window and Oa comes forward a turn later. Either way it
+comes to the Space in view, and as it takes the keyboard it is above every
+app's windows for a moment before settling at the normal level. Entering full
+screen makes it an ordinary window again, and it stays one afterwards.
 
 A link goes into an open Little window instead of a new one only when that
 window was opened on the very same address, still shows a page of that host and
@@ -52,8 +74,15 @@ the front-most standard window that shows it, else the front-most standard
 window, which switches to it. The button names the Space the front-most
 standard window of the profile shows, else the profile's first, worked out when
 the window opens and each time it becomes key. A Space of another profile asks
-first and loads the page again there. The Little window then fades away, as in
+first and loads the page again there. The Little window then closes, as in
 Arc, and any other page it has goes to the Archive.
+
+The chevron's list is a clear window of its own over the Little window, as
+Arc's, drawn over the button. It has the keyboard while it is open: typing
+searches the Spaces, ↑ and ↓ move the one lit row, Return moves the page to
+it, and Escape, a click elsewhere or losing the keyboard closes it. The row
+lit at first is the button's Space; after that it is the last one the pointer
+or an arrow reached, and the first match once the search changes.
 
 The profile chip lists the profiles that have a Space, and shows only in a
 window made while more than one profile was in use, as Arc's. Switching asks
@@ -76,8 +105,15 @@ by a sweep every five minutes, unless a page plays or records. A page that is
 shown in a visible window counts as active.
 
 A permission request is a card under the bar with Not Now and Allow, ended only
-by its buttons. Developer Tools open in their own window. The first two windows
-opened by the File menu or a link from another app carry a tip.
+by its buttons. The first two windows opened by the File menu or a link from
+another app carry a tip. The card, the tip, the bar and the list are drawn to
+Arc's measures in both appearances.
+
+Developer Tools open in a window of their own, at every open, because the
+engine doesn't dock a popup browser's, as ArcCore doesn't. Their menu has no
+Dock side. As in Arc, their own ⇧⌘D still docks them into the Little window's
+page and changes the profile's dock side, and Open in closes their window as
+it moves the page.
 
 ## Downloads
 
@@ -138,7 +174,8 @@ when they were all inactive for the set time.
 A Little window's Browser is Chromium's popup type. Patches 0026 to 0029 give
 the app's split view and Little window dispositions of their own, add the menu
 command, keep a popup's new tabs in its own strip and keep a popup from asking
-for the last session. The menu's open comes to the app as an address, which
+for the last session. Patch 0030 tells a popup's DevTools frontend it can't
+dock, which is upstream's rule and ArcCore's. The menu's open comes to the app as an address, which
 opens its own window. Blink's ⌘⌥-click reaches the app as a background page.
 
 ## Oa's own
@@ -162,10 +199,17 @@ opens its own window. Blink's ⌘⌥-click reaches the app as a background page.
 - The Library and Downloads menu items are off in a Little window.
 - A link inside the app that Air Traffic Control routes to Little Oa opens
   where Most Recent Space would.
+- The profile chip's glyph: Arc draws the profile's own icon, and Oa's
+  profiles have none yet.
+- The Open in list is never narrower than 244 pt; Arc's was only seen under a
+  long Space name.
+- How far the card's shadow spreads while the window covers the screen.
+- Arc's window presents through the controller its Peek uses. Oa's Peek is a
+  view inside its window, so the Little window has that controller to itself.
+- The bar has no grain.
 
 ## Not here
 
 The Archive's Little Arc filter, extensions in the bar,
-the Dock menu's rows, a menu-bar launcher, Arc's panel over another app's full
-screen, and back with no history closing a page to its opener, which is Arc's
-rule in every window.
+the Dock menu's rows, a menu-bar launcher, and back with no history closing a
+page to its opener, which is Arc's rule in every window.
