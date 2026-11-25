@@ -142,6 +142,7 @@ final class StubBrowserContext: BrowserContext {
 
     func browser(windowID: UUID, type: BrowserType) -> any Browser {
         if let browser = browsers[windowID]?.browser { return browser }
+        if type == .popup { StubPage.popupWindowIDs.insert(windowID) }
         let browser = StubBrowser(
             windowID: windowID, profileID: id, extensions: stubExtensions, downloads: stubDownloads)
         browsers = browsers.filter { $0.value.browser != nil }

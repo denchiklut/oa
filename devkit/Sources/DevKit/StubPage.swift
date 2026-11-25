@@ -38,7 +38,10 @@ final class StubPage: Page, MediaSession {
     var isAudible: Bool { isPlayingVideo }
     var isMuted = false
     var mediaSession: any MediaSession { self }
-    let devTools: any PageDevTools = StubPageDevTools()
+    var devTools: any PageDevTools { stubDevTools }
+    @ObservationIgnored private let stubDevTools = StubPageDevTools()
+    /// The windows whose browser is a popup, as the engine knows a browser's type.
+    static var popupWindowIDs: Set<UUID> = []
     var state: MediaSessionState? {
         hasPlayedVideo
             ? MediaSessionState(status: isPlayingVideo ? .active : .suspended, contentType: .audioVideo) : nil
@@ -94,6 +97,7 @@ final class StubPage: Page, MediaSession {
         self.downloads = downloads
         self.extensions = extensions
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
+        stubDevTools.canDock = { [weak self] in self.map { !Self.popupWindowIDs.contains($0.windowID) } ?? true }
         Self.arrive(self)
     }
 

@@ -9,6 +9,10 @@ final class StubPageDevTools: PageDevTools {
     /// The frontend's Dock side, which the engine keeps per profile; the stub keeps one.
     private static var dockSide = DevToolsDisplay.right
 
+    /// As the engine's `can_dock`, decided as the frontend opens: a popup browser's doesn't dock.
+    @ObservationIgnored var canDock: () -> Bool = { true }
+    fileprivate var docks = true
+
     private(set) var display: DevToolsDisplay?
     fileprivate(set) var panel = "elements"
     fileprivate(set) var isInspecting = false
@@ -40,7 +44,9 @@ final class StubPageDevTools: PageDevTools {
 
     fileprivate func show(_ panel: String) {
         self.panel = panel
-        if display == nil { display = Self.dockSide }
+        guard display == nil else { return }
+        docks = canDock()
+        display = docks ? Self.dockSide : .undocked
     }
 
     private func toggle(_ panel: String) {
@@ -64,11 +70,14 @@ private struct StubDevToolsView: View {
                             .fixedSize()
                     }
                     Spacer()
-                    Button("Undock into separate window", systemImage: "macwindow") { devTools.dock(.undocked) }
-                    Button("Dock to left", systemImage: "rectangle.lefthalf.filled") { devTools.dock(.left) }
-                    Button("Dock to bottom", systemImage: "rectangle.bottomhalf.filled") { devTools.dock(.bottom) }
-                    Button("Dock to right", systemImage: "rectangle.righthalf.filled") { devTools.dock(.right) }
-                    Button("Close DevTools", systemImage: "xmark") { devTools.close() }
+                    // As the frontend's: no Dock side and no close button when it can't dock.
+                    if devTools.docks {
+                        Button("Undock into separate window", systemImage: "macwindow") { devTools.dock(.undocked) }
+                        Button("Dock to left", systemImage: "rectangle.lefthalf.filled") { devTools.dock(.left) }
+                        Button("Dock to bottom", systemImage: "rectangle.bottomhalf.filled") { devTools.dock(.bottom) }
+                        Button("Dock to right", systemImage: "rectangle.righthalf.filled") { devTools.dock(.right) }
+                        Button("Close DevTools", systemImage: "xmark") { devTools.close() }
+                    }
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
