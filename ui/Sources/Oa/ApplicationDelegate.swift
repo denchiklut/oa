@@ -14,6 +14,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         engine: engine, store: store, openSettings: { [weak self] in self?.openSettings($0, in: $1) },
         openHelp: { [weak self] in self?.openHelp($0) }, createProfile: { [weak self] in self?.createProfile() },
         frontProfile: { [weak self] in self?.frontWindows.first?.space?.profileID })
+    private var globalHotkey: GlobalHotkeyManager?
     private let spaceNamesWithMissingProfiles: [String]
     private var askingToQuit = false
     private var isLaunching = true
@@ -99,6 +100,9 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         pendingLinks.removeAll()
         store.startAutoArchive()
         store.startLittleAutoArchive()
+        globalHotkey = GlobalHotkeyManager(keyBindings: store.keyBindings) { [weak self] in
+            self?.createOrFocusLittleWindow(.globalHotkey, profileID: nil)
+        }
         NSApplication.shared.activate(ignoringOtherApps: true)
         // From the run loop, so the pages go on working under the alert: they run on the main queue.
         if !spaceNamesWithMissingProfiles.isEmpty {

@@ -134,23 +134,24 @@ struct AirTrafficControlSheet: View {
 
     /// As Arc's: every Space in sidebar order as "Space (Profile)", then Most Recent Space and Little Arc.
     private func destination(_ selection: Binding<LinkDestination>) -> some View {
-        let target = Binding {
-            selection.wrappedValue.target
-        } set: {
-            selection.wrappedValue = .space($0)
-        }
+        let little = LinkDestination.littleArc(.mostRecent)
         return Menu {
-            Picker("Destination", selection: target) {
+            Picker("Destination", selection: selection) {
                 ForEach(store.state.spaces) { space in
-                    Text(title(of: space)).tag(LinkDestination.ProfileDestination.space(space.id))
+                    Text(title(of: space)).tag(LinkDestination.space(.space(space.id)))
                 }
                 Divider()
-                Text("Most Recent Space").tag(LinkDestination.ProfileDestination.mostRecent)
+                Text("Most Recent Space").tag(LinkDestination.space(.mostRecent))
+                // As seen in Arc: no further choice, stored on the most recent Space.
+                Text("Little Oa").tag(little)
             }
             .pickerStyle(.inline)
-            Button("Little Oa") {}.disabled(true)
         } label: {
-            Text(title(of: selection.wrappedValue.target))
+            if case .littleArc = selection.wrappedValue {
+                Text("Little Oa")
+            } else {
+                Text(title(of: selection.wrappedValue.target))
+            }
         }
         .frame(width: 200)
     }

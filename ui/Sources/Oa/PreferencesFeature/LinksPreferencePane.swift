@@ -4,6 +4,11 @@ struct LinksPreferencePane: View {
     @Bindable var store: SidebarStore
     let preferences: PreferencesState
     @State private var showsRoutes = false
+    @AppStorage(LittleBrowserPreferences.globalHotkeyKey) private var globalHotkey = true
+    @AppStorage(LittleBrowserPreferences.optionCommandClickKey) private var optionCommandClick = true
+    @AppStorage(LittleBrowserPreferences.externalLinksKey) private var externalLinks = true
+    @AppStorage(LittleBrowserPreferences.autoArchiveThresholdKey) private var autoArchive =
+        AutoArchiveLittleArcThreshold.sixHours
 
     var body: some View {
         ScrollView {
@@ -11,26 +16,30 @@ struct LinksPreferencePane: View {
                 LittleOaIllustration()
                 VStack(alignment: .leading, spacing: 24) {
                     Text(
-                        "Little Oa is a smaller window for quick lookups and reading links from other apps. It’s unavailable in this build."
+                        "Little Oa is a smaller, simpler Oa window. It’s perfect for quick lookups and reading funny tweets your friends send you."
                     )
                     .padding(.horizontal, 10)
                     PreferencesPaneSection {
-                        linkSwitch("Open Little Oa when I press ⌥⌘N in any app", isOn: .constant(false))
+                        linkSwitch(
+                            "Open Little Oa when I press \(littleShortcut) in any app",
+                            isOn: $globalHotkey)
                         PreferenceRowDivider()
-                        linkSwitch("Open Little Oa when clicking on links with ⌥⌘ held", isOn: .constant(false))
+                        linkSwitch("Open Little Oa when clicking on links with ⌥⌘ held", isOn: $optionCommandClick)
                         PreferenceRowDivider()
-                        linkSwitch("Links from other apps open in Little Oa", isOn: .constant(false))
+                        linkSwitch("Links from other apps open in Little Oa", isOn: $externalLinks)
                         PreferenceRowDivider()
                         PreferenceRow(height: 44) {
                             Text("Archive Little Oas after:")
                         } control: {
-                            Picker("Archive Little Oas after", selection: .constant(6)) {
-                                Text("6 hours (default)").tag(6)
+                            Picker("Archive Little Oas after", selection: $autoArchive) {
+                                ForEach(AutoArchiveLittleArcThreshold.offered) { threshold in
+                                    Text(threshold == .sixHours ? "\(threshold.title) (default)" : threshold.title)
+                                        .tag(threshold)
+                                }
                             }
                             .preferencePopup()
                         }
                     }
-                    .disabled(true)
                     Divider()
                     Text(
                         "Peek is a way to preview a link without opening a new tab. It’s perfect for quickly looking at a link from an email, news article, or tweet."
@@ -57,6 +66,11 @@ struct LinksPreferencePane: View {
             }
         }
         .sheet(isPresented: $showsRoutes) { AirTrafficControlSheet(store: store, profiles: preferences.profiles) }
+    }
+
+    /// As Arc's row, which names the shortcut New Little Arc Window has now.
+    private var littleShortcut: String {
+        store.keyBindings.state.shortcut(for: LittleBrowserPreferences.shortcutID)?.symbols.joined() ?? "⌥⌘N"
     }
 
     private func linkSwitch(_ title: String, note: String? = nil, isOn: Binding<Bool>) -> some View {
