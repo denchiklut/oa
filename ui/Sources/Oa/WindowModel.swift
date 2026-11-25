@@ -1047,6 +1047,11 @@ final class WindowModel {
             let itemIDs = itemIDs.filter { canMoveItem($0, toSpace: spaceID) }
             guard !itemIDs.isEmpty else { return }
             multiSelection = SidebarMultiSelection()
+            // As seen in Arc: a page a profile switch left in the Little window's old profile doesn't outlive the
+            // window in a Space of its new one.
+            let lost = tabIDs.filter {
+                isLittle && !crossesProfile && pages[$0]?.profileID ?? space.profileID != space.profileID
+            }
             if crossesProfile {
                 for window in store.windows { window.dropPages(of: tabIDs) }
             } else if standalone {
@@ -1063,7 +1068,7 @@ final class WindowModel {
             guard standalone else { return }
             destination.bringToFront()
             if closingWindow { Task { [weak window] in window?.close() } }
-            if isLittle { littlePageMoved() }
+            if isLittle { littlePageMoved(losing: lost, in: destination) }
         }
         if crossesProfile {
             if standalone { destination.bringToFront() }
@@ -1556,15 +1561,21 @@ final class WindowModel {
         }
     }
 
-    /// As seen in Arc: a Little window whose page moved out fades away, its other pages into the Archive.
-    private func littlePageMoved() {
+    /// As seen in Arc: a Little window whose page moved out fades away, its other pages into the Archive, and after
+    /// them a moved page that is lost with it, from the Space it reached.
+    private func littlePageMoved(losing lost: [UUID], in destination: WindowModel) {
         guard let window else { return }
         NSAnimationContext.runAnimationGroup {
             $0.duration = 0.11
             window.animator().alphaValue = 0
         } completionHandler: {
             window.close()
+            destination.endLittlePages(lost)
         }
+    }
+
+    private func endLittlePages(_ tabIDs: [UUID]) {
+        for tabID in tabIDs { end(tabID, reason: .manual, closedBy: nil) { page, _ in page.drop() } }
     }
 
     /// Before a profile is deleted: its Favorites' pages and the window's browser and omnibox for it.
