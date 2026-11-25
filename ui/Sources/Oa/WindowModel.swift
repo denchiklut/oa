@@ -167,7 +167,7 @@ final class WindowModel {
     /// By profile: ArcCore keeps one omnibox per window.
     @ObservationIgnored private var autocompletes: [UUID: any Autocomplete] = [:]
     @ObservationIgnored private var browserListeners: [UUID: Task<Void, Never>] = [:]
-    @ObservationIgnored private var littleDownloadsListener: Task<Void, Never>?
+    @ObservationIgnored private var littleDownloads: (downloads: any Downloads, listener: Task<Void, Never>)?
     /// As Arc's `ClosedSidebarItemsCache`: what the user closed from this window, a group for each close with a step
     /// for each tab, the last ten, in memory and gone with the window.
     @ObservationIgnored private var closedGroups: [ClosedGroup] = []
@@ -452,20 +452,22 @@ final class WindowModel {
     }
 
     /// As Arc's `setupSubscriptions`: a Little window hears of every download of its profile from then on,
-    /// whichever window starts it, and of none of an incognito context.
+    /// whichever window starts it, and of none of an incognito context. As seen in Arc, a profile switch doesn't
+    /// move it: the tray goes on with the profile the window was made in.
     private func subscribeToLittleDownloads() {
-        guard let profileID = little?.profile else { return }
-        littleDownloadsListener?.cancel()
-        let events = engine.browserContext(id: profileID, type: .normal).downloads.events
-        littleDownloadsListener = Task { [weak self] in
-            for await event in events { self?.receiveLittleDownload(event) }
-        }
+        guard littleDownloads == nil, let profileID = little?.profile else { return }
+        let downloads = engine.browserContext(id: profileID, type: .normal).downloads
+        let events = downloads.events
+        littleDownloads = (
+            downloads,
+            Task { [weak self] in
+                for await event in events { self?.receiveLittleDownload(event) }
+            }
+        )
     }
 
-    /// As Arc's, of the profile the window has now: a card kept from another profile only goes.
     func cancelLittleDownload(_ id: Download.ID) {
-        guard let profileID = little?.profile else { return }
-        engine.browserContext(id: profileID, type: .normal).downloads.cancel(id)
+        littleDownloads?.downloads.cancel(id)
     }
 
     private func ensureBrowser(for profileID: UUID) {
@@ -1061,7 +1063,7 @@ final class WindowModel {
             guard standalone else { return }
             destination.bringToFront()
             if closingWindow { Task { [weak window] in window?.close() } }
-            if isLittle { littlePageMoved(from: sourceSpaceID) }
+            if isLittle { littlePageMoved() }
         }
         if crossesProfile {
             if standalone { destination.bringToFront() }
@@ -1531,20 +1533,19 @@ final class WindowModel {
         }
     }
 
-    /// As Arc's `changeProfileInLittleBrowser`: only the window's own profile changes, not its hidden Space's. The
-    /// shown page is made again in the profile on its tab, and the others go on in the profile and Browser they
-    /// have. The host's links from other apps open in the profile from then on.
+    /// As Arc's `changeProfileInLittleBrowser`: the window's own profile changes, and its hidden Space's with it,
+    /// as seen in Arc's file. The shown page is made again in the profile on its tab, and the others go on in the
+    /// profile and Browser they have. A window opened on a link teaches the link's host its profile.
     func setLittleProfile(_ profileID: UUID) {
-        guard let little, little.profile != profileID, state.profile(profileID) != nil else { return }
-        let url = address
+        guard let little, let space, little.profile != profileID, state.profile(profileID) != nil else { return }
         endCommandBar()
         self.little?.profile = profileID
+        store.edit { $0.setProfile(profileID, forSpaces: [space.id]) }
         ensureBrowser(for: profileID)
         if let tabID = selectedTabID { dropPages(of: [tabID]) }
-        subscribeToLittleDownloads()
         loadExtensions()
         ensurePresentedPages()
-        if let url { LittleBrowserPreferences.setPreferredProfile(profileID, for: url) }
+        if let url = little.session.entryPoint.url { LittleBrowserPreferences.setPreferredProfile(profileID, for: url) }
     }
 
     /// As seen in Arc: the window closes at once, a page at a time into the Archive, with no stack and no toast.
@@ -1555,9 +1556,8 @@ final class WindowModel {
         }
     }
 
-    /// As seen in Arc: a Little window whose last page moved out fades away.
-    private func littlePageMoved(from spaceID: UUID) {
-        if let next = state.tabs(in: spaceID).first { return select(next.id) }
+    /// As seen in Arc: a Little window whose page moved out fades away, its other pages into the Archive.
+    private func littlePageMoved() {
         guard let window else { return }
         NSAnimationContext.runAnimationGroup {
             $0.duration = 0.11
@@ -2203,7 +2203,7 @@ final class WindowModel {
         closeExtensionPopup()
         browserListeners.values.forEach { $0.cancel() }
         browserListeners = [:]
-        littleDownloadsListener?.cancel()
+        littleDownloads?.listener.cancel()
         browsers = [:]
         archivePeekID = nil
         creating = [:]
