@@ -215,7 +215,7 @@ enum LittleBrowserFrame {
 
     /// As Arc's first frame, from the session's anchor: a bar under its top right corner; a link's window down and
     /// right of the newest other Little window, at its size, else the saved size about the anchor.
-    static func first(for session: LittleBrowserSession, after newest: NSWindow?) -> NSRect {
+    @MainActor static func first(for session: LittleBrowserSession, after newest: NSWindow?) -> NSRect {
         switch session.preferredFrame.anchor {
         case .topRight(let corner):
             return constrained(

@@ -4,7 +4,7 @@ extension NSScreen {
     /// Arc's `hasFullscreenWindow`: a window of the app in full screen here, or any app's window that covers the
     /// display exactly, under the menu bar where the display has a notch. The Dock's and Notification Center's
     /// don't count.
-    var hasFullscreenWindow: Bool {
+    @MainActor var hasFullscreenWindow: Bool {
         guard let id = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
             let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[CFString: Any]]
