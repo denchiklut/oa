@@ -1056,6 +1056,12 @@ final class WindowModel {
             let lost = tabIDs.filter {
                 isLittle && !crossesProfile && pages[$0]?.profileID ?? space.profileID != space.profileID
             }
+            // As seen in Arc: Open in closes the DevTools window of the page it moves.
+            if isLittle {
+                for case let devTools? in tabIDs.map({ pages[$0]?.devTools }) where devTools.display == .undocked {
+                    devTools.setOpen(false)
+                }
+            }
             if crossesProfile {
                 for window in store.windows { window.dropPages(of: tabIDs) }
             } else if standalone {
