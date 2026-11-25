@@ -52,15 +52,17 @@ the front-most standard window that shows it, else the front-most standard
 window, which switches to it. The button names the Space the front-most
 standard window of the profile shows, else the profile's first, worked out when
 the window opens and each time it becomes key. A Space of another profile asks
-first and loads the page again there. A Little window left without pages fades
-away.
+first and loads the page again there. The Little window then fades away, as in
+Arc, and any other page it has goes to the Archive.
 
 The profile chip lists the profiles that have a Space, and shows only in a
-window made while more than one profile was in use, as Arc's. Switching asks,
-makes the shown page again in that profile, and remembers the profile for the
-page's host. As in Arc, only the window's own profile changes: its other pages
-go on running in the profile they were made in, with their own Browser, and
-only a page made from then on is the new profile's.
+window made while more than one profile was in use, as Arc's. Switching asks
+and makes the shown page again in that profile. As in Arc, the window's other
+pages go on running in the profile they were made in, with their own Browser,
+and show as they are when they are next shown; a link from one stays in its
+profile. A window opened on a link also remembers the profile for the link's
+host. Choosing the profile the window has does nothing. Open in tells another
+profile by the window's profile, not the page's.
 
 ⌘W closes one page into the Archive and the window goes with its last one; the
 red button archives them all. Restore Last Closed Tab has nothing to bring back
@@ -79,7 +81,8 @@ A Little window has its own downloads tray, as Arc's: a row of cards along the
 bottom of the page, the oldest on the left. From the moment the window is made
 it hears of every new download of its profile, whichever window starts it, and
 of none that was there before or that an incognito window starts. Each window
-keeps its own list.
+keeps its own list. As in Arc, a profile switch doesn't move the tray: it goes
+on with the downloads of the profile the window was made in.
 
 A card is 250 × 56 with the file's icon, its name and the Library's line under
 it; while the download runs the icon has a ring that fills clockwise. The row
