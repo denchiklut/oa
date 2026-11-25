@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Arc's paging container in the sidebar: a page per Space side by side, each the sidebar's width, scrolled by the
@@ -14,6 +15,7 @@ struct SidebarPagingContainerView: View {
         let width = layout.sidebarWidth
         let offset = layout.sidebarScrollOffset
         let fade = layout.spaceCreationFade
+        let hidesScrollIndicators = layout.libraryProgress > 0
         // The URL field takes no room while the panel comes or goes, so the Space's page keeps its place below it.
         let below: CGFloat = layout.addressFieldShift != nil && !PageToolbar.isShown ? SidebarAddressField.height : 0
         // The Create a Space page has no Space, and breaks a profile's run of Spaces as another profile's would.
@@ -36,15 +38,18 @@ struct SidebarPagingContainerView: View {
                         let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
                         let tiles = FavoritesGrid.slots(
                             model.state.favoriteEntries(for: space.id), drag: current ? drag : nil)
-                        SidebarSpacePage(model: model, layout: layout, space: space)
-                            .padding(
-                                .top,
-                                global
-                                    ? FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16 : 0
-                            )
-                            .frame(width: width)
-                            .allowsHitTesting(current)
-                            .accessibilityHidden(!current)
+                        SidebarSpacePage(
+                            model: model, layout: layout, space: space,
+                            hidesScrollIndicators: hidesScrollIndicators
+                        )
+                        .padding(
+                            .top,
+                            global
+                                ? FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16 : 0
+                        )
+                        .frame(width: width)
+                        .allowsHitTesting(current)
+                        .accessibilityHidden(!current)
                     } else {
                         Color.clear.frame(width: width)
                     }
@@ -114,6 +119,7 @@ private struct SidebarSpacePage: View {
     let model: WindowModel
     let layout: WindowLayoutController
     let space: SidebarSpace
+    let hidesScrollIndicators: Bool
     @Environment(\.sidebarDrag) private var drag
     @Environment(\.sidebarRevealsControls) private var revealed
 
@@ -183,6 +189,8 @@ private struct SidebarSpacePage: View {
             )
             // As measured on Arc: an archived row fades where it is while the rows below close up.
             .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
+            // Oa's own: hide the scrollbar as soon as the Space starts blending into the background under the Library.
+            .background { VerticalScrollerHiding(hidesScroller: hidesScrollIndicators) }
         }
         // As Arc's: the list's empty space and its rows without a menu of their own give the Space's.
         .spaceContextMenu(
@@ -191,6 +199,55 @@ private struct SidebarSpacePage: View {
             SpaceMenu(model: model, layout: layout, space: space)
         }
         .sidebarDragFrame { drag?.lists[space.id, default: .init()].area = $0 }
+    }
+}
+
+/// Hides the enclosing scroll view's vertical scroller directly: SwiftUI's `scrollIndicators(.hidden)` leaves an
+/// always-shown AppKit scroller visible, and toggling `hasVerticalScroller` on a legacy scroller would widen the rows.
+private struct VerticalScrollerHiding: NSViewRepresentable {
+    let hidesScroller: Bool
+
+    func makeNSView(context: Context) -> ScrollerView { ScrollerView(hidesScroller: hidesScroller) }
+
+    func updateNSView(_ view: ScrollerView, context: Context) {
+        view.hidesScroller = hidesScroller
+        view.apply()
+    }
+
+    final class ScrollerView: NSView {
+        var hidesScroller: Bool
+
+        init(hidesScroller: Bool) {
+            self.hidesScroller = hidesScroller
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+        }
+
+        override func layout() {
+            super.layout()
+            apply()
+        }
+
+        func apply() {
+            guard let scrollView = enclosingScrollView else { return }
+            if hidesScroller {
+                if scrollView.scrollerStyle == .overlay {
+                    if scrollView.hasVerticalScroller { scrollView.hasVerticalScroller = false }
+                } else {
+                    scrollView.verticalScroller?.alphaValue = 0
+                }
+            } else {
+                if !scrollView.hasVerticalScroller { scrollView.hasVerticalScroller = true }
+                if scrollView.scrollerStyle == .legacy { scrollView.verticalScroller?.alphaValue = 1 }
+            }
+        }
     }
 }
 
