@@ -169,7 +169,7 @@ struct LittleBrowserToolbar: View {
     }
 
     private var profileChip: some View {
-        let profileID = model.space?.profileID
+        let profileID = model.little?.profile
         return Menu {
             ForEach(model.littleProfiles) { profile in
                 Toggle(

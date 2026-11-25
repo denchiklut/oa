@@ -6,7 +6,7 @@ extension WindowModel {
 
     /// As Arc's: worked out as the window is made and each time it becomes key, and not when its profile changes.
     func updateLittleDestination() {
-        guard isLittle, let profileID = space?.profileID else { return }
+        guard let profileID = little?.profile else { return }
         little?.destinationSpaceID = littleDestination(profileID)
     }
 

@@ -209,7 +209,16 @@ final class WindowModel {
     }
     /// The selected tab's profile, else the Space's: whose extensions the window shows.
     private var profileID: UUID? {
-        selectedTabID.flatMap { state.profile(containing: $0)?.id } ?? space?.profileID
+        selectedTabID.flatMap { profile(containing: $0)?.id } ?? shownProfileID
+    }
+    /// As Arc's `focusedProfile`: a Little window's own profile, whatever its hidden Space's is, else the shown
+    /// Space's.
+    var shownProfileID: UUID? { little?.profile ?? space?.profileID }
+
+    /// As Arc reads a Little window's pages: all of the window's own profile, also one a profile switch left
+    /// running in the profile before.
+    private func profile(containing tabID: UUID) -> SidebarProfile? {
+        little.flatMap { state.profile($0.profile) } ?? state.profile(containing: tabID)
     }
     var browser: (any Browser)? { profileID.flatMap { browsers[$0] } }
     func profileName(_ id: UUID) -> String { engine.userVisibleName(of: id) ?? "" }
@@ -354,7 +363,7 @@ final class WindowModel {
 
     /// As Arc: in a Peek over the tab (arc-site-controls.md §1).
     func openAllSiteSettings() {
-        guard let tabID = selectedTabID, let url = page?.url, let profile = state.profile(containing: tabID),
+        guard let tabID = selectedTabID, let url = page?.url, let profile = profile(containing: tabID),
             var components = URLComponents(string: "chrome://settings/content/siteDetails")
         else { return }
         components.queryItems = [URLQueryItem(name: "site", value: url.absoluteString)]
@@ -370,7 +379,7 @@ final class WindowModel {
 
     func siteSetting(_ type: SiteSettingType, ofPage pageID: UUID) -> SiteSettingValue? {
         guard let tabID = tabID(of: pageID), let url = pages[tabID]?.url,
-            let profile = state.profile(containing: tabID)
+            let profile = profile(containing: tabID)
         else { return nil }
         return context(for: profile.id).changedSiteSettings(for: url)?.first { $0.type == type }?.value
     }
@@ -386,7 +395,7 @@ final class WindowModel {
     }
 
     private var siteContext: (any BrowserContext)? {
-        selectedTabID.flatMap { state.profile(containing: $0) }.map { context(for: $0.id) }
+        selectedTabID.flatMap { profile(containing: $0) }.map { context(for: $0.id) }
     }
 
     /// As ADK's `browserContextID(for:)`: an incognito window's pages are its profile's incognito context's.
@@ -396,7 +405,7 @@ final class WindowModel {
 
     /// Read as a Space is shown, so the engine has reported its profile's by the time the Extensions menu opens.
     private func loadExtensions() {
-        if let profileID = space?.profileID { _ = engine.browserContext(id: profileID).extensions.items }
+        if let profileID = shownProfileID { _ = engine.browserContext(id: profileID).extensions.items }
     }
 
     /// As Arc: the Chrome Web Store's extensions page in a new tab.
@@ -435,14 +444,17 @@ final class WindowModel {
 
     /// As Arc's `ensureBrowsersCreated`, as the window appears: its browser in every profile it has a Space of.
     func ensureBrowsersCreated() {
-        for profileID in Set(spaces.map(\.profileID)) { ensureBrowser(for: profileID) }
+        // As Arc's `ensureBrowsersCreated`: a Little window adds its one profile.
+        for profileID in little.map({ [$0.profile] }) ?? Array(Set(spaces.map(\.profileID))) {
+            ensureBrowser(for: profileID)
+        }
         subscribeToLittleDownloads()
     }
 
     /// As Arc's `setupSubscriptions`: a Little window hears of every download of its profile from then on,
     /// whichever window starts it, and of none of an incognito context.
     private func subscribeToLittleDownloads() {
-        guard isLittle, let profileID = space?.profileID else { return }
+        guard let profileID = little?.profile else { return }
         littleDownloadsListener?.cancel()
         let events = engine.browserContext(id: profileID, type: .normal).downloads.events
         littleDownloadsListener = Task { [weak self] in
@@ -452,7 +464,7 @@ final class WindowModel {
 
     /// As Arc's, of the profile the window has now: a card kept from another profile only goes.
     func cancelLittleDownload(_ id: Download.ID) {
-        guard let profileID = space?.profileID else { return }
+        guard let profileID = little?.profile else { return }
         engine.browserContext(id: profileID, type: .normal).downloads.cancel(id)
     }
 
@@ -497,7 +509,7 @@ final class WindowModel {
     /// A page the engine made itself, as an extension's `chrome.tabs.create`. Oa's own: at the top of the shown Space
     /// when it is the profile's, else of the profile's first; where Arc puts one is unknown.
     private func place(_ page: any Page, isActive: Bool, in profileID: UUID) {
-        let shown = space?.profileID == profileID ? selectedSpaceID : nil
+        let shown = isLittle || space?.profileID == profileID ? selectedSpaceID : nil
         guard let spaceID = shown ?? spaces.first(where: { $0.profileID == profileID })?.id else {
             return page.drop()
         }
@@ -567,7 +579,7 @@ final class WindowModel {
     func openCommandBar(_ destination: CommandBar.Destination) {
         if destination == .currentTab, dialog != nil { return }
         let editing = destination == .currentTab && selectedTabID != nil
-        let profileID = editing ? selectedTabID.flatMap { state.profile(containing: $0)?.id } : space?.profileID
+        let profileID = editing ? selectedTabID.flatMap { profile(containing: $0)?.id } : shownProfileID
         guard let profileID else { return }
         commandBar?.autocomplete.stop()
         let context = context(for: profileID)
@@ -1025,7 +1037,7 @@ final class WindowModel {
         guard !itemIDs.isEmpty, let space = state.space(spaceID), !standalone || state.isGlobal(spaceID) else { return }
         let tabIDs = itemIDs.flatMap { state.splitView($0) != nil ? state.tree[$0]?.childIDs ?? [] : [$0] }
         let focused = presentedTabIDs.contains(where: tabIDs.contains) ? selectedTabID : nil
-        let crossesProfile = state.profile(containing: tabIDs[0])?.id != space.profileID
+        let crossesProfile = profile(containing: tabIDs[0])?.id != space.profileID
         let sourceSpaceID = selectedSpaceID
         guard let destination = standalone ? globalWindow(spaceID) : self else { return }
         let move = { [weak self, weak destination] in
@@ -1067,7 +1079,7 @@ final class WindowModel {
     /// and loads again there from its saved address, at once when shown, the window following, else once selected.
     /// Oa's own: the sheet names the profile, and the window follows to the profile's first Space.
     func moveFavorite(_ tabID: UUID, toProfile profileID: UUID) {
-        guard state.isFavorite(tabID), state.profile(containing: tabID)?.id != profileID,
+        guard state.isFavorite(tabID), profile(containing: tabID)?.id != profileID,
             let spaceID = state.spaces.first(where: { $0.profileID == profileID })?.id
         else { return }
         let shown = presentedTabIDs.contains(tabID)
@@ -1223,7 +1235,7 @@ final class WindowModel {
         // As Arc's filter, which keeps the items that are their own selectable root: a split is one card, here the
         // pane this window focuses in it.
         var cards = Set<UUID>()
-        return tabIDs.filter { state.tree.tab($0) != nil && state.profile(containing: $0)?.id == space?.profileID }
+        return tabIDs.filter { state.tree.tab($0) != nil && profile(containing: $0)?.id == shownProfileID }
             .compactMap { tabID in
                 let card = state.splitViewID(containing: tabID).flatMap(focusedTabID(of:)) ?? tabID
                 return cards.insert(card).inserted ? card : nil
@@ -1519,16 +1531,16 @@ final class WindowModel {
         }
     }
 
-    /// As Arc's `changeProfileInLittleBrowser`: the shown page loads again in the profile, and the host's links from
-    /// other apps open in it from then on. Oa's own: the window's hidden pages follow when they are next shown, where
-    /// Arc's keep running in the old profile.
+    /// As Arc's `changeProfileInLittleBrowser`: only the window's own profile changes, not its hidden Space's. The
+    /// shown page is made again in the profile on its tab, and the others go on in the profile and Browser they
+    /// have. The host's links from other apps open in the profile from then on.
     func setLittleProfile(_ profileID: UUID) {
-        guard isLittle, let space, space.profileID != profileID else { return }
+        guard let little, little.profile != profileID, state.profile(profileID) != nil else { return }
         let url = address
         endCommandBar()
-        dropPages(of: state.tabs(in: space.id).map(\.id))
-        store.edit { $0.setProfile(profileID, forSpaces: [space.id]) }
-        little?.profile = profileID
+        self.little?.profile = profileID
+        ensureBrowser(for: profileID)
+        if let tabID = selectedTabID { dropPages(of: [tabID]) }
         subscribeToLittleDownloads()
         loadExtensions()
         ensurePresentedPages()
@@ -1748,7 +1760,7 @@ final class WindowModel {
         // As seen in Arc: Expand follows Air Traffic Control and moves the live page, with a new tab even where one is
         // at that URL. Across profiles Arc opens no Peek; a page that got there since loads afresh, Oa's own.
         let spaceID = store.routedSpace(for: page.url, recent: selectedSpaceID)
-        guard state.space(spaceID)?.profileID == state.profile(containing: ownerID)?.id else {
+        guard state.space(spaceID)?.profileID == profile(containing: ownerID)?.id else {
             discardPeekPage(page)
             if let url = page.url { openRoutedLink(url, in: spaceID) }
             return
@@ -1917,7 +1929,7 @@ final class WindowModel {
     /// As Arc: the Peek's tab is selected and the Peek returns over it with its history, its Archive entry gone.
     /// Nothing shows when the tab already has a Peek, or when the tab is gone, which also keeps the entry.
     private func reopenPeek(_ closed: ClosedPage) {
-        guard case .peek(let ownerID) = closed.place, let profile = state.profile(containing: ownerID) else { return }
+        guard case .peek(let ownerID) = closed.place, let profile = profile(containing: ownerID) else { return }
         store.edit { $0.removeArchived(closed.id) }
         guard !store.windows.contains(where: { $0.peeks[ownerID] != nil }) else { return }
         if let spaceID = state.space(containing: ownerID)?.id { selectSpace(spaceID) }
@@ -2445,7 +2457,7 @@ final class WindowModel {
         if let maker = store.windows.first(where: { $0 !== self && $0.creating[tabID] != nil }) {
             return takeCreation(of: tabID, from: maker)
         }
-        guard let profile = state.profile(containing: tabID) else { return }
+        guard let profile = profile(containing: tabID) else { return }
         let token = UUID()
         creating[tabID] = token
         let context = context(for: profile.id)
@@ -2532,7 +2544,7 @@ final class WindowModel {
     /// reports changes and a page opened by script may have its title before it arrives here.
     private func install(_ page: any Page, for tabID: UUID) {
         pages[tabID] = page
-        if let profile = state.profile(containing: tabID) { ensureBrowser(for: profile.id) }
+        if let profile = profile(containing: tabID) { ensureBrowser(for: profile.id) }
         page.keepsAddress = peeksFromLinks(in: tabID)
         save(page, for: tabID)
         observe(page, for: tabID)
@@ -2637,7 +2649,7 @@ final class WindowModel {
             return showPage(pageID)
         case .openLinkInIncognitoWindow(let url):
             let ownerID = tabID(of: pageID) ?? peekOwner(of: pageID)
-            if let profile = ownerID.flatMap(state.profile(containing:)) { openLinkInIncognitoWindow(url, profile.id) }
+            if let profile = ownerID.flatMap { profile(containing: $0) } { openLinkInIncognitoWindow(url, profile.id) }
             return
         case .openLinkInLittleWindow(let url):
             // As Arc's `littleWindow(profile: nil)`.
@@ -2716,7 +2728,7 @@ final class WindowModel {
         let held = NSEvent.modifierFlags.intersection([.option, .command, .shift, .control])
         if disposition == .backgroundTab, held == [.command, .option], sidebarContext != .incognito,
             LittleBrowserPreferences.opensOnOptionCommandClick, let url,
-            let profile = state.profile(containing: openerID)
+            let profile = profile(containing: openerID)
         {
             return openLittleWindow(.browserPopup, profile.id, (page, url))
         }
@@ -2754,7 +2766,7 @@ final class WindowModel {
         {
             // As seen in Arc: no Peek for a link routed to another profile's Space; it loads there afresh.
             let spaceID = store.routedSpace(for: url, recent: selectedSpaceID)
-            guard let url, state.space(spaceID)?.profileID != state.profile(containing: openerID)?.id else {
+            guard let url, state.space(spaceID)?.profileID != profile(containing: openerID)?.id else {
                 return peek(page, from: openerID)
             }
             page.drop()
@@ -2810,7 +2822,7 @@ final class WindowModel {
     /// profile, else goes to the first Space of its profile in the sidebar's order.
     private func spaceToShow(_ tabID: UUID) -> UUID? {
         if let space = state.space(containing: tabID) { return space.id }
-        guard let profile = state.profile(containing: tabID) else { return nil }
+        guard let profile = profile(containing: tabID) else { return nil }
         if space?.profileID == profile.id { return selectedSpaceID }
         return state.spaces.first { $0.profileID == profile.id }?.id
     }

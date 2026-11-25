@@ -288,7 +288,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private func openURLInNewWindow(_ url: URL, from source: WindowModel) {
         if source.sidebarContext == .incognito {
             openWindow(
-                from: source, style: .standard(sidebarContext: .incognito), profileID: source.space?.profileID,
+                from: source, style: .standard(sidebarContext: .incognito), profileID: source.shownProfileID,
                 empty: true
             ).newTab(url)
         } else {
