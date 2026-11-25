@@ -2566,7 +2566,7 @@ final class WindowModel {
         let store = store
         let pictureInPicture = pictureInPicture
         let pageID = page.id
-        DevToolsWindowController.follow(page, inWindowOnly: isLittle)
+        DevToolsWindowController.follow(page)
         Task {
             for await event in page.events {
                 // The app's one window for it, whichever window holds the page, or none any more.
