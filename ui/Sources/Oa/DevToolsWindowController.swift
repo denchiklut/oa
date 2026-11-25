@@ -13,14 +13,14 @@ final class DevToolsWindowController: NSWindowController, NSWindowDelegate {
     private let page: any Page
     private var isClosedByParent = false
 
-    /// Shows and closes the page's window as its DevTools' display changes, for the page's life. As seen in Arc, a
-    /// Little window's page has them in a window whatever their dock side, which is `inWindowOnly`.
-    static func follow(_ page: any Page, inWindowOnly: Bool = false) {
+    /// Shows and closes the page's window as its DevTools' display changes, for the page's life. A Little window's
+    /// page has them undocked because the engine doesn't dock a popup browser's, as ArcCore's.
+    static func follow(_ page: any Page) {
         withObservationTracking {
-            update(page, inWindowOnly: inWindowOnly)
+            update(page)
         } onChange: { [followed = FollowedPage(page)] in
             Task { @MainActor in
-                if let page = followed.page { follow(page, inWindowOnly: inWindowOnly) }
+                if let page = followed.page { follow(page) }
             }
         }
     }
@@ -29,11 +29,8 @@ final class DevToolsWindowController: NSWindowController, NSWindowDelegate {
         windows[pageID]?.closeByParent()
     }
 
-    private static func update(_ page: any Page, inWindowOnly: Bool) {
-        let display = page.devTools.display
-        guard display == .undocked || (inWindowOnly && display != nil), let view = page.devTools.view else {
-            return pageClosed(page.id)
-        }
+    private static func update(_ page: any Page) {
+        guard page.devTools.display == .undocked, let view = page.devTools.view else { return pageClosed(page.id) }
         let controller = windows[page.id] ?? DevToolsWindowController(page: page)
         windows[page.id] = controller
         controller.show(view)
