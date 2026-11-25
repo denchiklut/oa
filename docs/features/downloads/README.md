@@ -14,9 +14,10 @@ an observer of every item of the profile's download manager, which reports the
 downloads Chromium's history brought back, then each one created, updated and
 removed, each as a snapshot of what ArcCore's download item reads: the item's
 GUID, state, bytes received and expected, speed, seconds left (−1 while there is
-no estimate), target path, source URL and its registrable domain, the address
-of the page that started it, start time, whether it is paused, done or
-resumable, and the page that started it. It pauses, resumes, cancels and
+no estimate), target path, source URL and its registrable domain, start time,
+whether it is paused, done or resumable, and the page that started it. The
+source URL is ArcCore's: the address that page shows while it is open, else
+the file's own. It pauses, resumes, cancels and
 removes by GUID. Every event is posted, as ArcCore posts its delegate's. This
 Chromium loads the history only when a download UI asks for it, so the object
 asks when it starts, as Chrome's bubble and downloads page do. ArcCore's hook
@@ -58,9 +59,11 @@ words (Image, Disk Image, PDF, Video, Movie, Audio, Zip Archive, Archive) and
 "Download" for the rest, "50.8/94.4 MB · 45s" with the ring while it runs,
 "Opening… (24%)" once it is set to open, "Paused · from ‹site›", "Failed to
 Download" and "Cancelled" greyed; nothing while the size is unknown. The site
-is the registrable domain of the download's address, so a file from
-files.example.com reads "from example.com". A source that is a bare address,
-such as 127.0.0.1, isn't named, as in Arc. What was cancelled, failed or lost its file before the
+is the registrable domain of the source URL: the site of the page the
+download was started from while that page is open, so a file a page on
+example.com links to on a CDN reads "from example.com", and the file's own
+site once the page has gone or after a relaunch. A source that is a bare
+address, such as 127.0.0.1, isn't named, as in Arc. What was cancelled, failed or lost its file before the
 Library opened isn't listed; one that ends so while it shows stays until the
 next time, as in Arc. "Search Downloads…" narrows the list by name, and Filter
 opens "Filter Downloads…" with a chip per profile. An empty list reads
