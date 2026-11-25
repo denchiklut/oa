@@ -42,6 +42,7 @@ extension ShortcutsPane {
         case "newWindow": "Creates a new window, blank window, or incognito window."
         case "newBlankWindow": "Creates a new blank window."
         case "newIncognitoWindow": "Creates a new incognito window."
+        case "showLittleArc": "Open Little Oa window for quick searches."
         case "newTab": "Creates a new tab."
         case "addressBar":
             "Opens the Command Bar to search the web, navigate to recent tabs, launch an extension, and more."
@@ -101,8 +102,8 @@ extension ShortcutsPane {
             computer!
             """
         case "clearExplore": "Moves all your unpinned tabs to the Archive."
-        // Oa's own words: Arc's are about Little Arc, which this action also serves there.
-        case "openTabIn": "Opens the Peek that’s in focus as a tab."
+        case "openTabIn": "Opens your current Little Oa tab in the Space of your choosing."
+        case "showLittleArcOpenInMenu": "Presents the Little Oa “Open In” Menu"
         case "newSpace": "Creates a new Space — for your work tabs, personal tabs, or otherwise."
         case "focusNextSpace": "Slides to the next Space in your Sidebar."
         case "focusPreviousSpace": "Slides to the previous Space in your Sidebar."

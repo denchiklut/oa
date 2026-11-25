@@ -33,8 +33,9 @@ struct PermissionRequestView: View {
         .onDisappear { model.permissionPromptClosed() }
     }
 
-    static func question(for request: PagePermissionRequest) -> String {
-        let site = request.nameOrOrigin
+    /// `site` is "this website" on a Little window's card, as seen in Arc.
+    static func question(for request: PagePermissionRequest, site: String? = nil) -> String {
+        let site = site ?? request.nameOrOrigin
         if request.kinds.count == 1 {
             switch request.kinds[0] {
             case .notifications: return "Allow \(site) to send you notifications?"

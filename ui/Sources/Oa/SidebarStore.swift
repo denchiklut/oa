@@ -28,6 +28,7 @@ final class SidebarStore {
     @ObservationIgnored private let favicons: FaviconCache
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
     @ObservationIgnored private var sweep: Task<Void, Never>?
+    @ObservationIgnored private var littleSweep: Task<Void, Never>?
     @ObservationIgnored private var frozen = false
     /// Set once quitting is certain.
     @ObservationIgnored var quitting = false
@@ -112,6 +113,15 @@ final class SidebarStore {
 
     /// Where Air Traffic Control sends `url`: the first matching route's Space, else `unmatched` or the Default.
     /// As seen in Arc, a route or Default whose Space is gone goes to `recent`, the Most Recent Space.
+    /// As seen in Arc: a route to Little Arc sends a link from another app there, and a link with no route goes
+    /// there while "Links from other apps open in Little Arc" is on, else where the default says.
+    func routesToLittleWindow(_ url: URL) -> Bool {
+        let rule = linkRouting.state.rule(for: url)
+        if rule == nil, LittleBrowserPreferences.opensExternalLinks { return true }
+        if case .littleArc = rule?.destination ?? linkRouting.state.defaultDestination { return true }
+        return false
+    }
+
     func routedSpace(for url: URL?, recent: UUID, unmatched: UUID? = nil) -> UUID {
         let rule = linkRouting.state.rule(for: url)
         if rule == nil, let unmatched { return unmatched }
@@ -158,6 +168,17 @@ final class SidebarStore {
         }
     }
 
+    /// As Arc's sweep of its Little windows, every 300 s.
+    func startLittleAutoArchive() {
+        littleSweep = Task { [weak self] in
+            while let self, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                let before = Date.now.addingTimeInterval(-LittleBrowserPreferences.autoArchiveThreshold.seconds)
+                for window in windows where window.isLittleIdle(since: before) { window.archiveLittlePages() }
+            }
+        }
+    }
+
     /// A tab with a live page is closed as the user would, so a `beforeunload` handler can keep it, as Arc's idle
     /// unload lets a page stay; the rest are archived outright.
     private func autoArchive() {
@@ -183,13 +204,27 @@ final class SidebarStore {
     }
 
     /// A window's own container goes with it, its tabs unarchived, as seen in Arc when its last tab closes it and
-    /// when it is closed by its button.
+    /// when it is closed by its button. A Little window's pages are archived first, as seen in Arc; at a quit too,
+    /// Oa's own, as its Little windows don't come back.
     func removeWindow(_ window: WindowModel) {
         windows.removeAll { $0 === window }
-        if !quitting, let container = window.sidebarContext.container(of: window.id) {
+        if case .littleBrowser? = window.sidebarContext.container(of: window.id) {
+            let tabIDs = state.tabs(in: window.selectedSpaceID).map(\.id)
+            edit { state in
+                for tabID in tabIDs { state.archiveTab(tabID, reason: .manual) }
+                state.removeContainer(.littleBrowser(window.id))
+            }
+        } else if !quitting, let container = window.sidebarContext.container(of: window.id) {
             edit { $0.removeContainer(container) }
         }
         scheduleSave()
+    }
+
+    /// Oa's own, as its Little windows don't come back: their pages go to the Archive at a quit.
+    func archiveLittlePagesForQuit() {
+        for window in windows where window.sidebarContext == .little {
+            for tab in state.tabs(in: window.selectedSpaceID) { state.archiveTab(tab.id, reason: .manual) }
+        }
     }
 
     /// Oa's own: once the windows are back, a container whose window didn't come back goes.
@@ -241,7 +276,7 @@ final class SidebarStore {
 
     private var sessionRestorationMapping: [SessionRestorationClient.Key: Int32] {
         var mapping: [SessionRestorationClient.Key: Int32] = [:]
-        for window in windows where window.sidebarContext != .incognito {
+        for window in windows where window.sidebarContext != .incognito && window.sidebarContext != .little {
             for (tabID, page) in window.pages where page.tabSessionID >= 0 {
                 guard let profile = state.profile(containing: tabID) else { continue }
                 mapping[.init(itemId: tabID, browser: .init(windowID: window.id, contextID: profile.id))] =
@@ -256,7 +291,8 @@ final class SidebarStore {
             state,
             windows: WindowsSnapshot(
                 sidebarViewPreferences: sidebarViewPreferences,
-                windows: windows.filter { $0.sidebarContext != .incognito }.map(\.record)))
+                windows: windows.filter { $0.sidebarContext != .incognito && $0.sidebarContext != .little }
+                    .map(\.record)))
         sessionRestoration.save(sessionRestorationMapping)
         favicons.prune(keeping: Set(state.tree.items.values.compactMap { $0.tab?.id } + state.archive.map(\.id)))
     }

@@ -106,6 +106,61 @@ extension ProfileDialogUtils {
     }
 }
 
+extension ProfileDialogUtils {
+    /// Arc's confirm before a Little window changes profile (`changeProfileInLittleWindow`), with its "Don't ask
+    /// again", setting 44.
+    static func confirmLittleSwitch(to profileID: UUID, in model: WindowModel) {
+        let key = LittleBrowserPreferences.bypassProfileDialogKey
+        guard !UserDefaults.standard.bool(forKey: key) else { return model.setLittleProfile(profileID) }
+        guard let window = model.window else { return }
+        DialogSheet.present(on: window) { dismiss in
+            SwitchLittleProfileDialog(profile: model.profileName(profileID)) { [weak model] proceed, dontAsk in
+                dismiss()
+                guard proceed else { return }
+                if dontAsk { UserDefaults.standard.set(true, forKey: key) }
+                model?.setLittleProfile(profileID)
+            }
+        }
+    }
+}
+
+private struct SwitchLittleProfileDialog: View {
+    let profile: String
+    let done: (_ proceed: Bool, _ dontAsk: Bool) -> Void
+    @State private var dontAsk = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            DialogIcon(systemName: "person.crop.circle.badge.questionmark")
+            (Text("Switch to your ") + Text(profile).fontWeight(.heavy) + Text(" Profile?"))
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(DialogColor.title)
+                .padding(.top, 17)
+            Text("Each Profile has different browser data, so this webpage might look a little different.")
+                .font(.system(size: 14))
+                .foregroundStyle(DialogColor.body)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 16)
+                .padding(.trailing, 5)
+            HStack(spacing: 8) {
+                Toggle("Don’t ask again", isOn: $dontAsk)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 14))
+                    .foregroundStyle(DialogColor.body)
+                Spacer()
+                DialogButtonView(title: "Cancel", kind: .cancel) { done(false, false) }.fixedSize()
+                DialogButtonView(title: "Switch it up", kind: .primary) { done(true, dontAsk) }.fixedSize()
+            }
+            .padding(.top, 30)
+            .padding(.trailing, -10)
+        }
+        .padding(.horizontal, 38)
+        .padding(.top, 38)
+        .padding(.bottom, 27)
+        .frame(width: 455)
+    }
+}
+
 struct SpaceProfileMenuItems: View {
     let model: WindowModel
     let space: SidebarSpace

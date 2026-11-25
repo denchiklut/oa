@@ -372,6 +372,14 @@ final class CommandBar {
 /// Measured in Arc: a 766 pt card centred on the whole window, its top 169.5 pt above the window's middle (270 pt down
 /// an 879 pt window, 256.5 down an 851 pt one), five 50 pt rows showing before the list scrolls.
 struct CommandBarView: View {
+    /// As seen in Arc: a Little window's bar is narrower and has a ✕, and before the window has a page the bar is
+    /// the whole window.
+    enum Presentation {
+        case window, littleWindow, littleBar
+
+        var width: CGFloat { self == .window ? CommandBarView.width : LittleBrowserFrame.barSize.width }
+    }
+
     static let width: CGFloat = 766
     static let rowHeight: CGFloat = 50
     static let visibleRows = 5
@@ -381,6 +389,7 @@ struct CommandBarView: View {
     let bar: CommandBar
     /// The window theme's `focus`, which Arc's bar draws a Site Search without a colour in.
     let themeFocus: Color
+    var presentation = Presentation.window
     @Environment(\.colorScheme) private var colorScheme
     @State private var bounces = 0.0
     @State private var glow: (id: UUID, color: Color)?
@@ -389,15 +398,16 @@ struct CommandBarView: View {
         let rows = bar.rows
         let tabs = bar.destination == .newTab ? model.commandBarTabs : []
         GeometryReader { geometry in
+            let fills = presentation == .littleBar
             ZStack(alignment: .top) {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture { model.closeCommandBar() }
                 card(rows)
                     .background { if let glow { SiteSearchGlow(color: glow.color).id(glow.id) } }
-                    .modifier(CommandBarBounce(count: bounces))
-                    .frame(width: min(Self.width, geometry.size.width - 32))
-                    .padding(.top, max(geometry.size.height / 2 - Self.topAboveMiddle, 0))
+                    .modifier(CommandBarBounce(count: fills ? 0 : bounces))
+                    .frame(width: fills ? geometry.size.width : min(presentation.width, geometry.size.width - 32))
+                    .padding(.top, fills ? 0 : max(geometry.size.height / 2 - Self.topAboveMiddle, 0))
             }
         }
         // As Arc: the bar bounces whenever it enters or leaves a Site Search.
@@ -451,6 +461,19 @@ struct CommandBarView: View {
                 if let hint = bar.siteSearchHint {
                     SiteSearchHint(name: hint.name) { bar.enterScope(hint) }
                 }
+                if presentation != .window {
+                    Button {
+                        model.closeCommandBar()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .frame(width: 26, height: 26)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.5)
+                    .accessibilityLabel("Close")
+                }
             }
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(isDark ? Color.white : .black)
@@ -468,9 +491,13 @@ struct CommandBarView: View {
                     .padding(.bottom, 9.5)
             }
         }
-        // As Arc: `CommandBarConstants.cornerRadius` and the floating bar's shadow.
+        .frame(maxHeight: presentation == .littleBar ? .infinity : nil, alignment: .top)
+        // As Arc: `CommandBarConstants.cornerRadius` and the floating bar's shadow; the window's own where the bar
+        // is the window.
         .modifier(
-            PopoverBackgroundView(cornerRadius: 12, shadowColor: .black.opacity(0.5), shadowRadius: 48, shadowY: 24))
+            PopoverBackgroundView(
+                cornerRadius: presentation == .littleBar ? 0 : 12,
+                shadowColor: .black.opacity(presentation == .littleBar ? 0 : 0.5), shadowRadius: 48, shadowY: 24))
     }
 
     private func list(_ rows: [CommandBar.Row]) -> some View {
