@@ -71,15 +71,18 @@ struct ToolbarAddressLabel: View {
 
     let url: URL?
     var placeholder = ""
+    var hostWeight = Font.Weight.medium
+    var color: Color?
     @AppStorage(ToolbarAddressLabel.fullURLPreferenceKey) private var showsFullURL = false
     @Environment(\.theme) private var theme
 
     var body: some View {
         let (host, remainder) = addressParts
-        let hostColor = url == nil ? theme.secondaryText : theme.addressText
+        let addressText = color ?? theme.addressText
+        let hostColor = url == nil ? theme.secondaryText : addressText
         // Arc gives the host more weight and the rest five sixths of its opacity.
-        let hostText = Text(host).font(.system(size: 13, weight: .medium)).foregroundStyle(hostColor)
-        let remainderText = Text(remainder).font(.system(size: 13)).foregroundStyle(theme.addressText.opacity(5.0 / 6))
+        let hostText = Text(host).font(.system(size: 13, weight: hostWeight)).foregroundStyle(hostColor)
+        let remainderText = Text(remainder).font(.system(size: 13)).foregroundStyle(addressText.opacity(5.0 / 6))
         Text("\(hostText)\(remainderText)").lineLimit(1)
     }
 
