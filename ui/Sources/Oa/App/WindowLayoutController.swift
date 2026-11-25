@@ -35,6 +35,7 @@ final class WindowLayoutController: NSViewController {
     /// Arc's pager over the window's pages, and where it is.
     @ObservationIgnored private let pager = PageSwipeController<WindowLayoutPage>()
     private var pagerPosition = homeWidth
+    private(set) var isPaging = false
     /// The Space whose page is beside the Library's, as Arc's pager starts its Space pages from one: the window's
     /// Space on the way into the Library and out of it, so neither passes through the Spaces before it, and the first
     /// Space otherwise.
@@ -104,6 +105,8 @@ final class WindowLayoutController: NSViewController {
         }
         pager.trackingStateUpdateHandler = { [weak self] in
             guard let self else { return }
+            let paging = pager.isTracking || pager.isAnimating
+            if isPaging != paging { isPaging = paging }
             if pager.isTracking, model.spaceCreation != nil { spaceCreationSwiped = true }
             if !pager.isTracking, !pager.isAnimating, let id = pendingSpaceSelection {
                 pendingSpaceSelection = nil
