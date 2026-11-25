@@ -57,8 +57,10 @@ away.
 
 The profile chip lists the profiles that have a Space, and shows only in a
 window made while more than one profile was in use, as Arc's. Switching asks,
-loads the shown page again in that profile, and remembers the profile for the
-page's host.
+makes the shown page again in that profile, and remembers the profile for the
+page's host. As in Arc, only the window's own profile changes: its other pages
+go on running in the profile they were made in, with their own Browser, and
+only a page made from then on is the new profile's.
 
 ⌘W closes one page into the Archive and the window goes with its last one; the
 red button archives them all. Restore Last Closed Tab has nothing to bring back
@@ -147,8 +149,6 @@ opens its own window. Blink's ⌘⌥-click reaches the app as a background page.
 - Escape keeps a page window; what Arc's does wasn't seen.
 - A ⌘⌥-click's page is the engine's, moved to the Little window on the opener's
   profile; who makes it in Arc is unknown.
-- After a profile switch the window's hidden pages follow when next shown,
-  where Arc's keep running in the old profile.
 - With no standard window open, Open in opens one on the Space; Arc's code
   makes none.
 - Open Link in Little Oa inside a Little window opens another.
