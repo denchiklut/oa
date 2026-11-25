@@ -19,12 +19,6 @@ struct LittleWindowView: View {
                     content(palette: theme.semanticColorPalette[appearance.colorScheme])
                 }
                 .background { WindowSurface(background: background, next: nil) }
-                .overlay(alignment: .topTrailing) {
-                    if model.little?.showsMoveMenu == true {
-                        LittleBrowserMoveMenu(model: model)
-                            .environment(\.colorScheme, appearance.colorScheme)
-                    }
-                }
                 .windowToast(of: model)
                 .overlay {
                     if let bar = model.commandBar {
@@ -250,114 +244,10 @@ struct LittleBrowserToolbar: View {
         .frame(height: 30)
         .background(RoundedRectangle(cornerRadius: 5).fill(theme.modalButtonFill))
         .opacity(model.littleDestinationSpace == nil ? 0 : 1)
-    }
-}
-
-/// As seen in Arc: in the button's place.
-struct LittleBrowserMoveMenu: View {
-    let model: WindowModel
-    @State private var search = ""
-    @FocusState private var searching: Bool
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { close() }
-            VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 12))
-                        .foregroundStyle(theme.modalButtonGlyph.opacity(0.6))
-                    TextField("Search Spaces…", text: $search)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                        .focused($searching)
-                        .onSubmit { if let first = spaces.first { model.moveLittlePage(toSpace: first.id) } }
-                    Button(action: close) {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(theme.modalButtonGlyph.opacity(0.6))
-                            .frame(width: 28.5, height: 30)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.leading, 8)
-                .frame(height: 30)
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(spaces) { space in
-                            Row(space: space, isTarget: space.id == model.little?.destinationSpaceID) {
-                                model.moveLittlePage(toSpace: space.id)
-                            }
-                        }
-                    }
-                    .padding(2)
-                }
-                .frame(height: min(spaces.reduce(4) { $0 + Row.height(isTarget: $1.id == targetID) }, 320))
-            }
-            .frame(width: 248)
-            .background(RoundedRectangle(cornerRadius: 5).fill(theme.modalButtonFill))
-            .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
-            .padding(.top, 8)
-            .padding(.trailing, 7.5)
-        }
-        .onAppear { searching = true }
-        .onExitCommand(perform: close)
-    }
-
-    private func close() { model.little?.showsMoveMenu = false }
-    private var targetID: UUID? { model.little?.destinationSpaceID }
-
-    /// As seen in Arc: the button's Space, then the others in the sidebar's order, of every profile.
-    private var spaces: [SidebarSpace] {
-        let all = model.state.spaces
-        let target = all.filter { $0.id == model.little?.destinationSpaceID }
-        let ordered = target + all.filter { $0.id != model.little?.destinationSpaceID }
-        return search.isEmpty ? ordered : ordered.filter { $0.name.localizedCaseInsensitiveContains(search) }
-    }
-
-    private struct Row: View {
-        let space: SidebarSpace
-        let isTarget: Bool
-        let action: () -> Void
-        @State private var hovering = false
-        @Environment(\.theme) private var theme
-
-        static func height(isTarget: Bool) -> CGFloat { isTarget ? 46 : 36 }
-
-        var body: some View {
-            Button(action: action) {
-                HStack(spacing: 8) {
-                    Group {
-                        if let icon = space.icon {
-                            SpaceIconGlyph(icon: icon)
-                        } else {
-                            Image(systemName: "circle.fill").font(.system(size: 6))
-                        }
-                    }
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.modalButtonGlyph)
-                    .frame(width: 24, height: 24)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(theme.modalButtonGlyph.opacity(0.12)))
-                    Text(space.name)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(theme.modalButtonGlyph)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 8)
-                .frame(height: Self.height(isTarget: isTarget))
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(theme.modalButtonGlyph.opacity(isTarget || hovering ? 0.1 : 0))
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering = $0 }
+        .onGeometryChange(for: CGRect.self) {
+            $0.frame(in: .global)
+        } action: {
+            model.littleMoveButtonFrame = $0
         }
     }
 }

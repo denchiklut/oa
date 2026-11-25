@@ -92,6 +92,8 @@ final class WindowModel {
     private(set) var webDialog: WebDialog?
     /// By profile, as ADK keeps a browser per window and profile: from the window's first page in the profile on.
     private(set) var browsers: [UUID: any Browser] = [:]
+    /// Where a Little window's Open in button is, for the list that opens over it.
+    var littleMoveButtonFrame = CGRect.zero
     /// Run by the window's controller once the window has closed.
     @ObservationIgnored var afterClose: (() -> Void)?
     private(set) var commandBar: CommandBar?
