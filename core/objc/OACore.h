@@ -231,6 +231,8 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
 @property(nonatomic, readonly) double loadProgress;
 // Chrome's session ID of the page's tab, kept while the page lives.
 @property(nonatomic, readonly) int32_t tabSessionID;
+// The app profile whose context the page was made in.
+@property(nonatomic, readonly) NSString* profileID;
 @property(nonatomic, readonly) BOOL canGoBack;
 @property(nonatomic, readonly) BOOL canGoForward;
 // Nil until Chromium's favicon driver has an icon for the page.

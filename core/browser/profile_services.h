@@ -23,6 +23,8 @@ void LoadBrowserContext(const std::string& identifier,
 // Null until loaded, and for an incognito one Chromium doesn't have.
 Profile* GetLoadedBrowserContext(const std::string& identifier,
                                  BrowserContextType type);
+// The app profile a context is of, its own or its incognito one.
+std::string GetBrowserProfileIdentifier(Profile* context);
 // Before the browser process tears down: a raw_ptr still pointing at a profile
 // ProfileManager destroyed aborts the exit.
 void UnloadBrowserProfiles();

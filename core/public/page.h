@@ -288,6 +288,9 @@ class Page {
   // Chrome's session ID of the page's tab, as ArcCore's restoration data keeps
   // it: kept while the page lives.
   virtual int32_t GetTabSessionID() const = 0;
+  // The app profile whose context the page was made in, as ADK's
+  // BrowserContextID; a move to another window keeps it.
+  virtual std::string GetProfileID() const = 0;
   virtual bool CanGoBack() const = 0;
   virtual bool CanGoForward() const = 0;
   // An NSImage, held by the tab while it keeps the icon; null until it has one.
