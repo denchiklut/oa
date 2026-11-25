@@ -95,7 +95,14 @@ public protocol BrowserContext: AnyObject {
     /// The app window's side in this profile, as ADK's `Browser`: one per window and profile, alive while the app
     /// holds it. As ADK's `ensureBrowserCreated`, a window asks for one in each profile as it appears: the engine's
     /// browser is made then, and a profile's first starts the restore of its last session.
-    func browser(windowID: UUID) -> any Browser
+    func browser(windowID: UUID, type: BrowserType) -> any Browser
+}
+
+/// As ADK's browser type: a little window's browser is the engine's popup, which holds its pages like any other and
+/// never comes back with a session.
+public enum BrowserType: Sendable {
+    case normal
+    case popup
 }
 
 extension BrowserContext {
@@ -672,6 +679,9 @@ public enum PageEvent {
     /// The page menu's Open Link in Incognito Window, as ADK's `onOpenLinkInIncognitoWindow`: only the address. The
     /// engine offers it only on a page of a profile's own context.
     case openLinkInIncognitoWindow(URL)
+    /// The page menu's Open Link in Little Oa, as ADK's `littleWindow` disposition, which the app answers by opening
+    /// its own window: only the address.
+    case openLinkInLittleWindow(URL)
     /// The page asked for a dialog; the app shows it and answers it once.
     case dialog(PageDialog)
     /// The engine closed the dialog: a navigation, a tab switch, a close. No answer is expected.

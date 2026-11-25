@@ -407,7 +407,7 @@ final class WindowModel {
 
     private func ensureBrowser(for profileID: UUID) {
         guard browsers[profileID] == nil else { return }
-        let browser = context(for: profileID).browser(windowID: id)
+        let browser = context(for: profileID).browser(windowID: id, type: .normal)
         browsers[profileID] = browser
         browserListeners[profileID] = Task { [weak self] in
             for await event in browser.events {

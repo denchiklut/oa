@@ -197,9 +197,9 @@ final class ChromiumBrowserContext: BrowserContext {
 
     func setUserVisibleName(_ name: String) { profile()?.setUserVisibleName(name) }
 
-    func browser(windowID: UUID) -> any Browser {
+    func browser(windowID: UUID, type: BrowserType) -> any Browser {
         if let browser = browsers[windowID]?.browser { return browser }
-        let browser = ChromiumBrowser(profile: profile(), windowID: windowID)
+        let browser = ChromiumBrowser(profile: profile(), windowID: windowID, type: type)
         browsers = browsers.filter { $0.value.browser != nil }
         browsers[windowID] = WeakBrowser(browser: browser)
         return browser

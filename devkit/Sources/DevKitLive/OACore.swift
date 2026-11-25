@@ -182,8 +182,8 @@ import AppKit
     var downloads: CoreDownloads { get }
     var preferences: CorePreferences { get }
     var extensions: CoreExtensions { get }
-    @objc(browserInWindow:delegate:)
-    func browser(inWindow windowIdentifier: String, delegate: CoreBrowserDelegate) -> CoreBrowser
+    @objc(browserInWindow:popup:delegate:)
+    func browser(inWindow windowIdentifier: String, popup: Bool, delegate: CoreBrowserDelegate) -> CoreBrowser
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
@@ -310,6 +310,7 @@ import AppKit
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int, byPage: Bool)
     @objc(pageWantsActivation:) func pageWantsActivation(_ page: CorePage)
     @objc(page:openLinkInIncognitoWindow:) func page(_ page: CorePage, openLinkInIncognitoWindow url: URL)
+    @objc(page:openLinkInLittleWindow:) func page(_ page: CorePage, openLinkInLittleWindow url: URL)
     @objc(page:rendererGone:) func page(_ page: CorePage, rendererGone exit: Int)
     @objc(pageRendererReady:) func pageRendererReady(_ page: CorePage)
     @objc(page:didRequestDialog:) func page(_ page: CorePage, didRequestDialog dialog: CorePageDialog)
