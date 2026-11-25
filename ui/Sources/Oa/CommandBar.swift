@@ -377,7 +377,7 @@ struct CommandBarView: View {
     enum Presentation {
         case window, littleWindow, littleBar
 
-        var width: CGFloat { self == .window ? CommandBarView.width : LittleBrowserFrame.barSize.width }
+        @MainActor var width: CGFloat { self == .window ? CommandBarView.width : LittleBrowserFrame.barSize.width }
     }
 
     static let width: CGFloat = 766

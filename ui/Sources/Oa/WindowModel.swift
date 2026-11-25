@@ -2663,8 +2663,9 @@ final class WindowModel {
         case .wantsActivation:
             return showPage(pageID)
         case .openLinkInIncognitoWindow(let url):
-            let ownerID = tabID(of: pageID) ?? peekOwner(of: pageID)
-            if let profile = ownerID.flatMap { profile(containing: $0) } { openLinkInIncognitoWindow(url, profile.id) }
+            if let ownerID = tabID(of: pageID) ?? peekOwner(of: pageID), let profile = profile(containing: ownerID) {
+                openLinkInIncognitoWindow(url, profile.id)
+            }
             return
         case .openLinkInLittleWindow(let url):
             // As Arc's `littleWindow(profile: nil)`.
