@@ -13,6 +13,7 @@ final class LittleBrowserMoveMenuWindowController {
         let window = MoveMenuWindow(
             contentRect: parent.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
+        window.onCancel = { [weak model] in model?.little?.showsMoveMenu = false }
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
@@ -51,10 +52,13 @@ final class LittleBrowserMoveMenuWindowController {
     }
 
     private final class MoveMenuWindow: NSWindow {
+        var onCancel: () -> Void = {}
+
         override var canBecomeKey: Bool { true }
         override var canBecomeMain: Bool { false }
 
         override func performClose(_ sender: Any?) { parent?.performClose(sender) }
+        override func cancelOperation(_ sender: Any?) { onCancel() }
     }
 }
 
@@ -77,65 +81,72 @@ private struct MoveMenuContent: View {
     }
 }
 
-/// Arc's `LittleBrowserMoveMenuView`, expanded: over the button, a little wider above and to its right.
+/// Arc's `LittleBrowserMoveMenuView`, expanded: over the button, a little wider above and to its right. As seen in
+/// Arc, one row is lit at a time: the button's Space at first, then the last one the pointer or an arrow key
+/// reached, and the first match once the search changes.
 private struct LittleBrowserMoveMenu: View {
     let model: WindowModel
     @State private var search = ""
-    @State private var highlighted: UUID?
+    @State private var lit: UUID?
     @State private var isExpanded = false
+    @State private var isCloseHovered = false
     @FocusState private var searching: Bool
     @Environment(\.theme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
 
     private static let rowHeight: CGFloat = 46
 
+    private func ink(_ light: Double, _ dark: Double) -> Color {
+        theme.isDark ? .white.opacity(dark) : .black.opacity(light)
+    }
+
     var body: some View {
         let button = model.littleMoveButtonFrame
-        let ink = theme.modalButtonGlyph
+        let litID = lit ?? spaces.first?.id
         GeometryReader { window in
             VStack(spacing: 0) {
-                HStack(spacing: 8) {
+                HStack(spacing: 0) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(ink.opacity(0.3))
-                    TextField(
-                        "", text: $search, prompt: Text("Search Spaces…").foregroundStyle(ink.opacity(0.55))
-                    )
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(ink)
-                    .focused($searching)
-                    .onSubmit { (highlighted ?? spaces.first?.id).map(model.moveLittlePage) }
-                    .onKeyPress(.downArrow) { highlight(1) }
-                    .onKeyPress(.upArrow) { highlight(-1) }
+                        .foregroundStyle(ink(0.3, 0.3))
+                        .padding(.trailing, 8)
+                    TextField("", text: $search, prompt: Text("Search Spaces…").foregroundStyle(ink(0.5, 0.55)))
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(ink(0.85, 0.85))
+                        .focused($searching)
+                        .onSubmit { litID.map(model.moveLittlePage) }
+                        .onKeyPress(.downArrow) { light(1) }
+                        .onKeyPress(.upArrow) { light(-1) }
+                    ink(0.1, 0.1).frame(width: 1, height: 18).opacity(isCloseHovered ? 0 : 1)
                     Button(action: close) {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(ink.opacity(0.33))
+                            .foregroundStyle(ink(0.3, 0.33))
                             .rotationEffect(.radians(isExpanded ? .pi : 0))
-                            .frame(width: 28, height: 30)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(ink.opacity(0.07)))
+                            .frame(width: 28.5)
+                            .frame(maxHeight: .infinity)
+                            .background(ink(0.04, 0.07).opacity(isCloseHovered ? 1 : 0))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.trailing, 4)
+                    .onHover { isCloseHovered = $0 }
                 }
                 .padding(.leading, 16)
                 .frame(height: Self.rowHeight)
                 if spaces.isEmpty {
                     Text("No results")
                         .font(.system(size: 13))
-                        .foregroundStyle(ink.opacity(0.3))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 24)
+                        .foregroundStyle(ink(0.3, 0.3))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 64)
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
                             ForEach(spaces) { space in
                                 Row(
-                                    space: space, fill: model.theme(of: space).primaryColorPalette.shaded.color,
-                                    isTarget: space.id == model.little?.destinationSpaceID,
-                                    isHighlighted: space.id == highlighted
+                                    space: space, color: model.theme(of: space).primaryColorPalette.shaded.color,
+                                    isLit: space.id == litID,
+                                    hover: { lit = space.id }
                                 ) {
                                     model.moveLittlePage(toSpace: space.id)
                                 }
@@ -145,35 +156,37 @@ private struct LittleBrowserMoveMenu: View {
                     .frame(height: min(CGFloat(spaces.count) * Self.rowHeight, 350))
                 }
             }
-            .frame(width: max(button.width - 4, 0))
+            // Oa's own floor: Arc's width was only seen under a long Space name.
+            .frame(width: max(button.width - 4, 244))
+            .background(theme.modalButtonFill)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(ink(0.06, 0.1), lineWidth: 0.5)
+            )
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(theme.modalButtonFill)
-                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.1953), radius: 8, y: 4)
+                    .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(ink.opacity(0.1), lineWidth: 0.5)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .padding(.top, button.minY - 4)
             .padding(.trailing, window.size.width - button.maxX - 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
+        // Once the window has the keyboard: a field focused as it appears doesn't take it.
+        .task { searching = true }
         .onAppear {
-            searching = true
             withAnimation(.spring(response: 0.28, dampingFraction: 0.63)) { isExpanded = true }
         }
-        .onChange(of: search) { _, _ in highlighted = nil }
+        .onChange(of: search) { _, _ in lit = nil }
         .onExitCommand(perform: close)
     }
 
     private func close() { model.little?.showsMoveMenu = false }
 
-    private func highlight(_ step: Int) -> KeyPress.Result {
+    private func light(_ step: Int) -> KeyPress.Result {
         let ids = spaces.map(\.id)
-        guard !ids.isEmpty else { return .handled }
-        let index = highlighted.flatMap(ids.firstIndex).map { $0 + step } ?? (step > 0 ? 0 : ids.count - 1)
-        highlighted = ids[min(max(index, 0), ids.count - 1)]
+        guard let index = (lit ?? ids.first).flatMap(ids.firstIndex) else { return .handled }
+        lit = ids[min(max(index + step, 0), ids.count - 1)]
         return .handled
     }
 
@@ -185,13 +198,14 @@ private struct LittleBrowserMoveMenu: View {
         return search.isEmpty ? ordered : ordered.filter { $0.name.localizedCaseInsensitiveContains(search) }
     }
 
+    /// As seen in Arc: the icon is the Space's colour under a white glyph in a dark list, and a pale wash of it
+    /// under a glyph in the colour in a light one.
     private struct Row: View {
         let space: SidebarSpace
-        let fill: Color
-        let isTarget: Bool
-        let isHighlighted: Bool
+        let color: Color
+        let isLit: Bool
+        let hover: () -> Void
         let action: () -> Void
-        @State private var hovering = false
         @Environment(\.theme) private var theme
 
         var body: some View {
@@ -205,29 +219,22 @@ private struct LittleBrowserMoveMenu: View {
                         }
                     }
                     .font(.system(size: 12))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.isDark ? .white : color)
                     .frame(width: 26, height: 26)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(fill))
+                    .background(RoundedRectangle(cornerRadius: 4).fill(color.opacity(theme.isDark ? 1 : 0.1)))
                     Text(space.name)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(theme.modalButtonGlyph.opacity(0.8))
+                        .foregroundStyle(theme.isDark ? .white.opacity(0.8) : .black.opacity(0.85))
                         .lineLimit(1)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 10)
                 .frame(height: LittleBrowserMoveMenu.rowHeight)
-                .background {
-                    // As seen in Arc: the button's Space is marked edge to edge; the pointer's row, inside.
-                    if hovering || isHighlighted {
-                        RoundedRectangle(cornerRadius: 3).fill(theme.modalButtonGlyph.opacity(0.15)).padding(3)
-                    } else if isTarget {
-                        theme.modalButtonGlyph.opacity(0.07)
-                    }
-                }
+                .background((theme.isDark ? Color.white.opacity(0.07) : .black.opacity(0.04)).opacity(isLit ? 1 : 0))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .onHover { hovering = $0 }
+            .onHover { if $0 { hover() } }
         }
     }
 }
