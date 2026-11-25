@@ -310,12 +310,12 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @property(nonatomic, readonly) int64_t remainingSeconds;
 // Nil until Chromium has chosen where the file goes.
 @property(nonatomic, readonly, nullable) NSURL* targetFileURL;
+// The address the page that started it shows, while that page is open, else
+// the file's.
 @property(nonatomic, readonly, nullable) NSURL* sourceURL;
 // The registrable domain of `sourceURL`; nil for an address without one, as an
 // IP.
 @property(nonatomic, readonly, nullable) NSString* sourceDomain;
-// The address of the page that started it, kept after that page has gone.
-@property(nonatomic, readonly, nullable) NSURL* tabURL;
 @property(nonatomic, readonly) NSDate* startTime;
 @property(nonatomic, readonly, getter=isPaused) BOOL paused;
 @property(nonatomic, readonly, getter=isDone) BOOL done;
