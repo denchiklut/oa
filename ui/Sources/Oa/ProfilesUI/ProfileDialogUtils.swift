@@ -108,7 +108,7 @@ extension ProfileDialogUtils {
 
 extension ProfileDialogUtils {
     /// Arc's confirm before a Little window changes profile (`changeProfileInLittleWindow`), with its "Don't ask
-    /// again", setting 44.
+    /// again", setting 46.
     static func confirmLittleSwitch(to profileID: UUID, in model: WindowModel) {
         let key = LittleBrowserPreferences.bypassProfileDialogKey
         guard !UserDefaults.standard.bool(forKey: key) else { return model.setLittleProfile(profileID) }
