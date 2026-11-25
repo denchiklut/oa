@@ -491,9 +491,6 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
         windows.append(controller)
         controller.open(cascadingFrom: previous, littleFrame: littleFrame)
         controller.model.updateLittleDestination()
-        if case .center(let pointer) = little?.session.preferredFrame.anchor {
-            controller.zoomLittleWindow(from: pointer)
-        }
         if let record {
             controller.model.restore(record)
         } else {

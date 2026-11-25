@@ -92,6 +92,8 @@ final class WindowModel {
     private(set) var webDialog: WebDialog?
     /// By profile, as ADK keeps a browser per window and profile: from the window's first page in the profile on.
     private(set) var browsers: [UUID: any Browser] = [:]
+    /// Run by the window's controller once the window has closed.
+    @ObservationIgnored var afterClose: (() -> Void)?
     private(set) var commandBar: CommandBar?
     /// When this window last showed a tab and when a tab was made through it, as Arc's per-window
     /// `itemLastActiveDates` and `itemCreatedDates`, which order its empty command bar.
@@ -1561,17 +1563,11 @@ final class WindowModel {
         }
     }
 
-    /// As seen in Arc: a Little window whose page moved out fades away, its other pages into the Archive, and after
+    /// As seen in Arc: a Little window whose page moved out closes, its other pages into the Archive, and after
     /// them a moved page that is lost with it, from the Space it reached.
     private func littlePageMoved(losing lost: [UUID], in destination: WindowModel) {
-        guard let window else { return }
-        NSAnimationContext.runAnimationGroup {
-            $0.duration = 0.11
-            window.animator().alphaValue = 0
-        } completionHandler: {
-            window.close()
-            destination.endLittlePages(lost)
-        }
+        afterClose = { [weak destination] in destination?.endLittlePages(lost) }
+        window?.close()
     }
 
     private func endLittlePages(_ tabIDs: [UUID]) {

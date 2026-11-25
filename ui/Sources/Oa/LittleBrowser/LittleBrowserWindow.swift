@@ -17,6 +17,21 @@ final class LittleBrowserWindow: NSPanel {
     }
 
     var onCancel: () -> Void = {}
+    /// Arc's dismiss, run before the window closes: it calls back once the window may go.
+    var dismiss: ((@escaping () -> Void) -> Void)?
+    private var isDismissing = false
+
+    override func close() {
+        guard !isDismissing else { return }
+        guard let dismiss else { return super.close() }
+        isDismissing = true
+        dismiss { [weak self] in
+            self?.dismiss = nil
+            self?.isDismissing = false
+            self?.orderOut(nil)
+            self?.close()
+        }
+    }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -84,11 +99,18 @@ final class LittleWindowViewController: NSViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    let card = ModalV2HostView()
+
     override func loadView() {
         let content = NSHostingView(rootView: LittleWindowView(model: model))
         content.sizingOptions = []
         content.autoresizingMask = [.width, .height]
+        content.wantsLayer = true
+        content.layer?.masksToBounds = true
+        card.wantsLayer = true
+        card.autoresizingMask = [.width, .height]
+        card.addSubview(content)
         view = KeyboardShortcutInterceptionView(keyBindings: model.keyBindings)
-        view.addSubview(content)
+        view.addSubview(card)
     }
 }
