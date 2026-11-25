@@ -91,9 +91,14 @@ struct LittleWindowView: View {
         .animation(.easeInOut(duration: 0.1), value: model.permissionRequest == nil)
         .overlay(alignment: .topTrailing) {
             if model.little?.showsTip == true {
+                // As seen in Arc: a window from the menu has its tip at once, with its page.
+                let scaleFade = AnyTransition.scale(scale: 0.8, anchor: .trailing).combined(with: .opacity)
                 LittleBrowserTip { model.little?.showsTip = false }
                     .padding(8)
-                    .transition(.scale(scale: 0.8, anchor: .trailing).combined(with: .opacity))
+                    .transition(
+                        .asymmetric(
+                            insertion: model.little?.session.entryPoint == .mainMenu ? .identity : scaleFade,
+                            removal: scaleFade))
             }
         }
         .animation(.easeInOut(duration: 0.1), value: model.little?.showsTip)
@@ -215,7 +220,7 @@ struct LittleBrowserToolbar: View {
                     .frame(width: 14, height: 14)
                     .background(Circle().fill(ink(0.1, 0.1)))
                 Text(profileID.map(model.profileName) ?? "")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
             }
             .foregroundStyle(ink(0.85, 0.8))
@@ -257,7 +262,7 @@ struct LittleBrowserToolbar: View {
                 .font(.system(size: 13, weight: .medium))
                 .padding(.horizontal, 6)
                 .frame(maxHeight: .infinity)
-                .background(ink(0.07, 0.07).opacity(hoveredSegment == .move ? 1 : 0))
+                .background(ink(0.04, 0.07).opacity(hoveredSegment == .move ? 1 : 0))
                 .contentShape(Rectangle())
             }
             .disabled(model.page == nil)
@@ -271,10 +276,11 @@ struct LittleBrowserToolbar: View {
                     .foregroundStyle(hoveredSegment == .menu ? ink(0.4, 0.33) : ink(0.3, 0.25))
                     .frame(width: 28.5)
                     .frame(maxHeight: .infinity)
-                    .background(ink(0.07, 0.07).opacity(hoveredSegment == .menu ? 1 : 0))
+                    .background(ink(0.04, 0.07).opacity(hoveredSegment == .menu ? 1 : 0))
                     .contentShape(Rectangle())
             }
             .help("More Spaces")
+            .accessibilityLabel("More Spaces")
             .onHover { hoveredSegment = $0 ? .menu : hoveredSegment == .menu ? nil : hoveredSegment }
         }
         .buttonStyle(.plain)
@@ -297,6 +303,7 @@ struct LittlePermissionRequestView: View {
     let model: WindowModel
     let request: PagePermissionRequest
     let palette: WindowTheme.SemanticColorPalette
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -307,18 +314,22 @@ struct LittlePermissionRequestView: View {
                     .frame(width: 24, height: 24)
                     .background(RoundedRectangle(cornerRadius: 4).fill(palette.background.color))
                 Text(PermissionRequestView.question(for: request, site: "this website"))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 13, weight: .medium))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("Click the \(Image(systemName: "lock.fill")) to change this any time").font(.system(size: 11))
+            Text("Click the \(Image(systemName: "lock.fill")) to change this any time")
+                .font(.system(size: 11))
+                .foregroundStyle(theme.isDark ? .white : .black.opacity(0.3))
             HStack(spacing: 8) {
-                Button("Not Now") { model.respond(to: request, with: .deny) }
-                    .buttonStyle(Style(fill: palette.backgroundExtra.color))
-                Button("Allow") { model.respond(to: request, with: .allow) }
-                    .buttonStyle(Style(fill: palette.focus.color))
+                CardButton(title: "Not Now", fill: palette.backgroundExtra.color, isPrimary: false) {
+                    model.respond(to: request, with: .deny)
+                }
+                CardButton(title: "Allow", fill: palette.focus.color, isPrimary: true) {
+                    model.respond(to: request, with: .allow)
+                }
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(theme.isDark ? .white : .black)
         .padding(16)
         .frame(width: 232, alignment: .leading)
         .background(
@@ -330,18 +341,33 @@ struct LittlePermissionRequestView: View {
         .onDisappear { model.permissionPromptClosed() }
     }
 
-    /// As seen in Arc: each button stands on a line a point below it.
-    private struct Style: ButtonStyle {
+    /// As seen in Arc: each button stands on a line a point below it, and the pointer dims Allow in a dark card
+    /// and pales it in a light one.
+    private struct CardButton: View {
+        let title: String
         let fill: Color
+        let isPrimary: Bool
+        let action: () -> Void
+        @State private var isHovered = false
+        @Environment(\.theme) private var theme
 
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-                .font(.system(size: 13, weight: .semibold))
-                .frame(maxWidth: .infinity, minHeight: 32)
-                .background(RoundedRectangle(cornerRadius: 4).fill(fill))
-                .background(RoundedRectangle(cornerRadius: 4).fill(.white.opacity(0.13)).offset(y: 1))
-                .opacity(configuration.isPressed ? 0.8 : 1)
-                .contentShape(Rectangle())
+        var body: some View {
+            let ink: Color = theme.isDark ? .white : .black
+            let veil = isPrimary ? (theme.isDark ? Color.black.opacity(0.38) : .white.opacity(0.5)) : ink.opacity(0.04)
+            Button(action: action) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isPrimary ? .white : ink)
+                    .frame(maxWidth: .infinity, minHeight: 32)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(veil.opacity(isHovered ? 1 : 0)))
+                    .background(RoundedRectangle(cornerRadius: 4).fill(fill))
+                    .background(
+                        RoundedRectangle(cornerRadius: 4).fill(ink.opacity(theme.isDark ? 0.13 : 0.15)).offset(y: 1)
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
         }
     }
 }
