@@ -129,18 +129,21 @@ final class StubBrowserContext: BrowserContext {
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
         if let sessionID,
             let page = StubPage.restore(
-                sessionID, id: UUID(), windowID: windowID, downloads: stubDownloads, extensions: stubExtensions)
+                sessionID, id: UUID(), windowID: windowID, profileID: id, downloads: stubDownloads,
+                extensions: stubExtensions)
         {
             return (page, true)
         }
-        let page = StubPage(id: UUID(), windowID: windowID, downloads: stubDownloads, extensions: stubExtensions)
+        let page = StubPage(
+            id: UUID(), windowID: windowID, profileID: id, downloads: stubDownloads, extensions: stubExtensions)
         page.isIncognito = isIncognito
         return (page, false)
     }
 
     func browser(windowID: UUID, type: BrowserType) -> any Browser {
         if let browser = browsers[windowID]?.browser { return browser }
-        let browser = StubBrowser(windowID: windowID, extensions: stubExtensions, downloads: stubDownloads)
+        let browser = StubBrowser(
+            windowID: windowID, profileID: id, extensions: stubExtensions, downloads: stubDownloads)
         browsers = browsers.filter { $0.value.browser != nil }
         browsers[windowID] = WeakBrowser(browser: browser)
         return browser
