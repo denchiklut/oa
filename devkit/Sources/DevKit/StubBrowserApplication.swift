@@ -138,7 +138,7 @@ final class StubBrowserContext: BrowserContext {
         return (page, false)
     }
 
-    func browser(windowID: UUID) -> any Browser {
+    func browser(windowID: UUID, type: BrowserType) -> any Browser {
         if let browser = browsers[windowID]?.browser { return browser }
         let browser = StubBrowser(windowID: windowID, extensions: stubExtensions, downloads: stubDownloads)
         browsers = browsers.filter { $0.value.browser != nil }

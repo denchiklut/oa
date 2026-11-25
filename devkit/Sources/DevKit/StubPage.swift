@@ -364,6 +364,10 @@ final class StubPage: Page, MediaSession {
             StubMenuItem("Open Link in Split View") { [weak self] in self?.open(.splitView, byPage: false) })
         if !isIncognito, let url {
             menu.addItem(
+                StubMenuItem("Open Link in Little Oa") { [weak self] in
+                    self?.continuation?.yield(.openLinkInLittleWindow(url.appending(path: "little")))
+                })
+            menu.addItem(
                 StubMenuItem("Open Link in Incognito Window") { [weak self] in
                     self?.continuation?.yield(.openLinkInIncognitoWindow(url.appending(path: "incognito")))
                 })

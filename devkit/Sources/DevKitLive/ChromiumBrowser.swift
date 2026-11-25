@@ -14,10 +14,10 @@ final class ChromiumBrowser: Browser {
     @ObservationIgnored private let delegate = BrowserDelegate()
     @ObservationIgnored private var core: CoreBrowser?
 
-    init(profile: CoreProfile?, windowID: UUID) {
+    init(profile: CoreProfile?, windowID: UUID, type: BrowserType) {
         (events, continuation) = AsyncStream<BrowserEvent>.makeStream()
         delegate.browser = self
-        core = profile?.browser(inWindow: windowID.uuidString, delegate: delegate)
+        core = profile?.browser(inWindow: windowID.uuidString, popup: type == .popup, delegate: delegate)
     }
 
     func runExtensionAction(_ id: ExtensionAction.ID) { core?.executeExtensionAction(id) }
