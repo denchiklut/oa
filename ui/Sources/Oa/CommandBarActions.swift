@@ -164,7 +164,6 @@ enum CommandBarActions {
     }
 
     private static func isEnabled(_ item: NSMenuItem, action: Selector, allowWhenHidden: Bool) -> Bool {
-        if item.isHidden && !allowWhenHidden { return false }
         guard let target = NSApp.target(forAction: action, to: item.target, from: item) else { return false }
         let valid: Bool
         if let validator = target as? NSMenuItemValidation {
