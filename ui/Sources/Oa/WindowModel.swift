@@ -305,12 +305,11 @@ final class WindowModel {
     }
 
     /// A pinned tab whose page has left its address reads "/ live title", as in Arc; a Favorite, whose tile has no
-    /// text, gives the window the live title as Arc's does.
+    /// text, gives the window the live title as Arc's does. Oa's own: the live title is the last one a finished load
+    /// gave, and the address's host until one has.
     func title(for tab: SidebarTab) -> String {
         guard let url = leftAddress(tab), let page = pages[tab.id] else { return tab.displayTitle }
-        let settled =
-            settledLiveTitles[tab.id]
-            ?? (!page.isLoading && page.navigationResult == .loaded && !page.title.isEmpty ? page.title : nil)
+        let settled = settledLiveTitles[tab.id] ?? settledTitle(of: page)
         let live = tab.customTitle ?? settled ?? url.host() ?? url.absoluteString
         // As seen in Arc: a split's pane shows no "/".
         return state.isFavorite(tab.id) || state.splitViewID(containing: tab.id) != nil ? live : "/ " + live
@@ -2879,22 +2878,29 @@ final class WindowModel {
         }
     }
 
-    /// As Arc: a tab's title stays untouched while a page loads or fails, and a page that has loaded with no favicon
-    /// clears an unpinned tab's while a tab that keeps its address never loses its own. Oa's own: a brand-new tab with
-    /// an address also waits for the load to settle so it shows its host steadily instead of flashing URL titles.
+    /// As Arc: a tab's title stays untouched while a page loads or fails. Oa's own, where Arc gives a tab with no
+    /// saved title one at once: such a tab waits too, so it shows its host steadily instead of flashing URL titles.
+    private func settledTitle(of page: any Page) -> String? {
+        guard page.url != nil, !page.isLoading, page.navigationResult == .loaded, !page.title.isEmpty else {
+            return nil
+        }
+        return page.title
+    }
+
+    /// As Arc: a page that has loaded with no favicon clears an unpinned tab's, and a tab that keeps its address never
+    /// loses its own.
     private func save(_ page: any Page, for tabID: UUID) {
-        let hasLoaded = page.navigationResult == .loaded
-        let settled = page.url != nil && !page.isLoading && hasLoaded
-        store.setSavedPage(tabID, title: settled ? page.title : nil, url: page.url)
+        let title = settledTitle(of: page)
+        store.setSavedPage(tabID, title: title, url: page.url)
         if let tab = state.tree.tab(tabID), leftAddress(tab, page: page) != nil {
-            if settled, !page.title.isEmpty { settledLiveTitles[tabID] = page.title }
+            if let title { settledLiveTitles[tabID] = title }
         } else {
             settledLiveTitles[tabID] = nil
         }
         // As seen in Arc, which keeps no favicon of an incognito page.
         guard sidebarContext != .incognito else { return }
         let favicon = page.favicon
-        guard favicon != nil || (hasLoaded && !state.keepsAddress(tabID)) else { return }
+        guard favicon != nil || (page.navigationResult == .loaded && !state.keepsAddress(tabID)) else { return }
         let hasSaved = store.savedFavicon(tabID) != nil
         guard state.takesFavicon(tabID, at: page.url, canGoBack: page.canGoBack, hasSaved: hasSaved) else { return }
         store.setSavedFavicon(tabID, favicon)
