@@ -10,6 +10,7 @@ import SwiftUI
 struct SidebarPagingContainerView: View {
     let model: WindowModel
     let layout: WindowLayoutController
+    let showsDownloads: Bool
     @AppStorage(PageToolbar.key) private var showsToolbar = false
     @Environment(\.sidebarDrag) private var drag
 
@@ -52,7 +53,7 @@ struct SidebarPagingContainerView: View {
                             + (extensionsHeight > 0 ? extensionsHeight + 8 : 0)
                         SidebarSpacePage(
                             model: model, layout: layout, space: space,
-                            hidesScrollIndicators: hidesScrollIndicators
+                            hidesScrollIndicators: hidesScrollIndicators, showsDownloads: showsDownloads
                         )
                         .padding(.top, global ? trayHeight : 0)
                         .frame(width: width)
@@ -141,6 +142,9 @@ private struct SidebarSpacePage: View {
     let layout: WindowLayoutController
     let space: SidebarSpace
     let hidesScrollIndicators: Bool
+    let showsDownloads: Bool
+    @State private var canScrollDown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.sidebarDrag) private var drag
     @Environment(\.sidebarRevealsControls) private var revealed
 
@@ -202,6 +206,13 @@ private struct SidebarSpacePage: View {
                     }
                 }
                 .padding([.horizontal, .bottom], 8)
+                .id(space.id)
+                .onGeometryChange(for: Bool.self) { geometry in
+                    guard let viewport = geometry.bounds(of: .scrollView(axis: .vertical)) else { return false }
+                    return geometry.size.height > viewport.maxY + 1
+                } action: {
+                    canScrollDown = $0
+                }
                 // As measured on Arc: the rows below a collapsing pinned section spring up, and down as it expands.
                 .animation(
                     collapsed
@@ -217,6 +228,27 @@ private struct SidebarSpacePage: View {
             .onChange(of: model.editingFolderID) { _, id in
                 guard let id, space.id == model.selectedSpaceID else { return }
                 withAnimation(.easeOut(duration: 0.16)) { proxy.scrollTo(id, anchor: .center) }
+            }
+            .overlay(alignment: .bottom) {
+                if canScrollDown, !showsDownloads, !hidesScrollIndicators {
+                    Button {
+                        // Oa's own: the recording shows the arrow at rest. A click takes this Space to its bottom.
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                            proxy.scrollTo(space.id, anchor: .bottom)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .frame(width: 28, height: 28)
+                            .background(.white.opacity(0.94), in: Circle())
+                            .shadow(color: .black.opacity(0.14), radius: 3, y: 1)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Scroll to Bottom")
+                    .help("Scroll to Bottom")
+                    .padding(.bottom, 8)
+                }
             }
         }
         // As Arc's: the list's empty space and its rows without a menu of their own give the Space's.

@@ -1,50 +1,46 @@
 import DevKit
 import SwiftUI
 
-/// Arc's flyout over the Library button: the four most recent downloads, the newest at the bottom beside the
-/// button, without a finished one whose file is gone. Arc mixes in its Library's other files, which Oa doesn't have.
 struct DownloadsFlyout: View {
     let model: WindowModel
+    let entries: [DownloadsStore.Entry]
 
     var body: some View {
-        let recent = model.downloads.entries.lazy.filter { $0.download.status != .finished || $0.fileExists }
-            .prefix(4)
-        if !recent.isEmpty {
-            VStack(spacing: 2) {
-                ForEach(recent.reversed()) { FlyoutRow(model: model, entry: $0) }
-            }
-            .padding(6)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.1)))
-            .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+        VStack(spacing: 8) {
+            ForEach(entries.reversed()) { FlyoutRow(model: model, entry: $0) }
         }
+        .padding(.leading, 4)
+        .padding(.trailing, 12)
+        .contentShape(Rectangle())
     }
 }
 
 private struct FlyoutRow: View {
     let model: WindowModel
     let entry: DownloadsStore.Entry
+    @Environment(\.theme) private var theme
     @State private var hovering = false
 
     var body: some View {
         let finished = entry.download.status == .finished
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             if entry.isRunning {
-                DownloadRing(progress: entry.fraction, size: 24)
+                DownloadRing(progress: entry.fraction, size: 32).frame(width: 40, height: 40)
             } else if finished {
-                DownloadIcon(entry: entry).frame(width: 24, height: 24)
+                DownloadIcon(entry: entry).frame(width: 40, height: 40)
             }
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(entry.name)
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
+                    .foregroundStyle(theme.foreground)
                     .lineLimit(1)
-                    .truncationMode(.middle)
+                    .truncationMode(.tail)
                 Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.foreground.opacity(0.65))
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if entry.isRunning {
                 Button {
                     model.downloads.cancel(entry)
@@ -58,9 +54,10 @@ private struct FlyoutRow: View {
                 .help("Cancel Download")
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(hovering ? 0.08 : 0)))
+        .padding(.leading, 4)
+        .padding(.trailing, 10)
+        .frame(height: 48)
+        .background(hovering ? theme.itemFill : .clear, in: RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
         .onTapGesture { model.activate(entry) }
         .onHover { hovering = $0 }

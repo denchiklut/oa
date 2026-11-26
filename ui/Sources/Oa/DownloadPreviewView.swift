@@ -95,6 +95,7 @@ struct DownloadPreviewView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let outline = RoundedRectangle(cornerRadius: 16, style: .continuous)
             ZStack {
                 Backdrop(onClick: model.closeDownloadPreview, color: NSColor.black.withAlphaComponent(0.7))
                 KeyTrap(onReturn: {}, onEscape: model.closeDownloadPreview)
@@ -104,7 +105,9 @@ struct DownloadPreviewView: View {
                     if let file = entry.download.file { FileView(file: file).padding(16) }
                 }
                 .background { if let file = entry.download.file { BlurredCopy(file: file) } }
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(outline)
+                // The enlarged blur would otherwise intercept backdrop clicks beyond the visible card.
+                .contentShape(outline)
                 .frame(
                     width: max(geometry.size.width * 0.8 - 50, 100), height: max(geometry.size.height * 0.8 - 50, 100))
             }
@@ -210,6 +213,8 @@ private struct QuickLook: NSViewRepresentable {
 
     func makeNSView(context: Context) -> QLPreviewView {
         let view = QLPreviewView(frame: .zero, style: .compact)!
+        // SwiftUI owns the close in dismantleNSView, including when navigation replaces this view with an image.
+        view.shouldCloseWithWindow = false
         view.autostarts = true
         return view
     }
