@@ -913,7 +913,15 @@ struct TabRow: View {
         )
         // As Arc's: the first click selects, the second opens the field.
         .simultaneousGesture(TapGesture(count: 2).onEnded { if !inCard { beginRename() } })
-        .help(inCard || renaming ? "" : "\(model.title(for: tab))\nDouble-click to rename")
+        .oaToolTip(
+            inCard || renaming || dragged || combining
+                ? nil
+                : OaToolTipConfiguration(
+                    title: model.title(for: tab),
+                    subtitle: "Double-click to rename",
+                    delay: OaToolTipConfiguration.rowDelay,
+                    priority: 0)
+        )
         .onGeometryChange(for: CGSize.self) {
             $0.size
         } action: {
@@ -934,7 +942,12 @@ struct TabRow: View {
                             model.close(tab.id)
                         }
                     }
-                    .help((glyph == .minus ? "Close and Keep Pinned" : "Archive this tab") + (current ? "  ⌘W" : ""))
+                    .oaToolTip(
+                        glyph == .minus ? "Close and Keep Pinned" : "Archive this tab",
+                        shortcut: current ? model.keyBindings.state.shortcut(for: "archiveTab") : nil,
+                        delay: OaToolTipConfiguration.controlDelay,
+                        priority: 1
+                    )
                 }
             }
             .padding(.trailing, 6)

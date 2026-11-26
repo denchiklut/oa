@@ -73,6 +73,7 @@ final class WindowLayoutController: NSViewController {
     /// The Space whose name shows the icon picker its menu asked for.
     var iconPickerSpaceID: UUID?
     @ObservationIgnored private let hover = WindowHoverTracker()
+    @ObservationIgnored let toolTipController = OaToolTipController()
     @ObservationIgnored private var holds: Set<Hold> = []
     @ObservationIgnored private var revealingCurrentTab: Task<Void, Never>?
     @ObservationIgnored private var spaceStyleEditorPopover: (spaceID: UUID, popover: SpaceStyleEditorPopover)?
@@ -85,8 +86,16 @@ final class WindowLayoutController: NSViewController {
         sidebarPresentation = model.sidebarMode == .anchored ? .locked : .hidden
         super.init(nibName: nil, bundle: nil)
         hover.needsUpdate = { [weak self] in self?.updatePresentation() }
+        toolTipController.canPresent = { [weak self] in
+            guard let self else { return false }
+            let transitioningLibrary = libraryProgress > 0 && libraryProgress < 1
+            return !isPaging && !transitioningLibrary && spaceCreationFade == nil && resizingWidth == nil
+                && sidebarPresentation != .hidden && holds.isEmpty
+                && model.commandBar == nil && model.dialog == nil && model.extensionRequest == nil
+        }
         pager.windowProvider = { [weak self] in self?.viewIfLoaded?.window }
         pager.positionUpdateHandler = { [weak self] in
+            self?.toolTipController.dismiss()
             self?.pagerPosition = $0
             self?.updatePull()
             self?.updateDock()
@@ -107,6 +116,7 @@ final class WindowLayoutController: NSViewController {
         pager.trackingStateUpdateHandler = { [weak self] in
             guard let self else { return }
             let paging = pager.isTracking || pager.isAnimating
+            if paging { toolTipController.dismiss() }
             if isPaging != paging { isPaging = paging }
             if pager.isTracking, model.spaceCreation != nil { spaceCreationSwiped = true }
             if !pager.isTracking, !pager.isAnimating, let id = pendingSpaceSelection {
@@ -429,6 +439,7 @@ final class WindowLayoutController: NSViewController {
 
     /// A fade that turns one still running back starts from as far as that one had got.
     private func fadeSpaceCreation(_ fade: SpaceCreationFade) {
+        toolTipController.dismiss()
         guard let window = view.window else { return finishSpaceCreationFade() }
         let now = CACurrentMediaTime()
         let start = runningFade == nil ? now : now - max(0, 0.25 - (now - fadeStart))
@@ -458,18 +469,28 @@ final class WindowLayoutController: NSViewController {
     override func viewDidAppear() {
         super.viewDidAppear()
         guard monitor == nil, let window = view.window else { return }
+        toolTipController.window = window
         window.acceptsMouseMovedEvents = true
-        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .scrollWheel]
+        let events: NSEvent.EventTypeMask = [
+            .mouseMoved, .leftMouseDragged, .scrollWheel, .leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown,
+        ]
         monitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
             guard let self else { return event }
             // A wheel's ticks have no phases, and a scroll view keeps those to itself: the pager gets them here.
             if event.type == .scrollWheel {
+                toolTipController.dismiss()
                 let isWheel = event.phase.isEmpty && event.momentumPhase.isEmpty && event.window === view.window
                 return isWheel && pager.scrollWheel(with: event) ? nil : event
             }
-            // A drag from the sidebar has ended by the time the pointer moves again.
-            if event.type == .mouseMoved { holds.remove(.drag) }
-            trackPointer()
+            if event.type == .mouseMoved {
+                toolTipController.handlePointerMoved()
+                // A drag from the sidebar has ended by the time the pointer moves again.
+                holds.remove(.drag)
+                trackPointer()
+                return event
+            }
+            toolTipController.dismiss()
+            if event.type == .leftMouseDragged { trackPointer() }
             return event
         }
         func observe(
@@ -482,8 +503,18 @@ final class WindowLayoutController: NSViewController {
                 })
         }
         observe(NSWindow.didBecomeKeyNotification, window) { $0.trackPointer() }
-        observe(NSWindow.didResignKeyNotification, window) { $0.trackPointer() }
-        observe(NSMenu.didBeginTrackingNotification, nil) { $0.setHold(.menu, $0.view.window?.isKeyWindow == true) }
+        observe(NSWindow.didResignKeyNotification, window) {
+            $0.toolTipController.dismiss()
+            $0.trackPointer()
+        }
+        observe(NSWindow.willMoveNotification, window) { $0.toolTipController.dismiss() }
+        observe(NSWindow.willStartLiveResizeNotification, window) { $0.toolTipController.dismiss() }
+        observe(NSWindow.willCloseNotification, window) { $0.toolTipController.tearDown() }
+        observe(NSApplication.didResignActiveNotification, nil) { $0.toolTipController.dismiss() }
+        observe(NSMenu.didBeginTrackingNotification, nil) {
+            $0.toolTipController.dismiss()
+            $0.setHold(.menu, $0.view.window?.isKeyWindow == true)
+        }
         observe(NSMenu.didEndTrackingNotification, nil) { $0.setHold(.menu, false) }
         observeModel()
         observeSpaceStyleEditor()
@@ -495,6 +526,7 @@ final class WindowLayoutController: NSViewController {
 
     override func viewDidDisappear() {
         super.viewDidDisappear()
+        toolTipController.tearDown()
         monitor.map(NSEvent.removeMonitor)
         monitor = nil
         appAppearance = nil
@@ -520,6 +552,7 @@ final class WindowLayoutController: NSViewController {
     }
 
     func resizeSidebar(by translation: CGFloat, velocity: CGFloat) {
+        toolTipController.dismiss()
         var state = resize ?? SidebarResizeState(width: model.sidebarWidth, mode: model.sidebarMode)
         let width = state.width(for: translation, velocity: velocity)
         resize = state
@@ -542,11 +575,17 @@ final class WindowLayoutController: NSViewController {
     }
 
     func resetSidebarWidth() {
+        toolTipController.dismiss()
         model.setSidebarWidth(SidebarResizeState.resetWidth)
     }
 
     func setHold(_ hold: Hold, _ held: Bool) {
-        if held { holds.insert(hold) } else { holds.remove(hold) }
+        if held {
+            holds.insert(hold)
+            toolTipController.dismiss()
+        } else {
+            holds.remove(hold)
+        }
         updatePresentation()
     }
 
@@ -604,6 +643,7 @@ final class WindowLayoutController: NSViewController {
     /// As Arc's sidebar: the editor hangs from its outer edge, level with the pointer, with no arrow.
     private func updateSpaceStyleEditorPopover(for presentation: UUID?) {
         guard presentation != spaceStyleEditorPopover?.spaceID else { return }
+        toolTipController.dismiss()
         if let shown = spaceStyleEditorPopover {
             spaceStyleEditorPopover = nil
             shown.popover.close(notifying: false)
@@ -633,8 +673,12 @@ final class WindowLayoutController: NSViewController {
             _ = model.permissionRequest
             _ = model.spaces
             _ = model.spaceCreation
+            _ = (model.commandBar, model.dialog, model.extensionRequest, model.peek)
         } onChange: { [weak self] in
-            Task { @MainActor in self?.observeModel() }
+            Task { @MainActor in
+                self?.toolTipController.dismiss()
+                self?.observeModel()
+            }
         }
         updatePages()
         updatePresentation()
@@ -682,6 +726,7 @@ final class WindowLayoutController: NSViewController {
     private func updatePresentation() {
         let (old, new) = (sidebarPresentation, derivedPresentation)
         guard new != old else { return }
+        toolTipController.dismiss()
         if new == .hidden { iconPickerSpaceID = nil }
         if old == .locked || new == .locked {
             // Animated where the window draws it: set in `withAnimation`, a repeated ⌘S at times drew the new layout
