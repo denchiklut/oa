@@ -75,16 +75,19 @@ struct SidebarPagingContainerView: View {
                         model.pinnedExtensionActions(for: run.space.profileID), sidebarWidth: width,
                         hasFavorites: !favorites.isEmpty)
                     : []
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 0) {
                     if !trayExtensions.isEmpty {
                         PinnedExtensionsGrid(model: model, layout: layout, actions: trayExtensions)
+                            .padding(.top, 8)
+                            .padding(.horizontal, 8)
                     }
                     FavoritesGrid(
                         model: model, layout: layout, slots: FavoritesGrid.slots(favorites, drag: shown ? drag : nil)
                     )
+                    .padding(8)
+                    .frame(width: width)
                     .sidebarDragFrame { if shown { drag?.grid = $0 } }
                 }
-                .padding(8)
                 .frame(width: width)
                 .offset(x: min(max(offset, CGFloat(first) * width), CGFloat(last) * width) - offset)
                 .allowsHitTesting(shown)
