@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// On the responder chain while a sidebar row is renamed inline, so window activation leaves it focused.
-final class SidebarRenameTextField: NSTextField {
+final class InlineRenameTextField: NSTextField {
     var onDidMoveToWindow: (() -> Void)?
 
     override func viewDidMoveToWindow() {
@@ -11,25 +11,24 @@ final class SidebarRenameTextField: NSTextField {
     }
 }
 
-/// An AppKit field for inline sidebar renames, taking first responder directly from Chromium and committing on Return
-/// or keypad Enter without racing focus-loss notifications.
+/// AppKit's field, where SwiftUI's took the keyboard from Chromium only after a delay and raced its own focus loss on
+/// Return. Oa's own: it holds a floating sidebar out while it is edited.
 struct InlineRenameField: NSViewRepresentable {
+    let layout: WindowLayoutController
     let text: String
-    var placeholder = "Title"
-    let textColor: NSColor
     let onCommit: (String) -> Void
     let onCancel: (NSEvent?) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onCommit: onCommit, onCancel: onCancel) }
+    func makeCoordinator() -> Coordinator { Coordinator(layout: layout, onCommit: onCommit, onCancel: onCancel) }
 
-    func makeNSView(context: Context) -> SidebarRenameTextField {
-        let field = SidebarRenameTextField(string: text)
+    func makeNSView(context: Context) -> InlineRenameTextField {
+        let field = InlineRenameTextField(string: text)
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
         field.font = .systemFont(ofSize: 14)
-        field.textColor = textColor
-        field.placeholderString = placeholder
+        field.textColor = NSColor(context.environment.theme.foreground)
+        field.placeholderString = "Title"
         field.usesSingleLineMode = true
         field.cell?.isScrollable = true
         field.cell?.wraps = false
@@ -44,13 +43,13 @@ struct InlineRenameField: NSViewRepresentable {
         return field
     }
 
-    func updateNSView(_ field: SidebarRenameTextField, context: Context) {
-        field.textColor = textColor
+    func updateNSView(_ field: InlineRenameTextField, context: Context) {
+        field.textColor = NSColor(context.environment.theme.foreground)
         context.coordinator.onCommit = onCommit
         context.coordinator.onCancel = onCancel
     }
 
-    static func dismantleNSView(_ field: SidebarRenameTextField, coordinator: Coordinator) {
+    static func dismantleNSView(_ field: InlineRenameTextField, coordinator: Coordinator) {
         field.onDidMoveToWindow = nil
         field.delegate = nil
         coordinator.teardown()
@@ -60,12 +59,17 @@ struct InlineRenameField: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var onCommit: (String) -> Void
         var onCancel: (NSEvent?) -> Void
-        weak var field: SidebarRenameTextField?
+        weak var field: InlineRenameTextField?
+        private weak var layout: WindowLayoutController?
         private var finished = false
         private var clickMonitor: Any?
         private var menuObserver: NSObjectProtocol?
 
-        init(onCommit: @escaping (String) -> Void, onCancel: @escaping (NSEvent?) -> Void) {
+        init(
+            layout: WindowLayoutController, onCommit: @escaping (String) -> Void,
+            onCancel: @escaping (NSEvent?) -> Void
+        ) {
+            self.layout = layout
             self.onCommit = onCommit
             self.onCancel = onCancel
         }
@@ -73,14 +77,13 @@ struct InlineRenameField: NSViewRepresentable {
         func attach() {
             guard !finished else { return }
             if clickMonitor == nil {
+                layout?.setHold(.rename, true)
                 clickMonitor = NSEvent.addLocalMonitorForEvents(
                     matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
                 ) { [weak self] event in
                     MainActor.assumeIsolated { self?.handleClick(event) }
                     return event
                 }
-            }
-            if menuObserver == nil {
                 menuObserver = NotificationCenter.default.addObserver(
                     forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main
                 ) { [weak self] _ in
@@ -91,10 +94,12 @@ struct InlineRenameField: NSViewRepresentable {
         }
 
         func teardown() {
-            if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
-            clickMonitor = nil
+            guard let clickMonitor else { return }
+            NSEvent.removeMonitor(clickMonitor)
+            self.clickMonitor = nil
             if let menuObserver { NotificationCenter.default.removeObserver(menuObserver) }
             menuObserver = nil
+            layout?.setHold(.rename, false)
         }
 
         private func focus() {
@@ -108,16 +113,16 @@ struct InlineRenameField: NSViewRepresentable {
             let inside =
                 event.window === window
                 && window.contentView?.hitTest(event.locationInWindow)?.isDescendant(of: field) == true
-            if !inside { finish(committing: false, text: nil, event: event) }
+            if !inside { finish(event: event) }
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
             switch selector {
             case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
-                finish(committing: true, text: control.stringValue, event: nil)
+                finish(text: control.stringValue)
                 return true
             case #selector(NSResponder.cancelOperation(_:)):
-                finish(committing: false, text: nil, event: nil)
+                finish()
                 return true
             default:
                 return false
@@ -125,18 +130,15 @@ struct InlineRenameField: NSViewRepresentable {
         }
 
         func controlTextDidEndEditing(_ notification: Notification) {
-            finish(committing: false, text: nil, event: nil)
+            finish()
         }
 
-        private func finish(committing: Bool, text: String?, event: NSEvent?) {
+        /// Commits `text`, or cancels without one; `event` is the press that ended the rename.
+        private func finish(text: String? = nil, event: NSEvent? = nil) {
             guard !finished else { return }
             finished = true
             teardown()
-            if committing, let text {
-                onCommit(text)
-            } else {
-                onCancel(event)
-            }
+            if let text { onCommit(text) } else { onCancel(event) }
         }
     }
 }

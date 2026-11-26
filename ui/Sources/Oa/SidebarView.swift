@@ -959,8 +959,6 @@ struct TabRow: View {
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
-        .onChange(of: renaming) { _, active in layout.setHold(.rename, active) }
-        .onDisappear { if renaming { layout.setHold(.rename, false) } }
         .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
         .platformContextMenu(
             isEnabled: inCard
@@ -997,9 +995,7 @@ struct TabRow: View {
     /// As Arc's: Return keeps the name, and Escape or, as the author has seen, a click away gives the old one back.
     /// Oa's own: a name left as it was isn't stored as the tab's.
     private var renameField: some View {
-        InlineRenameField(
-            text: tab.displayTitle, textColor: NSColor(theme.foreground), onCommit: commitRename
-        ) { event in
+        InlineRenameField(layout: layout, text: tab.displayTitle, onCommit: commitRename) { event in
             renameEndingClick = event?.timestamp
             renaming = false
         }
