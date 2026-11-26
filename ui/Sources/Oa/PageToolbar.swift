@@ -16,6 +16,8 @@ struct PageToolbar: View {
     /// As Arc's toolbar when its page changes: the page's last colour, else its host's cached one, else white, until
     /// the page's next sample.
     @State private var initialColor: NSColor?
+    @State private var toolbarWidth: CGFloat = 0
+    @State private var naturalURLWidth: CGFloat = 0
     @Environment(\.theme) private var windowTheme
 
     init(model: WindowModel, layout: WindowLayoutController) {
@@ -32,6 +34,20 @@ struct PageToolbar: View {
         let showsSidebarButton = model.sidebarMode == .noChrome
         let navigationSize = CGSize(width: 32, height: 24)
         let navigationSpacing: CGFloat = 5
+        let leadingWidth: CGFloat =
+            5 + (showsSidebarButton ? navigationSize.width + navigationSpacing : 0) + navigationSize.width * 3
+            + navigationSpacing * 2
+        let trailingFixed: CGFloat = 5 + 32 + 4 + 32
+        // As Arc's `TopBarPanelView`: 36 pt per pinned extension slot, showing the trailing pins that fit between
+        // the centred URL (at least 150 pt) and Site Controls.
+        let pinned = model.pinnedExtensionActions
+        let maxCenter = max(150, toolbarWidth - 2 * leadingWidth - 16)
+        let shownCenter = min(max(naturalURLWidth, 150), maxCenter)
+        let rightRoom = max(0, (toolbarWidth - shownCenter) / 2 - trailingFixed - 8)
+        let maxExtensions = toolbarWidth > 0 ? Int(floor(rightRoom / 36)) : pinned.count
+        let shownExtensions = Array(pinned.suffix(max(0, maxExtensions)))
+        let extensionsWidth = CGFloat(shownExtensions.count) * 36
+        let centerPadding = max(leadingWidth + 12, trailingFixed + extensionsWidth + 12)
         VStack(spacing: 0) {
             ZStack {
                 HStack(spacing: 0) {
@@ -50,6 +66,15 @@ struct PageToolbar: View {
                     }
                     NavigationButtons(page: model.page, size: navigationSize, spacing: navigationSpacing)
                     Spacer()
+                    if !shownExtensions.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(shownExtensions) { action in
+                                PinnedExtensionButton(
+                                    model: model, action: action, size: CGSize(width: 32, height: 28), cornerRadius: 6)
+                            }
+                        }
+                        .padding(.trailing, 4)
+                    }
                     SiteControlsButton(
                         model: model, size: CGSize(width: 32, height: 28), showingSiteControls: $showingSiteControls)
                     SplitViewMenuButton(model: model)
@@ -72,9 +97,28 @@ struct PageToolbar: View {
                     .buttonStyle(.plain)
                     Color.clear.frame(width: 24)
                 }
-                .padding(.horizontal, 130 + (showsSidebarButton ? navigationSize.width + navigationSpacing : 0))
+                .padding(.horizontal, centerPadding)
             }
             .frame(height: 32)
+            .onGeometryChange(for: CGFloat.self) {
+                $0.size.width
+            } action: {
+                toolbarWidth = $0
+            }
+            .background {
+                HStack(spacing: 3) {
+                    Color.clear.frame(width: 24)
+                    ToolbarAddressLabel(url: model.address, placeholder: "Search or Enter URL…")
+                    Color.clear.frame(width: 24)
+                }
+                .fixedSize()
+                .hidden()
+                .onGeometryChange(for: CGFloat.self) {
+                    $0.size.width
+                } action: {
+                    naturalURLWidth = $0
+                }
+            }
             (theme.isDark ? Color.white : .black).opacity(0.05).frame(height: 1)
         }
         .environment(\.theme, theme)

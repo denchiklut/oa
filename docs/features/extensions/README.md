@@ -43,12 +43,19 @@ re-enable an extension or grant it more permissions are declined for now.
   pin. While the pointer is over the section, "Manage" shows at the end of its
   header line and opens `chrome://extensions`. The "…" menu has Manage
   Extensions… and Add Extension… too.
-- **The extension's menu.** A right-click on a tile shows Chrome's own menu
-  for the action as a native menu, with Arc's wording and order for the
-  removal and the pin: Remove from Oa, then Pin or Unpin.
-
-Pinned extensions have no place in the toolbar yet, so a pin only shows as the
-badge.
+- **Sidebar URL pill and tray (Toolbar hidden).** Pinned extensions sit at the
+  end of the sidebar URL field, left of Copy Link and Site Controls, while all
+  of them fit beside a 100 pt host (up to three at the default 241 pt sidebar
+  width), fading in with the field's hover controls. When more are pinned than
+  fit and the Space has Favorites, they move together into an always-visible
+  28 pt tile row directly above Favorites; without Favorites, the URL field
+  keeps as many trailing pins as fit (at least one).
+- **Top toolbar (View ▸ Show Toolbar).** Pinned extensions appear left of Site
+  Controls, showing as many trailing pins as fit in the space beside the
+  centred URL at 36 pt per slot.
+- **The extension's menu.** A right-click on a tile or pinned button shows
+  Chrome's own menu for the action as a native menu, with Arc's wording and
+  order for the removal and the pin: Remove from Oa, then Pin or Unpin.
 
 ## Popups
 
@@ -79,9 +86,8 @@ The stub engine has a small catalog: its pages have an "Add an extension"
 link, and its actions open a placeholder popup that can grow, open a tab and
 close itself.
 
-Not done yet: pinned extensions in the toolbar, side panels, tab groups,
-omnibox keywords, extension commands and their shortcuts, windows an
-extension creates, the re-enable and permissions prompts, install errors and
-unpacked extensions.
+Not done yet: side panels, tab groups, omnibox keywords, extension commands and
+their shortcuts, windows an extension creates, the re-enable and permissions
+prompts, install errors and unpacked extensions.
 
 Return to the [feature inventory](../README.md).

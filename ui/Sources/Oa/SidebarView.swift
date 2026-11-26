@@ -311,6 +311,85 @@ private struct SidebarDockItem: View {
     }
 }
 
+/// Arc's `AppTrayCollectionViewLayout` section 0 for pinned extensions that overflow the URL pill: 28 pt tiles with
+/// 8 pt gaps and 9 pt corners, filling the row evenly with no 4-column cap.
+struct PinnedExtensionsGrid: View {
+    struct Layout {
+        let rows: Int
+        let columns: Int
+        let tileWidth: CGFloat
+
+        init(count: Int, width: CGFloat) {
+            guard count > 0 else {
+                rows = 0
+                columns = 0
+                tileWidth = 0
+                return
+            }
+            let inner = max(0, width - 16)
+            let most = max(1, Int(floor((inner + 8) / 36)))
+            let perRow = min(count, most)
+            rows = max(1, (count + perRow - 1) / perRow)
+            columns = max(1, (count + rows - 1) / rows)
+            tileWidth = (inner - CGFloat(columns - 1) * 8) / CGFloat(columns)
+        }
+
+        var height: CGFloat { rows > 0 ? CGFloat(rows) * 28 + CGFloat(rows - 1) * 8 : 0 }
+
+        func origin(of index: Int) -> CGPoint {
+            CGPoint(x: CGFloat(index % columns) * (tileWidth + 8), y: CGFloat(index / columns) * 36)
+        }
+    }
+
+    let model: WindowModel
+    let layout: WindowLayoutController
+    let actions: [ExtensionAction]
+
+    static func height(for count: Int, in width: CGFloat) -> CGFloat {
+        Layout(count: count, width: width).height
+    }
+
+    var body: some View {
+        let grid = Layout(count: actions.count, width: layout.sidebarWidth)
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
+                let origin = grid.origin(of: index)
+                PinnedExtensionTile(model: model, action: action, width: grid.tileWidth)
+                    .padding(.leading, origin.x)
+                    .padding(.top, origin.y)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: grid.height, alignment: .top)
+    }
+}
+
+private struct PinnedExtensionTile: View {
+    let model: WindowModel
+    let action: ExtensionAction
+    let width: CGFloat
+    @State private var hovering = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        Button {
+            model.runExtension(action.id)
+        } label: {
+            ExtensionActionIcon(action: action)
+                .frame(width: width, height: 28)
+                .background(shape.fill(hovering ? theme.itemHoveredFill : theme.itemFill))
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
+        .overlay { SecondaryClick { model.showExtensionMenu(for: action.id) } }
+        .help(action.tooltip.isEmpty ? action.name : action.tooltip)
+        .accessibilityLabel(action.name)
+    }
+}
+
 /// Arc's grid (`AppTrayCollectionViewLayout`): tiles 47 pt tall with 8 pt gaps filling the row, at most four and
 /// never narrower than 47 pt; columns from the count as `rows = ⌈n / most⌉`, `cols = ⌈n / rows⌉`, the last row
 /// left-aligned. While a drag is over it, the grid makes the slot it would land in and the tiles slide to their new

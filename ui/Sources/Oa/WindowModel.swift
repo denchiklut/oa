@@ -230,6 +230,12 @@ final class WindowModel {
     var profiles: [ProfileState] { engine.allProfiles().map { ProfileState(id: $0, name: profileName($0)) } }
     var extensions: [BrowserExtension] { profileID.map { engine.browserContext(id: $0).extensions.items } ?? [] }
     var extensionActions: [ExtensionAction] { browser?.extensionActions ?? [] }
+    var pinnedExtensionActions: [ExtensionAction] { pinnedExtensionActions(for: profileID) }
+
+    func pinnedExtensionActions(for profileID: UUID?) -> [ExtensionAction] {
+        guard let profileID, let actions = browsers[profileID]?.extensionActions else { return [] }
+        return actions.filter { $0.pinnedPosition != nil }.sorted { $0.pinnedPosition! < $1.pinnedPosition! }
+    }
     var extensionPopup: ExtensionPopup? { browsers.values.lazy.compactMap(\.extensionPopup).first }
     /// What the prompt draws: the answered request stays until its popover has closed.
     var promptedPermissionRequest: PagePermissionRequest? { permissionRequest ?? answeredPermissionRequest?.request }
