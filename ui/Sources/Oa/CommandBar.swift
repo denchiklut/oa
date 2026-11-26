@@ -14,13 +14,15 @@ final class CommandBar {
         case open(URL, background: Bool)
         case openInSplitView(URL)
         case switchTo(UUID)
+        case runCommand(CommandAction)
     }
 
-    /// One of Chromium's matches, or one of the profile's tabs as Arc's sidebar offers them.
+    /// One of Chromium's matches, one of the profile's tabs, or a Type Travel command.
     struct Row: Identifiable, Equatable {
         enum Source: Equatable {
             case match(AutocompleteMatch)
             case tab(CommandBarRanking.Tab)
+            case command(CommandAction)
         }
 
         let source: Source
@@ -28,7 +30,12 @@ final class CommandBar {
         var kind: AutocompleteMatch.Kind? {
             if case .match(let match) = source { match.kind } else { nil }
         }
-        var isTab: Bool { kind == nil }
+        var isTab: Bool {
+            if case .tab = source { true } else { false }
+        }
+        var isCommand: Bool {
+            if case .command = source { true } else { false }
+        }
         var isHistory: Bool { kind == .historyURL || kind == .historyTitle }
         var isNavigation: Bool { isTab || isHistory || kind == .urlWhatYouTyped || kind == .navSuggest }
 
@@ -36,21 +43,24 @@ final class CommandBar {
             switch source {
             case .match(let match): match.url
             case .tab(let tab): tab.url
+            case .command: nil
             }
         }
 
         var title: String {
             switch source {
             case .tab(let tab): tab.title
+            case .command(let command): command.title
             case .match(let match):
                 isHistory || kind == .navSuggest
                     ? (match.description.isEmpty ? match.contents : match.description) : match.contents
             }
         }
 
-        /// As ASE2's `DedupKey`: a search by its text and a page by its readable URL, with a tab apart from its
-        /// page; ASE2 makes those two one row after the sort.
+        /// As ASE2's `DedupKey`: a search by its text, a page by its readable URL, a tab apart from its page, and a
+        /// command by its ID.
         var id: String {
+            if case .command(let command) = source { return "command " + command.id }
             let address = CommandBarRanking.readable(url).lowercased()
             return isTab ? "tab " + address : isNavigation ? "url " + address : "search " + title.lowercased()
         }
@@ -93,6 +103,7 @@ final class CommandBar {
     /// Off in an incognito window, which neither applies the profile's picks nor records its own, as seen in Arc.
     @ObservationIgnored private let usesPicks: Bool
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
+    @ObservationIgnored private let commands: [CommandAction]
     @ObservationIgnored private let searchEngines: () -> [SearchEngine]
     @ObservationIgnored private let dominantColor: (_ host: String) async -> NSColor?
     @ObservationIgnored private var startedFresh = false
@@ -102,7 +113,8 @@ final class CommandBar {
 
     init(
         destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, profileID: UUID,
-        picks: CommandBarPicks, usesPicks: Bool = true, searchEngines: @escaping () -> [SearchEngine],
+        picks: CommandBarPicks, usesPicks: Bool = true, commands: [CommandAction] = [],
+        searchEngines: @escaping () -> [SearchEngine],
         dominantColor: @escaping (_ host: String) async -> NSColor?,
         tabs: @escaping () -> [CommandBarRanking.Tab]
     ) {
@@ -112,6 +124,7 @@ final class CommandBar {
         self.profileID = profileID
         self.picks = picks
         self.usesPicks = usesPicks
+        self.commands = commands
         self.tabs = tabs
         self.searchEngines = searchEngines
         self.dominantColor = dominantColor
@@ -197,7 +210,7 @@ final class CommandBar {
             guard !text.isEmpty, address.count > text.count, address.lowercased().hasPrefix(text.lowercased())
             else { return nil }
             return String(address.dropFirst(text.count))
-        case nil: return nil
+        case .command, nil: return nil
         }
     }
 
@@ -325,6 +338,9 @@ final class CommandBar {
         if !text.isEmpty, usesPicks { picks.record(row.id, for: text, in: profileID) }
         switch row.source {
         case .tab(let tab): perform(.switchTo(tab.tab.id))
+        case .command(let command):
+            if usesPicks { picks.recordCommand(command.id, in: profileID) }
+            perform(.runCommand(command))
         case .match(let match):
             guard let url = match.url else { return }
             if modifiers.contains(.option), destination == .newTab {
@@ -335,8 +351,9 @@ final class CommandBar {
         }
     }
 
-    /// As Arc: open tabs only when the bar makes a new tab, as Switch to Tab. In Site Search only the engine's search
-    /// for the text and its past searches, as Arc's `isEligibleInSiteSearch`.
+    /// As Arc: open tabs only when the bar makes a new tab, as Switch to Tab. Commands show for non-empty queries in
+    /// both ⌘T and ⌘L outside Site Search. In Site Search only the engine's search for the text and its past searches,
+    /// as Arc's `isEligibleInSiteSearch`.
     private func rank() {
         let answered = !text.isEmpty && autocomplete.input?.keyword == scope?.keyword
         func kept(_ matches: [AutocompleteMatch]) -> [AutocompleteMatch] {
@@ -346,6 +363,8 @@ final class CommandBar {
         let ranked = CommandBarRanking.rank(
             query: text, matches: kept(autocomplete.matches), additionalMatches: kept(autocomplete.additionalMatches),
             tabs: destination == .newTab && scope == nil ? tabs() : [],
+            commands: scope == nil ? commands : [],
+            commandUsage: usesPicks ? picks.commandUsage(in: profileID) : [:],
             lastPick: usesPicks ? picks.pick(for: text, in: profileID) : nil, now: .now)
         if ranked != rows { rows = ranked }
         let output = suggestedField.string
@@ -527,9 +546,12 @@ struct CommandBarView: View {
         if case .tab(let tab) = row.source { model.favicon(for: tab.tab) } else { nil }
     }
 
-    /// As measured on Arc: the magnifier stays while the chosen row is an open tab.
+    /// As measured on Arc: the magnifier stays while the chosen row is an open tab or a command.
     private func fieldIcon(_ row: CommandBar.Row?) -> String {
-        if case .tab? = row?.source { "magnifyingglass" } else { icon(for: row) }
+        switch row?.source {
+        case .tab, .command: "magnifyingglass"
+        default: icon(for: row)
+        }
     }
 
     private func icon(for row: CommandBar.Row?) -> String {
@@ -564,7 +586,20 @@ private struct CommandBarRow: View {
         let box = RoundedRectangle(cornerRadius: 6, style: .continuous)
         HStack(spacing: 9) {
             Group {
-                if let favicon {
+                if case .command(let command) = row.source {
+                    if let extIcon = command.extensionIcon {
+                        Image(nsImage: extIcon).resizable().scaledToFit()
+                            .frame(width: 16, height: 16)
+                            .frame(width: 24, height: 24)
+                            .background(selected ? Color.white : .clear, in: box)
+                    } else {
+                        Image(systemName: command.icon)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(selected ? focus : CommandBarInk.color(isDark, 0.65, 0.78))
+                            .frame(width: 24, height: 24)
+                            .background(selected ? Color.white : CommandBarInk.color(isDark, 0.06, 0.1), in: box)
+                    }
+                } else if let favicon {
                     // As Arc: the chosen row's favicon sits on a white tile.
                     Image(nsImage: favicon).resizable().scaledToFit()
                         .frame(width: 16, height: 16)
@@ -578,6 +613,20 @@ private struct CommandBarRow: View {
             }
             Text(row.title)
                 .lineLimit(1)
+            if case .command(let command) = row.source, let capsule = command.capsule {
+                HStack(spacing: 4) {
+                    if let icon = capsule.icon {
+                        SpaceIconGlyph(icon: icon)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    Text(capsule.title)
+                        .lineLimit(1)
+                }
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 7)
+                .frame(height: 22)
+                .background(selected ? Color.white.opacity(0.2) : CommandBarInk.color(isDark, 0.07, 0.12), in: box)
+            }
             if let address {
                 Text("— " + address)
                     .lineLimit(1)
@@ -593,6 +642,15 @@ private struct CommandBarRow: View {
                     .foregroundStyle(selected ? focus : CommandBarInk.color(isDark, 0.5, 0.66))
                     .frame(width: 24, height: 24)
                     .background(selected ? Color.white : CommandBarInk.color(isDark, 0.05, 0.05), in: box)
+            } else if case .command(let command) = row.source, let shortcut = command.shortcut {
+                Text(shortcut.symbols.joined())
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(selected ? Color.white : CommandBarInk.color(isDark, 0.55, 0.68))
+                    .padding(.horizontal, 7)
+                    .frame(height: 24)
+                    .background(
+                        selected ? Color.white.opacity(0.2) : CommandBarInk.color(isDark, 0.06, 0.1),
+                        in: RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
         }
         .font(.system(size: 13, weight: .medium))

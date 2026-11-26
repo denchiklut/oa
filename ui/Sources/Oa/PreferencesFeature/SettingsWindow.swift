@@ -68,8 +68,14 @@ final class SettingsWindowController: NSWindowController {
     /// binding on its detail side, and the list left where it is.
     func showShortcuts(selecting identifier: String) {
         showWindow(nil)
-        tabs.selectedTabViewItemIndex = 3
+        tabs.selectedTabViewItemIndex = SettingsPane.shortcuts.rawValue
         state.selectedKeyBindableActionIdentifier = identifier
+    }
+
+    func showPane(_ pane: SettingsPane, showAirTrafficControl: Bool = false) {
+        showWindow(nil)
+        tabs.selectedTabViewItemIndex = pane.rawValue
+        if showAirTrafficControl { state.showsAirTrafficControl = true }
     }
 
     /// As Arc: an open Settings comes back in front, key, once a create sheet ends with no question about Spaces
@@ -153,6 +159,8 @@ final class PreferencesState {
     var currentProfileID = SidebarProfile.defaultID
     /// Arc's `initiallySelectedKeyBindableActionIdentifier`, and the Shortcuts pane's selection after.
     var selectedKeyBindableActionIdentifier: String?
+    /// Arc's `isLinkRoutingPresented` when Air Traffic Control is opened from the command bar.
+    var showsAirTrafficControl = false
     private(set) var profiles: [ProfileState] = []
     @ObservationIgnored private let engine: any BrowserApplication
 

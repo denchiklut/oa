@@ -297,6 +297,10 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
 
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
+    func showSettingsPane(_ pane: SettingsPane, showAirTrafficControl: Bool = false) {
+        settings.showPane(pane, showAirTrafficControl: showAirTrafficControl)
+    }
+    func openChromiumSettings(_ page: ChromiumSettings, in profileID: UUID) { openSettings(page, in: profileID) }
     @objc func toggleToolbar(_ sender: Any?) { PageToolbar.isShown.toggle() }
     @objc func setAutomaticAppearance(_ sender: Any?) { AppAppearance.set(nil) }
     @objc func setLightAppearance(_ sender: Any?) { AppAppearance.set(.aqua) }
