@@ -40,8 +40,10 @@
 namespace oa {
 namespace {
 
-// Chrome's toolbar button: its 16 pt icon with room for the badge.
-constexpr gfx::Size kIconSize(28, 28);
+// As ArcCore: 32 pt matching ExtensionAction::ActionIconSize() so there is no
+// outer padding and the UI scales the icon cleanly to 16 pt with the badge
+// inset.
+constexpr gfx::Size kIconSize(32, 32);
 
 }  // namespace
 
