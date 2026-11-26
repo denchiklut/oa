@@ -8,31 +8,56 @@ struct SidebarView: View {
     @State private var overLibraryButton = false
     @State private var overFlyout = false
     @State private var showingFlyout = false
+    @State private var flyoutHeight: CGFloat = 0
     @State private var pointerInside = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        let recent = showingFlyout ? model.downloads.flyoutEntries : []
+        let flyoutVisible = !recent.isEmpty
         VStack(spacing: 0) {
-            SidebarHeader(model: model, layout: layout)
-            SidebarPagingContainerView(model: model, layout: layout)
+            VStack(spacing: 0) {
+                SidebarHeader(model: model, layout: layout)
+                SidebarPagingContainerView(model: model, layout: layout, showsDownloads: flyoutVisible)
+            }
+            .mask(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    Color.black
+                    LinearGradient(
+                        colors: [.black, flyoutVisible ? .clear : .black], startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(height: 112)
+                    (flyoutVisible ? Color.clear : Color.black)
+                        .frame(height: max(0, flyoutHeight - 6))
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if flyoutVisible {
+                    DownloadsFlyout(model: model, entries: recent)
+                        .onGeometryChange(for: CGFloat.self) {
+                            $0.size.height
+                        } action: {
+                            flyoutHeight = $0
+                        }
+                        .onHover { overFlyout = $0 }
+                        .onDisappear { overFlyout = false }
+                        .offset(y: 6)
+                        .transition(reduceMotion ? .opacity : .offset(y: 12).combined(with: .opacity))
+                }
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: flyoutVisible)
             spaces
         }
         .overlay(alignment: .trailing) {
             EdgeFeedbackView(progress: layout.spaceCreationPull.progress, reveal: layout.spaceCreationPull.reveal)
         }
-        .overlay(alignment: .bottomLeading) {
-            if showingFlyout {
-                DownloadsFlyout(model: model)
-                    .onHover { overFlyout = $0 }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 40)
-            }
-        }
         // As Arc's hover regions: the button or the flyout keeps it up, and it outlasts the gap between them.
-        .onChange(of: overLibraryButton || overFlyout) { _, over in
-            guard !over else { return showingFlyout = true }
-            Task {
+        .task(id: overLibraryButton || overFlyout) {
+            if overLibraryButton || overFlyout {
+                showingFlyout = true
+            } else if showingFlyout {
                 try? await Task.sleep(for: .milliseconds(300))
-                if !overLibraryButton, !overFlyout { showingFlyout = false }
+                if !Task.isCancelled { showingFlyout = false }
             }
         }
         // The sidebar stays mounted under the Library, where the pointer's leaving isn't reported.

@@ -46,6 +46,10 @@ final class DownloadsStore {
 
     var running: [Entry] { entries.filter(\.isRunning) }
 
+    var flyoutEntries: [Entry] {
+        Array(entries.lazy.filter { $0.download.status != .finished || $0.fileExists }.prefix(4))
+    }
+
     /// One ring for all that run, as Arc's Library button has: nil when none does.
     var progress: Double? {
         let running = running
