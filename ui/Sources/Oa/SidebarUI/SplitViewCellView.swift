@@ -13,11 +13,9 @@ struct SplitViewCellView: View {
     let spaceID: UUID
     @State private var hovering = false
     @State private var renaming = false
-    @State private var draft = ""
     @State private var pressed = false
     @State private var capsules: [UUID: CGRect] = [:]
     @State private var pickingIcon = false
-    @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
 
@@ -44,21 +42,15 @@ struct SplitViewCellView: View {
                 .frame(width: 24, height: 24)
                 Group {
                     if renaming {
-                        TextField("Title", text: $draft)
-                            .textFieldStyle(.plain)
-                            .focused($renameFocused)
-                            .onSubmit {
-                                model.renameSplitView(splitID, to: draft)
-                                renaming = false
-                            }
-                            .onExitCommand { renaming = false }
-                            .endsOnClickAway { _ in renaming = false }
-                            // After the menu has closed and given the window back its first responder.
-                            .task {
-                                try? await Task.sleep(for: .milliseconds(100))
-                                renameFocused = true
-                            }
-                            .onChange(of: renameFocused) { _, focused in if !focused { renaming = false } }
+                        InlineRenameField(
+                            text: title ?? "\(tabs.count) Tabs", textColor: NSColor(theme.foreground)
+                        ) { value in
+                            model.renameSplitView(splitID, to: value)
+                            renaming = false
+                        } onCancel: { _ in
+                            renaming = false
+                        }
+                        .frame(height: 19)
                     } else {
                         Text(title ?? "\(tabs.count) Tabs").lineLimit(1).truncationMode(.tail)
                     }
@@ -143,8 +135,12 @@ struct SplitViewCellView: View {
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
+        .onChange(of: renaming) { _, active in layout.setHold(.rename, active) }
         .sidebarDragFrame { drag?.rows[splitID] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) }
-        .onDisappear { drag?.rows[splitID] = nil }
+        .onDisappear {
+            drag?.rows[splitID] = nil
+            if renaming { layout.setHold(.rename, false) }
+        }
         .spaceMenuExclusion()
         .contextMenu {
             Button("Share Split View…") {}.disabled(true)
@@ -175,10 +171,7 @@ struct SplitViewCellView: View {
             // As seen in Arc: the picker hangs below the cell, its arrow at the first tab's favicon.
             Button("Change Icon…") { Task { pickingIcon = true } }
             // As seen in Arc: the field starts with the split's count, all selected.
-            Button("Rename…") {
-                draft = model.state.splitView(splitID)?.title ?? "\(tabs.count) Tabs"
-                renaming = true
-            }
+            Button("Rename…") { renaming = true }
             Divider()
             Button("Duplicate") { model.duplicateSplitView(splitID) }
             SplitViewMoveMenu(model: model, splitID: splitID)
