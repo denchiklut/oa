@@ -602,10 +602,11 @@ final class WindowModel {
         let autocomplete = autocompletes[profileID] ?? context.makeAutocomplete()
         autocompletes[profileID] = autocomplete
         let preferences = context.preferences
+        let commands = CommandBarActions.snapshot(for: self)
         let bar = CommandBar(
             destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
             currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks,
-            usesPicks: sidebarContext != .incognito,
+            usesPicks: sidebarContext != .incognito, commands: commands,
             searchEngines: { preferences.activeSearchEngines },
             dominantColor: { await context.siteSearchDominantColor(host: $0) }
         ) { [weak self] in self?.commandBarTabs ?? [] }
@@ -734,6 +735,8 @@ final class WindowModel {
             store.edit { $0.insertTab(tab, atTopOf: selectedSpaceID) }
             createdDates[tab.id] = .now
             ensurePage(tab.id)
+        case .runCommand(let command):
+            execute(command)
         case .open(let url, _):
             guard destination == .currentTab, let tabID = selectedTabID else { return newTab(url) }
             if let peek {
@@ -748,6 +751,80 @@ final class WindowModel {
                 pendingURLs[tabID] = url
             }
         }
+    }
+
+    var allLivePages: [any Page] { store.windows.flatMap { $0.pages.values } }
+
+    private func execute(_ command: CommandAction) {
+        let dismissBarWindow = little?.isPresented == false
+        switch command.kind {
+        case .menuItem(let id):
+            if let item = CommandBarActions.menuItem(withTypeTravelID: id), let action = item.action {
+                NSApp.sendAction(action, to: item.target, from: item)
+            }
+        case .openPreferencePane(let pane):
+            (NSApp.delegate as? ApplicationDelegate)?.showSettingsPane(pane)
+        case .openChromiumSettings(let page):
+            (NSApp.delegate as? ApplicationDelegate)?.openChromiumSettings(
+                page, in: shownProfileID ?? SidebarProfile.defaultID)
+        case .openAirTrafficControl:
+            (NSApp.delegate as? ApplicationDelegate)?.showSettingsPane(.links, showAirTrafficControl: true)
+        case .focusSpace(let spaceID):
+            selectSpace(spaceID)
+        case .moveToSpace(let spaceID):
+            if let tabID = selectedTabID { moveItems([tabID], toSpace: spaceID) }
+        case .browserExtension(let extID):
+            runExtension(extID)
+        case .addExtension:
+            addExtension()
+        case .manageExtensions:
+            manageExtensions()
+        case .renameCurrentTab:
+            guard let tabID = selectedTabID, let tab = state.tree.tab(tabID), let window else { break }
+            DialogSheet.present(on: window) { [weak self] dismiss in
+                TextInputDialog(
+                    title: "Rename Tab…", text: tab.displayTitle, placeholder: "Keep it short and sweet!",
+                    confirmTitle: "Rename"
+                ) { title in
+                    self?.renameTab(tabID, to: title)
+                    dismiss()
+                } onCancel: {
+                    dismiss()
+                }
+            }
+        case .duplicateCurrentTab:
+            if let tabID = selectedTabID { duplicate(tabID) }
+        case .resetCurrentTab:
+            if let tabID = selectedTabID, let url = state.tree.tab(tabID)?.url { livePage(for: tabID)?.load(url) }
+        case .moveToFavorites, .removeFromFavorites:
+            toggleFavorite()
+        case .muteAllTabs:
+            setAllTabsMuted(true)
+        case .unmuteAllTabs:
+            setAllTabsMuted(false)
+        case .convertToHorizontalSplitView, .convertToVerticalSplitView:
+            if let tabID = selectedTabID, let splitID = state.splitViewID(containing: tabID) {
+                flipSplitViewLayoutOrientation(splitID)
+            }
+        case .undoAction:
+            window?.undoManager?.undo()
+        case .redoAction:
+            window?.undoManager?.redo()
+        }
+        if dismissBarWindow { window?.close() }
+    }
+
+    private func setAllTabsMuted(_ muted: Bool) {
+        var changed: [UUID] = []
+        for model in store.windows {
+            for (tabID, page) in model.pages where muted ? (page.isAudible && !page.isMuted) : page.isMuted {
+                page.isMuted = muted
+                changed.append(tabID)
+            }
+        }
+        guard !changed.isEmpty else { return }
+        let status: SidebarTab.MuteStatus = muted ? .mute : .allowAudio
+        store.edit { state in for tabID in changed { state.setMuteStatus(tabID, to: status) } }
     }
 
     func select(_ tabID: UUID, restoring sessionID: PageSessionID? = nil, keepingMultiSelection: Bool = false) {

@@ -27,6 +27,14 @@ enum CommandBarRanking {
         let selectedAt: Date
     }
 
+    /// As Arc's `TypeTravelUsage`: the last 15 execution dates and total frequency per profile.
+    struct CommandUsage: Codable, Equatable {
+        static let maxExecuted = 15
+
+        var executed: [Date] = []
+        var frequency = 0
+    }
+
     /// The `maxSuggestions` Arc's bar gives ASE2. Where Arc cuts the list wasn't traced, so the cut after ranking is
     /// Oa's own.
     static let maxSuggestions = 15
@@ -77,33 +85,36 @@ enum CommandBarRanking {
         .saveLevel: Weighting(category: .save, weight: 3, lowerIsBetter: true, defaultValue: 8),
     ]
 
-    /// ASE2's boosts that Oa's rows can get, with its `BoostConfiguration` score and weight. `customTitlePrefix` is
-    /// left out: an Oa tab has no custom title.
+    /// ASE2's boosts that Oa's rows can get, with its `BoostConfiguration` score and weight.
     private enum Boost {
-        case exactBaseDomain, exactURL, baseDomain, chromiumSpecialSearchFunction
-        case autocompleteDefault, veryRecentTabOrDocumentBoost, autocompleteSearchOnly
+        case exactBaseDomain, exactHotWord, exactURL, baseDomain, chromiumSpecialSearchFunction
+        case typeTravelPrefixForLongQuery, autocompleteDefault, customTitlePrefix
+        case veryRecentTabOrDocumentBoost, recentlyUseTypeTravel, autocompleteSearchOnly
 
         var score: Double {
             switch self {
-            case .exactBaseDomain: 15
+            case .exactBaseDomain, .exactHotWord: 15
             case .autocompleteSearchOnly: 2
-            case .exactURL, .baseDomain, .chromiumSpecialSearchFunction, .autocompleteDefault,
-                .veryRecentTabOrDocumentBoost:
+            case .exactURL, .baseDomain, .chromiumSpecialSearchFunction, .typeTravelPrefixForLongQuery,
+                .autocompleteDefault, .customTitlePrefix, .veryRecentTabOrDocumentBoost, .recentlyUseTypeTravel:
                 3
             }
         }
 
         var weight: Double {
             switch self {
-            case .exactBaseDomain: 100
-            case .exactURL, .baseDomain, .chromiumSpecialSearchFunction: 40
-            case .autocompleteDefault, .veryRecentTabOrDocumentBoost, .autocompleteSearchOnly: 15
+            case .exactBaseDomain, .exactHotWord: 100
+            case .exactURL, .baseDomain, .chromiumSpecialSearchFunction, .typeTravelPrefixForLongQuery: 40
+            case .autocompleteDefault, .customTitlePrefix, .veryRecentTabOrDocumentBoost, .recentlyUseTypeTravel,
+                .autocompleteSearchOnly:
+                15
             }
         }
     }
 
     private static func archetype(_ row: CommandBar.Row) -> Double {
         switch row.source {
+        case .command: 104
         case .tab: 101
         case .match(let match):
             switch match.kind {
@@ -127,10 +138,11 @@ enum CommandBarRanking {
 
     static func rank(
         query: String, matches: [AutocompleteMatch], additionalMatches: [AutocompleteMatch], tabs: [Tab],
-        lastPick: Pick?, now: Date
+        commands: [CommandAction] = [], commandUsage: [String: CommandUsage] = [:], lastPick: Pick?, now: Date
     ) -> [CommandBar.Row] {
         guard !query.isEmpty else { return recent(tabs) }
         let lowered = query.lowercased()
+        let queryTokens = lowered.components(separatedBy: " ").filter { !$0.isEmpty }
         var candidates: [Candidate] = []
         // As Arc's sidebar provider: the Space's tabs and the profile's Favorites whose title or whole URL holds
         // the query.
@@ -143,6 +155,18 @@ enum CommandBarRanking {
             // As Arc's `SidebarTab.timeLastActiveAt`.
             candidate.values[.lastNavigated] = tab.tab.viewedAt.map { now.timeIntervalSince($0) }
             candidate.values[.saveLevel] = tab.saveLevel.map(Double.init)
+            candidates.append(candidate)
+        }
+        // As Arc's TypeTravel provider: matched enabled commands with their bump and per-profile usage.
+        for command in commands where command.matches(lowercaseQuery: lowered, queryTokens: queryTokens) {
+            var candidate = Candidate(row: CommandBar.Row(source: .command(command)))
+            if command.bump != 0 { candidate.values[.typeTravelCandidateBump] = command.bump }
+            if let usage = commandUsage[command.id] {
+                candidate.values[.frequencyEver] = Double(usage.frequency)
+                if let last = usage.executed.last {
+                    candidate.values[.lastNavigated] = now.timeIntervalSince(last)
+                }
+            }
             candidates.append(candidate)
         }
         // As Arc's Chromium provider: of the additional results only pages and what was typed, without a rank.
@@ -163,21 +187,39 @@ enum CommandBarRanking {
         }
         for index in candidates.indices {
             let row = candidates[index].row
-            let title = String(row.title.lowercased().prefix(512))
-            let url = row.isNavigation ? String(readable(row.url).lowercased().prefix(512)) : ""
-            if !lowered.isEmpty {
-                if let found = firstMatch(lowered, in: url) {
-                    candidates[index].values[.urlMatchScore] = found.score
-                    candidates[index].values[.urlMatchPosition] = found.position
-                    candidates[index].values[.urlMatchPercentage] = Double(lowered.count) / Double(url.count)
+            if case .command(let command) = row.source {
+                var bestScore = 0.0
+                var bestPosition = Double.infinity
+                var bestPercentage = 0.0
+                for property in command.searchableProperties {
+                    guard let found = firstMatch(lowered, in: property) else { continue }
+                    if found.score > bestScore { bestScore = found.score }
+                    if found.position < bestPosition { bestPosition = found.position }
+                    let percentage = Double(lowered.count) / Double(property.count)
+                    if percentage > bestPercentage { bestPercentage = percentage }
                 }
-                if let found = firstMatch(lowered, in: title) {
-                    candidates[index].values[.titleMatchScore] = found.score
-                    candidates[index].values[.titleMatchPosition] = found.position
-                    candidates[index].values[.titleMatchPercentage] = Double(lowered.count) / Double(title.count)
+                if bestScore > 0 {
+                    candidates[index].values[.hotWordsScore] = bestScore
+                    candidates[index].values[.hotWordsPosition] = bestPosition
+                    candidates[index].values[.hotWordsPercentage] = bestPercentage
+                }
+            } else {
+                let title = String(row.title.lowercased().prefix(512))
+                let url = row.isNavigation ? String(readable(row.url).lowercased().prefix(512)) : ""
+                if !lowered.isEmpty {
+                    if let found = firstMatch(lowered, in: url) {
+                        candidates[index].values[.urlMatchScore] = found.score
+                        candidates[index].values[.urlMatchPosition] = found.position
+                        candidates[index].values[.urlMatchPercentage] = Double(lowered.count) / Double(url.count)
+                    }
+                    if let found = firstMatch(lowered, in: title) {
+                        candidates[index].values[.titleMatchScore] = found.score
+                        candidates[index].values[.titleMatchPosition] = found.position
+                        candidates[index].values[.titleMatchPercentage] = Double(lowered.count) / Double(title.count)
+                    }
                 }
             }
-            candidates[index].boosts = boosts(for: candidates[index], query: lowered)
+            candidates[index].boosts = boosts(for: candidates[index], query: lowered, commandUsage: commandUsage)
         }
         score(&candidates)
         var rows = dedup(candidates).sorted { $0.score > $1.score }
@@ -231,10 +273,28 @@ enum CommandBarRanking {
     /// Two of its conditions are narrowed to Arc's live orders, which the decoded ones don't reproduce: the typed
     /// search gets no `autocompleteSearchOnly`, as a matching page always stood above it, and a navigation
     /// suggestion gets no `baseDomain`, as "quillbot.com" stood below the history rows for "quill".
-    private static func boosts(for candidate: Candidate, query: String) -> [Boost] {
+    private static func boosts(
+        for candidate: Candidate, query: String, commandUsage: [String: CommandUsage]
+    ) -> [Boost] {
         let row = candidate.row
         var result: [Boost] = []
-        if row.isTab, candidate.value(.lastNavigated) < 3600 { result.append(.veryRecentTabOrDocumentBoost) }
+        if case .command(let command) = row.source {
+            guard !query.isEmpty else { return result }
+            if command.searchableProperties.contains(query) { result.append(.exactHotWord) }
+            if query.count >= 3, command.searchableProperties.contains(where: { $0.hasPrefix(query) }) {
+                result.append(.typeTravelPrefixForLongQuery)
+            }
+            if (commandUsage[command.id]?.executed.count ?? 0) > 1 { result.append(.recentlyUseTypeTravel) }
+            return result
+        }
+        if case .tab(let tab) = row.source {
+            if candidate.value(.lastNavigated) < 3600 { result.append(.veryRecentTabOrDocumentBoost) }
+            if !query.isEmpty, let custom = tab.tab.customTitle?.lowercased(), !custom.isEmpty,
+                custom.hasPrefix(query)
+            {
+                result.append(.customTitlePrefix)
+            }
+        }
         guard !query.isEmpty else { return result }
         guard row.isNavigation else {
             if row.kind != .searchWhatYouTyped, row.title == query || row.title.hasPrefix(query) {
@@ -293,9 +353,10 @@ enum CommandBarRanking {
         // ASE2's next pass moves the current page off the top when `derankCurrentItemURLEnabled` is set. In Arc's
         // live runs the current page stayed first, so the flag reads as off and the pass is left out.
         applyPreferredMaxRanks(&rows, query: query)
-        // ASE2 asks that the query isn't a URL, which is read here as Chromium offering no typed URL, and its
-        // target index wasn't decoded; Arc's live run put the typed search first.
-        if query.contains(" "), !rows.contains(where: { $0.row.kind == .urlWhatYouTyped }),
+        // ASE2 asks that the query isn't a URL, which is read here as Chromium offering no typed URL, and keeps a top
+        // Type Travel command in place (Arc 1.174.3 `0x101d74074`, `cmp w0, #7`).
+        if query.contains(" "), rows.first?.row.isCommand != true,
+            !rows.contains(where: { $0.row.kind == .urlWhatYouTyped }),
             let index = rows.firstIndex(where: { $0.row.kind == .searchWhatYouTyped })
         {
             rows.insert(rows.remove(at: index), at: 0)
@@ -396,40 +457,71 @@ enum CommandBarRanking {
     static func readable(_ url: URL?) -> String { url.map { readable($0.absoluteString) } ?? "" }
 }
 
-/// As Arc's `queriesToSelectedArchetype` in `StorableCommandBarAdditionalRanking.json`: by profile, the row picked
-/// for a query, which ASE2 promotes for 24 hours. Older picks no longer count, so they are dropped, and so are a
-/// profile's when it is gone, both as Oa's own: Arc keeps them.
+/// As Arc's `queriesToSelectedArchetype` and `typeTravelUsage` in `StorableCommandBarAdditionalRanking.json`: by
+/// profile, the row picked for a query (promoted for 24 hours) and command execution counts. Older picks no longer
+/// count, so they are dropped, and so are a profile's entries when it is gone, both as Oa's own: Arc keeps them.
 @MainActor
 final class CommandBarPicks {
+    private struct Store: Codable {
+        var picks: [String: [String: CommandBarRanking.Pick]] = [:]
+        var commandUsage: [String: [String: CommandBarRanking.CommandUsage]] = [:]
+    }
+
     private let url: URL
-    /// By profile ID string, so the file is a JSON object.
-    private var picks: [String: [String: CommandBarRanking.Pick]]
+    private var store: Store
 
     init(directory: URL) {
         url = directory.appendingPathComponent("command-bar.json")
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        picks =
-            (try? Data(contentsOf: url)).flatMap {
-                try? decoder.decode([String: [String: CommandBarRanking.Pick]].self, from: $0)
-            } ?? [:]
+        if let data = try? Data(contentsOf: url) {
+            if let decoded = try? decoder.decode(Store.self, from: data) {
+                store = decoded
+            } else if let legacy = try? decoder.decode([String: [String: CommandBarRanking.Pick]].self, from: data) {
+                store = Store(picks: legacy)
+            } else {
+                store = Store()
+            }
+        } else {
+            store = Store()
+        }
     }
 
     func pick(for query: String, in profileID: UUID) -> CommandBarRanking.Pick? {
-        picks[profileID.uuidString]?[query]
+        store.picks[profileID.uuidString]?[query]
+    }
+
+    func commandUsage(in profileID: UUID) -> [String: CommandBarRanking.CommandUsage] {
+        store.commandUsage[profileID.uuidString] ?? [:]
     }
 
     func record(_ key: String, for query: String, in profileID: UUID) {
         let now = Date.now
-        picks[profileID.uuidString, default: [:]][query] = CommandBarRanking.Pick(key: key, selectedAt: now)
-        picks = picks.mapValues { $0.filter { now.timeIntervalSince($1.selectedAt) <= 86_400 } }.filter { !$1.isEmpty }
+        store.picks[profileID.uuidString, default: [:]][query] = CommandBarRanking.Pick(key: key, selectedAt: now)
+        store.picks = store.picks.mapValues { $0.filter { now.timeIntervalSince($1.selectedAt) <= 86_400 } }
+            .filter { !$1.isEmpty }
+        save()
+    }
+
+    func recordCommand(_ id: String, in profileID: UUID) {
+        var usage = store.commandUsage[profileID.uuidString, default: [:]][id] ?? CommandBarRanking.CommandUsage()
+        usage.executed.append(.now)
+        if usage.executed.count > CommandBarRanking.CommandUsage.maxExecuted {
+            usage.executed.removeFirst(usage.executed.count - CommandBarRanking.CommandUsage.maxExecuted)
+        }
+        usage.frequency += 1
+        store.commandUsage[profileID.uuidString, default: [:]][id] = usage
         save()
     }
 
     func prune(keeping profileIDs: [UUID]) {
         let kept = Set(profileIDs.map(\.uuidString))
-        guard picks.keys.contains(where: { !kept.contains($0) }) else { return }
-        picks = picks.filter { kept.contains($0.key) }
+        let hasStale =
+            store.picks.keys.contains { !kept.contains($0) }
+            || store.commandUsage.keys.contains { !kept.contains($0) }
+        guard hasStale else { return }
+        store.picks = store.picks.filter { kept.contains($0.key) }
+        store.commandUsage = store.commandUsage.filter { kept.contains($0.key) }
         save()
     }
 
@@ -437,6 +529,6 @@ final class CommandBarPicks {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try? encoder.encode(picks).write(to: url, options: .atomic)
+        try? encoder.encode(store).write(to: url, options: .atomic)
     }
 }

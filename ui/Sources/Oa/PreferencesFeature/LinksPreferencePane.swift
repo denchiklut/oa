@@ -2,8 +2,7 @@ import SwiftUI
 
 struct LinksPreferencePane: View {
     @Bindable var store: SidebarStore
-    let preferences: PreferencesState
-    @State private var showsRoutes = false
+    @Bindable var preferences: PreferencesState
     @AppStorage(LittleBrowserPreferences.globalHotkeyKey) private var globalHotkey = true
     @AppStorage(LittleBrowserPreferences.optionCommandClickKey) private var optionCommandClick = true
     @AppStorage(LittleBrowserPreferences.externalLinksKey) private var externalLinks = true
@@ -57,7 +56,7 @@ struct LinksPreferencePane: View {
                         PreferenceRow {
                             Text("Choose where links open inside Oa.")
                         } control: {
-                            Button("Air Traffic Control…") { showsRoutes = true }
+                            Button("Air Traffic Control…") { preferences.showsAirTrafficControl = true }
                         }
                     }
                 }
@@ -65,7 +64,9 @@ struct LinksPreferencePane: View {
                 .padding(.vertical, 24)
             }
         }
-        .sheet(isPresented: $showsRoutes) { AirTrafficControlSheet(store: store, profiles: preferences.profiles) }
+        .sheet(isPresented: $preferences.showsAirTrafficControl) {
+            AirTrafficControlSheet(store: store, profiles: preferences.profiles)
+        }
     }
 
     /// As Arc's row, which names the shortcut New Little Arc Window has now.

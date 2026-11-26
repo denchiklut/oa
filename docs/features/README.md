@@ -153,7 +153,7 @@ Sources: Arc [2022][arc22], [2023][arc23].
 | --- | :---: | :---: |
 | Command bar for addresses and web searches | ✅ | ✅ |
 | Search and switch to open tabs | ✅ | ✅ |
-| Run browser actions from the command bar | ✅ | ☐ |
+| Run browser actions from the command bar | ✅ | ✅ |
 | Search suggestions and history matches | ✅ | ✅ |
 | Site Search shortcuts | ✅ | ✅ |
 | Choose and manage search engines per profile | ✅ | ✅ |

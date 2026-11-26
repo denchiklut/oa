@@ -65,9 +65,38 @@ address, its live page's or else its saved one; its title doesn't matter.
   the only rows; Arc fills up to five with most visited sites and its
   onboarding links, which Oa doesn't have.
 
-Each row is one line: the icon, the title, then "— host/path" for a page or
-"Switch to Tab ➜" for a tab. A tab of another Space names its Space there
-instead, and Return switches to it in its Space.
+Each row is one line: the icon, the title, then "— host/path" for a page,
+"Switch to Tab ➜" for a tab, or the shortcut chip on the right for a command. A
+tab of another Space names its Space there instead, and Return switches to it in
+its Space.
+
+## Commands
+
+As Arc's Type Travel, command rows appear in both ⌘T and ⌘L whenever text is
+typed outside Site Search, never on an empty query. They come from two sources:
+
+- **The main menu.** Tagged items in `MainMenu.swift` carry Arc's command ID, SF
+  Symbol, trigger phrases, optional title override and optional ranking bump.
+  Opening the bar snapshots each item validated against the responder chain,
+  omitting disabled items as Arc does. Running one closes the bar and sends the
+  item's action through `NSApp.sendAction(_:to:from:)`.
+- **Built-in kinds.** Settings panes (`Open Settings`, `Open Profile
+  Preferences`, `Edit Keyboard Shortcuts`, …), Chromium settings (`Open Search
+  Settings`, `Open Password Manager`), `Open Air Traffic Control`, parametric
+  Space rows (`Switch to ‹Space›`, `Move Tab to ‹Space›` with a Space capsule),
+  installed extensions, current-tab actions (rename, duplicate, reset,
+  favorite), mute/unmute all tabs, split-view orientation conversion, and live
+  Undo/Redo.
+
+A command matches when every space-separated query word appears in its cached
+word tokens (unordered), or when any of its searchable properties (title or
+trigger phrases) contains the whole lowercased query, matching Arc 1.174.3.
+Commands join ASE2 ranking with archetype 104, `hotWords` matching,
+`typeTravelCandidateBump`, per-profile usage counts and last-used dates in
+`command-bar.json` (last 15 runs), and Arc's three Type Travel boosts:
+`exactHotWord` (score 15, weight 100), `typeTravelPrefixForLongQuery` (query of
+3+ characters starting a property; score 3, weight 40), and
+`recentlyUseTypeTravel` (run more than once in the profile; score 3, weight 15).
 
 ## Ranking
 
@@ -121,9 +150,9 @@ Oa's own, because Arc's isn't known:
   showed: the typed search gets no search boost, and a navigation suggestion
   none for its bare host;
 - the place a picked row is promoted to, the top;
-- the features Oa has no source for, such as Type Travel, most-visited rank
-  and site engagement, keep ASE2's defaults, which is how Arc ranks a query
-  without them. A tab's custom title has no boost, as Oa's tabs have none.
+- the features Oa has no source for, such as most-visited rank, site engagement
+  and global site rank, keep ASE2's defaults, which is how Arc ranks a query
+  without them.
 
 ASE2 can also keep the current page off the top; in Arc it stayed first, so Oa
 leaves that out. A tab's recency is when it was last selected, as Arc's.
@@ -218,8 +247,8 @@ colour is known.
 Not done yet, as later slices: the pill's menu (remove, change, manage),
 Space as a trigger, and an empty scope's recent searches.
 
-Not done yet, as later slices: Arc's commands in the bar, the sidebar's URL
-pill, Little Arc's bar and the onboarding rows.
+Not done yet, as later slices: the sidebar's URL pill anchored bar and the
+onboarding rows.
 
 Related: [Sidebar state](../sidebar/README.md) · [Peek](../peek/README.md).
 
