@@ -800,7 +800,6 @@ struct TabRow: View {
     @State private var previousTabID: UUID?
     @State private var bounces = 0
     @State private var renaming = false
-    @State private var draft = ""
     /// The press that closed the field, so it doesn't open it again as a second click on the tab.
     @State private var renameEndingClick: TimeInterval?
     /// A plain press on the current tab, which opens the field on mouse-up unless it drags.
@@ -811,7 +810,6 @@ struct TabRow: View {
     /// As AppKit's outline view: a press on a multi-selected row, which drags the selection or, let go, selects the
     /// row alone.
     @State private var heldMembers: [UUID] = []
-    @FocusState private var renameFocused: Bool
     @Environment(\.theme) private var theme
     @Environment(\.sidebarDrag) private var drag
 
@@ -961,6 +959,8 @@ struct TabRow: View {
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
+        .onChange(of: renaming) { _, active in layout.setHold(.rename, active) }
+        .onDisappear { if renaming { layout.setHold(.rename, false) } }
         .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
         .platformContextMenu(
             isEnabled: inCard
@@ -991,33 +991,24 @@ struct TabRow: View {
     }
 
     private func beginRename() {
-        draft = tab.displayTitle
         renaming = true
     }
 
     /// As Arc's: Return keeps the name, and Escape or, as the author has seen, a click away gives the old one back.
     /// Oa's own: a name left as it was isn't stored as the tab's.
     private var renameField: some View {
-        TextField("Title", text: $draft)
-            .textFieldStyle(.plain)
-            .focused($renameFocused)
-            .onSubmit { commitRename() }
-            .onExitCommand { renaming = false }
-            .endsOnClickAway {
-                renameEndingClick = $0.timestamp
-                renaming = false
-            }
-            // After the menu has closed and given the window back its first responder.
-            .task {
-                try? await Task.sleep(for: .milliseconds(100))
-                renameFocused = true
-            }
-            .onChange(of: renameFocused) { _, focused in if !focused { renaming = false } }
+        InlineRenameField(
+            text: tab.displayTitle, textColor: NSColor(theme.foreground), onCommit: commitRename
+        ) { event in
+            renameEndingClick = event?.timestamp
+            renaming = false
+        }
+        .frame(height: 19)
     }
 
-    private func commitRename() {
+    private func commitRename(_ title: String) {
         guard renaming else { return }
         renaming = false
-        if tab.customTitle != nil || draft != tab.displayTitle { model.renameTab(tab.id, to: draft) }
+        if tab.customTitle != nil || title != tab.displayTitle { model.renameTab(tab.id, to: title) }
     }
 }

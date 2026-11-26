@@ -283,8 +283,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // As Arc's: DevTools that had the keyboard keep it.
         let devTools = model.page?.devTools.view
         if let devTools, (window?.firstResponder as? NSView)?.isDescendant(of: devTools) == true { return }
-        // As Arc's: the find bar's field keeps the keyboard.
-        if (window?.firstResponder as? NSText)?.delegate is FindInPageTextField { return }
+        // As Arc's: the find bar's field keeps the keyboard; inline sidebar renames do too.
+        let field = ((window?.firstResponder as? NSText)?.delegate as AnyObject?) as? NSTextField
+        if field is FindInPageTextField || field is SidebarRenameTextField { return }
         if model.dialog == nil { model.page?.activate() }
     }
 
