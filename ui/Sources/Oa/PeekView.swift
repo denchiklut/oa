@@ -46,7 +46,7 @@ struct PeekView: View {
                     .id(page.id)
                     .transition(.identity)
             }
-            PageContentView(page: page)
+            PageContentView(model: model, page: page)
         }
         .findInPage(of: model, on: page, hasTopBar: showsToolbar)
         .pageRootBackground(page)

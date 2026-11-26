@@ -194,7 +194,7 @@ private struct SplitViewContentPane: View {
                     } else if let page {
                         // A pane's host is made once its page is, after the window activated the page: the focused
                         // pane's page takes the keyboard when the host is in the window.
-                        PageContentView(page: page) { model.activatePresented(page) }
+                        PageContentView(model: model, page: page) { model.activatePresented(page) }
                             .pageRootBackground(page)
                     }
                 }

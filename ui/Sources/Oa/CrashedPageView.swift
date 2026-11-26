@@ -32,6 +32,7 @@ struct CrashedPageView: View {
 }
 
 struct PageContentView: View {
+    let model: WindowModel
     let page: any Page
     var movedToWindow: () -> Void = {}
 
@@ -41,6 +42,11 @@ struct PageContentView: View {
                 CrashedPageView(page: page)
             } else {
                 PageHostView(view: page.view, movedToWindow: movedToWindow)
+                    .overlay(alignment: .bottomLeading) {
+                        if let link = page.hoveredLink {
+                            LinkPreview(url: link, allowsPeek: model.canShiftClickToPeek(link, from: page.id))
+                        }
+                    }
             }
         }
     }

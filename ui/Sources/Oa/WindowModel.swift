@@ -3011,6 +3011,20 @@ final class WindowModel {
         spaceDeletionEnded(page.id, kept: false)
     }
 
+    private var allowsShiftClickToPeek: Bool { store.peekOnShiftClick && !isLittle }
+
+    func canShiftClickToPeek(_ url: URL, from pageID: UUID) -> Bool {
+        guard allowsShiftClickToPeek, let tabID = tabID(of: pageID),
+            ["http", "https", "file"].contains(url.scheme)
+        else { return false }
+        return otherProfileSpace(for: url, from: tabID) == nil
+    }
+
+    private func otherProfileSpace(for url: URL, from openerID: UUID) -> UUID? {
+        let spaceID = store.routedSpace(for: url, recent: selectedSpaceID)
+        return state.space(spaceID)?.profileID == profile(containing: openerID)?.id ? nil : spaceID
+    }
+
     /// As Arc; a Shift-click arrives as the page's own new window, and the engine's, as its page menu's Open Link in
     /// New Window, opens a window on this Space with the page as its selected tab. A page from an Archive Peek has no
     /// tab to join, and the top of the shown Space is Oa's own.
@@ -3040,7 +3054,7 @@ final class WindowModel {
         // A Little window has no Peek, as Arc's: its Shift-click is a window too.
         let inWindow =
             disposition == .newWindow
-            && (!byPage || !store.peekOnShiftClick || insidePeek || isLittle)
+            && (!byPage || insidePeek || !allowsShiftClickToPeek)
         // As Arc's `createTabInNewWindow(url:isIncognito:)`: only the address goes, and loads afresh there.
         if inWindow, insidePeek || sidebarContext != .global {
             page.drop()
@@ -3061,8 +3075,7 @@ final class WindowModel {
         if !insidePeek, !inWindow, disposition == .newWindow || (!background && !split && peeksFromLinks(in: openerID))
         {
             // As seen in Arc: no Peek for a link routed to another profile's Space; it loads there afresh.
-            let spaceID = store.routedSpace(for: url, recent: selectedSpaceID)
-            guard let url, state.space(spaceID)?.profileID != profile(containing: openerID)?.id else {
+            guard let url, let spaceID = otherProfileSpace(for: url, from: openerID) else {
                 return peek(page, from: openerID)
             }
             page.drop()

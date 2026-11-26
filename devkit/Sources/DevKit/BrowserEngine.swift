@@ -637,6 +637,8 @@ public struct RestoredPage {
 /// One page and its history. Observable, so views that read it update as it loads.
 @MainActor
 public protocol Page: AnyObject, Observable {
+    /// The link destination reported by the page, cleared when the pointer leaves it.
+    var hoveredLink: URL? { get }
     /// The page's own identity, never its tab's, as Arc's content IDs are.
     var id: UUID { get }
     var url: URL? { get }

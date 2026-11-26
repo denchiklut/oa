@@ -8,6 +8,7 @@ import Observation
 final class ChromiumPage: Page, MediaSession {
     let id: UUID
     private(set) var url: URL?
+    fileprivate(set) var hoveredLink: URL?
     private(set) var title = ""
     private(set) var isLoading = false
     private(set) var loadProgress = 0.0
@@ -179,6 +180,7 @@ final class ChromiumPage: Page, MediaSession {
     }
 
     fileprivate func rendererGone(_ exit: Int) {
+        hoveredLink = nil
         if let crash = PageCrash(rendererExit: exit), crash != self.crash { self.crash = crash }
     }
 
@@ -326,6 +328,10 @@ final class PageDelegate: NSObject, CorePageDelegate {
     weak var content: ChromiumPage?
 
     func pageDidChangeState(_ page: CorePage) { content?.stateChanged() }
+
+    func page(_ page: CorePage, didUpdateTargetURL url: URL?) {
+        content?.hoveredLink = url
+    }
 
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int, byPage: Bool) {
         content?.opened(openedPage, url: targetURL, disposition: disposition, byPage: byPage)

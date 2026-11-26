@@ -208,6 +208,7 @@ class Page {
   class Observer {
    public:
     virtual void OnPageStateChanged() = 0;
+    virtual void OnPageTargetURLChanged(const std::string& url) = 0;
     // The page opened another page, already a background tab in this page's
     // Browser. The observer owns it; destroying it drops it. `by_page` tells
     // the page's own open, as a link or window.open, from one the browser
