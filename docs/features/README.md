@@ -1,26 +1,21 @@
 # Arc and Oa feature inventory
 
-Arc feature snapshot: **November 7, 2026**. Oa checklist initialized:
-**November 8, 2026**. This folder is the starting point for documenting Arc's
-features and tracking Oa's equivalents. The checklist is separate from the
-implementation notes linked below; acceptance criteria and prioritization
-remain to be defined.
+The Arc desktop inventory began on **November 7, 2026**. Oa's feature status
+was reviewed on **November 26, 2026** against the implementation on
+[`main` at `056ecce`](https://github.com/denchiklut/oa/tree/056ecce586ad8021d3657e626e01e449583bac66)
+and the verification recorded in merged pull requests.
 
 ## How to read this
 
-- **Arc ✅**: a documented or UI-observed Arc **macOS desktop** capability, not a
-  runtime or service-availability guarantee. Explicitly retired features are separated below.
-- **Oa ✅**: implemented in Oa and verified on the live engine.
-- **Oa ☐**: unchecked and not yet assessed. Every Oa entry intentionally starts
-  unchecked, regardless of any existing implementation; this is not a claim that
-  the feature is missing.
-- **†**: known from dated release notes; continued availability has not been
-  independently established. Explicit removals belong in the retired table.
+- **Arc ✅** marks a documented or observed macOS desktop capability.
+- **Oa ✅** marks a feature implemented in Oa and verified on the live Chromium engine.
+- **Text in the Oa column** describes partial support or the extent of the recorded checks.
+- **Oa ☐** means the review found no confirmed implementation for that row.
+- **†** marks a capability described in dated Arc release notes whose continued
+  availability is uncertain. The retired table lists explicit removals.
 
-This is a feature-and-settings checklist, not a specification. The baseline is
-macOS, not a claim that Windows has the same features. Arc Search's mobile-only
-features, such as Browse for Me and Call Arc, are outside this desktop comparison.
-No Oa implementation audit or app test run is represented by these unchecked entries.
+The comparison covers macOS. Arc Search's mobile features, including Browse
+for Me and Call Arc, fall outside its scope.
 
 **Date caveat:** Arc's official [sunset timeline][arc-sunset] schedules desktop
 Arc's shutdown for December 22, 2026. That is still in the future at this snapshot.
@@ -50,9 +45,6 @@ that every online integration still works.
 - [Ad blocker](ad-blocker/README.md)
 - [Split View](split-view/README.md)
 
-These pages describe existing slices and their product choices. Moving the
-notes here does not assess or change the checklist status below.
-
 ## Browse the checklist
 
 - [Sidebar, tabs and folders](#sidebar-tabs-and-folders)
@@ -78,36 +70,43 @@ notes here does not assess or change the checklist status below.
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Vertical sidebar | ✅ | ☐ |
+| Vertical sidebar | ✅ | ✅ |
 | Hide/reveal and resize the sidebar | ✅ | ✅ |
 | Optional top toolbar | ✅ | ✅ |
 | Favorites | ✅ | ✅ |
-| Pinned tabs | ✅ | ☐ |
-| Ordinary / Today tabs | ✅ | ☐ |
-| Rename and duplicate tabs | ✅ | ☐ |
-| Move and reorder tabs with drag and drop | ✅ | ☐ |
-| Custom tab icons | ✅ | ☐ |
-| Reset a pinned tab to its pinned URL | ✅ | ☐ |
-| Select and act on multiple tabs | ✅ | ☐ |
+| Pinned tabs | ✅ | ✅ |
+| Ordinary / Today tabs | ✅ | ✅ |
+| Rename and duplicate tabs | ✅ | ✅ |
+| Move and reorder tabs with drag and drop | ✅ | ✅ |
+| Custom tab icons | ✅ | Icon selection and removal checked on the stub |
+| Reset a pinned tab to its pinned URL | ✅ | ✅ |
+| Select and act on multiple tabs | ✅ | ✅ |
 | Recent-tab switcher | ✅ | ✅ |
-| Close tabs and reopen the last closed tab | ✅ | ☐ |
-| Clear all ordinary tabs | ✅ | ☐ |
-| Automatic tab archiving | ✅ | ☐ |
-| Configure auto-archive interval per profile | ✅ |✅ |
-| Archive browser and archived-tab restoration | ✅ | ☐ |
-| Search archived tabs † | ✅ | ☐ |
-| Clear the entire Archive † | ✅ | ☐ |
+| Close tabs and reopen the last closed tab | ✅ | ✅ |
+| Clear all ordinary tabs | ✅ | ✅ |
+| Automatic tab archiving | ✅ | Stub verified with aged tabs |
+| Configure auto-archive interval per profile | ✅ | ✅ |
+| Archive browser and archived-tab restoration | ✅ | ✅ |
+| Search archived tabs † | ✅ | Title and URL search in the Archive |
+| Clear the entire Archive † | ✅ | Clear and confirmation checked on the stub |
 | [Folders and nested folders](sidebar/README.md#folders) | ✅ | ✅ |
-| Rename, duplicate and move folders | ✅ | ☐ |
+| Rename, duplicate and move folders | ✅ | Rename and drag to move |
 | Convert a folder into a Space | ✅ | ☐ |
 | Copy all links in a folder | ✅ | ☐ |
 | Custom folder icons | ✅ | ✅ |
 | [Folder search](sidebar/README.md#folders) | ✅ | ✅ |
-| Collapse Pinned Tabs | ✅ | ☐ |
-| Reveal the current tab in the sidebar | ✅ | ☐ |
+| Collapse Pinned Tabs | ✅ | Collapse and persistence checked on the stub |
+| Reveal the current tab in the sidebar | ✅ | ✅ |
 | Reset all tabs in the current Space | ✅ | ☐ |
-| Copy multiple selected tab URLs † | ✅ | ☐ |
+| Copy multiple selected tab URLs † | ✅ | ✅ |
 | Copy folder links as Markdown | ✅ | ☐ |
+
+Restore Last Closed Tab brings back a closed tab or Peek with its history. Reselecting
+a pinned tab after ⌘W leaves the window empty is still open. [Restore verification](https://github.com/denchiklut/oa/pull/89) · [Pinned-tab issue](https://github.com/denchiklut/oa/issues/88)
+
+The tab menu supports rename, duplicate, custom icons and actions on multiple rows.
+A folder can be renamed or dragged to a new position. Its Duplicate command is
+disabled. [Tab menu](https://github.com/denchiklut/oa/pull/153) · [Multi-selection](https://github.com/denchiklut/oa/pull/155) · [Folders](sidebar/README.md#folders)
 
 Sources: Arc [2022][arc22], [2023][arc23], [2024–2026][arc24].
 
@@ -115,20 +114,25 @@ Sources: Arc [2022][arc22], [2023][arc23], [2024–2026][arc24].
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Create, rename, reorder and delete Spaces | ✅ | ☐ |
-| Space names and icons | ✅ | ☐ |
-| Switch Spaces by gesture or keyboard | ✅ | ☐ |
-| Spaces overview / management | ✅ | ☐ |
-| Space colors, gradients, texture and appearance | ✅ | ☐ |
+| Create, rename, reorder and delete Spaces | ✅ | ✅ |
+| Space names and icons | ✅ | ✅ |
+| Switch Spaces by gesture or keyboard | ✅ | ✅ |
+| Spaces overview / management | ✅ | ✅ |
+| Space colors, gradients, texture and appearance | ✅ | ✅ |
 | Separate browsing profiles | ✅ | ✅ |
 | Assign profiles to Spaces | ✅ | ✅ |
 | Create, rename and delete profiles | ✅ | ✅ |
-| Multiple browser windows | ✅ | ☐ |
-| Separate blank-window command | ✅ | ☐ |
-| Move an active page between windows | ✅ | ☐ |
-| Restore the sidebar and window selections after relaunch | ✅ | ☐ |
-| Full browser-session restoration | ✅ | ☐ |
-| Incognito windows | ✅ | ☐ |
+| Multiple browser windows | ✅ | ✅ |
+| Separate blank-window command | ✅ | ✅ |
+| Move an active page between windows | ✅ | ✅ |
+| Restore the sidebar and window selections after relaunch | ✅ | ✅ |
+| Full browser-session restoration | ✅ | Standard windows, tab history and session storage verified on relaunch |
+| Incognito windows | ✅ | ✅ |
+
+With session restoration enabled, a standard window returns to its selected tab
+with its history and session storage. With it disabled, the window returns with
+its command bar open. Incognito and Little Oa windows are excluded from a normal
+relaunch. [Session restoration](https://github.com/denchiklut/oa/pull/151) · [Blank and incognito windows](https://github.com/denchiklut/oa/pull/164) · [Little Oa](little-oa/README.md#saved-state)
 
 Sources: Arc [2022][arc22], [2023][arc23], [profile migration guide][arc-migration].
 
@@ -139,7 +143,7 @@ Sources: Arc [2022][arc22], [2023][arc23], [profile migration guide][arc-migrati
 | Multiple pages in a Split View | ✅ | ✅ |
 | Horizontal and vertical splits | ✅ | ✅ |
 | Resize, reorder and focus split panes | ✅ | ✅ |
-| Create splits by dragging tabs or links | ✅ | ☐ |
+| Create splits by dragging tabs or links | ✅ | ✅ |
 | Pin and save Split Views | ✅ | ✅ |
 | Separate a page from a split | ✅ | ✅ |
 | Custom Split View titles | ✅ | ✅ |
@@ -159,7 +163,7 @@ Sources: Arc [2022][arc22], [2023][arc23].
 | Choose and manage search engines per profile | ✅ | ✅ |
 | Enable/disable search suggestions per profile | ✅ | ✅ |
 | Delete individual command-bar suggestions † | ✅ | ✅ |
-| Keyboard shortcuts | ✅ | ☐ |
+| Keyboard shortcuts | ✅ | ✅ |
 | Customize keyboard shortcuts | ✅ | ✅ |
 | Search/filter shortcut settings | ✅ | ✅ |
 | Reset individual/all keyboard shortcuts | ✅ | ✅ |
@@ -167,7 +171,7 @@ Sources: Arc [2022][arc22], [2023][arc23].
 | Include/exclude Favorites in numbered navigation † | ✅ | ☐ |
 | Choose ninth-item versus last-item shortcut behavior † | ✅ | ☐ |
 | Copy the current URL with confirmation | ✅ | ✅ |
-| Copy current URL as Markdown | ✅ | ☐ |
+| Copy current URL as Markdown | ✅ | ✅ |
 | Copy URL as Quote / share selected-text quote | ✅ | ☐ |
 
 Sources: Arc [2022][arc22], [2023][arc23].
@@ -185,13 +189,13 @@ matching edge cases or rule-priority semantics.
 | Create, edit and remove routes | ✅ | ✅ |
 | URL matching: Is equal to / Contains | ✅ | ✅ |
 | Route matching links to a chosen Space | ✅ | ✅ |
-| Route matching links to Little Arc | ✅ | ☐ |
+| Route matching links to Little Arc | ✅ | External links |
 | Most Recent Space as an individual rule destination | ✅ | ✅ |
 | Default destination: chosen Space / Most Recent Space | ✅ | ✅ |
-| Default destination: Little Arc | ✅ | ☐ |
+| Default destination: Little Arc | ✅ | External links |
 | Apply routing when restoring archived tabs | ✅ | ✅ |
 | Apply routing when opening Peek destinations | ✅ | ✅ |
-| Reuse an already-open Little Arc window for the same link † | ✅ | ☐ |
+| Reuse an already-open Little Arc window for the same link † | ✅ | ✅ |
 
 Sources: Arc [2023][arc23], [2024–2026][arc24], [feature FAQ][arc-faq], and native
 Settings → Links → Air Traffic Control (including operator/destination menus).
@@ -205,16 +209,20 @@ Little Arc is a separate small browser window, not an overlay or summary card.
 | Little Arc / quick browsing window | ✅ | ✅ |
 | Enable/disable opening external links in Little Arc | ✅ | ✅ |
 | Open the quick-window page in a Space | ✅ | ✅ |
-| Launch Little Arc globally from another app | ✅ | ☐ |
+| Launch Little Arc globally from another app | ✅ | Global shortcut verified on the stub |
 | Option-Command-click a link to open Little Arc | ✅ | ✅ |
-| Configure Little Arc auto-archive interval | ✅ | ☐ |
+| Configure Little Arc auto-archive interval | ✅ | 1, 6 or 12 hours in Links settings |
 | Multiple simultaneous Little Arc windows † | ✅ | ✅ |
 | Reuse an identical external-link Little Arc window † | ✅ | ✅ |
-| Remember domain-specific profile selection † | ✅ | ☐ |
-| Filter Archive to Little Arc † | ✅ | ☐ |
+| Remember domain-specific profile selection † | ✅ | Host preference checked on the stub |
+| Filter Archive to Little Arc † | ✅ | Little Arc source filter in the Library |
 | Show/hide all Little Arc windows from the Dock † | ✅ | ☐ |
 | Use extensions in Little Arc † | ✅ | ☐ |
 | Optional menu-bar launcher † | ✅ | ☐ |
+
+The Little Oa checks cover external-link reuse, profile switching and moving
+a live page into a Space. The Library gained its Little Arc filter afterwards.
+[Little Oa verification](https://github.com/denchiklut/oa/pull/168) · [Archive search and filters](https://github.com/denchiklut/oa/pull/176)
 
 Sources: Arc native Settings → Links; [2021][arc21], [2022][arc22],
 [2023][arc23].
@@ -231,10 +239,10 @@ see [sidebar previews](#sidebar-previews-and-integrations).
 | Cross-site links from Favorites/Pinned tabs open Peek | ✅ | ✅ |
 | Shift-click links to open Peek | ✅ | ✅ |
 | Expand a Peek into a tab | ✅ | ✅ |
-| Add a Peek to Split View | ✅ | ☐ |
-| Reopen a closed Peek † | ✅ | ☐ |
+| Add a Peek to Split View | ✅ | Available when the opener can take another pane |
+| Reopen a closed Peek † | ✅ | ✅ |
 | Open Easels in Peek † | ✅ | ☐ |
-| Copy Peek URL as Markdown † | ✅ | ☐ |
+| Copy Peek URL as Markdown † | ✅ | Copy URL as Markdown uses the open Peek |
 
 Sources: Arc native Settings → Links and [2023 release notes][arc23].
 
@@ -242,21 +250,23 @@ Sources: Arc native Settings → Links and [2023 release notes][arc23].
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Webpage loading, back/forward, reload and stop | ✅ | ☐ |
-| Force Refresh | ✅ | ☐ |
+| Webpage loading, back/forward, reload and stop | ✅ | ✅ |
+| Force Refresh | ✅ | ✅ |
 | Clear Cookies and Refresh | ✅ | ☐ |
 | Clear Cache and Refresh | ✅ | ☐ |
 | Live page titles, URLs, favicons and loading indicators | ✅ | ✅ |
-| Find in page | ✅ | ☐ |
-| Page zoom | ✅ | ☐ |
-| Print and Save as PDF | ✅ | ☐ |
-| Save Page As | ✅ | ☐ |
+| Show a link's destination on hover | ✅ | ✅ |
+| Find in page | ✅ | ✅ |
+| Page zoom | ✅ | ✅ |
+| Print and Save as PDF | ✅ | Print preview verified |
+| Save Page As | ✅ | Save dialog verified |
 | Open local files and PDFs | ✅ | ☐ |
 | Native page/link/image/text context menus | ✅ | ✅ |
-| Full-screen browser window | ✅ | ☐ |
+| Full-screen browser window | ✅ | ✅ |
+| Enter and exit fullscreen from a webpage video | ✅ | ✅ |
 | Page translation | ✅ | ☐ |
 | Browsing-history viewer | ✅ | ✅ |
-| Chromium DevTools, inspector and console | ✅ | ☐ |
+| Chromium DevTools, inspector and console | ✅ | ✅ |
 | View page source | ✅ | ✅ |
 | Arc Developer Mode tabs | ✅ | ☐ |
 | Developer Mode for localhost and its subdomains † | ✅ | ☐ |
@@ -267,6 +277,10 @@ Sources: Arc native Settings → Links and [2023 release notes][arc23].
 | Record diagnostic performance traces | ✅ | ☐ |
 | AppleScript browser automation | ✅ | ☐ |
 
+The live checks cover cache-bypassing refresh, find results, zoom levels, print
+preview, the Save Page As dialog and the DevTools element picker. Later checks
+cover video fullscreen and link destinations on hover. [Page commands](https://github.com/denchiklut/oa/pull/163) · [DevTools](https://github.com/denchiklut/oa/pull/164) · [Video fullscreen](https://github.com/denchiklut/oa/pull/183) · [Link hover](https://github.com/denchiklut/oa/pull/184)
+
 Sources: Arc [2021][arc21], [2022][arc22], [2023][arc23],
 [troubleshooting][arc-troubleshoot].
 
@@ -276,14 +290,14 @@ Sources: Arc [2021][arc21], [2022][arc22], [2023][arc23],
 | --- | :---: | :---: |
 | Ad blocker | ✅ | ✅ |
 | Install and manage Chrome extensions | ✅ | ✅ |
-| Site Controls and per-site permission settings | ✅ | ☐ |
+| Site Controls and per-site permission settings | ✅ | ✅ |
 | Permission prompts for camera, microphone, location, etc. | ✅ | ✅ |
-| Connection-security indicator | ✅ | ☐ |
+| Connection-security indicator | ✅ | ✅ |
 | JavaScript alert, confirm and prompt dialogs | ✅ | ✅ |
-| Clear browsing data / privacy settings UI | ✅ |✅ |
-| Password manager | ✅ | ☐ |
-| Address and payment autofill UI | ✅ | ☐ |
-| Per-profile notifications settings | ✅ |✅ |
+| Clear browsing data / privacy settings UI | ✅ | ✅ |
+| Password manager | ✅ | Password manager page verified |
+| Address and payment autofill UI | ✅ | Payment settings page verified |
+| Per-profile notifications settings | ✅ | ✅ |
 
 Sources: Arc [2022][arc22], [2023][arc23], [2024–2026][arc24],
 [ad-blocker troubleshooting][arc-troubleshoot], [data clearing][arc-clear],
@@ -315,7 +329,7 @@ Sources: Arc [account management][arc-account], [account deletion][arc-delete],
 | Display download progress † | ✅ | ✅ |
 | Cancel an active download † | ✅ | ✅ |
 | Recent downloads on Library hover † | ✅ | ✅ |
-| Library lists downloads outside the Downloads folder † | ✅ | ☐ |
+| Library lists downloads outside the Downloads folder † | ✅ | Browser downloads saved to a chosen folder |
 | Include/exclude screenshots in Library † | ✅ | ☐ |
 | Remember the selected Library section † | ✅ | ✅ |
 | Move Library files to macOS Trash † | ✅ | ✅ |
@@ -327,7 +341,7 @@ Sources: Arc native Settings → Profiles; [2022][arc22], [2023][arc23],
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Library | ✅ | ☐ |
+| Library | ✅ | ✅ |
 | Screenshot of the visible page | ✅ | ☐ |
 | Region capture and capture editing | ✅ | ☐ |
 | Capture Full Page | ✅ | ☐ |
@@ -351,7 +365,7 @@ Sources: Arc native Settings → Profiles; [2022][arc22], [2023][arc23],
 | Enable JavaScript Boosts separately on each device † | ✅ | ☐ |
 | Boost gallery and Boost sharing | ✅ | ☐ |
 | Custom application icons | ✅ | ☐ |
-| Share a page URL through the system share sheet | ✅ | ☐ |
+| Share a page URL through the system share sheet | ✅ | System sharing services in the tab menu |
 | Hosted sharing of Spaces, folders and Split Views | ✅ | ☐ |
 | Read-only Easel sharing / viewing in other browsers † | ✅ | ☐ |
 | Export an Easel as PNG | ✅ | ☐ |
@@ -391,7 +405,7 @@ Sources: Arc native General → Previews and Profiles settings;
 | --- | :---: | :---: |
 | Picture-in-Picture / automatic video mini-player | ✅ | ✅ |
 | Sidebar audio player and media controls | ✅ | ☐ |
-| Mute a tab from the browser UI | ✅ | ☐ |
+| Mute a tab from the browser UI | ✅ | ✅ |
 | Cast a browser tab | ✅ | ☐ |
 | Automatically show Google Meet Picture-in-Picture † | ✅ | ☐ |
 | Open a notification's existing sender tab † | ✅ | ☐ |
@@ -428,17 +442,21 @@ Sources: Arc [2023][arc23], [2024–2026][arc24], [feature FAQ][arc-faq].
 | Update-available prompt and restart workflow | ✅ | ☐ |
 | Warn before quitting | ✅ | ✅ |
 | Browser sound-effects switch | ✅ | ☐ |
-| Tab-reordering haptic-feedback switch | ✅ | ☐ |
-| Configure whether previous windows reopen at startup | ✅ | ☐ |
-| Allow/disallow dragging the window from webpage tops | ✅ | ☐ |
-| Show full URL in the toolbar | ✅ | ☐ |
+| Tab-reordering haptic-feedback switch | ✅ | ✅ |
+| Configure whether previous windows reopen at startup | ✅ | The switch restores pages in returning windows |
+| Allow/disallow dragging the window from webpage tops | ✅ | ✅ |
+| Show full URL in the toolbar | ✅ | ✅ |
 | Show/hide Shared Quotes on text selection | ✅ | ☐ |
-| Enable/disable automatic Picture-in-Picture | ✅ | ☐ |
+| Enable/disable automatic Picture-in-Picture | ✅ | ✅ |
 | Allow sites access to Space-theme data | ✅ | ☐ |
 | Enable/disable Boosts globally | ✅ | ☐ |
-| More Settings: open advanced Chromium settings | ✅ | ☐ |
+| More Settings: open advanced Chromium settings | ✅ | ✅ |
 | Reset translated-site prompts | ✅ | ☐ |
 | Automatic low-battery saving behavior † | ✅ | ☐ |
+
+The live settings check covered switch persistence, dragging a window from a page
+and opening Chromium settings. Physical trackpad feedback remains unverified.
+[Advanced settings verification](https://github.com/denchiklut/oa/pull/150)
 
 Sources: native Arc General/Advanced settings, [updates][arc-updates],
 [2022][arc22], [2023][arc23], [2024–2026][arc24].

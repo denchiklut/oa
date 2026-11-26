@@ -210,6 +210,5 @@ opens its own window. Blink's ⌘⌥-click reaches the app as a background page.
 
 ## Not here
 
-The Archive's Little Arc filter, extensions in the bar,
-the Dock menu's rows, a menu-bar launcher, and back with no history closing a
+Extensions in the bar, the Dock menu's rows, a menu-bar launcher, and back with no history closing a
 page to its opener, which is Arc's rule in every window.
