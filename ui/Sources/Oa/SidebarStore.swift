@@ -131,7 +131,7 @@ final class SidebarStore {
         return id
     }
 
-    func setSavedPage(_ tabID: UUID, title: String, url: URL?) {
+    func setSavedPage(_ tabID: UUID, title: String?, url: URL?) {
         state.setSavedPage(tabID, title: title, url: url)
     }
 
