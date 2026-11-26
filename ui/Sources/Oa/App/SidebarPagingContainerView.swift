@@ -543,7 +543,9 @@ struct ClearDivider: View {
                 }
                 .buttonStyle(.plain)
                 .onHover { hovering = $0 }
-                .help(clearsAll ? "Clear Today tabs" : "Clear unselected Today tabs")
+                .oaToolTip(
+                    clearsAll ? "Clear Today tabs" : "Clear unselected Today tabs",
+                    shortcut: model.keyBindings.state.shortcut(for: "clearExplore"))
             }
         }
         .padding(.leading, 10)
