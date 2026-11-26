@@ -202,11 +202,7 @@ private struct ExtensionActionTile: View {
             model.showExtensionMenu(for: action.id)
             dismiss()
         } label: {
-            if let icon = action.icon {
-                Image(nsImage: icon).opacity(action.isEnabled ? 1 : 0.4)
-            } else {
-                Image(systemName: "puzzlepiece.extension.fill")
-            }
+            ExtensionActionIcon(action: action)
         }
         .onHover { overTile = $0 }
         .overlay(alignment: .bottomTrailing) {
