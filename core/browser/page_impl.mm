@@ -305,6 +305,9 @@ void PageImpl::Unbind() {
 
 void PageImpl::Rebind(content::WebContents* new_contents) {
   Unbind();
+  if (observer_) {
+    observer_->OnPageTargetURLChanged({});
+  }
   new_contents->SetUserData(
       kPageMarkerKey, std::make_unique<PageMarker>(weak_factory_.GetWeakPtr()));
   Bind(new_contents);
@@ -1034,6 +1037,20 @@ content::WebContents* PageImpl::AddNewContents(
 void PageImpl::ActivateContents(content::WebContents* contents) {
   if (observer_) {
     observer_->OnPageWantsActivation();
+  }
+}
+
+void PageImpl::UpdateTargetURL(content::WebContents* source, const GURL& url) {
+  if (observer_) {
+    observer_->OnPageTargetURLChanged(url.is_valid() ? url.spec()
+                                                     : std::string());
+  }
+  ForwardingWebContentsDelegate::UpdateTargetURL(source, url);
+}
+
+void PageImpl::OnVisibilityChanged(content::Visibility visibility) {
+  if (visibility == content::Visibility::HIDDEN && observer_) {
+    observer_->OnPageTargetURLChanged({});
   }
 }
 

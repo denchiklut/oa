@@ -224,6 +224,12 @@ class PageObserverBridge : public oa::Page::Observer {
  public:
   explicit PageObserverBridge(OAPage* page) : page_(page) {}
   void OnPageStateChanged() override { [page_ pageStateChanged]; }
+  void OnPageTargetURLChanged(const std::string& url) override {
+    OAPage* page = page_;
+    [page.delegate page:page
+        didUpdateTargetURL:url.empty() ? nil
+                                       : [NSURL URLWithString:ToNSString(url)]];
+  }
   void OnPageOpenedPage(std::unique_ptr<oa::Page> page,
                         const std::string& target_url,
                         oa::OpenDisposition disposition,

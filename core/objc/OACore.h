@@ -170,6 +170,7 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
 
 @protocol OAPageDelegate <NSObject>
 - (void)pageDidChangeState:(OAPage*)page;
+- (void)page:(OAPage*)page didUpdateTargetURL:(nullable NSURL*)url;
 // `openedPage` has no delegate yet; releasing it drops the page.
 - (void)page:(OAPage*)page
     didOpenPage:(OAPage*)openedPage

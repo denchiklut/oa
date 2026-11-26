@@ -165,6 +165,7 @@ class PageImpl : public Page,
       bool user_gesture,
       bool* was_blocked) override;
   void ActivateContents(content::WebContents* contents) override;
+  void UpdateTargetURL(content::WebContents* source, const GURL& url) override;
   void NavigationStateChanged(content::WebContents* source,
                               content::InvalidateTypes changed_flags) override;
   void LoadingStateChanged(content::WebContents* source,
@@ -204,6 +205,7 @@ class PageImpl : public Page,
       content::RenderWidgetHost* render_widget_host) override;
   void OnWebContentsLostFocus(
       content::RenderWidgetHost* render_widget_host) override;
+  void OnVisibilityChanged(content::Visibility visibility) override;
   void WebContentsDestroyed() override;
   void OnAudioStateChanged(bool audible) override;
   void DidUpdateAudioMutingState(bool muted) override;

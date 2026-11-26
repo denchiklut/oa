@@ -310,6 +310,9 @@ import AppKit
 
 @MainActor @objc protocol CorePageDelegate: NSObjectProtocol {
     @objc(pageDidChangeState:) func pageDidChangeState(_ page: CorePage)
+    @objc(page:didUpdateTargetURL:)
+    func page(_ page: CorePage, didUpdateTargetURL url: URL?)
+
     @objc(page:didOpenPage:targetURL:disposition:byPage:)
     func page(_ page: CorePage, didOpen openedPage: CorePage, targetURL: URL?, disposition: Int, byPage: Bool)
     @objc(pageWantsActivation:) func pageWantsActivation(_ page: CorePage)

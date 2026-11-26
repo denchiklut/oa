@@ -62,7 +62,7 @@ struct LittleWindowView: View {
         Group {
             if let page = model.page {
                 // As Arc's: the Little window's page has the docked layout too, which its DevTools' own shortcut reaches.
-                PageContentView(page: page)
+                PageContentView(model: model, page: page)
                     .pageRootBackground(page)
             } else {
                 Color.clear

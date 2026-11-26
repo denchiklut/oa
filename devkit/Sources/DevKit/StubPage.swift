@@ -8,6 +8,7 @@ import SwiftUI
 final class StubPage: Page, MediaSession {
     let id: UUID
     private(set) var url: URL?
+    fileprivate(set) var hoveredLink: URL?
     private(set) var title = ""
     private(set) var isLoading = false
     private(set) var loadProgress = 1.0
@@ -75,7 +76,10 @@ final class StubPage: Page, MediaSession {
         let view = StubHostingView(rootView: StubPageView(page: self))
         view.sizingOptions = []
         view.movedToWindow = { [weak self] in self?.showPendingDialog() }
-        view.leavingWindow = { [weak self] in self?.makeThumbnail() }
+        view.leavingWindow = { [weak self] in
+            self?.hoveredLink = nil
+            self?.makeThumbnail()
+        }
         view.contextMenu = { [weak self] in self?.contextMenu() }
         view.focusChanged = { [weak self] in self?.hasFocus = $0 }
         view.consumesKey = { [weak self] event in
@@ -347,16 +351,27 @@ final class StubPage: Page, MediaSession {
         continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(disposition), byPage: byPage))
     }
 
-    func clickCrossOriginLink() {
-        guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
-        components.host = "other." + (components.host ?? "stub")
-        components.path = "/linked"
-        guard let target = components.url else { return }
-        guard keepsAddress else { return load(target) }
+    fileprivate func linkTarget(crossOrigin: Bool) -> URL? {
+        guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        if crossOrigin {
+            components.host = "other." + (components.host ?? "stub")
+            components.path = "/linked"
+        } else {
+            components.path = "/followed"
+            components.query = nil
+        }
+        return components.url
+    }
+
+    fileprivate func follow(_ target: URL, crossOrigin: Bool) {
+        let shift = NSEvent.modifierFlags.intersection([.shift, .command, .control, .option]) == .shift
+        guard shift || (crossOrigin && keepsAddress) else { return load(target) }
         let opened = StubPage(
             id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
+        opened.isIncognito = isIncognito
         opened.load(target)
-        continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(.foregroundTab), byPage: true))
+        let disposition = OpenDisposition.withModifiers(shift ? .newWindow : .foregroundTab)
+        continuation?.yield(.opened(opened, url: target, disposition: disposition, byPage: true))
     }
 
     /// A short stand-in for the engine's page menu: the items the app's own parts answer.
@@ -383,13 +398,6 @@ final class StubPage: Page, MediaSession {
                 })
         }
         return menu
-    }
-
-    func followLink() {
-        guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
-        components.path = "/followed"
-        components.query = nil
-        if let target = components.url { load(target) }
     }
 
     func download(failing: Bool = false) {
@@ -615,6 +623,7 @@ final class StubPage: Page, MediaSession {
     }
 
     private func startLoading() {
+        hoveredLink = nil
         load?.cancel()
         isCameraOn = false
         isMicrophoneOn = false
@@ -756,8 +765,8 @@ private struct StubPageView: View {
                             Button("Select the title") { page.selectTitle() }
                         }
                         HStack(spacing: 16) {
-                            Button("Follow a link on this host") { page.followLink() }
-                            Button("Click a link to another host") { page.clickCrossOriginLink() }
+                            linkButton("Follow a link on this host", page: page, crossOrigin: false)
+                            linkButton("Click a link to another host", page: page, crossOrigin: true)
                             Button("Ask for focus in 3 s") { page.askForFocus() }
                             Button("Crash the renderer") { page.crashRenderer() }
                             Button("Close itself") { page.closeItself() }
@@ -805,6 +814,16 @@ private struct StubPageView: View {
         .clipped()
         .background(Color(nsColor: page?.rootBackgroundColor ?? .textBackgroundColor))
         .environment(\.colorScheme, page?.rootBackgroundColor == nil ? colorScheme : .light)
+    }
+
+    @ViewBuilder
+    private func linkButton(_ title: String, page: StubPage, crossOrigin: Bool) -> some View {
+        if let url = page.linkTarget(crossOrigin: crossOrigin) {
+            Button(title) { page.follow(url, crossOrigin: crossOrigin) }
+                .onHover { inside in
+                    if inside { page.hoveredLink = url } else if page.hoveredLink == url { page.hoveredLink = nil }
+                }
+        }
     }
 }
 
