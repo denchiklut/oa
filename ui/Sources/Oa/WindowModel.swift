@@ -2144,7 +2144,8 @@ final class WindowModel {
                 store.edit { $0.restoreFolder(folder, tabs: tabs, fallbackSpaceID: selectedSpaceID) }
                 for tab in tabs { createdDates[tab.id] = .now }
                 expandedFolderIDs.insert(folder.id)
-                if let focused = group.focusedTabID, state.tree.tab(focused) != nil {
+                if let focused = group.focusedTabID, let spaceID = state.space(containing: focused)?.id {
+                    selectSpace(spaceID)
                     expandAncestors(of: focused)
                     select(focused, restoring: steps[focused]?.sessionID)
                 }
@@ -2412,6 +2413,8 @@ final class WindowModel {
             siblings: state.tabs(in: selectedSpaceID).map(\.id))
         group.splitView = splitView
         group.folder = folder
+        // AppKit needs the inverse during redo, even when live pages report their closes later.
+        if window?.undoManager?.isRedoing == true { push(group) }
         if let selected = selectedTabID, closing.contains(selected) {
             let next =
                 keptID.flatMap { state.isSelectable($0, in: selectedSpaceID) ? $0 : nil }
@@ -2967,6 +2970,14 @@ final class WindowModel {
     /// A refused auto-archive counts as a view, so the next sweep doesn't ask again.
     private func closeCancelled(_ pageID: UUID) {
         let request = store.closing.removeValue(forKey: pageID)
+        if case .window(let ownerID, let group?) = request, group.folder != nil,
+            !store.closing.values.contains(where: { $0.group == group }),
+            let owner = store.windows.first(where: { $0.id == ownerID }),
+            let index = owner.closedGroups.firstIndex(where: { $0 == group && $0.steps.isEmpty })
+        {
+            owner.closedGroups.remove(at: index)
+            owner.undoManager?.removeUndos(group.id.uuidString)
+        }
         if let tabID = tabID(of: pageID) {
             store.archivingPins.remove(tabID)
             if request == .auto { store.markViewed(tabID) }
