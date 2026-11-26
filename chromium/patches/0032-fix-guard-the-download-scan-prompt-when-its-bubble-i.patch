@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Thu, 26 Nov 2026 16:26:38 -0700
+Subject: [PATCH] fix: guard the download scan prompt when its bubble is
+ unavailable
+
+---
+ .../ui/webui/downloads/downloads_dom_handler.cc     | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/chrome/browser/ui/webui/downloads/downloads_dom_handler.cc b/chrome/browser/ui/webui/downloads/downloads_dom_handler.cc
+index 049825d73ca1d5df372b0ec8cad40bbf660b5bb0..47a7a6dea9dbb613bd4d8997e641e346a7cb080c 100644
+--- a/chrome/browser/ui/webui/downloads/downloads_dom_handler.cc
++++ b/chrome/browser/ui/webui/downloads/downloads_dom_handler.cc
+@@ -138,14 +138,13 @@ void PromptForScanningInBubble(content::WebContents* web_contents,
+ #if !BUILDFLAG(IS_CHROMEOS)
+   BrowserWindowInterface* browser =
+       GlobalBrowserCollection::GetInstance()->FindBrowserWithTab(web_contents);
+-  if (!browser) {
+-    return;
++  auto* window = BrowserWindow::FromBrowser(browser);
++  auto* bubble = window ? window->GetDownloadBubbleUIController() : nullptr;
++  auto* display = bubble ? bubble->GetDownloadDisplayController() : nullptr;
++  if (display) {
++    display->OpenSecuritySubpage(
++        OfflineItemUtils::GetContentIdForDownload(download));
+   }
+-  BrowserWindow::FromBrowser(browser)
+-      ->GetDownloadBubbleUIController()
+-      ->GetDownloadDisplayController()
+-      ->OpenSecuritySubpage(
+-          OfflineItemUtils::GetContentIdForDownload(download));
+ #endif
+ }
+ 
