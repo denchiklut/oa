@@ -119,8 +119,12 @@ struct SplitViewCellView: View {
                 SidebarCellButton(glyph: selected ? .minus : .close) {
                     if selected { model.closeSplitViewPages(splitID) } else { model.closeSplitView(splitID) }
                 }
-                // Arc's tooltip on the "—" also shows ⌘W as key badges.
-                .help(selected ? "Close this item" : "Archive this item")
+                .oaToolTip(
+                    selected ? "Close this item" : "Archive this item",
+                    shortcut: selected ? model.keyBindings.state.shortcut(for: "archiveTab") : nil,
+                    delay: OaToolTipConfiguration.controlDelay,
+                    priority: 1
+                )
                 .padding(.trailing, 7.5)
             }
         }
@@ -203,7 +207,7 @@ struct SplitViewCellView: View {
                 if showsClose {
                     Spacer(minLength: 0)
                     SidebarCellButton(glyph: .close) { model.close(tab.id) }
-                        .help("Archive this item")
+                        .oaToolTip("Archive this item", delay: OaToolTipConfiguration.controlDelay, priority: 1)
                         .padding(.trailing, 2)
                 }
             }
@@ -217,7 +221,7 @@ struct SplitViewCellView: View {
             // As measured on Arc: white 7 % over the selected card in dark, black 8 % in light.
             .background { if isSelected { card.fill(theme.isDark ? .white.opacity(0.07) : .black.opacity(0.08)) } }
             .contentShape(card)
-            .help(model.title(for: tab))
+            .oaToolTip(model.title(for: tab), delay: OaToolTipConfiguration.rowDelay, priority: 0)
         }
     }
 }
