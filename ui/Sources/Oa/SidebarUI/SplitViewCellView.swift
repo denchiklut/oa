@@ -25,6 +25,7 @@ struct SplitViewCellView: View {
         let data = model.state.splitView(splitID)
         let title = data?.title
         let icon = data?.icon
+        let name = title ?? "\(tabs.count) Tabs"
         let card = RoundedRectangle(cornerRadius: 12, style: .continuous)
         HStack(spacing: 0) {
             // As seen in Arc: a split with a title or an icon is drawn as a row, the icon or a count badge where a
@@ -42,9 +43,8 @@ struct SplitViewCellView: View {
                 .frame(width: 24, height: 24)
                 Group {
                     if renaming {
-                        InlineRenameField(
-                            text: title ?? "\(tabs.count) Tabs", textColor: NSColor(theme.foreground)
-                        ) { value in
+                        // As seen in Arc: the field starts with the split's count, all selected.
+                        InlineRenameField(layout: layout, text: name) { value in
                             model.renameSplitView(splitID, to: value)
                             renaming = false
                         } onCancel: { _ in
@@ -52,7 +52,7 @@ struct SplitViewCellView: View {
                         }
                         .frame(height: 19)
                     } else {
-                        Text(title ?? "\(tabs.count) Tabs").lineLimit(1).truncationMode(.tail)
+                        Text(name).lineLimit(1).truncationMode(.tail)
                     }
                 }
                 .font(.system(size: 14))
@@ -135,12 +135,8 @@ struct SplitViewCellView: View {
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
-        .onChange(of: renaming) { _, active in layout.setHold(.rename, active) }
         .sidebarDragFrame { drag?.rows[splitID] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) }
-        .onDisappear {
-            drag?.rows[splitID] = nil
-            if renaming { layout.setHold(.rename, false) }
-        }
+        .onDisappear { drag?.rows[splitID] = nil }
         .spaceMenuExclusion()
         .contextMenu {
             Button("Share Split View…") {}.disabled(true)
@@ -170,7 +166,6 @@ struct SplitViewCellView: View {
             }
             // As seen in Arc: the picker hangs below the cell, its arrow at the first tab's favicon.
             Button("Change Icon…") { Task { pickingIcon = true } }
-            // As seen in Arc: the field starts with the split's count, all selected.
             Button("Rename…") { renaming = true }
             Divider()
             Button("Duplicate") { model.duplicateSplitView(splitID) }

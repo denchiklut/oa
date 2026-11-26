@@ -9,6 +9,7 @@ import SwiftUI
 @Observable
 final class WindowLayoutController: NSViewController {
     /// What keeps a floating sidebar out with the pointer elsewhere, as Arc's does for its menus, drags and popovers.
+    /// Oa's own: an inline rename does too.
     enum Hold { case menu, drag, popover, rename }
 
     /// As measured in Arc: a floating sidebar is this far in from the window's left, top and bottom.
