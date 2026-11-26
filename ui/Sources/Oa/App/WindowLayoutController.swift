@@ -10,7 +10,7 @@ import SwiftUI
 final class WindowLayoutController: NSViewController {
     /// What keeps a floating sidebar out with the pointer elsewhere, as Arc's does for its menus, drags and popovers.
     /// Oa's own: an inline rename does too.
-    enum Hold { case menu, drag, popover, rename }
+    enum Hold { case menu, drag, popover, rename, folderPreview }
 
     /// As measured in Arc: a floating sidebar is this far in from the window's left, top and bottom.
     static let floatingInset: CGFloat = 5
@@ -77,6 +77,10 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private var holds: Set<Hold> = []
     @ObservationIgnored private var revealingCurrentTab: Task<Void, Never>?
     @ObservationIgnored private var spaceStyleEditorPopover: (spaceID: UUID, popover: SpaceStyleEditorPopover)?
+    private(set) var folderPreview: (id: UUID, anchor: CGRect)?
+    @ObservationIgnored var folderPreviewFrame = CGRect.zero
+    @ObservationIgnored private var folderPreviewExit: Task<Void, Never>?
+    @ObservationIgnored private weak var responderBeforeFolderPreview: NSResponder?
     @ObservationIgnored private var monitor: Any?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var appAppearance: NSKeyValueObservation?
@@ -476,6 +480,10 @@ final class WindowLayoutController: NSViewController {
         ]
         monitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
             guard let self else { return event }
+            if folderPreview != nil, [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type) {
+                let point = CGPoint(x: event.locationInWindow.x, y: size.height - event.locationInWindow.y)
+                if event.window !== view.window || !folderPreviewFrame.contains(point) { dismissFolderPreview() }
+            }
             // A wheel's ticks have no phases, and a scroll view keeps those to itself: the pager gets them here.
             if event.type == .scrollWheel {
                 toolTipController.dismiss()
@@ -504,6 +512,7 @@ final class WindowLayoutController: NSViewController {
         }
         observe(NSWindow.didBecomeKeyNotification, window) { $0.trackPointer() }
         observe(NSWindow.didResignKeyNotification, window) {
+            $0.dismissFolderPreview()
             $0.toolTipController.dismiss()
             $0.trackPointer()
         }
@@ -526,6 +535,7 @@ final class WindowLayoutController: NSViewController {
 
     override func viewDidDisappear() {
         super.viewDidDisappear()
+        dismissFolderPreview()
         toolTipController.tearDown()
         monitor.map(NSEvent.removeMonitor)
         monitor = nil
@@ -579,8 +589,46 @@ final class WindowLayoutController: NSViewController {
         model.setSidebarWidth(SidebarResizeState.resetWidth)
     }
 
+    func showFolderPreview(_ id: UUID, at anchor: CGRect) {
+        guard folderPreview?.id != id, let window = view.window, window.isKeyWindow,
+            holds.subtracting([.folderPreview]).isEmpty, !isPaging, sidebarPresentation != .hidden,
+            !model.coversWindow, model.library == nil
+        else { return }
+        if folderPreview == nil { responderBeforeFolderPreview = window.firstResponder }
+        folderPreviewExit?.cancel()
+        folderPreview = (id, anchor)
+        setHold(.folderPreview, true)
+    }
+
+    func leaveFolderPreview(_ id: UUID) {
+        guard folderPreview?.id == id else { return }
+        folderPreviewExit?.cancel()
+        folderPreviewExit = Task { [weak self] in
+            // Oa allows time to cross the gap between the row and the panel.
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled, let self, let preview = folderPreview, preview.id == id,
+                let location = view.window?.mouseLocationOutsideOfEventStream
+            else { return }
+            let point = CGPoint(x: location.x, y: size.height - location.y)
+            if !preview.anchor.contains(point), !folderPreviewFrame.contains(point) { dismissFolderPreview() }
+        }
+    }
+
+    func dismissFolderPreview() {
+        guard folderPreview != nil else { return }
+        folderPreviewExit?.cancel()
+        folderPreview = nil
+        folderPreviewFrame = .zero
+        setHold(.folderPreview, false)
+        if let responderBeforeFolderPreview, !model.coversWindow {
+            view.window?.makeFirstResponder(responderBeforeFolderPreview)
+        }
+        responderBeforeFolderPreview = nil
+    }
+
     func setHold(_ hold: Hold, _ held: Bool) {
         if held {
+            if hold != .folderPreview { dismissFolderPreview() }
             holds.insert(hold)
             toolTipController.dismiss()
         } else {

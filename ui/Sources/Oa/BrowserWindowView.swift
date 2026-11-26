@@ -89,6 +89,12 @@ struct BrowserWindowView: View {
             SidebarDragLayer(model: model, drag: sidebarDrag)
                 .environment(\.colorScheme, appearance.colorScheme)
         }
+        .overlay(alignment: .topLeading) {
+            if let preview = layout.folderPreview, let folder = model.state.tree.folder(preview.id) {
+                FolderPreviewView(model: model, layout: layout, folder: folder, anchor: preview.anchor)
+                    .id(folder.id)
+            }
+        }
         .background { WindowSurface(background: background, next: next) }
         .overlay {
             // The Archive's Peek is over the whole window. A tab's is over its page and leaves the docked sidebar
@@ -120,10 +126,11 @@ struct BrowserWindowView: View {
                 ExtensionRequestView(model: model, request: request).id(ObjectIdentifier(request))
             }
         }
+        .onChange(of: model.selectedTabID) { layout.dismissFolderPreview() }
         .onChange(of: model.page?.id) { _, _ in
             DispatchQueue.main.async {
                 guard let page = model.page, model.dialog == nil, model.extensionRequest == nil,
-                    model.commandBar == nil
+                    model.commandBar == nil, layout.folderPreview == nil
                 else { return }
                 (model.peek ?? page).activate()
             }

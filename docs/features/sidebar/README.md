@@ -160,6 +160,11 @@ collapsed. If the active tab is inside, its row stays visible through its
 ancestor folders. Numbered tab shortcuts follow visible rows. Command Bar
 search also finds tabs inside collapsed folders.
 
+Hover over a collapsed folder to search its tabs, including tabs in nested
+folders. The preview lists them by last visit and filters by title or URL.
+Click a result or use the arrow keys and Return to open it. Escape dismisses
+the preview.
+
 The sidebar file stores each folder’s title, icon and ordered children.
 Each window saves its own expanded folders in `windows.json`. Deleting a
 nonempty folder asks for confirmation and archives its tabs. **Edit ▸ Undo**

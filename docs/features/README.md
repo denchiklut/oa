@@ -102,7 +102,7 @@ notes here does not assess or change the checklist status below.
 | Convert a folder into a Space | ✅ | ☐ |
 | Copy all links in a folder | ✅ | ☐ |
 | Custom folder icons | ✅ | ✅ |
-| Folder search | ✅ | ☐ |
+| [Folder search](sidebar/README.md#folders) | ✅ | ✅ |
 | Collapse Pinned Tabs | ✅ | ☐ |
 | Reveal the current tab in the sidebar | ✅ | ☐ |
 | Reset all tabs in the current Space | ✅ | ☐ |
@@ -366,7 +366,7 @@ The Settings → General → Previews switches below were observed individually.
 
 | Feature | Arc | Oa |
 | --- | :---: | :---: |
-| Folder hover previews (Arc Folders) | ✅ | ☐ |
+| [Folder hover previews (Arc Folders)](sidebar/README.md#folders) | ✅ | ✅ |
 | Google Calendar previews | ✅ | ☐ |
 | Google Mail previews | ✅ | ☐ |
 | Outlook Calendar previews | ✅ | ☐ |
