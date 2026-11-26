@@ -51,7 +51,8 @@ private struct FlyoutRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Cancel Download")
+                .accessibilityLabel("Cancel Download")
+                .oaToolTip("Cancel Download")
             }
         }
         .padding(.leading, 4)

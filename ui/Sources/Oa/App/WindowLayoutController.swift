@@ -90,7 +90,7 @@ final class WindowLayoutController: NSViewController {
             guard let self else { return false }
             let transitioningLibrary = libraryProgress > 0 && libraryProgress < 1
             return !isPaging && !transitioningLibrary && spaceCreationFade == nil && resizingWidth == nil
-                && sidebarPresentation != .hidden && holds.isEmpty
+                && (sidebarPresentation != .hidden || libraryProgress >= 1) && holds.isEmpty
                 && model.commandBar == nil && model.dialog == nil && model.extensionRequest == nil
         }
         pager.windowProvider = { [weak self] in self?.viewIfLoaded?.window }

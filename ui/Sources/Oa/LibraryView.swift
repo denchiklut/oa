@@ -113,7 +113,8 @@ struct LibraryView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(LibraryIconButtonStyle())
-                .help("Exit Library")
+                .accessibilityLabel("Exit Library")
+                .oaToolTip("Exit Library")
                 Spacer()
             }
         }
@@ -631,13 +632,15 @@ private struct ArchiveRow: View {
                             .font(.system(size: 13.5))
                             .frame(width: 28, height: 28)
                     }
-                    .help("Delete")
+                    .accessibilityLabel("Delete")
+                    .oaToolTip("Delete", priority: 1)
                     Button(action: restore) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 13.5, weight: .medium))
                             .frame(width: 28, height: 28)
                     }
-                    .help("Restore")
+                    .accessibilityLabel("Restore")
+                    .oaToolTip("Restore", priority: 1)
                 }
                 .buttonStyle(LibraryIconButtonStyle(cornerRadius: 6))
             }
@@ -651,7 +654,7 @@ private struct ArchiveRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture(perform: peek)
         .onHover { hovering = $0 }
-        .help(entry.displayTitle)
+        .oaToolTip(entry.displayTitle, delay: OaToolTipConfiguration.rowDelay)
         .contextMenu {
             Button("Restore", action: restore)
             Button("Delete", action: delete)
@@ -715,7 +718,7 @@ private struct DownloadRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture { model.activate(entry) }
         .onHover { hovering = $0 }
-        .help(entry.name)
+        .oaToolTip(entry.name, delay: OaToolTipConfiguration.rowDelay)
         .contextMenu { DownloadMenu(model: model, entry: entry) }
     }
 }
@@ -788,7 +791,8 @@ struct LibraryButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(ChromeButtonStyle())
-        .help("View Library")
+        .accessibilityLabel("View Library")
+        .oaToolTip("View Library", shortcut: model.keyBindings.state.shortcut(for: "viewLibrary"))
         .overlay(alignment: .topTrailing) {
             if let progress = model.downloads.progress {
                 DownloadRing(progress: progress, size: 13)
