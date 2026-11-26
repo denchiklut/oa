@@ -25,7 +25,10 @@ struct SpaceMenu {
             MenuActionItem("Edit Theme Color…", global ? editTheme : nil),
             MenuActionItem("Set Profile", submenu: profiles(), enabled: global),
             .separator(),
-            MenuActionItem("New Folder"),
+            MenuActionItem("New Folder", enabled: global) { [model, space] in
+                model.exitLibrary()
+                model.createFolder(in: space.id, startEditing: true)
+            },
             MenuActionItem("Live Folders", submenu: NSMenu(), enabled: false),
             .separator(),
             MenuActionItem("Share Space…"),

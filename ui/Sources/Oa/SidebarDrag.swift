@@ -16,10 +16,13 @@ final class SidebarDrag {
 
     struct Target: Equatable {
         var section: Section
-        /// Among the list's rows as they stand, the dragged one included; among the Favorites, which it has left,
-        /// without it.
+        /// Container (root or folder) receiving the drop, nil for Favorites.
+        var parentID: UUID?
+        /// Among `parentID`'s children (or among Favorites without the lifted tile).
         var index: Int
         var line: CGRect?
+        /// Folder being hovered directly onto (tilts icon open, fills `maxContrast @ 0.5`, appends on drop).
+        var dropFolderID: UUID?
         /// The row whose middle the tab is held on, which it would make a split with or join, last when held on the
         /// row's right half.
         var combine: UUID?
@@ -47,14 +50,15 @@ final class SidebarDrag {
     /// Where the window's page or panes are.
     @ObservationIgnored var pageArea = CGRect.zero
 
-    /// A tab, or a split's cell or tile, which moves whole.
+    /// A tab, folder, or a split's cell or tile, which moves whole.
     private(set) var entry: SidebarEntry?
     /// The multi-selection the dragged row is in, in the sidebar's order, which moves with it.
     private(set) var memberIDs: [UUID] = []
     /// As seen in Arc's stack: the selected tab in front when it is a member, else the dragged row.
-    private(set) var stack: [SidebarTab] = []
+    private(set) var stack: [SidebarEntry] = []
     /// A link dragged in from a page.
     @ObservationIgnored private var link = false
+    var isLinkDrag: Bool { link }
     private(set) var source: Section?
     private(set) var target: Target?
     private(set) var location = CGPoint.zero
@@ -83,6 +87,7 @@ final class SidebarDrag {
     private struct HapticSource: Hashable {
         var spaceID: UUID
         var grid: Bool
+        var parentID: UUID?
     }
 
     private enum Edge {
@@ -130,7 +135,7 @@ final class SidebarDrag {
     private func retarget(model: WindowModel) {
         let next = target(at: location, model: model)
         if next != target { target = next }
-        if let next, next.combine == nil { tick(at: next, in: model.selectedSpaceID) }
+        if let next, next.combine == nil, next.dropFolderID == nil { tick(at: next, in: model.selectedSpaceID) }
         let dropTarget = next == nil ? splitViewDropTarget(at: location, model: model) : nil
         if dropTarget != model.proposedSplitViewDropTarget { model.proposedSplitViewDropTarget = dropTarget }
         // As measured on Arc: AppKit turns the drag image into the card over about 0.2 s.
@@ -146,23 +151,23 @@ final class SidebarDrag {
     /// As Arc: a tick when an insertion slot differs from the last one, which counts even with haptics off; a drop
     /// onto a row sends nothing.
     private func tick(at target: Target, in spaceID: UUID) {
-        let source = HapticSource(spaceID: spaceID, grid: target.section == .favorites)
+        let source = HapticSource(spaceID: spaceID, grid: target.section == .favorites, parentID: target.parentID)
         guard hapticSlots.updateValue(target.index, forKey: source) != target.index,
             !TabReorderingHaptics.isDisabled
         else { return }
         NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
     }
 
-    /// Over a place, the tab moves there at once and the copy glides onto it; elsewhere it glides back.
+    /// Over a place, the item moves there at once and the copy glides onto it; elsewhere it glides back.
     func finish(model: WindowModel, layout: WindowLayoutController) {
-        guard let entry, let tab = entry.tabs.first, !settling else { return }
+        guard let entry, !settling else { return }
         heldInsert = nil
         combineCandidate = nil
         // As seen in Arc: a drag ends the multi-selection however it ends.
         model.clearMultiSelection()
         let memberIDs = memberIDs
         self.memberIDs = []
-        if model.proposedSplitViewDropTarget != nil || target?.combine != nil {
+        if model.proposedSplitViewDropTarget != nil || target?.combine != nil, let tab = entry.tabs.first {
             if let combine = target?.combine, !memberIDs.isEmpty {
                 model.combineIntoSplitView(memberIDs, onto: combine, last: target?.combinesLast == true)
             } else if let combine = target?.combine {
@@ -179,45 +184,67 @@ final class SidebarDrag {
             return layout.setHold(.drag, false)
         }
         // Oa's own: a tab dropped anywhere else is the selected one, as before it was dragged over the page.
-        if showsPrevious {
+        if showsPrevious, let tab = entry.tabs.first {
             if case .splitView(let id, _) = entry { model.selectSplitView(id) } else { model.select(tab.id) }
         }
         showsPrevious = false
         settling = true
         let target = target
         if let target {
-            switch target.section {
-            case .favorites where !memberIDs.isEmpty:
-                model.favorite(memberIDs, at: target.index)
-            case .pinned where !memberIDs.isEmpty, .today where !memberIDs.isEmpty:
-                let pinned = target.section == .pinned
-                let ids = model.state.entries(in: model.selectedSpaceID, pinned: pinned).map(\.id)
-                let anchorID = ids.prefix(target.index).last { !memberIDs.contains($0) }
-                model.moveTabs(memberIDs, pinned: pinned, after: anchorID)
-            case .favorites:
-                let favorites = model.state.favoriteEntries(for: model.selectedSpaceID)
-                let from = source == .favorites ? favorites.firstIndex { $0.id == entry.id } : nil
-                // The grid's index leaves the tile out; the tree counts it where it was. A split's tab takes its
-                // split.
-                model.favorite(
-                    tab.id, at: from.map { $0 < target.index ? target.index + 1 : target.index } ?? target.index)
-            case .pinned, .today:
-                model.move(entry.id, pinned: target.section == .pinned, at: target.index)
+            if let dropFolderID = target.dropFolderID {
+                if !memberIDs.isEmpty {
+                    let moving = Set(memberIDs)
+                    let anchor = model.state.tree[dropFolderID]?.childIDs.last { !moving.contains($0) }
+                    model.moveItems(memberIDs, into: dropFolderID, after: anchor)
+                } else {
+                    model.moveItem(entry.id, into: dropFolderID, at: nil)
+                }
+            } else {
+                switch target.section {
+                case .favorites where !memberIDs.isEmpty:
+                    model.favorite(memberIDs, at: target.index)
+                case .favorites:
+                    if let tab = entry.tabs.first {
+                        let favorites = model.state.favoriteEntries(for: model.selectedSpaceID)
+                        let from = source == .favorites ? favorites.firstIndex { $0.id == entry.id } : nil
+                        // The grid's index leaves the tile out; the tree counts it where it was. A split's tab takes
+                        // its split.
+                        model.favorite(
+                            tab.id, at: from.map { $0 < target.index ? target.index + 1 : target.index } ?? target.index
+                        )
+                    }
+                case .pinned, .today:
+                    if let parentID = target.parentID {
+                        if !memberIDs.isEmpty {
+                            let top = model.state.topLevelItemIDs(in: memberIDs)
+                            let siblings = model.state.tree[parentID]?.childIDs ?? []
+                            let anchorID = siblings.prefix(target.index).last { !top.contains($0) }
+                            model.moveItems(top, into: parentID, after: anchorID)
+                        } else {
+                            model.moveItem(entry.id, into: parentID, at: target.index)
+                        }
+                    }
+                }
             }
         }
         let frontID = stack.first?.id ?? entry.id
         let before = rows[frontID]?.rect
         Task {
             // The row's new frame comes with the layout after the move; a row that stays put reports none.
-            for _ in 0..<(target.map { $0.section != .favorites } == true ? 8 : 1) {
+            for _ in 0..<(target.map { $0.section != .favorites && $0.dropFolderID == nil } == true ? 8 : 1) {
                 try? await Task.sleep(for: .milliseconds(15))
                 if let rect = rows[frontID]?.rect, rect != before { break }
             }
-            let landing =
-                switch target?.section {
-                case .favorites: gap
-                case .pinned, .today: rows[frontID]?.rect.insetBy(dx: 0, dy: 2) ?? origin
-                case nil: origin
+            let landing: CGRect =
+                if let dropFolderID = target?.dropFolderID {
+                    rows[frontID]?.rect.insetBy(dx: 0, dy: 2)
+                        ?? rows[dropFolderID]?.rect.insetBy(dx: 0, dy: 2) ?? origin
+                } else {
+                    switch target?.section {
+                    case .favorites: gap
+                    case .pinned, .today: rows[frontID]?.rect.insetBy(dx: 0, dy: 2) ?? origin
+                    case nil: origin
+                    }
                 }
             let anchor = morph == 1 ? tileAnchor : rowAnchor
             withAnimation(.easeOut(duration: 0.16)) {
@@ -258,8 +285,12 @@ final class SidebarDrag {
         self.entry = entry
         memberIDs = members
         let frontID = model.selectedTabID.flatMap { members.contains($0) ? $0 : nil } ?? entry.id
-        let tabs = members.compactMap { model.state.tree.tab($0) }
-        stack = tabs.filter { $0.id == frontID } + tabs.filter { $0.id != frontID }
+        let entries: [SidebarEntry] = members.compactMap { id in
+            if let tab = model.state.tree.tab(id) { return .tab(tab) }
+            if let folder = model.state.tree.folder(id) { return .folder(folder) }
+            return nil
+        }
+        stack = entries.filter { $0.id == frontID } + entries.filter { $0.id != frontID }
         source = section
         self.glyph = glyph
         layout.setHold(.drag, true)
@@ -354,13 +385,32 @@ final class SidebarDrag {
         return CGSize(width: (frames.first?.width ?? 0) * scale, height: (frames.first?.height ?? 0) * scale)
     }
 
+    private func draggedItemIDs(model: WindowModel) -> [UUID] {
+        if !memberIDs.isEmpty { return model.state.topLevelItemIDs(in: memberIDs) }
+        return entry.map { [$0.id] } ?? []
+    }
+
+    private func dragsFolder(model: WindowModel) -> Bool {
+        draggedItemIDs(model: model).contains { model.state.tree.folder($0) != nil }
+    }
+
+    private func canMoveDragged(into parentID: UUID, model: WindowModel) -> Bool {
+        if link {
+            return model.state.tree[parentID]?.container != nil || model.state.containerDepth(of: parentID) != nil
+        }
+        let ids = draggedItemIDs(model: model)
+        guard !ids.isEmpty else { return false }
+        return ids.allSatisfy { model.state.canMoveItem($0, into: parentID) }
+    }
+
     /// The pointer picks the place, as AppKit's drag destinations do: among the Favorites the slot under it, in the
-    /// list the gap between the rows around it.
+    /// list a folder's body or the gap between the rows around it (indented 16 pt per nesting level).
     private func target(at point: CGPoint, model: WindowModel) -> Target? {
         guard entry != nil || link, let list = lists[model.selectedSpaceID] else { return nil }
+        let draggingFolder = dragsFolder(model: model)
         if grid.contains(point) {
-            // A link dropped on the Favorites wasn't tried in Arc; Oa's own: nothing.
-            guard let entry else { return nil }
+            // A link dropped on the Favorites wasn't tried in Arc; folders are pinned-section only.
+            guard let entry, !draggingFolder else { return nil }
             let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != entry.id }.count
             let slots = FavoritesGrid.Layout(count: others + 1, width: grid.width)
             let column = Int((point.x - grid.minX - 4) / (slots.tileWidth + 8))
@@ -369,12 +419,19 @@ final class SidebarDrag {
             return Target(section: .favorites, index: min(index, others))
         }
         guard list.area.contains(point) else { return nil }
-        let pinnedIDs = model.state.entries(in: model.selectedSpaceID, pinned: true).map(\.id)
+        let pinnedRows = model.visiblePinnedRows(in: model.selectedSpaceID)
         let boundary =
             list.divider?.midY ?? (list.newTab != .zero ? list.newTab.minY : nil)
-            ?? pinnedIDs.compactMap { rows[$0]?.rect.maxY }.max() ?? list.pinnedTop
+            ?? pinnedRows.compactMap { rows[$0.id]?.rect.maxY }.max() ?? list.pinnedTop
         let pinned = point.y < boundary && model.sidebarContext == .global
-        let ids = pinned ? pinnedIDs : model.state.entries(in: model.selectedSpaceID, pinned: false).map(\.id)
+        if pinned {
+            return pinnedTarget(at: point, list: list, pinnedRows: pinnedRows, model: model)
+        }
+        // As Arc's `SidebarData.item(_:canHaveContext:)`: folders cannot move to Today.
+        guard !draggingFolder, let unpinnedRootID = model.state.space(model.selectedSpaceID)?.unpinnedRootID else {
+            return nil
+        }
+        let ids = model.state.entries(in: model.selectedSpaceID, pinned: false).map(\.id)
         let index = ids.filter { (rows[$0]?.rect.midY ?? .infinity) < point.y }.count
         let y: CGFloat =
             if index < ids.count, let rect = rows[ids[index]]?.rect {
@@ -382,16 +439,100 @@ final class SidebarDrag {
             } else if let last = ids.last, let rect = rows[last]?.rect {
                 rect.maxY + 1
             } else {
-                pinned ? list.pinnedTop : list.newTab.maxY + 1
+                list.newTab.maxY + 1
             }
-        let section = pinned ? Section.pinned : .today
         if let combine = combineTarget(at: point, among: ids, model: model) {
             // As measured on Arc: the row's middle decides, for a tab's row as for a split's cell.
             let last = point.x > rows[combine]?.rect.midX ?? .infinity
-            return Target(section: section, index: index, combine: combine, combinesLast: last)
+            return Target(section: .today, parentID: unpinnedRootID, index: index, combine: combine, combinesLast: last)
         }
         let line = CGRect(x: list.area.minX + 16, y: y - 4, width: list.area.width - 27, height: 8)
-        return Target(section: section, index: index, line: line)
+        return Target(section: .today, parentID: unpinnedRootID, index: index, line: line)
+    }
+
+    private func pinnedTarget(at point: CGPoint, list: ListFrame, pinnedRows: [SidebarRow], model: WindowModel)
+        -> Target?
+    {
+        guard let pinnedRootID = model.state.space(model.selectedSpaceID)?.pinnedRootID else { return nil }
+        // Drop directly onto a folder's middle band: tilts its icon open and fills `maxContrast @ 0.5`.
+        for row in pinnedRows where row.entry.folder != nil {
+            guard let rect = rows[row.id]?.rect, rect.contains(point),
+                point.y >= rect.minY + 9, point.y <= rect.maxY - 9
+            else { continue }
+            guard canMoveDragged(into: row.id, model: model) else { return nil }
+            let count = model.state.tree[row.id]?.childIDs.count ?? 0
+            return Target(section: .pinned, parentID: row.id, index: count, dropFolderID: row.id)
+        }
+        if !dragsFolder(model: model),
+            let combine = combineTarget(
+                at: point, among: pinnedRows.filter { $0.entry.folder == nil }.map(\.id), model: model)
+        {
+            let last = point.x > rows[combine]?.rect.midX ?? .infinity
+            return Target(section: .pinned, parentID: pinnedRootID, index: 0, combine: combine, combinesLast: last)
+        }
+        let slot = pinnedRows.filter { (rows[$0.id]?.rect.midY ?? .infinity) < point.y }.count
+        let y: CGFloat =
+            if slot < pinnedRows.count, let rect = rows[pinnedRows[slot].id]?.rect {
+                rect.minY
+            } else if let last = pinnedRows.last, let rect = rows[last.id]?.rect {
+                rect.maxY + 1
+            } else {
+                list.pinnedTop
+            }
+        let above = slot > 0 ? pinnedRows[slot - 1] : nil
+        let below = slot < pinnedRows.count ? pinnedRows[slot] : nil
+        let outermostCollapsed: (UUID) -> UUID? = { id in
+            model.state.folderAncestors(of: id).reversed().first { !model.isFolderExpanded($0) }
+        }
+        // Do not splice a drop line inside a collapsed (peeked) folder's branch.
+        if let below, let collapsed = outermostCollapsed(below.id),
+            let above, above.id == collapsed || outermostCollapsed(above.id) == collapsed
+        {
+            return nil
+        }
+        if model.collapsedPinnedSpaces.contains(model.selectedSpaceID) {
+            let index =
+                above.flatMap { row -> Int? in
+                    let top = model.state.folderAncestors(of: row.id).last ?? row.id
+                    return model.state.tree.location(of: top).map { $0.index + 1 }
+                } ?? 0
+            let line = CGRect(x: list.area.minX + 16, y: y - 4, width: list.area.width - 27, height: 8)
+            return Target(section: .pinned, parentID: pinnedRootID, index: index, line: line)
+        }
+        let minDepth = below?.depth ?? 0
+        var candidates: [(parentID: UUID, index: Int, depth: Int)] = []
+        func appendChain(startingFrom itemID: UUID, depth startDepth: Int) {
+            var currentID = itemID
+            var depth = startDepth
+            while depth >= minDepth, let place = model.state.tree.location(of: currentID) {
+                candidates.append((place.parentID, place.index + 1, depth))
+                if depth == minDepth || place.parentID == pinnedRootID { break }
+                currentID = place.parentID
+                depth -= 1
+            }
+        }
+        if let above {
+            if above.entry.folder != nil, above.isExpanded {
+                candidates.append((above.id, 0, above.depth + 1))
+                if below?.parentID != above.id { appendChain(startingFrom: above.id, depth: above.depth) }
+            } else if let collapsed = outermostCollapsed(above.id),
+                let collapsedRow = pinnedRows.first(where: { $0.id == collapsed })
+            {
+                appendChain(startingFrom: collapsed, depth: collapsedRow.depth)
+            } else {
+                appendChain(startingFrom: above.id, depth: above.depth)
+            }
+        } else {
+            candidates = [(pinnedRootID, 0, 0)]
+        }
+        candidates = candidates.filter { canMoveDragged(into: $0.parentID, model: model) }
+        guard !candidates.isEmpty else { return nil }
+        let desired = max(0, Int(floor((point.x - (list.area.minX + 16)) / 16)))
+        let chosen = candidates.min { abs($0.depth - desired) < abs($1.depth - desired) }!
+        let indent = CGFloat(chosen.depth) * 16
+        let line = CGRect(
+            x: list.area.minX + 16 + indent, y: y - 4, width: max(list.area.width - 27 - indent, 20), height: 8)
+        return Target(section: .pinned, parentID: chosen.parentID, index: chosen.index, line: line)
     }
 
     /// As measured on Arc: a tab held on the middle half of another row for 0.2 s from entering it would make a split
@@ -448,8 +589,10 @@ struct SidebarLinkDrop: DropDelegate {
             Task { @MainActor in
                 if let splitID = target.combine {
                     model.openDroppedLink(url, inSplitView: splitID, last: target.combinesLast)
-                } else {
-                    model.openDroppedLink(url, pinned: target.section == .pinned, at: target.index)
+                } else if let dropFolderID = target.dropFolderID {
+                    model.openDroppedLink(url, into: dropFolderID, at: nil)
+                } else if let parentID = target.parentID {
+                    model.openDroppedLink(url, into: parentID, at: target.index)
                 }
             }
         }
@@ -487,9 +630,9 @@ struct SidebarDragLayer: View {
                     // As seen in Arc: AppKit's stack, up to three rows each 6 pt down and right, the count at its
                     // corner.
                     let shown = Array(drag.stack.prefix(3).enumerated())
-                    ForEach(shown.reversed(), id: \.element.id) { depth, tab in
+                    ForEach(shown.reversed(), id: \.element.id) { depth, item in
                         SidebarDragPreview(
-                            model: model, drag: drag, entry: .tab(tab), morph: drag.morph, depth: CGFloat(depth),
+                            model: model, drag: drag, entry: item, morph: drag.morph, depth: CGFloat(depth),
                             count: depth == 0 ? drag.stack.count : nil)
                     }
                 }
@@ -564,6 +707,17 @@ private struct SidebarDragPreview: View, Animatable {
                 TabFavicon(model: model, tab: tab)
                     .frame(width: 16, height: 16)
                     .offset(x: 10 + (width / 2 - 18) * t, y: (height - 16) / 2)
+            case .folder(let folder):
+                FolderIcon(state: .collapsed, customIcon: folder.icon, theme: theme)
+                    .frame(width: FolderIcon.size.width, height: FolderIcon.size.height)
+                    .frame(width: 24, height: 24)
+                    .offset(x: 6, y: (height - 24) / 2)
+                Text(folder.displayTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(theme.foreground)
+                    .lineLimit(1)
+                    .frame(width: max(drag.rowSize.width - 46, 1), height: height, alignment: .leading)
+                    .offset(x: 36)
             case .splitView(let id, let tabs):
                 SplitAppTrayRing(favicons: tabs.map(model.favicon(for:)), tileWidth: width).opacity(t)
                 let data = model.state.splitView(id)

@@ -5,17 +5,15 @@ describes the broader intended responsibilities.
 
 The current app uses an observable `SidebarStore` for shared data and a
 `WindowModel` for each window, composed by `ApplicationDelegate`. `AppEngine`
-selects the live or stub DevKit implementation. These notes describe existing
-slices; folders, split views, undo, sync and the full feature surface are not
-implied to be implemented.
+selects the live or stub DevKit implementation.
 
 ## Shared model and window selection
 
 `SidebarState` is the app's source of truth: profiles, Spaces and an item tree.
 A profile owns a favorites root; a Space owns a pinned root and an unpinned
 root. The engine owns the profiles' names and the list of them; see
-[Profiles](../profiles/README.md). Tree nodes are containers, tabs, folders and split views; only containers
-and tabs are implemented. A tab entry takes its tab's ID, so pinning is a move
+[Profiles](../profiles/README.md). The tree contains section roots, tabs,
+folders and split views. A tab entry takes its tab's ID, so pinning is a move
 to the end of the other section and the entry keeps its identity. A tab's live
 page has an ID of its own, a fresh one per page as Arc gives its contents, so
 two pages for one entry stay two. A tab record
@@ -148,6 +146,24 @@ reused named tab rather than showing the page twice. Arc does nothing for a
 same way, so Oa raises the window for that too. Chromium grants the request
 only to a caller with a recent gesture or to the page's opener, so a page
 can't pull the selection to itself from the background.
+
+### Folders
+
+Use **Tabs ▸ New Folder…** to name a folder in a Space’s pinned section.
+The sidebar’s **+** and Space menus start an inline rename. A folder’s context
+menu can rename it, change its icon or add a nested folder. Selected rows can
+be grouped into a folder together.
+
+Folders nest up to seven levels. Drop a row onto a folder to append it, or
+between rows to set its position. Dropping into a collapsed folder keeps it
+collapsed. If the active tab is inside, its row stays visible through its
+ancestor folders. Numbered tab shortcuts follow visible rows. Command Bar
+search also finds tabs inside collapsed folders.
+
+The sidebar file stores each folder’s title, icon and ordered children.
+Each window saves its own expanded folders in `windows.json`. Deleting a
+nonempty folder asks for confirmation and archives its tabs. **Edit ▸ Undo**
+restores the folder tree in order.
 
 ## Window frame
 

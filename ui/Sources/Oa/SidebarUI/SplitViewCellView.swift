@@ -11,6 +11,7 @@ struct SplitViewCellView: View {
     let splitID: UUID
     let tabs: [SidebarTab]
     let spaceID: UUID
+    var depth = 0
     @State private var hovering = false
     @State private var renaming = false
     @State private var pressed = false
@@ -20,6 +21,7 @@ struct SplitViewCellView: View {
     @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
+        let indent = CGFloat(depth) * 16
         let selected = tabs.contains { $0.id == model.selectedTabIDs[spaceID] }
         let pinned = tabs.first.map { model.state.isPinned($0.id) } ?? false
         let data = model.state.splitView(splitID)
@@ -87,6 +89,7 @@ struct SplitViewCellView: View {
         .contentShape(card)
         // As measured on Arc: the split's card is 1.5 pt narrower at each side than a tab's.
         .padding(.horizontal, 1.5)
+        .padding(.leading, indent)
         // As seen in Arc: a press anywhere on the cell drags the split whole. It selects a split that isn't
         // selected, and on the selected one focuses the tab pressed. The split stays selected through the drag, so
         // it never drops on its own page.
@@ -130,8 +133,8 @@ struct SplitViewCellView: View {
         }
         .opacity(drag?.entry?.id == splitID && drag?.settling == true ? 0 : 1)
         .popover(
-            isPresented: $pickingIcon, attachmentAnchor: .rect(.rect(CGRect(x: 16, y: 2, width: 20, height: 36))),
-            arrowEdge: .bottom
+            isPresented: $pickingIcon,
+            attachmentAnchor: .rect(.rect(CGRect(x: 16 + indent, y: 2, width: 20, height: 36))), arrowEdge: .bottom
         ) {
             // Oa's own: the Space icon picker. Arc's has its Ionicons and every emoji; a pick applies at once and the
             // picker stays, as Arc's does.

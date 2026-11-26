@@ -109,7 +109,11 @@ struct SidebarSnapshot: Codable {
                         customTitle: savedTitle == nil || title.isEmpty ? nil : title,
                         icon: try values.decodeIfPresent(CustomInfo.self, forKey: .customInfo)?.icon,
                         muteStatus: try values.decodeIfPresent(SidebarTab.MuteStatus.self, forKey: .savedMuteStatus)))
-            case "folder": kind = .folder(title: title)
+            case "folder":
+                kind = .folder(
+                    SidebarFolder(
+                        id: id, title: title,
+                        icon: try values.decodeIfPresent(CustomInfo.self, forKey: .customInfo)?.icon))
             case "splitView":
                 var data =
                     try values.decodeIfPresent(SidebarSplitViewData.self, forKey: .splitView)
@@ -141,9 +145,10 @@ struct SidebarSnapshot: Codable {
                 try values.encodeIfPresent(tab.activeTabBeforeCreationID, forKey: .activeTabBeforeCreationID)
                 if let icon = tab.icon { try values.encode(CustomInfo(icon: icon), forKey: .customInfo) }
                 try values.encodeIfPresent(tab.muteStatus, forKey: .savedMuteStatus)
-            case .folder(let title):
+            case .folder(let folder):
                 try values.encode("folder", forKey: .type)
-                try values.encode(title, forKey: .title)
+                try values.encode(folder.title, forKey: .title)
+                if let icon = folder.icon { try values.encode(CustomInfo(icon: icon), forKey: .customInfo) }
             case .splitView(let data):
                 try values.encode("splitView", forKey: .type)
                 try values.encodeIfPresent(data.title, forKey: .title)
@@ -246,6 +251,8 @@ struct WindowRecord: Codable {
     var lastActiveDates: [UUID: Date]
     var createdDates: [UUID: Date]
     var collapsedPinnedSpaces: Set<UUID>
+    /// Arc's per-window `expandedItems`: the folders open in this window.
+    var expandedItems: Set<UUID>
     /// Oa's own key: the tab the window showed, which comes back shown with its page when the last session does.
     var selectedTabID: UUID?
     var style: WindowStyle
@@ -253,12 +260,13 @@ struct WindowRecord: Codable {
     private enum Key: String, CodingKey {
         case id, selectedSpaceID, sidebarMode, sidebarWidth, lastActiveDates, createdDates, selectedTabID, style
         case collapsedPinnedSpaces = "spacesWithCollapsedPinnedSections"
+        case expandedItems
     }
 
     init(
         id: UUID, style: WindowStyle, selectedSpaceID: UUID, sidebarMode: SidebarMode,
         sidebarWidth: CGFloat, lastActiveDates: [UUID: Date], createdDates: [UUID: Date],
-        collapsedPinnedSpaces: Set<UUID>, selectedTabID: UUID?
+        collapsedPinnedSpaces: Set<UUID>, expandedItems: Set<UUID> = [], selectedTabID: UUID?
     ) {
         self.id = id
         self.style = style
@@ -268,6 +276,7 @@ struct WindowRecord: Codable {
         self.lastActiveDates = lastActiveDates
         self.createdDates = createdDates
         self.collapsedPinnedSpaces = collapsedPinnedSpaces
+        self.expandedItems = expandedItems
         self.selectedTabID = selectedTabID
     }
 
@@ -287,6 +296,7 @@ struct WindowRecord: Codable {
         lastActiveDates = try dates(.lastActiveDates)
         createdDates = try dates(.createdDates)
         collapsedPinnedSpaces = try values.decodeIfPresent(Set<UUID>.self, forKey: .collapsedPinnedSpaces) ?? []
+        expandedItems = try values.decodeIfPresent(Set<UUID>.self, forKey: .expandedItems) ?? []
         selectedTabID = try values.decodeIfPresent(UUID.self, forKey: .selectedTabID)
         // As Arc's: a style that doesn't read, as a hot key's Little window's, is a standard window's.
         style = (try? values.decode(WindowStyle.self, forKey: .style)) ?? .standard(sidebarContext: .global)
@@ -305,6 +315,9 @@ struct WindowRecord: Codable {
         try values.encode(stored(createdDates), forKey: .createdDates)
         try values.encode(
             collapsedPinnedSpaces.sorted { $0.uuidString < $1.uuidString }, forKey: .collapsedPinnedSpaces)
+        if !expandedItems.isEmpty {
+            try values.encode(expandedItems.sorted { $0.uuidString < $1.uuidString }, forKey: .expandedItems)
+        }
         try values.encodeIfPresent(selectedTabID, forKey: .selectedTabID)
         try values.encode(style, forKey: .style)
     }

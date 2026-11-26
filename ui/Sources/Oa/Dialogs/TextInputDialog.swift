@@ -8,6 +8,7 @@ struct TextInputDialog: View {
     let icon: NSImage?
     let placeholder: String
     let confirmTitle: String
+    let isValidWhenEmpty: Bool
     let width: CGFloat
     let onSubmit: (String) -> Void
     let onCancel: () -> Void
@@ -16,14 +17,15 @@ struct TextInputDialog: View {
 
     init(
         title: String, message: String? = nil, icon: NSImage? = nil, text: String, placeholder: String,
-        confirmTitle: String, width: CGFloat = 450, onSubmit: @escaping (String) -> Void,
-        onCancel: @escaping () -> Void
+        confirmTitle: String, isValidWhenEmpty: Bool = true, width: CGFloat = 450,
+        onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void
     ) {
         self.title = title
         self.message = message
         self.icon = icon
         self.placeholder = placeholder
         self.confirmTitle = confirmTitle
+        self.isValidWhenEmpty = isValidWhenEmpty
         self.width = width
         self.onSubmit = onSubmit
         self.onCancel = onCancel
@@ -31,6 +33,7 @@ struct TextInputDialog: View {
     }
 
     var body: some View {
+        let canSubmit = isValidWhenEmpty || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         VStack(alignment: .leading, spacing: 0) {
             if let icon {
                 Image(nsImage: icon)
@@ -47,12 +50,12 @@ struct TextInputDialog: View {
             }
             DialogTextField(placeholder: placeholder, text: $text)
                 .focused($focused)
-                .onSubmit { onSubmit(text) }
+                .onSubmit { if canSubmit { onSubmit(text) } }
                 .padding(.top, 20)
             HStack(spacing: 8) {
                 Spacer()
                 DialogButtonView(title: "Cancel", kind: .cancel, action: onCancel)
-                DialogButtonView(title: confirmTitle, kind: .primary) { onSubmit(text) }
+                DialogButtonView(title: confirmTitle, kind: .primary, isEnabled: canSubmit) { onSubmit(text) }
             }
             .padding(.top, 24)
         }

@@ -12,7 +12,7 @@ struct TabContextMenu {
     var rename: () -> Void = {}
 
     func make() -> NSMenu {
-        let selected = model.multiSelectedTabIDs
+        let selected = model.multiSelectedItemIDs
         if selected.contains(tab.id) { return make(several: selected) }
         let state = model.state
         let favorite = state.isFavorite(tab.id)
@@ -65,33 +65,46 @@ struct TabContextMenu {
         return menu
     }
 
-    /// As seen in Arc for several rows: no one-item entries, Change Icon… off, and the last group by kind. Share N
-    /// Items… (Arc's sharing service) and New Folder with N Items are left out, as Oa's own.
-    private func make(several tabIDs: [UUID]) -> NSMenu {
+    /// As seen in Arc for several rows: no one-item entries, Change Icon… off, New Folder with N Items under Move to,
+    /// and the last group by kind. Share N Items… (Arc's sharing service) is left out, as Oa's own.
+    private func make(several itemIDs: [UUID]) -> NSMenu {
         let state = model.state
+        let tabIDs = itemIDs.filter { state.tree.tab($0) != nil }
+        let hasFolders = tabIDs.count < itemIDs.count
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(MenuActionItem("Copy Links") { [model] in model.copyURLs(of: tabIDs) })
+        menu.addItem(MenuActionItem("Copy Links", enabled: !tabIDs.isEmpty) { [model] in model.copyURLs(of: tabIDs) })
         menu.addItem(.separator())
         menu.addItem(MenuActionItem("Change Icon…", enabled: false))
         let audio = tabIDs.map(model.audio(of:))
-        let muted = audio.allSatisfy { $0?.isMuted == true }
+        let muted = !tabIDs.isEmpty && audio.allSatisfy { $0?.isMuted == true }
         menu.addItem(
             MenuActionItem(muted ? "Unmute" : "Mute", enabled: muted || audio.contains { $0?.isAudible == true }) {
                 [model] in model.toggleMuted(tabIDs)
             })
         menu.addItem(.separator())
         menu.addItem(
-            MenuActionItem("Open in Split View", enabled: model.canOpenInSplitView(tabIDs)) { [model] in
+            MenuActionItem("Open in Split View", enabled: !hasFolders && model.canOpenInSplitView(tabIDs)) { [model] in
                 model.openInSplitView(tabIDs)
             })
-        menu.addItem(MenuActionItem("Duplicate") { [model] in for tabID in tabIDs { model.duplicate(tabID) } })
-        if model.sidebarContext != .incognito { menu.addItem(move(tabIDs, favorite: false)) }
+        menu.addItem(
+            MenuActionItem("Duplicate", enabled: !hasFolders) { [model] in
+                for tabID in tabIDs { model.duplicate(tabID) }
+            })
+        if model.sidebarContext != .incognito {
+            if !hasFolders { menu.addItem(move(tabIDs, favorite: false)) }
+            if model.sidebarContext == .global {
+                menu.addItem(
+                    MenuActionItem("New Folder with \(itemIDs.count) Items") { [model] in
+                        model.createFolder(wrapping: itemIDs)
+                    })
+            }
+        }
         menu.addItem(.separator())
         let pinned = tabIDs.filter(state.isPinned)
-        if pinned.count == tabIDs.count {
+        if !hasFolders, pinned.count == tabIDs.count {
             menu.addItem(MenuActionItem("Remove Pins") { [model] in model.archiveTabs(tabIDs) })
-        } else {
+        } else if !hasFolders {
             menu.addItem(MenuActionItem("Archive Tabs") { [model] in model.archiveTabs(tabIDs) })
             // As Arc's: below and above are for one tab.
             if pinned.isEmpty {
@@ -99,6 +112,16 @@ struct TabContextMenu {
                 menu.addItem(MenuActionItem("Archive Tabs Below", enabled: false))
                 menu.addItem(.alternate(MenuActionItem("Archive Tabs Above", enabled: false)))
             }
+        } else {
+            menu.addItem(
+                MenuActionItem("Archive Items") { [model] in
+                    let roots = model.state.topLevelItemIDs(in: itemIDs)
+                    let standaloneTabs = roots.filter { model.state.tree.tab($0) != nil }
+                    if !standaloneTabs.isEmpty { model.archiveTabs(standaloneTabs) }
+                    for id in roots where model.state.tree.folder(id) != nil {
+                        if let folder = model.state.tree.folder(id) { FolderDeletion.confirm(folder, in: model) }
+                    }
+                })
         }
         return menu
     }

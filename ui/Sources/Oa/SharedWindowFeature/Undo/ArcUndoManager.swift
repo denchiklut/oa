@@ -8,6 +8,8 @@ enum UndoAction {
     case closePeek(ownerID: UUID)
     /// Arc's `undoUpdateSpaceTheme`: the theme the Space had before, none for the default.
     case updateSpaceTheme(spaceID: UUID, theme: WindowTheme?)
+    case restoreFolder(ClosedFolder)
+    case deleteFolder(UUID)
 }
 
 /// Arc's names for what Edit ▸ Undo takes back.
@@ -15,6 +17,7 @@ enum UndoStrings {
     static let archiveTab = "Archive Tab"
     static let archiveTabs = "Archive Tabs"
     static let closePeek = "Close Peek"
+    static let deleteFolder = "Delete Folder"
     static let updateTheme = "Update Theme"
     static func clearTabs(_ count: Int) -> String { count == 1 ? "Clear Tab" : "Clear Tabs" }
 }
