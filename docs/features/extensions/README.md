@@ -12,7 +12,10 @@ replaces.
 
 ## Installing and removing
 
-The store's own button starts the install. Chrome then asks before it goes on,
+The store's own button starts the install. As Arc's internal extension does,
+Core's renderer hides Chrome promotion dialogs and the "Switch to Chrome"
+banner on `chromewebstore.google.com` and replaces "Chrome" with "Oa" in the
+store's action buttons. Chrome then asks before it goes on,
 and the question reaches the app through the page that asked: a panel 450 pt
 wide over the window, dimmed with the grey Arc's sheets and dialogs share, with
 Oa's icon, the extension's, "Add the “‹name›” extension to Oa?" and Chrome's

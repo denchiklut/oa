@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "chrome/common/chrome_isolated_world_ids.h"
 #include "chrome/renderer/chrome_content_renderer_client.h"
 #include "content/public/renderer/render_frame.h"
 #include "content/public/renderer/render_frame_visitor.h"
@@ -19,9 +20,106 @@
 #include "third_party/blink/public/platform/web_string.h"
 #include "third_party/blink/public/web/web_document.h"
 #include "third_party/blink/public/web/web_local_frame.h"
+#include "third_party/blink/public/web/web_script_source.h"
 
 namespace oa {
 namespace {
+
+// As Arc's internal extension: hide Chrome promotion dialogs/banners on the
+// Chrome Web Store and replace "Chrome" with "Oa" in store action buttons.
+constexpr char kWebstoreHost[] = "chromewebstore.google.com";
+constexpr char kWebstoreCSS[] =
+    "div[role=\"dialog\"]:has(a[href*=\"google.com/chrome\"]),\n"
+    "div[role=\"dialog\"]:has(path[d=\"M11 7h2v2h-2zm0 4h2v6h-2z\"]),\n"
+    "div[aria-label=\"Info\"]:has(button[aria-label*=\"Chrome\"]) {\n"
+    "  display: none !important;\n"
+    "}";
+constexpr char kWebstoreScript[] = R"JS((() => {
+  const brand = 'Oa';
+  const selector = 'div > button > span';
+  const rename = (span, observe) => {
+    if (span.textContent.includes('Chrome')) {
+      span.textContent = span.textContent.replace(/Chrome/g, brand);
+    }
+    if (observe) {
+      new MutationObserver(mutations => {
+        if (mutations.some(m => m.type === 'characterData')) {
+          rename(span, false);
+        }
+      }).observe(span, {characterData: true, subtree: true});
+    }
+  };
+  const clean = () => {
+    document.querySelector('div[role="dialog"] a[href*="google.com/chrome"]')
+        ?.closest('div[role="dialog"]')?.remove();
+    document.querySelector(
+        'div[role="dialog"] path[d="M11 7h2v2h-2zm0 4h2v6h-2z"]')
+        ?.closest('div[role="dialog"]')?.remove();
+    document.querySelectorAll('div[aria-label="Info"]').forEach(el => {
+      if (el.querySelector('button[aria-label*="Chrome"]')) el.remove();
+    });
+    for (const span of document.querySelectorAll(selector)) {
+      const box = span.parentElement?.parentElement?.parentElement?.parentElement;
+      if (!box) continue;
+      const directText = el => [...el.childNodes]
+          .filter(n => n.nodeType === Node.TEXT_NODE)
+          .map(n => n.textContent).join('').trim();
+      if ([...box.querySelectorAll('section > div > div > div > div')]
+          .find(el => directText(el).includes('Chrome'))) {
+        box.remove();
+        break;
+      }
+    }
+  };
+  clean();
+  for (const span of document.querySelectorAll(selector)) rename(span, false);
+  if (window.oaWebstoreInjected) return;
+  window.oaWebstoreInjected = true;
+  const start = () => {
+    if (!document.body) return;
+    clean();
+    let ticks = 0;
+    const timer = setInterval(() => {
+      clean();
+      if (++ticks >= 10) clearInterval(timer);
+    }, 500);
+    for (const span of document.querySelectorAll(selector)) rename(span, true);
+    new MutationObserver(mutations => {
+      clean();
+      mutations.filter(m => m.type === 'childList').forEach(m => {
+        [...m.addedNodes]
+            .filter(n => n.nodeType === Node.ELEMENT_NODE)
+            .forEach(el => {
+              if (el.matches(selector)) {
+                rename(el, true);
+              } else {
+                for (const span of el.querySelectorAll(selector)) {
+                  rename(span, true);
+                }
+              }
+            });
+      });
+    }).observe(document.body, {childList: true, subtree: true});
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, {once: true});
+  } else {
+    start();
+  }
+})();)JS";
+
+bool IsChromeWebStoreMainFrame(content::RenderFrame* frame) {
+  if (!frame->IsMainFrame()) {
+    return false;
+  }
+  const blink::WebDocument document = frame->GetWebFrame()->GetDocument();
+  if (document.IsNull()) {
+    return false;
+  }
+  const GURL url = document.Url();
+  return url.SchemeIs("https") && url.host() == kWebstoreHost;
+}
+
 class AdBlockerAgent : public content::RenderThreadObserver,
                        public mojom::AdBlockerAgent,
                        public content::RenderFrameVisitor {
@@ -135,7 +233,21 @@ class ContentRendererClient : public ChromeContentRendererClient {
   }
   void RunScriptsAtDocumentStart(content::RenderFrame* frame) override {
     agent_->Visit(frame);
+    if (IsChromeWebStoreMainFrame(frame)) {
+      auto key = blink::WebString::FromAscii("webstore");
+      frame->GetWebFrame()->GetDocument().InsertStyleSheet(
+          blink::WebString::FromAscii(kWebstoreCSS), &key);
+    }
     ChromeContentRendererClient::RunScriptsAtDocumentStart(frame);
+  }
+  void RunScriptsAtDocumentEnd(content::RenderFrame* frame) override {
+    ChromeContentRendererClient::RunScriptsAtDocumentEnd(frame);
+    if (IsChromeWebStoreMainFrame(frame)) {
+      frame->GetWebFrame()->ExecuteScriptInIsolatedWorld(
+          ISOLATED_WORLD_ID_CHROME_INTERNAL,
+          blink::WebScriptSource(blink::WebString::FromUtf8(kWebstoreScript)),
+          blink::BackForwardCacheAware::kAllow);
+    }
   }
   std::unique_ptr<blink::URLLoaderThrottleProvider>
   CreateURLLoaderThrottleProvider(
