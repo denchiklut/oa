@@ -66,6 +66,115 @@ struct CopyLinkButton: View {
     }
 }
 
+/// Where Arc places pinned extensions when the top toolbar is hidden (`WindowState+CommandBarPlaceholder` and
+/// `WindowState+AppTray`): inside the URL pill while all of them fit beside a 100 pt host, else moved together into a
+/// row above Favorites; without Favorites, the URL pill keeps as many trailing pins as fit (at least one).
+enum PinnedExtensionLayout {
+    /// 28 pt per button + 1 pt gap + 100 pt host room + 20 pt field insets + 16 pt sidebar padding.
+    static func fitsInAddressField(count: Int, sidebarWidth: CGFloat) -> Bool {
+        guard count > 0 else { return true }
+        return CGFloat(count) * 28 + CGFloat(max(0, count - 1)) + 136 <= sidebarWidth
+    }
+
+    static func addressFieldActions(
+        _ pinned: [ExtensionAction], sidebarWidth: CGFloat, hasFavorites: Bool, staticButtons: Int
+    ) -> [ExtensionAction] {
+        guard !pinned.isEmpty else { return [] }
+        if hasFavorites {
+            return fitsInAddressField(count: pinned.count, sidebarWidth: sidebarWidth) ? pinned : []
+        }
+        let room = sidebarWidth - 100 - CGFloat(staticButtons) * 28
+        let cap = max(1, Int(floor(room / 28)))
+        return Array(pinned.suffix(cap))
+    }
+
+    static func trayActions(
+        _ pinned: [ExtensionAction], sidebarWidth: CGFloat, hasFavorites: Bool
+    ) -> [ExtensionAction] {
+        guard hasFavorites, !pinned.isEmpty, !fitsInAddressField(count: pinned.count, sidebarWidth: sidebarWidth) else {
+            return []
+        }
+        return pinned
+    }
+}
+
+/// An extension's 16 pt action icon, dimmed when disabled on the current page.
+struct ExtensionActionIcon: View {
+    let action: ExtensionAction
+
+    var body: some View {
+        Group {
+            if let icon = action.icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 16, height: 16)
+            } else {
+                Image(systemName: "puzzlepiece.extension.fill")
+                    .font(.system(size: 13))
+            }
+        }
+        .opacity(action.isEnabled ? 1 : 0.4)
+    }
+}
+
+/// A pinned extension button for the sidebar URL pill or top toolbar: left-click runs the action, secondary click opens
+/// Chrome's native extension menu.
+struct PinnedExtensionButton: View {
+    let model: WindowModel
+    let action: ExtensionAction
+    let size: CGSize
+    let cornerRadius: CGFloat
+    @State private var hovering = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let ink: Color = theme.isDark ? .white : .black
+        Button {
+            model.runExtension(action.id)
+        } label: {
+            ExtensionActionIcon(action: action)
+                .frame(width: size.width, height: size.height)
+                .background(
+                    ink.opacity(hovering ? (theme.isDark ? 0.09 : 0.05) : 0),
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.14), value: hovering)
+        .overlay { SecondaryClick { model.showExtensionMenu(for: action.id) } }
+        .help(action.tooltip.isEmpty ? action.name : action.tooltip)
+        .accessibilityLabel(action.name)
+    }
+}
+
+/// Takes the secondary click over a view and nothing else; the engine draws the menu, which SwiftUI's own can't.
+struct SecondaryClick: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> ClickView { ClickView() }
+
+    func updateNSView(_ view: ClickView, context: Context) { view.action = action }
+
+    final class ClickView: NSView {
+        var action: () -> Void = {}
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            let event = NSApp.currentEvent
+            let secondary =
+                event?.type == .rightMouseDown
+                || (event?.type == .leftMouseDown && event?.modifierFlags.contains(.control) == true)
+            return secondary ? super.hitTest(point) : nil
+        }
+
+        override func rightMouseDown(with event: NSEvent) { action() }
+        override func mouseDown(with event: NSEvent) { action() }
+    }
+}
+
 struct ToolbarAddressLabel: View {
     static let fullURLPreferenceKey = "toolbarShowFullURLsEnabledPreference"
 

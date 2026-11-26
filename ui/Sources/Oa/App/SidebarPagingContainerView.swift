@@ -1,4 +1,5 @@
 import AppKit
+import DevKit
 import SwiftUI
 
 /// Arc's paging container in the sidebar: a page per Space side by side, each the sidebar's width, scrolled by the
@@ -9,6 +10,7 @@ import SwiftUI
 struct SidebarPagingContainerView: View {
     let model: WindowModel
     let layout: WindowLayoutController
+    @AppStorage(PageToolbar.key) private var showsToolbar = false
     @Environment(\.sidebarDrag) private var drag
 
     var body: some View {
@@ -17,7 +19,7 @@ struct SidebarPagingContainerView: View {
         let fade = layout.spaceCreationFade
         let hidesScrollIndicators = layout.isPaging || layout.libraryProgress > 0
         // The URL field takes no room while the panel comes or goes, so the Space's page keeps its place below it.
-        let below: CGFloat = layout.addressFieldShift != nil && !PageToolbar.isShown ? SidebarAddressField.height : 0
+        let below: CGFloat = layout.addressFieldShift != nil && !showsToolbar ? SidebarAddressField.height : 0
         // The Create a Space page has no Space, and breaks a profile's run of Spaces as another profile's would.
         let pages = layout.sidebarPages.map { page -> SidebarSpace? in
             if case .space(let id) = page { model.state.space(id) } else { nil }
@@ -36,17 +38,23 @@ struct SidebarPagingContainerView: View {
                 ForEach(Array(zip(layout.sidebarPages, pages)), id: \.0) { _, space in
                     if let space {
                         let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
-                        let tiles = FavoritesGrid.slots(
-                            model.state.favoriteEntries(for: space.id), drag: current ? drag : nil)
+                        let favorites = model.state.favoriteEntries(for: space.id)
+                        let tiles = FavoritesGrid.slots(favorites, drag: current ? drag : nil)
+                        let trayExtensions =
+                            global && !showsToolbar
+                            ? PinnedExtensionLayout.trayActions(
+                                model.pinnedExtensionActions(for: space.profileID), sidebarWidth: width,
+                                hasFavorites: !favorites.isEmpty)
+                            : []
+                        let extensionsHeight = PinnedExtensionsGrid.height(for: trayExtensions.count, in: width)
+                        let trayHeight =
+                            FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16
+                            + (extensionsHeight > 0 ? extensionsHeight + 8 : 0)
                         SidebarSpacePage(
                             model: model, layout: layout, space: space,
                             hidesScrollIndicators: hidesScrollIndicators
                         )
-                        .padding(
-                            .top,
-                            global
-                                ? FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16 : 0
-                        )
+                        .padding(.top, global ? trayHeight : 0)
                         .frame(width: width)
                         .allowsHitTesting(current)
                         .accessibilityHidden(!current)
@@ -61,11 +69,22 @@ struct SidebarPagingContainerView: View {
                 let shown =
                     model.spaceCreation == nil && pages[run.pages].contains { $0?.id == model.selectedSpaceID }
                 let favorites = model.state.favoriteEntries(for: run.space.id)
-                FavoritesGrid(
-                    model: model, layout: layout, slots: FavoritesGrid.slots(favorites, drag: shown ? drag : nil)
-                )
+                let trayExtensions =
+                    !showsToolbar
+                    ? PinnedExtensionLayout.trayActions(
+                        model.pinnedExtensionActions(for: run.space.profileID), sidebarWidth: width,
+                        hasFavorites: !favorites.isEmpty)
+                    : []
+                VStack(alignment: .leading, spacing: 8) {
+                    if !trayExtensions.isEmpty {
+                        PinnedExtensionsGrid(model: model, layout: layout, actions: trayExtensions)
+                    }
+                    FavoritesGrid(
+                        model: model, layout: layout, slots: FavoritesGrid.slots(favorites, drag: shown ? drag : nil)
+                    )
+                    .sidebarDragFrame { if shown { drag?.grid = $0 } }
+                }
                 .padding(8)
-                .sidebarDragFrame { if shown { drag?.grid = $0 } }
                 .frame(width: width)
                 .offset(x: min(max(offset, CGFloat(first) * width), CGFloat(last) * width) - offset)
                 .allowsHitTesting(shown)

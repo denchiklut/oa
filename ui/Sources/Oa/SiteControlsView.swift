@@ -257,30 +257,6 @@ private struct PinBadge: View {
     }
 }
 
-/// Takes the secondary click over a view and nothing else; the engine draws the menu, which SwiftUI's own can't.
-private struct SecondaryClick: NSViewRepresentable {
-    let action: () -> Void
-
-    func makeNSView(context: Context) -> ClickView { ClickView() }
-
-    func updateNSView(_ view: ClickView, context: Context) { view.action = action }
-
-    final class ClickView: NSView {
-        var action: () -> Void = {}
-
-        override func hitTest(_ point: NSPoint) -> NSView? {
-            let event = NSApp.currentEvent
-            let secondary =
-                event?.type == .rightMouseDown
-                || (event?.type == .leftMouseDown && event?.modifierFlags.contains(.control) == true)
-            return secondary ? super.hitTest(point) : nil
-        }
-
-        override func rightMouseDown(with event: NSEvent) { action() }
-        override func mouseDown(with event: NSEvent) { action() }
-    }
-}
-
 /// Arc's row: a white symbol in a circle of the accent, pale when off, then the name and its state.
 private struct SiteSettingRow: View {
     let title: String

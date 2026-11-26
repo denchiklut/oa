@@ -56,19 +56,30 @@ struct SidebarHeader: View {
     }
 }
 
-/// Arc's URL field as measured: 36 pt tall, 8 pt in from the sidebar's edges, showing the page's host; copy link and
-/// Site Controls at its end while the pointer is in the sidebar, or while Site Controls or a permission prompt hangs
-/// from it.
+/// Arc's URL field as measured: 36 pt tall, 8 pt in from the sidebar's edges, showing the page's host; pinned
+/// extensions that fit beside the host, copy link and Site Controls at its end while the pointer is in the sidebar,
+/// or while Site Controls or a permission prompt hangs from it.
 struct SidebarAddressField: View {
     static let height: CGFloat = 36
 
     let model: WindowModel
     let layout: WindowLayoutController
     @State private var showingSiteControls = false
+    @State private var trailingWidth: CGFloat = 0
     @Environment(\.theme) private var theme
     @Environment(\.sidebarRevealsControls) private var revealed
 
     var body: some View {
+        let hasPage = model.address != nil && model.emptySplitViewPaneIndex == nil
+        let controlsVisible =
+            hasPage
+            && (revealed || showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue)
+        let pinned =
+            hasPage
+            ? PinnedExtensionLayout.addressFieldActions(
+                model.pinnedExtensionActions, sidebarWidth: layout.sidebarWidth,
+                hasFavorites: model.sidebarContext == .global && !model.favorites.isEmpty, staticButtons: 2)
+            : []
         // As Arc: the URL opens the command bar to edit it, rather than being edited in place.
         Button {
             model.openCommandBar(.currentTab)
@@ -82,15 +93,41 @@ struct SidebarAddressField: View {
             .lineLimit(1)
             .foregroundStyle(theme.tertiaryText)
             .frame(height: Self.height)
+            .mask {
+                GeometryReader { geometry in
+                    if controlsVisible, trailingWidth > 0, geometry.size.width > 0 {
+                        let width = geometry.size.width
+                        let end = max(0, (width - trailingWidth - 2) / width)
+                        let start = max(0, (width - trailingWidth - 18) / width)
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0),
+                                .init(color: .black, location: start),
+                                .init(color: .clear, location: end),
+                                .init(color: .clear, location: 1),
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    } else {
+                        Color.black
+                    }
+                }
+            }
             .background(theme.fieldFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .overlay(alignment: .trailing) {
-            if model.address != nil, model.emptySplitViewPaneIndex == nil {
-                HStack(spacing: -2) {
-                    CopyLinkButton(model: model, size: 30)
+            if hasPage {
+                // As Arc's `CommandBarPlaceholderButtonsView`: 28 pt buttons, radius 9.
+                HStack(spacing: 0) {
+                    ForEach(pinned) { action in
+                        PinnedExtensionButton(
+                            model: model, action: action, size: CGSize(width: 28, height: 28), cornerRadius: 9)
+                    }
+                    CopyLinkButton(model: model, size: 28)
                     if model.presentedTabIDs.count > 1 {
                         // As seen in Arc: in a split, Share Split View… takes Site Controls' place, which the
                         // focused pane's bar has. Oa has no sharing, so it is off; the permission prompt still
@@ -99,7 +136,7 @@ struct SidebarAddressField: View {
                         } label: {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 14))
-                                .frame(width: 30, height: 30)
+                                .frame(width: 28, height: 28)
                         }
                         .buttonStyle(ChromeButtonStyle())
                         .accessibilityLabel("Share Split View…")
@@ -115,15 +152,18 @@ struct SidebarAddressField: View {
                         }
                     } else {
                         SiteControlsButton(
-                            model: model, size: CGSize(width: 30, height: 30),
+                            model: model, size: CGSize(width: 28, height: 28),
                             showingSiteControls: $showingSiteControls)
                     }
                 }
                 .padding(.trailing, 4)
-                .opacity(
-                    revealed || showingSiteControls || model.permissionPromptBinding(inPeekToolbar: false).wrappedValue
-                        ? 1 : 0
-                )
+                .onGeometryChange(for: CGFloat.self) {
+                    $0.size.width
+                } action: {
+                    trailingWidth = $0
+                }
+                .opacity(controlsVisible ? 1 : 0)
+                .allowsHitTesting(controlsVisible)
                 .transition(.opacity.animation(AddressFieldLabel.swap))
             }
         }
