@@ -67,6 +67,14 @@ final class WindowModel {
     var spaceStyleEditorPresetPage = 0
     /// As Arc's per-window `spacesWithCollapsedPinnedSections`: the Spaces whose pinned tabs this window folds away.
     private(set) var collapsedPinnedSpaces: Set<UUID> = []
+    /// As Arc's per-window `expandedItems`: the folders expanded in this window.
+    private(set) var expandedFolderIDs: Set<UUID> = []
+    /// Folder currently in inline rename (set when created inline so it focuses and scrolls into view).
+    var editingFolderID: UUID?
+    /// Tabs kept peeked under collapsed folders for 100 ms after selection leaves them, as Arc's
+    /// `reparentPeekingIfNecessary(for:requiresDelay:)`.
+    private var departingPeekTargets: [UUID: Set<UUID>] = [:]
+    @ObservationIgnored private var departingPeekTasks: [UUID: Task<Void, Never>] = [:]
     private(set) var multiSelection = SidebarMultiSelection()
     private(set) var library: LibrarySection? {
         didSet {
@@ -251,8 +259,16 @@ final class WindowModel {
     /// As Arc's `selectableItemInfo`, whose root for a split's tab is the split: a split counts once, as the pane
     /// this window focuses in it.
     var selectableTabs: [SidebarTab] {
-        state.selectableTabs(in: selectedSpaceID).filter { tab in
-            state.splitViewID(containing: tab.id).map { focusedTabID(of: $0) == tab.id } ?? true
+        let entries =
+            state.favoriteEntries(for: selectedSpaceID)
+            + visiblePinnedRows(in: selectedSpaceID).map(\.entry)
+            + state.entries(in: selectedSpaceID, pinned: false)
+        return entries.compactMap { entry in
+            switch entry {
+            case .folder: nil
+            case .tab(let tab): tab
+            case .splitView(let id, _): focusedTabID(of: id).flatMap(state.tree.tab)
+            }
         }
     }
     var canRestoreLastClosed: Bool { closedGroups.contains { !$0.steps.isEmpty } }
@@ -271,7 +287,8 @@ final class WindowModel {
         WindowRecord(
             id: id, style: style, selectedSpaceID: selectedSpaceID, sidebarMode: sidebarMode,
             sidebarWidth: sidebarWidth, lastActiveDates: lastActiveDates, createdDates: createdDates,
-            collapsedPinnedSpaces: collapsedPinnedSpaces, selectedTabID: selectedTabIDs[selectedSpaceID])
+            collapsedPinnedSpaces: collapsedPinnedSpaces, expandedItems: expandedFolderIDs,
+            selectedTabID: selectedTabIDs[selectedSpaceID])
     }
 
     init(
@@ -300,6 +317,7 @@ final class WindowModel {
         lastActiveDates = record.lastActiveDates
         createdDates = record.createdDates
         collapsedPinnedSpaces = record.collapsedPinnedSpaces
+        expandedFolderIDs = record.expandedItems.filter { state.tree.folder($0) != nil }
         guard let profileID = space?.profileID else { return openCommandBar(.newTab) }
         awaitedRestoration = (profileID, record.selectedTabID)
     }
@@ -670,14 +688,10 @@ final class WindowModel {
         // As seen in Arc: a Blank Window offers only its own tabs.
         let others = spaces.filter { $0.profileID == space.profileID && $0.id != space.id }
         let tabs: [(SidebarTab, String?)] =
-            selectableTabs.map { ($0, nil) }
-            + others.flatMap { other in
-                state.tabs(in: other.id).filter { tab in
-                    state.splitViewID(containing: tab.id).map { focusedTabID(of: $0) == tab.id } ?? true
-                }
-                .map { ($0, other.name) }
-            }
+            state.selectableTabs(in: space.id).map { ($0, nil) }
+            + others.flatMap { other in state.tabs(in: other.id).map { ($0, other.name) } }
         return tabs.compactMap { tab, spaceName in
+            if let splitID = state.splitViewID(containing: tab.id), focusedTabID(of: splitID) != tab.id { return nil }
             guard !presentedTabIDs.contains(tab.id), let url = livePage(for: tab.id)?.url ?? tab.url else {
                 return nil
             }
@@ -839,6 +853,7 @@ final class WindowModel {
         let presented = state.presentedTabIDs(with: tabID)
         noteSelection(of: tabID, after: selectedTabID)
         if let current = selectedTabID, !presented.contains(current) {
+            scheduleDepartingPeek(leaving: current, goingTo: tabID, in: selectedSpaceID)
             splitViewLayout = nil
             for leaving in presentedTabIDs {
                 placeholders[leaving] = nil
@@ -849,6 +864,25 @@ final class WindowModel {
         for shown in presented {
             markViewed(shown)
             ensurePage(shown, restoring: shown == tabID ? sessionID : nil)
+        }
+    }
+
+    /// As Arc's `reparentPeekingIfNecessary(for:requiresDelay:)`: leaving a tab inside a collapsed folder keeps it
+    /// peeked for 100 ms before the collapsed folder closes over it.
+    private func scheduleDepartingPeek(leaving oldTabID: UUID, goingTo newTabID: UUID, in spaceID: UUID) {
+        let collapsedOld = Set(state.folderAncestors(of: oldTabID).filter { !expandedFolderIDs.contains($0) })
+        guard !collapsedOld.isEmpty else { return }
+        let collapsedNew = Set(state.folderAncestors(of: newTabID).filter { !expandedFolderIDs.contains($0) })
+        guard !collapsedOld.subtracting(collapsedNew).isEmpty else { return }
+        var held = Set(state.presentedTabIDs(with: oldTabID))
+        if let splitID = state.splitViewID(containing: oldTabID) { held.insert(splitID) }
+        departingPeekTargets[spaceID, default: []].formUnion(held)
+        departingPeekTasks[spaceID]?.cancel()
+        departingPeekTasks[spaceID] = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+            self?.departingPeekTargets[spaceID] = nil
+            self?.departingPeekTasks[spaceID] = nil
         }
     }
 
@@ -896,13 +930,23 @@ final class WindowModel {
         ensurePresentedPages()
     }
 
-    /// Arc's multi-selection as the menu and ⌘W take it: the shown Space's selected rows in row order, the selected
-    /// tab among them when it is a row; none until there are two. Oa's own: a split and its panes don't join.
-    var multiSelectedTabIDs: [UUID] {
+    /// Visible rows in the shown Space that are multi-selected (tabs and folders), in display order; none until there
+    /// are two.
+    var multiSelectedItemIDs: [UUID] {
         guard multiSelection != SidebarMultiSelection() else { return [] }
-        let ids = state.tabs(in: selectedSpaceID).map(\.id).filter {
-            state.splitViewID(containing: $0) == nil && ($0 == selectedTabID || multiSelection.contains($0))
+        let visible =
+            visiblePinnedRows(in: selectedSpaceID).map(\.id) + state.unpinnedRows(in: selectedSpaceID).map(\.id)
+        let ids = visible.filter {
+            state.splitView($0) == nil && state.splitViewID(containing: $0) == nil
+                && ($0 == selectedTabID || multiSelection.contains($0))
         }
+        return ids.count > 1 ? ids : []
+    }
+
+    /// Arc's multi-selection as tab-only actions (Copy Links, ⌘W) take it: the selected tab rows in row order; none
+    /// until there are two. Oa's own: a split and its panes don't join.
+    var multiSelectedTabIDs: [UUID] {
+        let ids = multiSelectedItemIDs.filter { state.tree.tab($0) != nil }
         return ids.count > 1 ? ids : []
     }
 
@@ -910,30 +954,35 @@ final class WindowModel {
         multiSelection = SidebarMultiSelection()
     }
 
-    private func isMultiSelectable(_ tabID: UUID) -> Bool {
-        state.space(containing: tabID)?.id == selectedSpaceID && state.splitViewID(containing: tabID) == nil
+    private func isMultiSelectable(_ itemID: UUID) -> Bool {
+        guard state.space(containingItem: itemID)?.id == selectedSpaceID else { return false }
+        if state.tree.folder(itemID) != nil { return true }
+        return state.tree.tab(itemID) != nil && state.splitViewID(containing: itemID) == nil
     }
 
     /// As seen in Arc's ⌘-click: a row joins the selection or leaves it, and the page stays. The selected tab leaves
     /// for another member, which is shown; alone, it stays. Oa's own: the first member in row order is shown.
-    func toggleMultiSelection(_ tabID: UUID) {
-        guard isMultiSelectable(tabID) else { return }
-        guard tabID == selectedTabID else { return multiSelection.toggle(tabID) }
-        guard let next = multiSelectedTabIDs.first(where: { $0 != tabID }) else { return }
-        multiSelection.remove(tabID)
+    func toggleMultiSelection(_ itemID: UUID) {
+        guard isMultiSelectable(itemID) else { return }
+        guard itemID == selectedTabID else { return multiSelection.toggle(itemID) }
+        guard let next = multiSelectedTabIDs.first(where: { $0 != itemID }) else { return }
+        multiSelection.remove(itemID)
         multiSelection.remove(next)
         select(next, keepingMultiSelection: true)
     }
 
-    /// As seen in Arc's ⇧-click: the rows from the anchor to this one in its list, in place of the last range. Oa's
-    /// own: a range across the pinned and Today lists does nothing, as Arc's first click across does.
-    func extendMultiSelection(to tabID: UUID) {
+    /// As seen in Arc's ⇧-click: the visible rows from the anchor to this one in its section, in place of the last
+    /// range. Oa's own: a range across the pinned and Today lists does nothing, as Arc's first click across does.
+    func extendMultiSelection(to itemID: UUID) {
         let anchor = multiSelection.anchorID.flatMap { isMultiSelectable($0) ? $0 : nil } ?? selectedTabID
-        guard let anchor, isMultiSelectable(anchor), isMultiSelectable(tabID),
-            state.isPinned(anchor) == state.isPinned(tabID)
+        guard let anchor, isMultiSelectable(anchor), isMultiSelectable(itemID),
+            state.isPinnedItem(anchor) == state.isPinnedItem(itemID)
         else { return }
-        let rows = state.tabs(in: selectedSpaceID, pinned: state.isPinned(anchor)).map(\.id).filter(isMultiSelectable)
-        guard let from = rows.firstIndex(of: anchor), let to = rows.firstIndex(of: tabID) else { return }
+        let pinned = state.isPinnedItem(anchor)
+        let rows =
+            (pinned ? visiblePinnedRows(in: selectedSpaceID) : state.unpinnedRows(in: selectedSpaceID))
+            .map(\.id).filter(isMultiSelectable)
+        guard let from = rows.firstIndex(of: anchor), let to = rows.firstIndex(of: itemID) else { return }
         multiSelection.select(range: Array(rows[min(from, to)...max(from, to)]))
     }
 
@@ -1041,12 +1090,12 @@ final class WindowModel {
     }
 
     /// As seen in Arc: a link dropped in the list is a tab at the line, its page loaded in the background.
-    func openDroppedLink(_ url: URL, pinned: Bool, at index: Int) {
+    func openDroppedLink(_ url: URL, into parentID: UUID, at index: Int?) {
+        guard let spaceID = state.space(containingItem: parentID)?.id else { return }
         let tab = makeTab(url: url)
-        let spaceID = selectedSpaceID
         store.edit {
             $0.appendTab(tab, in: spaceID)
-            $0.moveTab(tab.id, in: spaceID, pinned: pinned, at: index)
+            $0.moveItem(tab.id, into: parentID, at: index)
         }
         createdDates[tab.id] = .now
         ensurePage(tab.id)
@@ -1541,14 +1590,128 @@ final class WindowModel {
         if selecting, let created { selectSpace(created.id) }
     }
 
-    /// As Arc: a new window starts with the collapsed sections of the window it came from.
+    /// As Arc: a new window starts with the collapsed sections and expanded folders of the window it came from.
     func inheritCollapsedPinnedSpaces(from source: WindowModel) {
         collapsedPinnedSpaces = source.collapsedPinnedSpaces
+        expandedFolderIDs = source.expandedFolderIDs
     }
 
     func togglePinnedSection(of spaceID: UUID) {
         if collapsedPinnedSpaces.remove(spaceID) == nil { collapsedPinnedSpaces.insert(spaceID) }
         store.windowStateChanged()
+    }
+
+    // MARK: - Folders
+
+    func peekedTargets(in spaceID: UUID, includeDeparting: Bool = true) -> Set<UUID> {
+        var targets = includeDeparting ? (departingPeekTargets[spaceID] ?? []) : []
+        if let selected = selectedTabIDs[spaceID] {
+            targets.formUnion(state.presentedTabIDs(with: selected))
+            if let splitID = state.splitViewID(containing: selected) { targets.insert(splitID) }
+        }
+        return targets
+    }
+
+    func visiblePinnedRows(in spaceID: UUID, sectionCollapsed: Bool? = nil) -> [SidebarRow] {
+        let collapsed = sectionCollapsed ?? collapsedPinnedSpaces.contains(spaceID)
+        return state.visiblePinnedRows(
+            in: spaceID, expanded: expandedFolderIDs,
+            peekedTargets: peekedTargets(in: spaceID, includeDeparting: !collapsed),
+            sectionCollapsed: collapsed)
+    }
+
+    func isFolderExpanded(_ id: UUID) -> Bool { expandedFolderIDs.contains(id) }
+
+    func toggleFolderExpanded(_ id: UUID) {
+        setFolderExpanded(id, !expandedFolderIDs.contains(id))
+    }
+
+    func setFolderExpanded(_ id: UUID, _ expanded: Bool) {
+        let changed = expanded ? expandedFolderIDs.insert(id).inserted : expandedFolderIDs.remove(id) != nil
+        if changed { store.windowStateChanged() }
+    }
+
+    /// As Arc's `WindowData.recursivelyExpandParents(for:)`: expands every enclosing folder (and uncollapses the
+    /// Space's pinned section) so `id` is directly visible.
+    func expandAncestors(of id: UUID) {
+        guard state.isPinnedItem(id) else { return }
+        let ancestors = state.folderAncestors(of: id)
+        var changed = false
+        for folderID in ancestors where expandedFolderIDs.insert(folderID).inserted { changed = true }
+        if let spaceID = state.space(containingItem: id)?.id, collapsedPinnedSpaces.remove(spaceID) != nil {
+            changed = true
+        }
+        if changed { store.windowStateChanged() }
+    }
+
+    @discardableResult
+    func createFolder(in spaceID: UUID, title: String = "", startEditing: Bool = false) -> UUID? {
+        guard state.isGlobal(spaceID), let pinnedRootID = state.space(spaceID)?.pinnedRootID else { return nil }
+        if spaceID != selectedSpaceID { selectSpace(spaceID) }
+        var created: SidebarFolder?
+        store.edit { created = $0.createFolder(title: title, in: pinnedRootID) }
+        return revealCreatedFolder(created, startEditing: startEditing)
+    }
+
+    @discardableResult
+    func createNestedFolder(in parentID: UUID) -> UUID? {
+        guard state.canCreateFolder(in: parentID), let spaceID = state.space(containingItem: parentID)?.id else {
+            return nil
+        }
+        exitLibrary()
+        if spaceID != selectedSpaceID { selectSpace(spaceID) }
+        var created: SidebarFolder?
+        store.edit { created = $0.createFolder(in: parentID) }
+        return revealCreatedFolder(created, startEditing: true)
+    }
+
+    @discardableResult
+    func createFolder(wrapping itemIDs: [UUID], title: String = "", startEditing: Bool = true) -> UUID? {
+        guard sidebarContext == .global else { return nil }
+        let spaceID = selectedSpaceID
+        var created: SidebarFolder?
+        store.edit { created = $0.createFolder(wrapping: itemIDs, in: spaceID, title: title) }
+        return revealCreatedFolder(created, startEditing: startEditing)
+    }
+
+    private func revealCreatedFolder(_ folder: SidebarFolder?, startEditing: Bool) -> UUID? {
+        guard let folder else { return nil }
+        clearMultiSelection()
+        expandAncestors(of: folder.id)
+        setFolderExpanded(folder.id, true)
+        if startEditing { editingFolderID = folder.id }
+        return folder.id
+    }
+
+    func renameFolder(_ id: UUID, to title: String) {
+        store.edit { $0.renameFolder(id, to: title) }
+    }
+
+    func setFolderIcon(_ id: UUID, to icon: String?) {
+        store.edit { $0.setFolderIcon(id, to: icon) }
+    }
+
+    func moveItem(_ itemID: UUID, into parentID: UUID, at index: Int? = nil) {
+        store.edit { $0.moveItem(itemID, into: parentID, at: index) }
+    }
+
+    func moveItems(_ itemIDs: [UUID], into parentID: UUID, after anchorID: UUID?) {
+        store.edit { $0.moveItems(itemIDs, into: parentID, after: anchorID) }
+    }
+
+    /// As Arc: empty folders delete immediately; non-empty folders archive all descendant tabs in one undoable group
+    /// and remove the folder once its tabs have closed.
+    func deleteFolder(_ id: UUID) {
+        guard let closed = state.closedFolder(id) else { return }
+        multiSelection = SidebarMultiSelection()
+        let tabIDs = state.tree.tabs(under: id).map(\.id)
+        if tabIDs.isEmpty {
+            store.edit { $0.removeFolder(id) }
+            undoManager?.registerUndos([.restoreFolder(closed)], UndoStrings.deleteFolder)
+            present(.undo("Folder deleted"), at: .window)
+            return
+        }
+        closeTogether(tabIDs.reversed(), undoPrompt: UndoStrings.deleteFolder, completionToast: nil, folder: closed)
     }
 
     func moveSpace(_ spaceID: UUID, to index: Int) {
@@ -1730,16 +1893,6 @@ final class WindowModel {
     /// A tile dropped on the tab list, Oa's own way to Arc's command-bar Unfavorite Tab.
     func unfavorite(_ tabID: UUID) {
         store.edit { $0.unfavoriteTab(tabID, in: selectedSpaceID) }
-    }
-
-    func move(_ tabID: UUID, pinned: Bool, at index: Int) {
-        store.edit { $0.moveTab(tabID, in: selectedSpaceID, pinned: pinned, at: index) }
-    }
-
-    /// As seen in Arc: dragged rows land together at the gap, pinning or unpinning there. Oa's own: in the sidebar's
-    /// order, where Arc reverses the rows that came from above the gap and drops nothing next to a selected row.
-    func moveTabs(_ tabIDs: [UUID], pinned: Bool, after anchorID: UUID?) {
-        store.edit { $0.moveTabs(tabIDs, in: selectedSpaceID, pinned: pinned, after: anchorID) }
     }
 
     /// As seen in Arc: dragged rows all become Favorites from the slot. Oa's own: in the sidebar's order.
@@ -1977,10 +2130,27 @@ final class WindowModel {
                 editing ? spaceStyleEditor?.editor.theme : space.customInfo?.windowTheme, for: spaceID)
             setSpaceTheme(theme, for: spaceID)
             if editing { spaceStyleEditor?.editor = SpaceStyleEditor(theme: theme) }
+        case .restoreFolder(let closed):
+            store.edit { $0.restoreFolder(closed, tabs: [], fallbackSpaceID: selectedSpaceID) }
+            undoManager?.registerUndos([.deleteFolder(closed.id)], UndoStrings.deleteFolder)
+        case .deleteFolder(let folderID):
+            deleteFolder(folderID)
         case .undoCloseItems(let groupID):
             guard let index = closedGroups.firstIndex(where: { $0.id == groupID }) else { return }
             let group = closedGroups.remove(at: index)
-            if let split = group.splitView, state.tree[split.id] == nil {
+            if let folder = group.folder, state.tree[folder.id] == nil {
+                let steps = Dictionary(group.steps.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                let tabs = group.steps.reversed().map(\.reopenedTab)
+                store.edit { $0.restoreFolder(folder, tabs: tabs, fallbackSpaceID: selectedSpaceID) }
+                for tab in tabs { createdDates[tab.id] = .now }
+                expandedFolderIDs.insert(folder.id)
+                if let focused = group.focusedTabID, state.tree.tab(focused) != nil {
+                    expandAncestors(of: focused)
+                    select(focused, restoring: steps[focused]?.sessionID)
+                }
+                undoManager?.registerUndos([.deleteFolder(folder.id)], group.undoPrompt)
+                return
+            } else if let split = group.splitView, state.tree[split.id] == nil {
                 // As seen in Arc: the split comes back whole, with its ID, where it was.
                 let steps = Dictionary(group.steps.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
                 let tabs = split.tabIDs.compactMap { steps[$0]?.reopenedTab }
@@ -2230,7 +2400,7 @@ final class WindowModel {
     /// One close of several tabs from this window, one entry on its stack, the steps going back from the last.
     private func closeTogether(
         _ tabIDs: [UUID], undoPrompt: String? = nil, completionToast: CloseItemsCompletionToast? = .clearedTabs,
-        splitView: ClosedSplitView? = nil, selectingInstead keptID: UUID? = nil
+        splitView: ClosedSplitView? = nil, folder: ClosedFolder? = nil, selectingInstead keptID: UUID? = nil
     ) {
         guard !tabIDs.isEmpty else { return }
         let asSplitView = splitView != nil
@@ -2241,6 +2411,7 @@ final class WindowModel {
             completionToast: asSplitView ? nil : completionToast, order: tabIDs,
             siblings: state.tabs(in: selectedSpaceID).map(\.id))
         group.splitView = splitView
+        group.folder = folder
         if let selected = selectedTabID, closing.contains(selected) {
             let next =
                 keptID.flatMap { state.isSelectable($0, in: selectedSpaceID) ? $0 : nil }
@@ -2365,6 +2536,8 @@ final class WindowModel {
         for splitID in Array(focusedPaneIDs.keys) where state.splitView(splitID) == nil {
             focusedPaneIDs[splitID] = nil
         }
+        expandedFolderIDs = expandedFolderIDs.filter { state.tree.folder($0) != nil }
+        if let editingFolderID, state.tree.folder(editingFolderID) == nil { self.editingFolderID = nil }
         // Arc's `restorableSplitViewLayout` is for the panes it was made with.
         if let layout = splitViewLayout,
             Set(layout.itemWidthFactors.keys) != Set(state.tree[layout.splitID]?.childIDs ?? [])
@@ -2464,6 +2637,14 @@ final class WindowModel {
                 closed,
                 in: request?.group
                     ?? ClosedGroup(undoPrompt: UndoStrings.archiveTab, focusedTabID: focused ? tabID : nil))
+        }
+        if let folder = request?.group?.folder, state.tree.folder(folder.id) != nil,
+            state.tree.tabs(under: folder.id).isEmpty,
+            Set(state.tree.descendants(of: folder.id).map(\.id)).isSubset(
+                of: Set(folder.descendants.compactMap { $0.folder?.id }))
+        {
+            store.edit { $0.removeFolder(folder.id) }
+            requester?.present(.undo("Folder deleted"), at: .window)
         }
     }
 

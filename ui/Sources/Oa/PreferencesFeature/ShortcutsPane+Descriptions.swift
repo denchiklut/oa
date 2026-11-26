@@ -103,6 +103,7 @@ extension ShortcutsPane {
             """
         case "clearExplore": "Moves all your unpinned tabs to the Archive."
         case "openTabIn": "Opens your current Little Oa tab in the Space of your choosing."
+        case "newFolder": "Creates a new folder in the current Space."
         case "showLittleArcOpenInMenu": "Presents the Little Oa “Open In” Menu"
         case "newSpace": "Creates a new Space — for your work tabs, personal tabs, or otherwise."
         case "focusNextSpace": "Slides to the next Space in your Sidebar."

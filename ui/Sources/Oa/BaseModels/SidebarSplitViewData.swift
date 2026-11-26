@@ -83,21 +83,40 @@ struct WindowSplitViewLayout {
 
 enum SidebarEntry: Identifiable, Hashable {
     case tab(SidebarTab)
+    case folder(SidebarFolder)
     case splitView(id: UUID, tabs: [SidebarTab])
 
     var id: UUID {
         switch self {
         case .tab(let tab): tab.id
+        case .folder(let folder): folder.id
         case .splitView(let id, _): id
         }
+    }
+
+    var folder: SidebarFolder? {
+        if case .folder(let folder) = self { return folder }
+        return nil
     }
 
     var tabs: [SidebarTab] {
         switch self {
         case .tab(let tab): [tab]
+        case .folder: []
         case .splitView(_, let tabs): tabs
         }
     }
+}
+
+/// One visible row in a Space's sidebar list, with its nesting depth (16 pt per level) and folder state.
+struct SidebarRow: Identifiable, Hashable {
+    let entry: SidebarEntry
+    let depth: Int
+    let parentID: UUID
+    var isExpanded = false
+    var isPeeked = false
+
+    var id: UUID { entry.id }
 }
 
 extension SidebarState {
@@ -120,6 +139,7 @@ extension SidebarState {
         guard let rootID = space(spaceID)?.rootID(pinned: pinned) else { return [] }
         return (tree[rootID]?.childIDs ?? []).compactMap { id in
             if let tab = tree.tab(id) { return .tab(tab) }
+            if let folder = tree.folder(id) { return .folder(folder) }
             if splitView(id) != nil { return .splitView(id: id, tabs: tree.tabs(under: id)) }
             return nil
         }
@@ -242,9 +262,12 @@ extension SidebarState {
     /// As seen in Arc: Move to ▸ puts the item at the top of the Space's list. A pinned one stays pinned, as seen
     /// for a move to another profile's Space; the top of the pinned list is Oa's own.
     mutating func move(_ id: UUID, toSpace spaceID: UUID) {
-        guard let space = space(spaceID), let tabID = splitView(id) != nil ? tree[id]?.childIDs.first : id else {
+        guard let space = space(spaceID) else { return }
+        if tree.folder(id) != nil {
+            if let pinnedRootID = space.pinnedRootID { tree.move(id, into: pinnedRootID, at: 0) }
             return
         }
+        guard let tabID = splitView(id) != nil ? tree[id]?.childIDs.first : id else { return }
         tree.move(id, into: space.rootID(pinned: isPinned(tabID)) ?? space.unpinnedRootID, at: 0)
     }
 

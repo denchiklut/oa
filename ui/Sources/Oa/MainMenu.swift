@@ -408,6 +408,9 @@ final class MainMenu {
         tabs.addItem(.separator())
         tabs.addItem(item("Favorite Tab", #selector(BrowserWindowController.toggleFavorite(_:))))
         tabs.addItem(
+            item("New Folder…", #selector(BrowserWindowController.newFolder(_:)), id: "newFolder")
+                .typeTravel("newFolder", icon: "folder.badge.plus", triggers: ["Create New Folder"]))
+        tabs.addItem(
             item(
                 "Clear Today", #selector(BrowserWindowController.clearTabs(_:)), key: "k",
                 modifiers: [.command, .shift], id: "clearExplore"

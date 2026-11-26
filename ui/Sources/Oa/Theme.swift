@@ -5,6 +5,8 @@ struct Theme {
     let foreground: Color
     let maxContrast: Color
     let cutout: Color
+    /// Arc's `palette.foregroundSecondary`, the back fill of `FolderIconView`.
+    let folderBackFill: Color
     let icon: Color
     let disabledIcon: Color
     let addressText: Color
@@ -38,6 +40,7 @@ struct Theme {
         foreground = palette.title.color
         maxContrast = palette.maxContrastColor.color
         cutout = palette.cutoutColor.color
+        folderBackFill = palette.foregroundSecondary.color
         icon = ink(0.57, 0.59)
         disabledIcon = ink(0.22, 0.25)
         addressText = ink(0.62, 0.64)
@@ -74,6 +77,7 @@ struct Theme {
         foreground = .primary
         maxContrast = .primary
         cutout = Color(nsColor: .textBackgroundColor)
+        folderBackFill = Color(nsColor: .secondaryLabelColor)
         icon = Color(nsColor: .secondaryLabelColor)
         disabledIcon = Color(nsColor: .tertiaryLabelColor)
         addressText = Color(nsColor: .secondaryLabelColor)
@@ -113,6 +117,7 @@ struct Theme {
         foreground = ink
         maxContrast = ink
         cutout = backdrop.color
+        folderBackFill = ink.opacity(0.5)
         icon = ink
         disabledIcon = ink.opacity(0.4)
         addressText = ink

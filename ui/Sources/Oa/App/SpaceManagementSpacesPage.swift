@@ -204,6 +204,7 @@ private struct SpaceManagementCollectionViewItem: View {
         let background = spaceTheme.background[windowColorScheme]
         let appearance = background.contentOverBackgroundAppearance
         let theme = Theme(palette: spaceTheme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
+        let pinnedRows = model.visiblePinnedRows(in: space.id, sectionCollapsed: false)
         let unpinned = model.state.tabs(in: space.id, pinned: false)
         let global = model.state.isGlobal(space.id)
         VStack(alignment: .leading, spacing: 0) {
@@ -221,7 +222,20 @@ private struct SpaceManagementCollectionViewItem: View {
             }
             ScrollView {
                 VStack(spacing: 1) {
-                    ForEach(model.state.tabs(in: space.id, pinned: true)) { row($0) }
+                    ForEach(pinnedRows) { pinnedRow in
+                        switch pinnedRow.entry {
+                        case .tab(let tab):
+                            row(tab, depth: pinnedRow.depth)
+                        case .folder(let folder):
+                            FolderRowView(
+                                model: model, layout: layout, folder: folder, spaceID: space.id, depth: pinnedRow.depth,
+                                isExpanded: pinnedRow.isExpanded, isPeeked: pinnedRow.isPeeked, place: .card
+                            )
+                            .transition(.opacity)
+                        case .splitView(_, let tabs):
+                            ForEach(tabs) { row($0, depth: pinnedRow.depth) }
+                        }
+                    }
                     // As Arc's card: Clear shows without the pointer over it. None for a window's own Space.
                     if global, !unpinned.isEmpty {
                         ClearDivider(model: model, spaceID: space.id, showsClear: true, inCard: true)
@@ -230,7 +244,8 @@ private struct SpaceManagementCollectionViewItem: View {
                 }
                 .padding([.horizontal, .bottom], 8)
                 .animation(
-                    .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: model.state.tabs(in: space.id).map(\.id))
+                    .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12),
+                    value: pinnedRows.map(\.id) + unpinned.map(\.id))
             }
             footer(isDark: appearance == .dark)
         }
@@ -294,8 +309,8 @@ private struct SpaceManagementCollectionViewItem: View {
         .padding(8)
     }
 
-    private func row(_ tab: SidebarTab) -> some View {
-        TabRow(model: model, layout: layout, tab: tab, spaceID: space.id, place: .card)
+    private func row(_ tab: SidebarTab, depth: Int = 0) -> some View {
+        TabRow(model: model, layout: layout, tab: tab, spaceID: space.id, depth: depth, place: .card)
             .transition(.opacity)
     }
 }

@@ -173,13 +173,22 @@ extension SidebarArchivedTab {
     }
 }
 
+struct SidebarFolder: Identifiable, Hashable {
+    let id: UUID
+    var title: String
+    /// Arc's `customInfo.iconType`, rendered as a monochrome mask on the folder's front flap.
+    var icon: String?
+
+    var displayTitle: String { title.isEmpty ? "Untitled" : title }
+}
+
 /// A node of the sidebar tree. A tab entry takes its tab's ID, so moves keep identity.
 struct SidebarItem: Identifiable, Hashable {
     enum Container: String, Codable { case favorites, pinned, unpinned }
     enum Kind: Hashable {
         case container(Container)
         case tab(SidebarTab)
-        case folder(title: String)
+        case folder(SidebarFolder)
         case splitView(SidebarSplitViewData)
     }
 
@@ -190,6 +199,11 @@ struct SidebarItem: Identifiable, Hashable {
 
     var tab: SidebarTab? {
         if case .tab(let tab) = kind { return tab }
+        return nil
+    }
+
+    var folder: SidebarFolder? {
+        if case .folder(let folder) = kind { return folder }
         return nil
     }
 
@@ -213,6 +227,17 @@ struct SidebarTree {
     subscript(id: UUID) -> SidebarItem? { items[id] }
 
     func tab(_ id: UUID) -> SidebarTab? { items[id]?.tab }
+
+    func folder(_ id: UUID) -> SidebarFolder? { items[id]?.folder }
+
+    func isDescendant(_ id: UUID, of ancestorID: UUID) -> Bool {
+        var current = items[id]?.parentID
+        while let parentID = current {
+            if parentID == ancestorID { return true }
+            current = items[parentID]?.parentID
+        }
+        return false
+    }
 
     func rootID(of id: UUID) -> UUID? {
         guard var item = items[id] else { return nil }
@@ -269,7 +294,9 @@ struct SidebarTree {
 
     /// Appends when `index` is nil.
     mutating func move(_ id: UUID, into parentID: UUID, at index: Int? = nil) {
-        guard let oldParentID = items[id]?.parentID, items[parentID] != nil else { return }
+        guard id != parentID, !isDescendant(parentID, of: id), let oldParentID = items[id]?.parentID,
+            items[parentID] != nil
+        else { return }
         let from = detach(id) ?? 0
         var at = index ?? Int.max
         if oldParentID == parentID, from < at { at -= 1 }
@@ -332,9 +359,77 @@ struct SidebarState {
 
     func isGlobal(_ spaceID: UUID) -> Bool { spaces.contains { $0.id == spaceID } }
 
-    func space(containing tabID: UUID) -> SidebarSpace? {
-        guard tree.tab(tabID) != nil, let rootID = tree.rootID(of: tabID) else { return nil }
+    /// Arc's `canMoveItems` enforces `depth(target) + childrenDepth(item) < 8` (up to 7 folder levels).
+    static let maxFolderDepth = 7
+
+    func space(containingItem id: UUID) -> SidebarSpace? {
+        guard let rootID = tree.rootID(of: id) else { return nil }
         return allSpaces.first { $0.pinnedRootID == rootID || $0.unpinnedRootID == rootID }
+    }
+
+    func space(containing tabID: UUID) -> SidebarSpace? {
+        guard tree.tab(tabID) != nil else { return nil }
+        return space(containingItem: tabID)
+    }
+
+    func isPinnedItem(_ id: UUID) -> Bool {
+        guard let pinnedRootID = space(containingItem: id)?.pinnedRootID else { return false }
+        return tree.rootID(of: id) == pinnedRootID
+    }
+
+    func hasPinnedItems(in spaceID: UUID) -> Bool {
+        guard let pinnedRootID = space(spaceID)?.pinnedRootID else { return false }
+        return !(tree[pinnedRootID]?.childIDs.isEmpty ?? true)
+    }
+
+    /// Ancestor folder IDs of `id`, from its nearest enclosing folder up to the outermost.
+    func folderAncestors(of id: UUID) -> [UUID] {
+        var ancestors: [UUID] = []
+        var current = tree[id]?.parentID
+        while let parentID = current, let parent = tree[parentID] {
+            if parent.folder != nil { ancestors.append(parentID) }
+            current = parent.parentID
+        }
+        return ancestors
+    }
+
+    /// 0 for a global Space's pinned root, 1…7 for folders inside it, nil for non-pinned containers.
+    func containerDepth(of containerID: UUID) -> Int? {
+        guard let item = tree[containerID] else { return nil }
+        if item.container == .pinned { return 0 }
+        guard item.folder != nil, isPinnedItem(containerID) else { return nil }
+        return folderAncestors(of: containerID).count + 1
+    }
+
+    /// 0 for a tab or split view; 1 for a leaf folder; 1 + max child depth for nested folders.
+    func subtreeFolderDepth(of itemID: UUID) -> Int {
+        guard tree.folder(itemID) != nil else { return 0 }
+        let children = tree[itemID]?.childIDs ?? []
+        return 1 + (children.map(subtreeFolderDepth(of:)).max() ?? 0)
+    }
+
+    func canCreateFolder(in parentID: UUID) -> Bool {
+        containerDepth(of: parentID).map { $0 < Self.maxFolderDepth } ?? false
+    }
+
+    /// As Arc's `SidebarData.item(_:canHaveContext:)` and `canMoveItems`: folders live only in pinned sections at
+    /// depth `< 8`, and never inside themselves.
+    func canMoveItem(_ itemID: UUID, into parentID: UUID) -> Bool {
+        guard let item = tree[itemID], let parent = tree[parentID], itemID != parentID,
+            !tree.isDescendant(parentID, of: itemID)
+        else { return false }
+        guard item.container == nil else { return false }
+        if item.folder != nil {
+            guard let targetDepth = containerDepth(of: parentID) else { return false }
+            return targetDepth + subtreeFolderDepth(of: itemID) <= Self.maxFolderDepth
+        }
+        return parent.container != nil || (parent.folder != nil && containerDepth(of: parentID) != nil)
+    }
+
+    /// Drops items whose ancestor is also in `ids`, keeping the original order.
+    func topLevelItemIDs(in ids: [UUID]) -> [UUID] {
+        let set = Set(ids)
+        return ids.filter { id in !folderAncestors(of: id).contains(where: set.contains) }
     }
 
     /// As Arc's: an untitled Space on `profileID` with only an unpinned container, and no theme or Arc's incognito
@@ -361,7 +456,7 @@ struct SidebarState {
     }
 
     func isPinned(_ tabID: UUID) -> Bool {
-        space(containing: tabID)?.pinnedRootID == tree.rootID(of: tabID)
+        tree.tab(tabID) != nil && isPinnedItem(tabID)
     }
 
     func isFavorite(_ tabID: UUID) -> Bool {
@@ -606,22 +701,6 @@ struct SidebarState {
         tree.move(tabID, into: isPinned(tabID) ? space.unpinnedRootID : pinnedRootID)
     }
 
-    /// A row dropped in the list, as Arc's: the section it lands in pins, unpins or unfavorites it.
-    mutating func moveTab(_ tabID: UUID, in spaceID: UUID, pinned: Bool, at index: Int) {
-        guard let rootID = space(spaceID)?.rootID(pinned: pinned) else { return }
-        tree.move(tabID, into: rootID, at: index)
-    }
-
-    mutating func moveTabs(_ tabIDs: [UUID], in spaceID: UUID, pinned: Bool, after anchorID: UUID?) {
-        guard let rootID = space(spaceID)?.rootID(pinned: pinned) else { return }
-        var previousID = anchorID
-        for tabID in tabIDs {
-            let index = previousID.flatMap { tree[rootID]?.childIDs.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
-            tree.move(tabID, into: rootID, at: index)
-            previousID = tabID
-        }
-    }
-
     /// Into the profile's grid at `index`, where a drop lands in Arc; appended when nil, as Arc's Favorite Tab does.
     /// As seen in Arc, a split's tab takes its split whole.
     mutating func favoriteTab(_ tabID: UUID, at index: Int? = nil) {
@@ -715,5 +794,191 @@ struct SidebarState {
             if let url, !keeps { tab.url = url }
             item.kind = .tab(tab)
         }
+    }
+
+    // MARK: - Folders
+
+    /// Appends to the end of `parentID` when `index` is nil, as Arc's `SidebarContainer.insertItems` resolves `-1`.
+    @discardableResult
+    mutating func createFolder(
+        title: String = "", icon: String? = nil, in parentID: UUID, at index: Int? = nil
+    ) -> SidebarFolder? {
+        guard canCreateFolder(in: parentID) else { return nil }
+        let folder = SidebarFolder(id: UUID(), title: title.trimmingCharacters(in: .whitespacesAndNewlines), icon: icon)
+        let item = SidebarItem(id: folder.id, kind: .folder(folder))
+        if let index { tree.insert(item, into: parentID, at: index) } else { tree.append(item, to: parentID) }
+        return folder
+    }
+
+    /// As Arc's `createFolderFromItems`: wraps `itemIDs` in a new folder in `spaceID`'s pinned section (or their
+    /// shared parent folder when all live in one), appending at the end.
+    @discardableResult
+    mutating func createFolder(wrapping itemIDs: [UUID], in spaceID: UUID, title: String = "") -> SidebarFolder? {
+        guard let pinnedRootID = space(spaceID)?.pinnedRootID else { return nil }
+        let roots = topLevelItemIDs(in: itemIDs)
+        guard !roots.isEmpty,
+            roots.allSatisfy({ space(containingItem: $0)?.id == spaceID && tree[$0]?.container == nil })
+        else { return nil }
+        let maxChildDepth = roots.map(subtreeFolderDepth(of:)).max() ?? 0
+        guard maxChildDepth < Self.maxFolderDepth else { return nil }
+        let sharedParents = Set(roots.compactMap { tree[$0]?.parentID })
+        var targetParentID = pinnedRootID
+        if sharedParents.count == 1, let candidate = sharedParents.first,
+            let depth = containerDepth(of: candidate), depth + 1 + maxChildDepth <= Self.maxFolderDepth
+        {
+            targetParentID = candidate
+        }
+        guard let folder = createFolder(title: title, in: targetParentID) else { return nil }
+        for itemID in roots where canMoveItem(itemID, into: folder.id) { tree.move(itemID, into: folder.id) }
+        return folder
+    }
+
+    /// As Arc's `WindowData.updateCustomTitle` / `SidebarList.readableTitle`: an empty rename keeps the folder's
+    /// previous non-empty title, or falls back to "Untitled" when it had none yet.
+    mutating func renameFolder(_ id: UUID, to title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        tree.update(id) { item in
+            guard var folder = item.folder else { return }
+            if !trimmed.isEmpty {
+                folder.title = trimmed
+            } else if folder.title.isEmpty {
+                folder.title = "Untitled"
+            }
+            item.kind = .folder(folder)
+        }
+    }
+
+    mutating func setFolderIcon(_ id: UUID, to icon: String?) {
+        tree.update(id) { item in
+            guard var folder = item.folder else { return }
+            folder.icon = icon
+            item.kind = .folder(folder)
+        }
+    }
+
+    mutating func moveItem(_ id: UUID, into parentID: UUID, at index: Int? = nil) {
+        guard canMoveItem(id, into: parentID) else { return }
+        tree.move(id, into: parentID, at: index)
+    }
+
+    mutating func moveItems(_ itemIDs: [UUID], into parentID: UUID, after anchorID: UUID?) {
+        let roots = topLevelItemIDs(in: itemIDs)
+        var previousID = anchorID
+        for itemID in roots where canMoveItem(itemID, into: parentID) {
+            let index = previousID.flatMap { tree[parentID]?.childIDs.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
+            tree.move(itemID, into: parentID, at: index)
+            previousID = itemID
+        }
+    }
+
+    mutating func removeFolder(_ id: UUID) {
+        guard tree.folder(id) != nil else { return }
+        tree.remove(id)
+    }
+
+    /// Captures a folder's hierarchy for Undo before its tabs are closed or removed.
+    func closedFolder(_ id: UUID) -> ClosedFolder? {
+        guard let root = tree[id], root.folder != nil, let place = tree.location(of: id),
+            let spaceID = space(containingItem: id)?.id
+        else { return nil }
+        return ClosedFolder(
+            root: root, index: place.index, spaceID: spaceID, descendants: tree.descendants(of: id),
+            depth: subtreeFolderDepth(of: id))
+    }
+
+    /// The snapshot is in sidebar order, so every parent is back before its children.
+    mutating func restoreFolder(_ closed: ClosedFolder, tabs: [SidebarTab], fallbackSpaceID: UUID) {
+        guard tree[closed.id] == nil else { return }
+        let destination: UUID?
+        if let parentID = closed.root.parentID, let parentDepth = containerDepth(of: parentID),
+            parentDepth + closed.depth <= Self.maxFolderDepth
+        {
+            destination = parentID
+        } else {
+            destination = space(closed.spaceID)?.pinnedRootID ?? space(fallbackSpaceID)?.pinnedRootID
+        }
+        guard let destination else { return }
+
+        var root = closed.root
+        root.childIDs = []
+        tree.insert(root, into: destination, at: closed.index)
+        let restored = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0) })
+        for var item in closed.descendants {
+            guard let parentID = item.parentID, tree[item.id] == nil, tree[parentID] != nil else { continue }
+            if item.tab != nil {
+                guard let tab = restored[item.id] else { continue }
+                item.kind = .tab(tab)
+            }
+            item.childIDs = []
+            tree.append(item, to: parentID)
+        }
+        archive.removeAll { restored[$0.id] != nil && tree.tab($0.id) != nil }
+    }
+
+    /// Pinned rows visible in `spaceID`, expanding folders in `expanded` and peeking collapsed folders that contain a
+    /// target in `peekedTargets` (selected tab or active Peek).
+    func visiblePinnedRows(
+        in spaceID: UUID, expanded: Set<UUID>, peekedTargets: Set<UUID>, sectionCollapsed: Bool
+    ) -> [SidebarRow] {
+        guard let pinnedRootID = space(spaceID)?.pinnedRootID else { return [] }
+        if sectionCollapsed {
+            var rows: [SidebarRow] = []
+            var seen = Set<UUID>()
+            for item in tree.descendants(of: pinnedRootID) {
+                guard let tab = item.tab, peekedTargets.contains(tab.id) else { continue }
+                if let splitID = splitViewID(containing: tab.id) {
+                    if seen.insert(splitID).inserted {
+                        rows.append(
+                            SidebarRow(
+                                entry: .splitView(id: splitID, tabs: tree.tabs(under: splitID)), depth: 0,
+                                parentID: tree[splitID]?.parentID ?? pinnedRootID))
+                    }
+                } else if seen.insert(tab.id).inserted {
+                    rows.append(SidebarRow(entry: .tab(tab), depth: 0, parentID: item.parentID ?? pinnedRootID))
+                }
+            }
+            return rows
+        }
+        let targetFolders = Set(peekedTargets.flatMap(folderAncestors(of:)))
+        var rows: [SidebarRow] = []
+        func walk(_ parentID: UUID, depth: Int, peekOnly: Bool) {
+            for childID in tree[parentID]?.childIDs ?? [] {
+                guard let item = tree[childID] else { continue }
+                switch item.kind {
+                case .folder(let folder):
+                    let hasTarget = targetFolders.contains(folder.id)
+                    if peekOnly, !hasTarget { continue }
+                    let isExpanded = !peekOnly && expanded.contains(folder.id)
+                    let isPeeked = !isExpanded && hasTarget
+                    rows.append(
+                        SidebarRow(
+                            entry: .folder(folder), depth: depth, parentID: parentID, isExpanded: isExpanded,
+                            isPeeked: isPeeked))
+                    if isExpanded {
+                        walk(folder.id, depth: depth + 1, peekOnly: false)
+                    } else if isPeeked {
+                        walk(folder.id, depth: depth + 1, peekOnly: true)
+                    }
+                case .tab(let tab):
+                    if peekOnly, !peekedTargets.contains(tab.id) { continue }
+                    rows.append(SidebarRow(entry: .tab(tab), depth: depth, parentID: parentID))
+                case .splitView:
+                    let tabs = tree.tabs(under: childID)
+                    let hasTarget = peekedTargets.contains(childID) || tabs.contains { peekedTargets.contains($0.id) }
+                    if peekOnly, !hasTarget { continue }
+                    rows.append(
+                        SidebarRow(entry: .splitView(id: childID, tabs: tabs), depth: depth, parentID: parentID))
+                case .container:
+                    break
+                }
+            }
+        }
+        walk(pinnedRootID, depth: 0, peekOnly: false)
+        return rows
+    }
+
+    func unpinnedRows(in spaceID: UUID) -> [SidebarRow] {
+        guard let unpinnedRootID = space(spaceID)?.unpinnedRootID else { return [] }
+        return entries(in: spaceID, pinned: false).map { SidebarRow(entry: $0, depth: 0, parentID: unpinnedRootID) }
     }
 }

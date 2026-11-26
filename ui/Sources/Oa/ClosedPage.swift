@@ -33,6 +33,17 @@ struct ClosedSplitView {
     let tabIDs: [UUID]
 }
 
+/// A deleted folder subtree kept for Undo, so ⌘Z puts its nested folders, splits and tabs back in order.
+struct ClosedFolder {
+    let root: SidebarItem
+    let index: Int
+    let spaceID: UUID
+    let descendants: [SidebarItem]
+    let depth: Int
+
+    var id: UUID { root.id }
+}
+
 /// Arc's `CloseItemsCompletionToast`.
 enum CloseItemsCompletionToast {
     case clearedTabs
@@ -49,6 +60,8 @@ struct ClosedGroup: Equatable {
     var completionToast: CloseItemsCompletionToast?
     /// A split closed whole, which an undo rebuilds with its ID, as Arc's does.
     var splitView: ClosedSplitView?
+    /// A folder deleted whole, which an undo rebuilds with its hierarchy and tabs.
+    var folder: ClosedFolder?
     /// The tabs of a close of several, in the order their steps go on, whatever order their pages end in.
     var order: [UUID] = []
     /// Their list as it was before the close, so each goes back between its old neighbours in any order.

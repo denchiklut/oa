@@ -432,6 +432,7 @@ struct FavoritesGrid: View {
         init(_ entry: SidebarEntry) {
             switch entry {
             case .tab(let tab): self.init(id: tab.id, tab: tab)
+            case .folder(let folder): self.init(id: folder.id, tab: nil)
             case .splitView(let id, let tabs): self.init(id: id, tab: nil, splitTabs: tabs)
             }
         }
@@ -793,6 +794,7 @@ struct TabRow: View {
     let layout: WindowLayoutController
     let tab: SidebarTab
     let spaceID: UUID
+    var depth = 0
     var place = Place.sidebar
     @State private var hovering = false
     @State private var size = CGSize.zero
@@ -815,13 +817,14 @@ struct TabRow: View {
 
     var body: some View {
         let inCard = place == .card
+        let indent = CGFloat(depth) * 16
         let pinned = model.state.isPinned(tab.id)
         let current = !inCard && model.selectedTabIDs[spaceID] == tab.id
         // As Arc: the New Tab row takes the selected look while the bar makes a tab.
         let selected = current && (spaceID != model.selectedSpaceID || model.commandBar?.destination != .newTab)
         // As seen in Arc: the selected tab keeps its card, and under the ⌘T bar it is drawn as the others.
         let multiSelected =
-            !inCard && !selected && spaceID == model.selectedSpaceID && model.multiSelectedTabIDs.contains(tab.id)
+            !inCard && !selected && spaceID == model.selectedSpaceID && model.multiSelectedItemIDs.contains(tab.id)
         // As Arc's `closeButtonAction`: a pinned tab that is shown, or has left its address, keeps its pin.
         let glyph: SidebarCellButton.Glyph =
             pinned && !inCard && (current || model.leftAddress(tab) != nil) ? .minus : .close
@@ -870,6 +873,7 @@ struct TabRow: View {
             }
         }
         .contentShape(card)
+        .padding(.leading, indent)
         .gesture(
             DragGesture(minimumDistance: 0, coordinateSpace: inCard ? .local : .named(SidebarDrag.space))
                 .onChanged { value in
@@ -878,7 +882,7 @@ struct TabRow: View {
                         previousTabID = model.selectedTabIDs[spaceID]
                         // As the author has seen in Arc: a click on the current tab renames it.
                         clickRenames =
-                            !inCard && selected && model.multiSelectedTabIDs.isEmpty
+                            !inCard && selected && model.multiSelectedItemIDs.isEmpty
                             && NSApp.currentEvent?.timestamp != renameEndingClick
                         if !inCard { press() }
                     }
@@ -965,14 +969,15 @@ struct TabRow: View {
         }
         // As seen in Arc: the picker hangs below the row, its arrow at the favicon.
         .popover(
-            isPresented: $pickingIcon, attachmentAnchor: .rect(.rect(CGRect(x: 6, y: 2, width: 24, height: 36))),
-            arrowEdge: .bottom
+            isPresented: $pickingIcon,
+            attachmentAnchor: .rect(.rect(CGRect(x: 6 + indent, y: 2, width: 24, height: 36))), arrowEdge: .bottom
         ) {
             SpaceIconPicker(selection: tab.icon) { model.setTabIcon(tab.id, to: $0) }
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
         .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
+        .onDisappear { if !inCard { drag?.rows[tab.id] = nil } }
         .platformContextMenu(
             isEnabled: inCard
                 ? model.library != nil
@@ -990,7 +995,7 @@ struct TabRow: View {
         let flags = event?.type == .leftMouseDown ? event?.modifierFlags ?? [] : NSEvent.modifierFlags
         picking = !flags.contains(.option) && (flags.contains(.command) || flags.contains(.shift))
         guard picking else {
-            let members = model.multiSelectedTabIDs
+            let members = model.multiSelectedItemIDs
             if members.contains(tab.id) { return heldMembers = members }
             return model.select(tab.id)
         }

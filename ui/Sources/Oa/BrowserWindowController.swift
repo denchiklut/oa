@@ -358,8 +358,33 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func cycleToNextRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.next) }
     @objc func cycleToPreviousRecentTab(_ sender: Any?) { model.highlightAdjacentRecentTab(.previous) }
     @objc func togglePin(_ sender: Any?) { model.togglePin() }
-    @objc func focusSidebar(_ sender: Any?) { layout?.revealCurrentTab() }
+    @objc func focusSidebar(_ sender: Any?) {
+        if let tabID = model.selectedTabID { model.expandAncestors(of: tabID) }
+        layout?.revealCurrentTab()
+    }
     @objc func toggleFavorite(_ sender: Any?) { model.toggleFavorite() }
+
+    /// As Arc's Tabs ▸ New Folder… (`0x102bb03c0`): modal sheet with Create disabled while empty.
+    @objc func newFolder(_ sender: Any?) {
+        guard let window, model.sidebarContext == .global else { return }
+        let items = model.multiSelectedItemIDs
+        DialogSheet.present(on: window) { [weak model] dismiss in
+            TextInputDialog(
+                title: "New Folder…", text: "", placeholder: "What are you organizing?", confirmTitle: "Create",
+                isValidWhenEmpty: false
+            ) { title in
+                dismiss()
+                guard let model else { return }
+                if items.isEmpty {
+                    model.createFolder(in: model.selectedSpaceID, title: title)
+                } else {
+                    model.createFolder(wrapping: items, title: title, startEditing: false)
+                }
+            } onCancel: {
+                dismiss()
+            }
+        }
+    }
 
     /// As Arc's File ▸ New Profile: the create sheet with the window's Space ticked.
     @objc func newProfile(_ sender: Any?) {
@@ -525,6 +550,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         // As Arc: the Create a Space panel holds back creating and editing a Space, not moving between them.
         let editsSpace = [
             #selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(editTheme(_:)), #selector(changeProfile(_:)),
+            #selector(newFolder(_:)),
         ]
         if model.spaceCreation != nil, let action = item.action, editsSpace.contains(action) { return false }
         // As seen in Arc: a window with a sidebar of its own has no Spaces to edit or move between and no pins, and
@@ -540,7 +566,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                 #selector(newSpace(_:)), #selector(renameSpace(_:)), #selector(editTheme(_:)),
                 #selector(deleteSpace(_:)), #selector(nextSpace(_:)), #selector(previousSpace(_:)),
                 #selector(focusSpace(_:)), #selector(togglePin(_:)), #selector(toggleFavorite(_:)),
-                #selector(togglePinnedSection(_:)),
+                #selector(togglePinnedSection(_:)), #selector(newFolder(_:)),
             ]
             if spaces.contains(action) { return false }
             // As seen in Arc: a Little window has no sidebar, Library, Archive or closed pages to bring back. Its

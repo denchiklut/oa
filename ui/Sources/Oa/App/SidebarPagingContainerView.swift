@@ -117,21 +117,20 @@ struct SidebarPagingContainerView: View {
     }
 }
 
-/// A Space's page: its name, its pinned tabs, the divider, New Tab and its Today tabs, with its own scroll position.
+/// A Space's page: its name, its pinned tabs and folders, the divider, New Tab and its Today tabs, with its own scroll
+/// position.
 private struct SidebarSpacePage: View {
     private enum Item: Identifiable {
         static let dividerID = UUID()
         static let newTabID = UUID()
 
-        case tab(SidebarTab)
-        case splitView(id: UUID, tabs: [SidebarTab])
+        case row(SidebarRow)
         case divider
         case newTab
 
         var id: UUID {
             switch self {
-            case .tab(let tab): tab.id
-            case .splitView(let id, _): id
+            case .row(let row): row.id
             case .divider: Self.dividerID
             case .newTab: Self.newTabID
             }
@@ -145,74 +144,80 @@ private struct SidebarSpacePage: View {
     @Environment(\.sidebarDrag) private var drag
     @Environment(\.sidebarRevealsControls) private var revealed
 
-    private static func items(_ entries: [SidebarEntry]) -> [Item] {
-        entries.map { entry in
-            switch entry {
-            case .tab(let tab): Item.tab(tab)
-            case .splitView(let id, let tabs): Item.splitView(id: id, tabs: tabs)
-            }
-        }
-    }
-
     var body: some View {
-        let unpinned = Self.items(model.state.entries(in: space.id, pinned: false))
+        let unpinned = model.state.unpinnedRows(in: space.id).map(Item.row)
         let collapsed = model.collapsedPinnedSpaces.contains(space.id)
-        // As Arc: a collapsed section still shows its selected tab, or split.
-        let pinned = Self.items(
-            model.state.entries(in: space.id, pinned: true).filter { entry in
-                switch entry {
-                case .tab(let tab): !collapsed || tab.id == model.selectedTabID
-                case .splitView(_, let tabs): !collapsed || tabs.contains { $0.id == model.selectedTabID }
-                }
-            })
+        let pinned = model.visiblePinnedRows(in: space.id).map(Item.row)
         let pinnedIDs = Set(pinned.map(\.id))
         // As seen in Arc: a window's own sidebar has no pinned section, so no divider.
         let global = model.sidebarContext == .global
         let items = pinned + (unpinned.isEmpty || !global ? [] : [.divider]) + [.newTab] + unpinned
-        ScrollView {
-            // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
-            VStack(spacing: 1) {
-                if global {
-                    SpaceNameRow(model: model, layout: layout, space: space)
-                        .sidebarDragFrame { drag?.lists[space.id, default: .init()].pinnedTop = $0.maxY + 0.5 }
-                } else {
-                    ProfileIndicatorView(model: model, space: space)
-                }
-                ForEach(items) { item in
-                    switch item {
-                    case .tab(let tab):
-                        // As measured on Arc: collapsing takes the pinned rows away at once, and expanding fades
-                        // them in where they go.
-                        TabRow(model: model, layout: layout, tab: tab, spaceID: space.id)
-                            .transition(
-                                pinnedIDs.contains(tab.id)
-                                    ? .asymmetric(
-                                        insertion: .opacity.animation(.easeOut(duration: 0.08)), removal: .identity)
-                                    : .opacity)
-                    case .splitView(let id, let tabs):
-                        SplitViewCellView(model: model, layout: layout, splitID: id, tabs: tabs, spaceID: space.id)
-                            .transition(.opacity)
-                    case .divider:
-                        ClearDivider(model: model, spaceID: space.id, showsClear: revealed)
-                            .sidebarDragFrame { drag?.lists[space.id, default: .init()].divider = $0 }
-                            .onDisappear { drag?.lists[space.id]?.divider = nil }
-                    case .newTab:
-                        NewTabRow(model: model, isCurrent: space.id == model.selectedSpaceID)
-                            .sidebarDragFrame { drag?.lists[space.id, default: .init()].newTab = $0 }
+        ScrollViewReader { proxy in
+            ScrollView {
+                // Not lazy: a drag reads every row's frame and the section boundary, scrolled out of view or not.
+                VStack(spacing: 1) {
+                    if global {
+                        SpaceNameRow(model: model, layout: layout, space: space)
+                            .sidebarDragFrame { drag?.lists[space.id, default: .init()].pinnedTop = $0.maxY + 0.5 }
+                    } else {
+                        ProfileIndicatorView(model: model, space: space)
+                    }
+                    ForEach(items) { item in
+                        switch item {
+                        case .row(let row):
+                            switch row.entry {
+                            case .tab(let tab):
+                                // As measured on Arc: collapsing takes the pinned rows away at once, and expanding
+                                // fades them in where they go.
+                                TabRow(model: model, layout: layout, tab: tab, spaceID: space.id, depth: row.depth)
+                                    .transition(
+                                        pinnedIDs.contains(tab.id)
+                                            ? .asymmetric(
+                                                insertion: .opacity.animation(.easeOut(duration: 0.08)),
+                                                removal: .identity)
+                                            : .opacity)
+                            case .folder(let folder):
+                                FolderRowView(
+                                    model: model, layout: layout, folder: folder, spaceID: space.id, depth: row.depth,
+                                    isExpanded: row.isExpanded, isPeeked: row.isPeeked
+                                )
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .opacity.animation(.easeOut(duration: 0.08)), removal: .identity))
+                            case .splitView(let id, let tabs):
+                                SplitViewCellView(
+                                    model: model, layout: layout, splitID: id, tabs: tabs, spaceID: space.id,
+                                    depth: row.depth
+                                )
+                                .transition(.opacity)
+                            }
+                        case .divider:
+                            ClearDivider(model: model, spaceID: space.id, showsClear: revealed)
+                                .sidebarDragFrame { drag?.lists[space.id, default: .init()].divider = $0 }
+                                .onDisappear { drag?.lists[space.id]?.divider = nil }
+                        case .newTab:
+                            NewTabRow(model: model, isCurrent: space.id == model.selectedSpaceID)
+                                .sidebarDragFrame { drag?.lists[space.id, default: .init()].newTab = $0 }
+                        }
                     }
                 }
+                .padding([.horizontal, .bottom], 8)
+                // As measured on Arc: the rows below a collapsing pinned section spring up, and down as it expands.
+                .animation(
+                    collapsed
+                        ? .spring(response: 0.125, dampingFraction: 0.94)
+                        : .spring(response: 0.135, dampingFraction: 0.9),
+                    value: collapsed
+                )
+                // As measured on Arc: an archived row fades where it is while the rows below close up.
+                .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
+                // Oa's own: hide the scrollbar while paging between Spaces or into the Library.
+                .background { VerticalScrollerHiding(hidesScroller: hidesScrollIndicators) }
             }
-            .padding([.horizontal, .bottom], 8)
-            // As measured on Arc: the rows below a collapsing pinned section spring up, and down as it expands.
-            .animation(
-                collapsed
-                    ? .spring(response: 0.125, dampingFraction: 0.94) : .spring(response: 0.135, dampingFraction: 0.9),
-                value: collapsed
-            )
-            // As measured on Arc: an archived row fades where it is while the rows below close up.
-            .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
-            // Oa's own: hide the scrollbar while paging between Spaces or into the Library.
-            .background { VerticalScrollerHiding(hidesScroller: hidesScrollIndicators) }
+            .onChange(of: model.editingFolderID) { _, id in
+                guard let id, space.id == model.selectedSpaceID else { return }
+                withAnimation(.easeOut(duration: 0.16)) { proxy.scrollTo(id, anchor: .center) }
+            }
         }
         // As Arc's: the list's empty space and its rows without a menu of their own give the Space's.
         .spaceContextMenu(
@@ -288,7 +293,7 @@ private struct SpaceNameRow: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        let hasPinned = !model.state.tabs(in: space.id, pinned: true).isEmpty
+        let hasPinned = model.state.hasPinnedItems(in: space.id)
         let collapsed = hasPinned && model.collapsedPinnedSpaces.contains(space.id)
         let showsChevron = hasPinned && (hovering || collapsed)
         HStack(spacing: 0) {

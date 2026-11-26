@@ -65,7 +65,10 @@ private struct SidebarPlusMenu: View {
                 Row(title: "New Space", symbol: "plus.rectangle.on.rectangle") {
                     model.beginSpaceCreation(after: model.selectedSpaceID)
                 },
-                Row(title: "New Folder", symbol: "folder"),
+                model.sidebarContext == .global
+                    ? Row(title: "New Folder", symbol: "folder") {
+                        model.createFolder(in: model.selectedSpaceID, startEditing: true)
+                    } : Row(title: "New Folder", symbol: "folder"),
             ],
             [
                 Row(title: "New Easel", symbol: "scribble", shortcut: "⌃⇧E"),

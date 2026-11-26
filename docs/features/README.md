@@ -97,11 +97,11 @@ notes here does not assess or change the checklist status below.
 | Archive browser and archived-tab restoration | ✅ | ☐ |
 | Search archived tabs † | ✅ | ☐ |
 | Clear the entire Archive † | ✅ | ☐ |
-| Folders and nested folders | ✅ | ☐ |
+| [Folders and nested folders](sidebar/README.md#folders) | ✅ | ✅ |
 | Rename, duplicate and move folders | ✅ | ☐ |
 | Convert a folder into a Space | ✅ | ☐ |
 | Copy all links in a folder | ✅ | ☐ |
-| Custom folder icons | ✅ | ☐ |
+| Custom folder icons | ✅ | ✅ |
 | Folder search | ✅ | ☐ |
 | Collapse Pinned Tabs | ✅ | ☐ |
 | Reveal the current tab in the sidebar | ✅ | ☐ |

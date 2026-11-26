@@ -16,6 +16,8 @@ final class InlineRenameTextField: NSTextField {
 struct InlineRenameField: NSViewRepresentable {
     let layout: WindowLayoutController
     let text: String
+    var placeholder = "Title"
+    var weight: NSFont.Weight = .regular
     let onCommit: (String) -> Void
     let onCancel: (NSEvent?) -> Void
 
@@ -26,9 +28,9 @@ struct InlineRenameField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 14)
+        field.font = .systemFont(ofSize: 14, weight: weight)
         field.textColor = NSColor(context.environment.theme.foreground)
-        field.placeholderString = "Title"
+        field.placeholderString = placeholder
         field.usesSingleLineMode = true
         field.cell?.isScrollable = true
         field.cell?.wraps = false

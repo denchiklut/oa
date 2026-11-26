@@ -119,9 +119,27 @@ private struct RestoreDataView: View {
 
     private func preview(of state: SidebarState) -> String {
         var lines: [String] = []
+        func appendPinned(_ parentID: UUID, indent: String) {
+            for childID in state.tree[parentID]?.childIDs ?? [] {
+                guard let item = state.tree[childID] else { continue }
+                switch item.kind {
+                case .folder(let folder):
+                    lines.append("\(indent)Folder: \(folder.displayTitle)")
+                    appendPinned(folder.id, indent: indent + "    ")
+                case .tab(let tab):
+                    lines.append("\(indent)Pinned Tab: \(tab.displayTitle)")
+                case .splitView:
+                    for tab in state.tree.tabs(under: childID) {
+                        lines.append("\(indent)Pinned Tab: \(tab.displayTitle)")
+                    }
+                case .container:
+                    break
+                }
+            }
+        }
         for space in state.spaces {
             lines.append(space.name)
-            lines += state.tabs(in: space.id, pinned: true).map { "    Pinned Tab: \($0.displayTitle)" }
+            if let pinnedRootID = space.pinnedRootID { appendPinned(pinnedRootID, indent: "    ") }
             lines += state.tabs(in: space.id, pinned: false).map { "    Tab: \($0.displayTitle)" }
             lines.append("")
         }
