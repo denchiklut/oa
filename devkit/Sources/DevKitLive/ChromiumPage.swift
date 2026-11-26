@@ -15,6 +15,7 @@ final class ChromiumPage: Page, MediaSession {
     private(set) var canGoForward = false
     private(set) var favicon: NSImage?
     private(set) var securityLevel = SecurityLevel.neutral
+    private(set) var fullscreenOrigin: String?
     private(set) var rootBackgroundColor: NSColor?
     private(set) var navigationResult: NavigationResult?
     private(set) var isCameraOn = false
@@ -85,6 +86,7 @@ final class ChromiumPage: Page, MediaSession {
     func resetZoomAndScaleFactors() { page?.resetZoomAndScaleFactors() }
     func savePage() { page?.savePage() }
     func print() { page?.print() }
+    func exitFullscreen() { page?.exitFullscreen() }
     func stopLoading() { page?.stopLoading() }
     func activate() { page?.activate() }
     func find(_ text: String, direction: FindDirection, findMatch: Bool) {
@@ -141,6 +143,8 @@ final class ChromiumPage: Page, MediaSession {
         if favicon !== self.favicon { self.favicon = favicon }
         let level = SecurityLevel(core: page.securityLevel)
         if level != securityLevel { securityLevel = level }
+        let origin = page.fullscreenOrigin
+        if fullscreenOrigin != origin { fullscreenOrigin = origin }
         let background = page.rootBackgroundColor
         if background != rootBackgroundColor { rootBackgroundColor = background }
         let result = NavigationResult(core: page.navigationResult)

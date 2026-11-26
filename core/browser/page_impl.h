@@ -110,6 +110,8 @@ class PageImpl : public Page,
   bool CanGoForward() const override;
   void* Favicon() const override;
   SecurityLevel GetSecurityLevel() const override;
+  std::optional<std::string> GetFullscreenOrigin() const override;
+  void ExitFullscreen() override;
   std::optional<Color> GetRootBackgroundColor() const override;
   NavigationResult GetNavigationResult() const override;
   bool IsCameraOn() const override;
@@ -170,12 +172,17 @@ class PageImpl : public Page,
   void CloseContents(content::WebContents* source) override;
   bool CanEnterFullscreenModeForTab(
       content::RenderFrameHost* requesting_frame) override;
+  void EnterFullscreenModeForTab(
+      content::RenderFrameHost* requesting_frame,
+      const blink::mojom::FullscreenOptions& options) override;
   void BeforeUnloadFired(content::WebContents* tab,
                          bool proceed,
                          bool* proceed_to_fire_unload) override;
 
   // content::WebContentsObserver:
   void BeforeUnloadFired(bool proceed) override;
+  void DidToggleFullscreenModeForTab(bool entered_fullscreen,
+                                     bool will_cause_resize) override;
   void PrimaryMainFrameRenderProcessGone(
       base::TerminationStatus status) override;
   void RenderViewReady() override;

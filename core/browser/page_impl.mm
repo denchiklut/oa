@@ -25,6 +25,7 @@
 #include "chrome/browser/tab_contents/tab_util.h"
 #include "chrome/browser/ui/browser_live_tab_context.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_muted_utils.h"
@@ -62,6 +63,7 @@
 #include "third_party/blink/public/common/input/web_keyboard_event.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
 #include "third_party/blink/public/common/renderer_preferences/renderer_preferences.h"
+#include "third_party/blink/public/mojom/frame/fullscreen.mojom.h"
 #include "third_party/blink/public/mojom/input/input_event_result.mojom-shared.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/page_transition_types.h"
@@ -373,6 +375,28 @@ void* PageImpl::Favicon() const {
     return nullptr;
   }
   return (__bridge void*)driver->GetFavicon().ToNSImage();
+}
+
+std::optional<std::string> PageImpl::GetFullscreenOrigin() const {
+  if (!window_browser_ || !web_contents()) {
+    return std::nullopt;
+  }
+  auto* manager = ExclusiveAccessManager::From(window_browser_->browser());
+  if (!manager) {
+    return std::nullopt;
+  }
+  auto* controller = manager->fullscreen_controller();
+  if (controller->GetFullscreenState(web_contents()).target_mode !=
+      content::FullscreenMode::kContent) {
+    return std::nullopt;
+  }
+  return controller->GetOriginForExclusiveAccessBubble().Serialize();
+}
+
+void PageImpl::ExitFullscreen() {
+  if (web_contents() && web_contents()->IsFullscreen()) {
+    web_contents()->ExitFullscreen(/*will_cause_resize=*/false);
+  }
 }
 
 std::optional<Color> PageImpl::GetRootBackgroundColor() const {
@@ -1035,7 +1059,29 @@ void PageImpl::CloseContents(content::WebContents* source) {
 
 bool PageImpl::CanEnterFullscreenModeForTab(
     content::RenderFrameHost* requesting_frame) {
-  return false;
+  NSWindow* window =
+      window_browser_ ? window_browser_->GetNativeWindow().GetNativeNSWindow()
+                      : nil;
+  return inner() && window &&
+         web_contents()->GetNativeView().GetNativeNSView().window == window &&
+         ForwardingWebContentsDelegate::CanEnterFullscreenModeForTab(
+             requesting_frame);
+}
+
+void PageImpl::EnterFullscreenModeForTab(
+    content::RenderFrameHost* requesting_frame,
+    const blink::mojom::FullscreenOptions& options) {
+  // Oa keeps the window on its current display so AppKit restores its Space on
+  // exit.
+  auto local_options = options.Clone();
+  local_options->display_id = display::kInvalidDisplayId;
+  ForwardingWebContentsDelegate::EnterFullscreenModeForTab(requesting_frame,
+                                                           *local_options);
+}
+
+void PageImpl::DidToggleFullscreenModeForTab(bool entered_fullscreen,
+                                             bool will_cause_resize) {
+  NotifyStateChanged();
 }
 
 // Chrome would close the page once the handler lets it go; asking keeps it.

@@ -214,6 +214,8 @@ import AppKit
     var canGoForward: Bool { get }
     var favicon: NSImage? { get }
     var securityLevel: Int { get }
+    var fullscreenOrigin: String? { get }
+    func exitFullscreen()
     var rootBackgroundColor: NSColor? { get }
     var navigationResult: Int { get }
     var isCameraOn: Bool { get }

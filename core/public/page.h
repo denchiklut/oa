@@ -296,6 +296,8 @@ class Page {
   // An NSImage, held by the tab while it keeps the icon; null until it has one.
   virtual void* Favicon() const = 0;
   virtual SecurityLevel GetSecurityLevel() const = 0;
+  virtual std::optional<std::string> GetFullscreenOrigin() const = 0;
+  virtual void ExitFullscreen() = 0;
   // The main frame's compositor frames' root background colour, as ArcCore
   // keeps it: none until the first frame, then the last one, across
   // navigations and crashes.

@@ -5,6 +5,7 @@
 #define OA_BROWSER_UI_BROWSER_WINDOW_IMPL_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,6 +43,8 @@ class BrowserWindowImpl : public BrowserWindow, public ExclusiveAccessContext {
   BrowserWindowInterface* browser() const { return browser_; }
   // The Oa window's Browser and strip logic. Never null.
   WindowBrowser* window_browser() const { return window_browser_.get(); }
+
+  void WindowFullscreenDidChange();
 
   // ui::BaseWindow:
   void Show() override;
@@ -170,8 +173,7 @@ class BrowserWindowImpl : public BrowserWindow, public ExclusiveAccessContext {
   void CreateTabSearchBubble() override;
   void CloseTabSearchBubble() override;
 
-  // ExclusiveAccessContext: fullscreen and pointer lock stay off until the app
-  // implements them.
+  // ExclusiveAccessContext:
   Profile* GetProfile() override;
   void EnterFullscreen(const url::Origin& origin,
                        ExclusiveAccessBubbleType bubble_type,
@@ -202,6 +204,9 @@ class BrowserWindowImpl : public BrowserWindow, public ExclusiveAccessContext {
       bool user_gesture,
       bool in_tab_dragging);
 
+  void SetWindowFullscreen(bool fullscreen);
+
+  std::optional<bool> requested_fullscreen_;
   const raw_ptr<BrowserWindowInterface> browser_;
   std::unique_ptr<WindowBrowser> window_browser_;
   std::unique_ptr<LocationBarImpl> location_bar_;
