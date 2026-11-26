@@ -57,7 +57,7 @@ While a page has the keyboard, ⌘Z is the page's first, as in Arc:
   from the menu still works;
 - ⇧⌘Z goes the same way: the page's redo first.
 
-The engine does this, by [patch 0018](../../../chromium/patches/README.md): the
+The engine does this, by [patch 0018](https://github.com/denchiklut/oa/blob/main/chromium/patches/0018-oa-ask-the-page-to-undo-before-the-window-as-ArcCore.patch): the
 page's view sends Undo or Redo to the focused frame with a reply, and when the
 frame did nothing, the first undo manager up the responder chain that can undo
 does, which is the window's. ArcCore's view does the same.
