@@ -707,11 +707,11 @@ struct SidebarState {
     }
 
     /// Write-back from a live page. A tab that keeps its address takes the title only while the page is at it.
-    mutating func setSavedPage(_ tabID: UUID, title: String, url: URL?) {
+    mutating func setSavedPage(_ tabID: UUID, title: String?, url: URL?) {
         let keeps = keepsAddress(tabID)
         tree.update(tabID) { item in
             guard var tab = item.tab else { return }
-            if !title.isEmpty, !keeps || tab.isAt(url) { tab.title = title }
+            if let title, !title.isEmpty, !keeps || tab.isAt(url) { tab.title = title }
             if let url, !keeps { tab.url = url }
             item.kind = .tab(tab)
         }
