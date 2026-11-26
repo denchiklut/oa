@@ -707,6 +707,17 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
                : OAPageNavigationResultNone;
 }
 
+- (void)exitFullscreen {
+  if (_page) {
+    _page->ExitFullscreen();
+  }
+}
+
+- (nullable NSString*)fullscreenOrigin {
+  auto origin = _page ? _page->GetFullscreenOrigin() : std::nullopt;
+  return origin ? ToNSString(*origin) : nil;
+}
+
 - (nullable NSColor*)rootBackgroundColor {
   std::optional<oa::Color> color =
       _page ? _page->GetRootBackgroundColor() : std::nullopt;

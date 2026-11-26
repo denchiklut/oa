@@ -15,6 +15,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let downloadPreview = DownloadPreviewWindow()
     private let extensionPopup = ExtensionPopupWindow()
     private var modalItemSwitcher: (state: ModalItemSwitcher, controller: ModalItemSwitcherWindowController)?
+    private var fullscreenPage: FullscreenPage?
     private var webDialog: WebDialogWindowController?
     private var viewTimer: Task<Void, Never>?
     private var isPlacingLittleWindow = false
@@ -128,6 +129,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         observeExtensionPopup()
         observeModalItemSwitcher()
         observeWebDialog()
+        observeFullscreenPage()
         // As Arc's per-window timer: each minute the shown tab counts as viewed, unless the window is fully hidden.
         viewTimer = Task { [weak self] in
             while !Task.isCancelled {
@@ -244,6 +246,32 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         controller.beginObservingEvents()
     }
 
+    private func observeFullscreenPage() {
+        let (page, origin, presentingControls) = withObservationTracking {
+            let page = model.frontPage
+            return (
+                page, page?.fullscreenOrigin,
+                model.commandBar != nil || model.dialog != nil
+                    || model.permissionRequest != nil || model.extensionRequest != nil
+            )
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeFullscreenPage() }
+        }
+        if let current = fullscreenPage, current.page.id != page?.id || origin == nil || presentingControls {
+            fullscreenPage = nil
+            current.dismiss(refocus: current.page.id == page?.id && !presentingControls)
+            if current.page.id != page?.id { current.page.exitFullscreen() }
+        }
+        guard !isClosing, let page, let origin, let content = window?.contentView else { return }
+        if presentingControls { return page.exitFullscreen() }
+        if let fullscreenPage {
+            fullscreenPage.showHint(for: origin)
+        } else {
+            fullscreenPage = FullscreenPage(page: page, in: content, origin: origin)
+            if fullscreenPage == nil { page.exitFullscreen() }
+        }
+    }
+
     private func observeWebDialog() {
         let dialog = withObservationTracking {
             model.webDialog
@@ -308,6 +336,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowWillClose(_ notification: Notification) {
         isClosing = true
+        fullscreenPage?.dismiss(refocus: false)
+        fullscreenPage = nil
         viewTimer?.cancel()
         model.dismissModalItemSwitcher()
         modalItemSwitcher?.controller.close()

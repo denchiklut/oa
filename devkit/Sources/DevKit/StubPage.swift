@@ -16,6 +16,8 @@ final class StubPage: Page, MediaSession {
     let tabSessionID = StubPage.nextTabSessionID()
     let profileID: UUID
     private(set) var favicon: NSImage?
+    let fullscreenOrigin: String? = nil
+    func exitFullscreen() {}
     private(set) var rootBackgroundColor: NSColor?
     private(set) var navigationResult: NavigationResult?
     var securityLevel: SecurityLevel {

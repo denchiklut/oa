@@ -238,6 +238,8 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
 // Nil until Chromium's favicon driver has an icon for the page.
 @property(nonatomic, readonly, nullable) NSImage* favicon;
 @property(nonatomic, readonly) OAPageSecurityLevel securityLevel;
+@property(nonatomic, readonly, nullable) NSString* fullscreenOrigin;
+- (void)exitFullscreen;
 // In sRGB; nil until the page's first frame.
 @property(nonatomic, readonly, nullable) NSColor* rootBackgroundColor;
 @property(nonatomic, readonly) OAPageNavigationResult navigationResult;

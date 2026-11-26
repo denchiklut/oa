@@ -15,6 +15,7 @@
 #include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
 #include "chrome/browser/ui/find_bar/find_bar.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -353,7 +354,8 @@ void BrowserWindowImpl::Restore() {}
 
 bool BrowserWindowImpl::IsFullscreen() const {
   NSWindow* window = AppWindow(window_browser_.get());
-  return window && (window.styleMask & NSWindowStyleMaskFullScreen);
+  return requested_fullscreen_.value_or(
+      (window.styleMask & NSWindowStyleMaskFullScreen) != 0);
 }
 
 // BrowserWindow.
@@ -639,9 +641,39 @@ Profile* BrowserWindowImpl::GetProfile() {
 void BrowserWindowImpl::EnterFullscreen(
     const url::Origin& origin,
     ExclusiveAccessBubbleType bubble_type,
-    FullscreenTabParams fullscreen_tab_params) {}
+    FullscreenTabParams fullscreen_tab_params) {
+  SetWindowFullscreen(true);
+}
 
-void BrowserWindowImpl::ExitFullscreen() {}
+void BrowserWindowImpl::ExitFullscreen() {
+  SetWindowFullscreen(false);
+}
+
+void BrowserWindowImpl::SetWindowFullscreen(bool fullscreen) {
+  NSWindow* window = AppWindow(window_browser_.get());
+  if (!window || fullscreen == IsFullscreen()) {
+    return;
+  }
+  // AppKit ignores a second toggle during a Space transition.
+  bool transitioning = requested_fullscreen_.has_value();
+  requested_fullscreen_ = fullscreen;
+  if (!transitioning) {
+    [window toggleFullScreen:nil];
+  }
+}
+
+void BrowserWindowImpl::WindowFullscreenDidChange() {
+  NSWindow* window = AppWindow(window_browser_.get());
+  bool fullscreen = (window.styleMask & NSWindowStyleMaskFullScreen) != 0;
+  if (requested_fullscreen_ && *requested_fullscreen_ != fullscreen) {
+    [window toggleFullScreen:nil];
+    return;
+  }
+  requested_fullscreen_.reset();
+  if (auto* manager = ExclusiveAccessManager::From(browser_)) {
+    manager->fullscreen_controller()->WindowFullscreenStateChanged();
+  }
+}
 
 void BrowserWindowImpl::UpdateExclusiveAccessBubble(
     const ExclusiveAccessBubbleParams& params,

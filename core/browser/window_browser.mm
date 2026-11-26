@@ -180,6 +180,32 @@ WindowBrowser* WindowBrowser::GetOrCreate(const std::string& window_id,
 // static
 void WindowBrowser::AttachWindow(const std::string& window_id,
                                  void* ns_window) {
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    for (NSNotificationName name in @[
+           NSWindowDidEnterFullScreenNotification,
+           NSWindowDidExitFullScreenNotification
+         ]) {
+      [NSNotificationCenter.defaultCenter
+          addObserverForName:name
+                      object:nil
+                       queue:nil
+                  usingBlock:^(NSNotification* note) {
+                    // AppKit finishes its Space transition after delivering the
+                    // notification.
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                      for (auto& candidate : OpenWindowBrowsers(nullptr)) {
+                        if (candidate &&
+                            candidate->GetNativeWindow().GetNativeNSWindow() ==
+                                note.object) {
+                          BrowserWindowImpl::FromBrowser(candidate->browser())
+                              ->WindowFullscreenDidChange();
+                        }
+                      }
+                    });
+                  }];
+    }
+  });
   NSString* key = base::SysUTF8ToNSString(window_id);
   if (![AttachedWindows() objectForKey:key]) {
     [AttachedWindows() setObject:(__bridge NSWindow*)ns_window forKey:key];
