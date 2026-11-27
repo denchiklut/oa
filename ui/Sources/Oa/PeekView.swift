@@ -6,7 +6,9 @@ import SwiftUI
 struct PeekView: View {
     let model: WindowModel
     let page: any Page
+    let swipe: PeekDismissSwipe
     let sidebarWidth: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(PageToolbar.key) private var showsToolbar = false
 
     var body: some View {
@@ -22,9 +24,13 @@ struct PeekView: View {
                 }
                 panel
                     .frame(width: panelWidth, height: max(geometry.size.height - 23, 100))
+                    .scaleEffect(swipe.dismissing == page.id && !reduceMotion ? 0.75 : 1)
+                    .opacity(swipe.dismissing == page.id ? 0 : 1)
+                    .offset(x: swipe.offset)
                     .padding(.leading, sidebarWidth + margin)
                     .padding(.top, 11)
                 controls
+                    .opacity(swipe.dismissing == page.id ? 0 : 1)
                     .padding(.leading, sidebarWidth + margin + panelWidth + 13)
                     .padding(.top, 11 + 7.5)
             }

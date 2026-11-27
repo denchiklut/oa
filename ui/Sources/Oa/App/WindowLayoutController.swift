@@ -35,6 +35,7 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private var resize: SidebarResizeState?
     /// Arc's pager over the window's pages, and where it is.
     @ObservationIgnored private let pager = PageSwipeController<WindowLayoutPage>()
+    @ObservationIgnored let peekSwipe = PeekDismissSwipe()
     private var pagerPosition = homeWidth
     private(set) var isPaging = false
     /// The Space whose page is beside the Library's, as Arc's pager starts its Space pages from one: the window's
@@ -159,11 +160,37 @@ final class WindowLayoutController: NSViewController {
     /// Arc's gate on a swipe: between Spaces it starts over the sidebar, and with the Library in view anywhere.
     private func scrollingShouldBegin(_ event: NSEvent) -> Bool {
         guard model.spaceCreation?.phase != .animating, spaceCreationFade == nil else { return false }
-        guard libraryProgress == 0 else { return true }
+        if isOverSidebar(event) { return true }
+        return libraryProgress != 0 && !(swipeablePeekID != nil && isOverPeekContent(event))
+    }
+
+    private func isOverSidebar(_ event: NSEvent) -> Bool {
         let point = CGPoint(x: event.locationInWindow.x, y: view.bounds.height - event.locationInWindow.y)
         let inset = sidebarPresentation == .floating ? Self.floatingInset : 0
         let sidebar = CGRect(x: 0, y: 0, width: sidebarWidth, height: view.bounds.height - 2 * inset)
         return sidebarPresentation != .hidden && sidebar.offsetBy(dx: inset, dy: inset).contains(point)
+    }
+
+    private func isOverPeekContent(_ event: NSEvent) -> Bool {
+        guard !isOverSidebar(event) else { return false }
+        if model.showingArchive || libraryProgress == 0 { return true }
+        let libraryWidth = libraryWidth(for: model.library ?? model.lastLibrarySection)
+        return event.locationInWindow.x >= libraryWidth * libraryProgress
+    }
+
+    private var swipeablePeekID: UUID? {
+        guard let peek = model.peek, model.commandBar == nil, model.dialog == nil, model.extensionRequest == nil,
+            viewIfLoaded?.window?.attachedSheet == nil
+        else { return nil }
+        return peek.id
+    }
+
+    private func handlePeekSwipe(_ event: NSEvent) -> Bool {
+        let id = swipeablePeekID
+        return peekSwipe.handle(event, pageID: id, startsInContent: isOverPeekContent(event)) { [weak self] in
+            guard let self else { return }
+            if let id, swipeablePeekID == id { model.closePeek() } else { peekSwipe.cancel() }
+        }
     }
 
     /// How far the Space pages are scrolled, from the first Space's.
@@ -487,7 +514,9 @@ final class WindowLayoutController: NSViewController {
             // A wheel's ticks have no phases, and a scroll view keeps those to itself: the pager gets them here.
             if event.type == .scrollWheel {
                 toolTipController.dismiss()
-                let isWheel = event.phase.isEmpty && event.momentumPhase.isEmpty && event.window === view.window
+                guard event.window === view.window else { return event }
+                if handlePeekSwipe(event) { return nil }
+                let isWheel = event.phase.isEmpty && event.momentumPhase.isEmpty
                 return isWheel && pager.scrollWheel(with: event) ? nil : event
             }
             if event.type == .mouseMoved {
@@ -512,6 +541,7 @@ final class WindowLayoutController: NSViewController {
         }
         observe(NSWindow.didBecomeKeyNotification, window) { $0.trackPointer() }
         observe(NSWindow.didResignKeyNotification, window) {
+            $0.peekSwipe.cancel()
             $0.dismissFolderPreview()
             $0.toolTipController.dismiss()
             $0.trackPointer()
@@ -535,6 +565,7 @@ final class WindowLayoutController: NSViewController {
 
     override func viewDidDisappear() {
         super.viewDidDisappear()
+        peekSwipe.cancel()
         dismissFolderPreview()
         toolTipController.tearDown()
         monitor.map(NSEvent.removeMonitor)
@@ -728,6 +759,7 @@ final class WindowLayoutController: NSViewController {
                 self?.observeModel()
             }
         }
+        peekSwipe.validate(pageID: swipeablePeekID)
         updatePages()
         updatePresentation()
     }
