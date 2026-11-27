@@ -40,6 +40,7 @@ final class SidebarStore {
     /// One for the app, as Arc's.
     @ObservationIgnored let topBarColors = TopBarColorClient()
     @ObservationIgnored let contentSnapshots = ContentSnapshotClient()
+    @ObservationIgnored let captureLibrary: CaptureLibrary
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored let keyBindings: KeyBindingsClient
     @ObservationIgnored let developerMode: DeveloperModeClient
@@ -53,6 +54,7 @@ final class SidebarStore {
         persistence = SidebarPersistence(directory: directory)
         favicons = FaviconCache(directory: directory)
         commandBarPicks = CommandBarPicks(directory: directory)
+        captureLibrary = CaptureLibrary(directory: directory)
         home = StorableHome(directory: directory)
         keyBindings = KeyBindingsClient(directory: directory)
         developerMode = DeveloperModeClient(directory: directory)

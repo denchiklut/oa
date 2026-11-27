@@ -308,6 +308,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowDidBecomeKey(_ notification: Notification) {
         model.updateLittleDestination()
         model.showSelected()
+        if model.regionCapture.hasResult { return }
         // As Arc's: DevTools that had the keyboard keep it.
         let devTools = model.page?.devTools.view
         if let devTools, (window?.firstResponder as? NSView)?.isDescendant(of: devTools) == true { return }
@@ -319,7 +320,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     /// As Arc's: a Little window that is still its bar alone closes when it stops being key, whatever took the key.
     func windowDidResignKey(_ notification: Notification) {
-        model.regionCapture.cancel()
+        model.regionCapture.windowResignedKey()
         if model.little?.isPresented == false, !isClosing { window?.close() }
     }
 
