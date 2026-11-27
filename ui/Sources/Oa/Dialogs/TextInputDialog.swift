@@ -3,7 +3,7 @@ import SwiftUI
 /// Arc's `TextInputDialogContext`: an optional icon, a title, an optional line under it, one field with its text all
 /// selected, and Cancel and the confirming button.
 struct TextInputDialog: View {
-    let title: String
+    let title: LocalizedStringKey
     let message: String?
     let icon: NSImage?
     let placeholder: String
@@ -16,7 +16,7 @@ struct TextInputDialog: View {
     @FocusState private var focused: Bool
 
     init(
-        title: String, message: String? = nil, icon: NSImage? = nil, text: String, placeholder: String,
+        title: LocalizedStringKey, message: String? = nil, icon: NSImage? = nil, text: String, placeholder: String,
         confirmTitle: String, isValidWhenEmpty: Bool = true, width: CGFloat = 450,
         onSubmit: @escaping (String) -> Void, onCancel: @escaping () -> Void
     ) {
@@ -32,8 +32,15 @@ struct TextInputDialog: View {
         _text = State(initialValue: text)
     }
 
+    private var canSubmit: Bool {
+        isValidWhenEmpty || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func submit() {
+        if canSubmit { onSubmit(text) }
+    }
+
     var body: some View {
-        let canSubmit = isValidWhenEmpty || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         VStack(alignment: .leading, spacing: 0) {
             if let icon {
                 Image(nsImage: icon)
@@ -50,12 +57,12 @@ struct TextInputDialog: View {
             }
             DialogTextField(placeholder: placeholder, text: $text)
                 .focused($focused)
-                .onSubmit { if canSubmit { onSubmit(text) } }
+                .onSubmit(submit)
                 .padding(.top, 20)
             HStack(spacing: 8) {
                 Spacer()
                 DialogButtonView(title: "Cancel", kind: .cancel, action: onCancel)
-                DialogButtonView(title: confirmTitle, kind: .primary, isEnabled: canSubmit) { onSubmit(text) }
+                DialogButtonView(title: confirmTitle, kind: .primary, isEnabled: canSubmit, action: submit)
             }
             .padding(.top, 24)
         }
@@ -67,6 +74,23 @@ struct TextInputDialog: View {
             focused = true
             DispatchQueue.main.async {
                 NSApplication.shared.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+            }
+        }
+    }
+}
+
+extension TextInputDialog {
+    static func renameSpace(_ space: SidebarSpace, in model: WindowModel) {
+        guard let window = model.window else { return }
+        DialogSheet.present(on: window) { dismiss in
+            TextInputDialog(
+                title: "Rename “\(Text(verbatim: space.name).foregroundStyle(.blue))”",
+                text: space.name, placeholder: "Space name", confirmTitle: "Rename", isValidWhenEmpty: false
+            ) { name in
+                model.renameSpace(space.id, to: name.trimmingCharacters(in: .whitespacesAndNewlines))
+                dismiss()
+            } onCancel: {
+                dismiss()
             }
         }
     }

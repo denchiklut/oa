@@ -447,8 +447,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     @objc func renameSpace(_ sender: Any?) {
-        guard let space = model.space, let name = NamePrompt.run("Rename Space", name: space.name) else { return }
-        model.renameSpace(space.id, to: name)
+        if let space = model.space { TextInputDialog.renameSpace(space, in: model) }
     }
 
     @objc func editTheme(_ sender: Any?) {
