@@ -707,11 +707,8 @@ final class WindowLayoutController: NSViewController {
     private func updateWindowAppearance() {
         guard let window = view.window else { return }
         let app = NSApplication.shared
-        let isDark = app.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let appearance =
-            chromeTheme.windowAppearance.map {
-                NSAppearance(named: $0[isDark ? .dark : .light] == .dark ? .darkAqua : .aqua)
-            }
+            chromeTheme.windowAppearance.flatMap { NSAppearance(named: $0.resolved(against: app.effectiveAppearance)) }
             ?? app.appearance
         if window.appearance?.name != appearance?.name { window.appearance = appearance }
     }

@@ -4,7 +4,6 @@ import SwiftUI
 /// A Space's theme, in the shape and under the names Arc stores as `customInfo.windowTheme`.
 struct WindowTheme: Hashable, Codable {
     var background: AppearanceBased<Background>
-    /// Kept as Arc stores it: nil on its default and on every theme from its editor. What it drives isn't traced.
     var windowAppearance: AppearanceBased<Appearance>?
     var primaryColorPalette: PrimaryColorPalette
     var semanticColorPalette: AppearanceBased<SemanticColorPalette>
@@ -103,6 +102,13 @@ struct WindowTheme: Hashable, Codable {
         var cutoutColor: ThemeColor
         var title: ThemeColor
         var subtitle: ThemeColor
+    }
+}
+
+extension WindowTheme.AppearanceBased where Value == WindowTheme.Appearance {
+    func resolved(against appearance: NSAppearance) -> NSAppearance.Name {
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return self[dark ? .dark : .light] == .dark ? .darkAqua : .aqua
     }
 }
 

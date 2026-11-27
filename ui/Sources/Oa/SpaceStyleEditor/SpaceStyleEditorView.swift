@@ -31,12 +31,7 @@ struct SpaceStyleEditorView: View {
         // As Arc's: AppKit's popover material over the window behind it, so the theme being made shows through.
         .background(WindowMaterial(material: .popover, blendingMode: .behindWindow, state: .active))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .onReceive(NSApplication.shared.publisher(for: \.appearance)) { appearance in
-            update {
-                $0.onAppearanceUpdated(appearance?.name)
-                return nil
-            }
-        }
+
     }
 }
 
@@ -84,8 +79,10 @@ private struct ColorPad: View {
             .animation(
                 isDragging ? nil : .spring(response: 0.25, dampingFraction: 0.9),
                 value: knobs.map { [$0.point.x, $0.point.y] })
-            AppearanceToggle(editor: editor)
-                .position(x: 170, y: 40)
+            AppearanceToggle(override: editor.state.windowAppearance) { name in
+                update { $0.selectAppearance(name) }
+            }
+            .position(x: 170, y: 40)
             HStack(spacing: 8) {
                 PadButton(symbol: "minus", help: "Remove color", label: "Remove", isEnabled: editor.canRemoveColor) {
                     update { $0.didRemoveColor() }
@@ -137,25 +134,23 @@ private struct ColorKnob: View {
     }
 }
 
-/// Arc's three buttons over the pad. They set the app's appearance, as View ▸ Appearance does, and leave the theme
-/// alone; the lit one is the app's.
 private struct AppearanceToggle: View {
-    let editor: SpaceStyleEditor
+    let override: WindowTheme.AppearanceBased<WindowTheme.Appearance>?
+    let select: (NSAppearance.Name?) -> Void
+    @State private var appAppearance = NSApp.appearance?.name
+    @State private var effectiveAppearance = NSApp.effectiveAppearance
 
     var body: some View {
-        let state = editor.state
+        let selected = override?.resolved(against: effectiveAppearance) ?? appAppearance
         HStack(spacing: 8) {
-            PadButton(
-                symbol: "sparkles", help: "Automatic Appearance",
-                isSelected: state.hasAppeared && state.appearance == nil
-            ) { AppAppearance.set(nil) }
-            PadButton(symbol: "sun.max", help: "Light Appearance", isSelected: state.appearance == .aqua) {
-                AppAppearance.set(.aqua)
-            }
-            PadButton(symbol: "moon.stars", help: "Dark Appearance", isSelected: state.appearance == .darkAqua) {
-                AppAppearance.set(.darkAqua)
+            PadButton(symbol: "sparkles", help: "Automatic Appearance", isSelected: selected == nil) { select(nil) }
+            PadButton(symbol: "sun.max", help: "Light Appearance", isSelected: selected == .aqua) { select(.aqua) }
+            PadButton(symbol: "moon.stars", help: "Dark Appearance", isSelected: selected == .darkAqua) {
+                select(.darkAqua)
             }
         }
+        .onReceive(NSApp.publisher(for: \.appearance)) { appAppearance = $0?.name }
+        .onReceive(NSApp.publisher(for: \.effectiveAppearance)) { effectiveAppearance = $0 }
     }
 }
 
@@ -186,6 +181,7 @@ private struct PadButton: View {
         .onHover { isHovered = $0 }
         .oaToolTip(help)
         .accessibilityLabel(label ?? help)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
