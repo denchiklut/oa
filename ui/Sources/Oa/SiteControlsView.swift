@@ -52,11 +52,27 @@ struct SiteControlsView: View {
         .padding(10)
         .frame(width: 236)
         .background(SiteControlsHitTestAnchor(browserWindow: model.window))
+        .modifier(SiteControlsAppearance(model: model))
     }
 
     private func openAllSiteSettings() {
         dismiss()
         model.openAllSiteSettings()
+    }
+}
+
+struct SiteControlsAppearance: ViewModifier {
+    let model: WindowModel
+    @Environment(\.windowColorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let theme = model.space.map(model.theme(of:)) ?? .default
+        let ink = scheme == .dark ? Color.white : .black
+        // The native popover follows the window even when the sidebar uses light ink on dark or vice versa.
+        content
+            .foregroundStyle(ink.opacity(0.75), ink.opacity(0.5), ink.opacity(0.35))
+            .tint(theme.semanticColorPalette[scheme].maxContrastColor.color)
+            .environment(\.colorScheme, scheme)
     }
 }
 
@@ -82,7 +98,6 @@ struct ExtensionsSection: View {
             HStack {
                 Text("Extensions")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
                 Spacer()
                 Button("Manage") {
                     dismiss()
@@ -131,7 +146,6 @@ private struct SettingsSection: View {
                 HStack {
                     Text("Settings")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
                     Spacer()
                     Text("More")
                         .font(.system(size: 12, weight: .semibold))
@@ -247,18 +261,34 @@ private struct PinBadge: View {
 
     var body: some View {
         Button(action: toggle) {
-            Image(systemName: "pin.fill")
-                .font(.system(size: 7, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 14, height: 14)
-                .background(Color.accentColor.opacity(pinned ? 1 : 0.4), in: Circle())
+            SiteControlsBadge(
+                symbol: "pin.fill", font: .system(size: 7, weight: .bold), size: 14, opacity: pinned ? 1 : 0.4)
         }
         .buttonStyle(.plain)
         .oaToolTip(pinned ? "Unpin" : "Pin")
     }
 }
 
-/// Arc's row: a white symbol in a circle of the accent, pale when off, then the name and its state.
+private struct SiteControlsBadge: View {
+    let symbol: String
+    let font: Font
+    let size: CGFloat
+    let opacity: Double
+
+    var body: some View {
+        Circle()
+            .fill(.tint.opacity(opacity))
+            .frame(width: size, height: size)
+            .overlay {
+                Image(systemName: symbol)
+                    .font(font)
+                    .foregroundStyle(.black)
+                    .blendMode(.destinationOut)
+            }
+            .compositingGroup()
+    }
+}
+
 private struct SiteSettingRow: View {
     let title: String
     let value: String
@@ -269,11 +299,8 @@ private struct SiteSettingRow: View {
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: 9) {
-                Image(systemName: symbol)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(Color.accentColor.opacity(isOn ? 1 : 0.3), in: Circle())
+                SiteControlsBadge(
+                    symbol: symbol, font: .system(size: 12, weight: .semibold), size: 28, opacity: isOn ? 1 : 0.33)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(.system(size: 13, weight: .semibold))
                     Text(value)
