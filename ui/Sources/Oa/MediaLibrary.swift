@@ -6,8 +6,13 @@ import UniformTypeIdentifiers
 struct MediaItem: Identifiable, Hashable {
     let file: URL
     let date: Date
-    let isMovie: Bool
+    enum Kind: String {
+        case image = "Image", movie = "Video", file = "File"
+    }
+
+    let kind: Kind
     var captureTitle: String?
+    var sourceURL: URL?
     var title: String { captureTitle ?? name }
     var id: URL { file }
     var name: String { file.lastPathComponent }
@@ -45,32 +50,48 @@ struct MediaItem: Identifiable, Hashable {
         lhs.date == rhs.date ? lhs.file.path < rhs.file.path : lhs.date > rhs.date
     }
 
-    static func discover(files: [URL], screenshots: URL, saved: [MediaItem]) -> [Self] {
-        let keys: Set<URLResourceKey> = [
-            .isRegularFileKey, .creationDateKey, .contentModificationDateKey, .contentTypeKey,
-        ]
-        let local =
-            (try? FileManager.default.contentsOfDirectory(
-                at: screenshots, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])) ?? []
+    private static let fileKeys: Set<URLResourceKey> = [
+        .isRegularFileKey, .creationDateKey, .contentModificationDateKey, .contentTypeKey,
+    ]
+
+    static func contents(of directory: URL) -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: Array(fileKeys), options: [.skipsHiddenFiles])) ?? []
+    }
+
+    static func isScreenshot(_ file: URL) -> Bool {
         // Arc names the system capture attribute and preference domain. Filename matching also picks up CleanShot recordings.
-        let captures = local.filter { file in
-            let name = file.lastPathComponent.lowercased()
-            return ["cleanshot ", "screenshot ", "screen shot ", "screen recording "].contains(where: name.hasPrefix)
-                || getxattr(file.path, "com.apple.metadata:kMDItemIsScreenCapture", nil, 0, 0, 0) >= 0
+        let name = file.lastPathComponent.lowercased()
+        return ["cleanshot ", "screenshot ", "screen shot ", "screen recording "].contains(where: name.hasPrefix)
+            || getxattr(file.path, "com.apple.metadata:kMDItemIsScreenCapture", nil, 0, 0, 0) >= 0
+    }
+
+    static func localFile(_ file: URL) -> Self? {
+        guard let values = try? file.resourceValues(forKeys: fileKeys), values.isRegularFile == true else { return nil }
+        let type = values.contentType ?? UTType(filenameExtension: file.pathExtension)
+        let kind: Kind
+        if type?.conforms(to: .image) == true {
+            kind = .image
+        } else if type?.conforms(to: .movie) == true {
+            kind = .movie
+        } else {
+            kind = .file
         }
+        return Self(
+            file: canonicalFile(file), date: values.creationDate ?? values.contentModificationDate ?? .distantPast,
+            kind: kind)
+    }
+
+    static func discover(files: [URL], screenshots: URL, saved: [MediaItem]) -> [Self] {
+        let captures = contents(of: screenshots).filter(isScreenshot)
         let library = Dictionary(uniqueKeysWithValues: saved.map { ($0.file, $0) })
         return Set((files + captures + library.keys).map(canonicalFile))
             .compactMap { file in
-                guard let values = try? file.resourceValues(forKeys: keys), values.isRegularFile == true,
-                    let type = values.contentType ?? UTType(filenameExtension: file.pathExtension),
-                    type.conforms(to: .image) || type.conforms(to: .movie)
-                else { return nil }
-                return library[file]
-                    ?? Self(
-                        file: file, date: values.creationDate ?? values.contentModificationDate ?? .distantPast,
-                        isMovie: type.conforms(to: .movie))
+                guard let item = localFile(file), item.kind != .file else { return nil }
+                return library[file] ?? item
             }.sorted(by: newestFirst)
     }
+
 }
 
 struct MediaPage: View {
@@ -173,7 +194,7 @@ private struct MediaTile: View {
                         }
                     }
                 }
-                if item.isMovie {
+                if item.kind == .movie {
                     Image(systemName: "play.fill").font(.system(size: 23)).foregroundStyle(.white).shadow(radius: 3)
                 }
             }.aspectRatio(1, contentMode: .fit).contentShape(Rectangle())
@@ -201,24 +222,39 @@ struct MediaThumbnail<Content: View>: View {
 struct MediaActions: View {
     let model: WindowModel
     let item: MediaItem
+    var inFlyout = false
 
     var body: some View {
-        Button(item.isMovie ? "Copy Video" : "Copy Image") {
-            let object: NSPasteboardWriting?
-            if item.isMovie { object = item.file as NSURL } else { object = NSImage(contentsOf: item.file) }
+        Button("Copy \(item.kind.rawValue)") {
+            let object: NSPasteboardWriting? = item.kind == .image ? NSImage(contentsOf: item.file) : item.file as NSURL
             if let object { NSPasteboard.general.clearContents(); NSPasteboard.general.writeObjects([object]) }
         }
         Divider()
         Button("Send via iMessage") { NSSharingService(named: .composeMessage)?.perform(withItems: [item.file]) }
         Button("AirDrop") { NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.file]) }
         Divider()
-        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.file]) }
-        Divider()
-        Button("Hide from Oa") {
-            do {
-                try model.captureLibrary.hide(item.file)
-                if model.previewedMedia == item { model.closeFilePreview() }
-            } catch { model.window?.presentError(error) }
+        if item.captureTitle != nil && inFlyout {
+            if let source = item.sourceURL {
+                Button("Open Source URL") { model.newTab(source) }
+                Button("Copy Source URL") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.writeObjects([source as NSURL])
+                    NSPasteboard.general.setString(source.absoluteString, forType: .string)
+                }
+                Divider()
+            }
+            Button("Delete") {
+                do { try model.captureLibrary.remove(item.file) } catch { model.window?.presentError(error) }
+            }
+        } else {
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.file]) }
+            Divider()
+            Button("Hide from Oa") {
+                do {
+                    try model.captureLibrary.hide(item.file)
+                    if model.previewedMedia == item { model.closeFilePreview() }
+                } catch { model.window?.presentError(error) }
+            }
         }
     }
 }
@@ -241,23 +277,33 @@ struct MediaPreview: View {
                     Image(systemName: "ellipsis")
                 }
                 .menuStyle(.button).menuIndicator(.hidden).fixedSize().accessibilityLabel("More")
-                Button {
-                    let bundle = item.isMovie ? "com.apple.QuickTimePlayerX" : "com.apple.Preview"
-                    if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
+                if let app = previewApplication {
+                    Button {
                         NSWorkspace.shared.open([item.file], withApplicationAt: app, configuration: .init()) {
                             _, error in
                             if let error { Task { @MainActor in model.window?.presentError(error) } }
                         }
-                    } else {
-                        NSWorkspace.shared.open(item.file)
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(item.isMovie ? "Open in QuickTime Player" : "Open in Preview");
-                        Image(systemName: "arrow.up.right")
-                    }
-                }.buttonStyle(.bordered)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Open in \(app.deletingPathExtension().lastPathComponent)")
+                            Image(systemName: "arrow.up.right")
+                        }
+                    }.buttonStyle(.bordered)
+                }
             }.buttonStyle(.borderless).padding(.horizontal, 12)
+        }
+    }
+
+    private var previewApplication: URL? {
+        let workspace = NSWorkspace.shared
+        switch item.kind {
+        case .movie:
+            return workspace.urlForApplication(withBundleIdentifier: "com.apple.QuickTimePlayerX")
+                ?? workspace.urlForApplication(toOpen: item.file)
+        case .image:
+            return workspace.urlForApplication(withBundleIdentifier: "com.apple.Preview")
+                ?? workspace.urlForApplication(toOpen: item.file)
+        case .file: return workspace.urlForApplication(toOpen: item.file)
         }
     }
 }

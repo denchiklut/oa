@@ -39,13 +39,19 @@ which run for fifteen seconds and leave a small text file in a temporary folder.
 The sidebar's bottom row starts with the Library button, left of the Spaces.
 While downloads run it carries a white disc with a blue arrow and one ring for
 all of them, as Arc's does; its symbol is Oa's own. Hovering it shows Arc's
-flyout: the four most recent downloads, the newest at the bottom, each with its
-Quick Look thumbnail or file icon, name and age; a running one with its own
-ring, "32.6/94.4 MB · 1m 1s" and an ✕ that cancels; a cancelled one as
-"Cancelled · from ‹site›" and a failed one as "Failed to Download", both
-without an icon. A finished one whose file is gone is left out, as in Arc. A
-finished row drags out as a file. Arc's flyout also lists its Library's other
-files, which Oa doesn't have.
+flyout with the four most recent items from the enabled sources. The newest is
+at the bottom. Finished downloads show a Quick Look thumbnail or file icon,
+name and age. A running download shows its own progress ring, "32.6/94.4 MB ·
+1m 1s" and an ✕ that cancels it. Cancelled and failed downloads show
+"Cancelled · from ‹site›" or "Failed to Download" without an icon. A finished one whose file is gone is left out, as in Arc. A
+finished row drags out as a file.
+
+Right-click or Control-click the Library button to choose which sources appear in
+the flyout. Documents, Desktop, Screenshots, Oa Captures and Downloads start
+enabled. The selection applies across windows and persists across launches.
+Right-click a saved capture to copy the image, send it via iMessage or AirDrop,
+or delete it. Captures saved with a full source URL also offer Open Source URL
+and Copy Source URL.
 
 A click on the button, or Window ▸ View Downloads…, opens the Library over the
 sidebar with the page still showing beside it; the menu item then reads Hide

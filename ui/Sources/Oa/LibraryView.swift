@@ -797,6 +797,7 @@ struct LibraryButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(ChromeButtonStyle())
+        .contextMenu { FlyoutSourceMenu(home: model.home) }
         .accessibilityLabel("View Library")
         .oaToolTip("View Library", shortcut: model.keyBindings.state.shortcut(for: "viewLibrary"))
         .overlay(alignment: .topTrailing) {
@@ -805,6 +806,27 @@ struct LibraryButton: View {
                     .offset(x: 5, y: -4)
                     .allowsHitTesting(false)
             }
+        }
+    }
+}
+
+struct FlyoutSourceMenu: View {
+    let home: StorableHome
+
+    var body: some View {
+        Text("Show Recent Media from:")
+        ForEach(FlyoutSource.allCases, id: \.self) { source in
+            Toggle(
+                source.title,
+                isOn: Binding {
+                    home.flyoutSources.contains(source)
+                } set: { enabled in
+                    if enabled {
+                        home.flyoutSources.insert(source)
+                    } else {
+                        home.flyoutSources.remove(source)
+                    }
+                })
         }
     }
 }
