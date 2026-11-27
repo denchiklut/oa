@@ -142,6 +142,8 @@ private struct MediaTile: View {
     let item: MediaItem
     let revision: UUID?
     let open: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.theme) private var theme
     @State private var hovered = false
 
     var body: some View {
@@ -150,10 +152,23 @@ private struct MediaTile: View {
                 RoundedRectangle(cornerRadius: 10).fill(.primary.opacity(hovered ? 0.12 : 0.035))
                 MediaThumbnail(file: item.file, revision: revision) { image in
                     if let image {
-                        Image(nsImage: image).resizable().scaledToFit()
-                            .padding(3).background(.white, in: RoundedRectangle(cornerRadius: 2))
-                            .shadow(color: .black.opacity(0.24), radius: 4, y: 2)
-                            .padding(10)
+                        let thumbnail = Image(nsImage: image).resizable().scaledToFit().padding(3)
+                        if item.captureTitle != nil {
+                            thumbnail
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .strokeBorder(
+                                            theme.maxContrast.opacity(0.48),
+                                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 3]))
+                                }
+                                .scaleEffect(hovered && !reduceMotion ? 1.055 : 1)
+                                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: hovered)
+                                .padding(10)
+                        } else {
+                            thumbnail.background(.white, in: RoundedRectangle(cornerRadius: 2))
+                                .shadow(color: .black.opacity(0.24), radius: 4, y: 2)
+                                .padding(10)
+                        }
                     }
                 }
                 if item.isMovie {
@@ -161,7 +176,7 @@ private struct MediaTile: View {
                 }
             }.aspectRatio(1, contentMode: .fit).contentShape(Rectangle())
         }
-        .buttonStyle(.plain).help(item.title).accessibilityLabel(item.title).onHover { hovered = $0 }
+        .buttonStyle(.plain).oaToolTip(item.title).accessibilityLabel(item.title).onHover { hovered = $0 }
     }
 }
 
