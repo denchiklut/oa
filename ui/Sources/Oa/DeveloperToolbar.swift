@@ -106,6 +106,7 @@ struct DeveloperToolbar<Trailing: View>: View {
                 .popover(isPresented: $showingExtensions, arrowEdge: .bottom) {
                     ExtensionsSection(model: model) { showingExtensions = false }
                         .padding(10).frame(width: 236)
+                        .modifier(SiteControlsAppearance(model: model))
                 }
             trailing.environment(\.theme, chrome)
         }
