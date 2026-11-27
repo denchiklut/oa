@@ -76,11 +76,9 @@ struct DeveloperToolbar<Trailing: View>: View {
                     }
                     .accessibilityLabel("Capture a portion of this page")
                     .oaToolTip(
-                        OaToolTipConfiguration(
-                            title: "Capture a portion of this page",
-                            shortcut: model.keyBindings.state.shortcut(for: "capturePage"),
-                            palette: .developerToolbar(palette))
+                        "Capture a portion of this page", shortcut: model.keyBindings.state.shortcut(for: "capturePage")
                     )
+                    .environment(\.oaToolTipPalette, .developerToolbar(palette))
                     divider
                     inspectorActions
                     divider

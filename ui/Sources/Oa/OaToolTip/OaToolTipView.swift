@@ -10,10 +10,9 @@ struct OaToolTipView: View {
 
     let configuration: OaToolTipConfiguration
     let pinchedCorner: OaToolTipCorner
-    @Environment(\.colorScheme) private var colorScheme
+    let palette: OaToolTipPalette
 
     var body: some View {
-        let palette = configuration.palette ?? OaToolTipPalette.resolved(for: colorScheme)
         let shape = UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
         let symbols = configuration.shortcut?.symbols ?? []
         HStack(spacing: 8) {
@@ -33,7 +32,7 @@ struct OaToolTipView: View {
             if !symbols.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(Array(symbols.enumerated()), id: \.offset) { _, symbol in
-                        keyCap(symbol, palette: palette)
+                        keyCap(symbol)
                     }
                 }
             }
@@ -65,7 +64,7 @@ struct OaToolTipView: View {
         )
     }
 
-    private func keyCap(_ symbol: String, palette: OaToolTipPalette) -> some View {
+    private func keyCap(_ symbol: String) -> some View {
         let cap = RoundedRectangle(cornerRadius: 5, style: .continuous)
         return Text(symbol)
             .font(.system(size: 11, weight: .semibold))
@@ -84,6 +83,7 @@ struct OaToolTipView: View {
 private struct OaToolTipModifier: ViewModifier {
     let configuration: OaToolTipConfiguration?
     @Environment(\.oaToolTipController) private var controller
+    @Environment(\.oaToolTipPalette) private var palette
     @State private var id = UUID()
     @State private var hovered = false
 
@@ -96,6 +96,7 @@ private struct OaToolTipModifier: ViewModifier {
             .onChange(of: configuration) { _, _ in
                 sync()
             }
+            .onChange(of: palette) { sync() }
             .onDisappear {
                 hovered = false
                 controller?.unregister(id)
@@ -105,7 +106,7 @@ private struct OaToolTipModifier: ViewModifier {
     private func sync() {
         guard let controller else { return }
         if hovered, let configuration {
-            controller.register(id, configuration: configuration)
+            controller.register(id, configuration: configuration, palette: palette)
         } else {
             controller.unregister(id)
         }
@@ -128,5 +129,6 @@ extension View {
 }
 
 extension EnvironmentValues {
+    @Entry var oaToolTipPalette = OaToolTipPalette.space(WindowTheme.default.semanticColorPalette[.light])
     @Entry var oaToolTipController: OaToolTipController?
 }
