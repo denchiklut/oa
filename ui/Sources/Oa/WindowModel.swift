@@ -26,7 +26,7 @@ final class WindowModel {
     private(set) var selectedSpaceID: UUID {
         didSet {
             dismissSpaceStyleEditor()
-            closeCommandBarIfSelectionChanged()
+            updateCommandBarForSelection()
             loadExtensions()
             presentationChanged()
             dismissModalItemSwitcher()
@@ -40,7 +40,7 @@ final class WindowModel {
             for tabID in selectedTabIDs.values {
                 if let splitID = state.splitViewID(containing: tabID) { focusedPaneIDs[splitID] = tabID }
             }
-            closeCommandBarIfSelectionChanged()
+            updateCommandBarForSelection()
             presentationChanged()
         }
     }
@@ -57,7 +57,7 @@ final class WindowModel {
     /// As Arc's `WindowState.spaceCreationState`: while it is open the window shows nothing selected.
     private(set) var spaceCreation: SpaceCreationState? {
         didSet {
-            closeCommandBarIfSelectionChanged()
+            updateCommandBarForSelection()
             presentationChanged()
         }
     }
@@ -122,7 +122,6 @@ final class WindowModel {
     /// Arc's `WindowState.queuedHotkey`: the menu item a consumed shortcut asked about, while its toast is up.
     @ObservationIgnored private weak var queuedHotkey: NSMenuItem?
     @ObservationIgnored private var toastRemoval: Task<Void, Never>?
-    /// The selection the command bar was opened over, which its destination is for.
     @ObservationIgnored private var commandBarSelection: (spaceID: UUID, tabID: UUID?)?
     @ObservationIgnored var bringToFront: () -> Void = {}
     @ObservationIgnored weak var window: NSWindow?
@@ -617,20 +616,21 @@ final class WindowModel {
         guard let profileID else { return }
         commandBar?.autocomplete.stop()
         let context = context(for: profileID)
-        let autocomplete = autocompletes[profileID] ?? context.makeAutocomplete()
-        autocompletes[profileID] = autocomplete
-        let preferences = context.preferences
-        let commands = CommandBarActions.snapshot(for: self)
         let bar = CommandBar(
-            destination: editing ? .currentTab : .newTab, autocomplete: autocomplete,
-            currentURL: editing ? frontPage?.url ?? address : nil, profileID: profileID, picks: store.commandBarPicks,
-            usesPicks: sidebarContext != .incognito, commands: commands,
-            searchEngines: { preferences.activeSearchEngines },
-            dominantColor: { await context.siteSearchDominantColor(host: $0) }
+            destination: editing ? .currentTab : .newTab, autocomplete: autocomplete(for: context),
+            currentURL: editing ? frontPage?.url ?? address : nil, context: context, picks: store.commandBarPicks,
+            usesPicks: sidebarContext != .incognito, commands: CommandBarActions.snapshot(for: self)
         ) { [weak self] in self?.commandBarTabs ?? [] }
         bar.perform = { [weak self, destination = bar.destination] in self?.perform($0, in: destination) }
         commandBar = bar
         commandBarSelection = (selectedSpaceID, selectedTabID)
+    }
+
+    private func autocomplete(for context: any BrowserContext) -> any Autocomplete {
+        if let cached = autocompletes[context.id] { return cached }
+        let autocomplete = context.makeAutocomplete()
+        autocompletes[context.id] = autocomplete
+        return autocomplete
     }
 
     var topBarColors: TopBarColorClient { store.topBarColors }
@@ -671,13 +671,18 @@ final class WindowModel {
         if dialog == nil { frontPage?.activate() }
     }
 
-    /// Oa's own: ⌘W, ⌘Y or anything else that changes the selection under the bar closes it, rather than leaving
-    /// it to act on a tab it wasn't opened for. Arc's behaviour here is untested.
-    private func closeCommandBarIfSelectionChanged() {
-        guard commandBar != nil, let opened = commandBarSelection,
+    private func updateCommandBarForSelection() {
+        guard let bar = commandBar, let opened = commandBarSelection,
             opened.spaceID != selectedSpaceID || opened.tabID != selectedTabID
         else { return }
-        closeCommandBar()
+        // As seen in Arc: the open bar follows a swipe between Spaces with no selected tab.
+        guard opened.tabID == nil, selectedTabID == nil, let profileID = shownProfileID else {
+            return closeCommandBar()
+        }
+        commandBarSelection = (selectedSpaceID, nil)
+        let context = context(for: profileID)
+        bar.changeSpace(
+            to: context, autocomplete: autocomplete(for: context), commands: CommandBarActions.snapshot(for: self))
     }
 
     /// As Arc's command bar: the profile's Favorites and the tabs of all its Spaces but the selected tab, each with
@@ -1511,7 +1516,7 @@ final class WindowModel {
         selectSpace(spaces[index].id)
     }
 
-    /// As Arc: a Space with nothing to show is shown empty, with no command bar.
+    /// As seen in Arc: switching to an empty Space doesn't open the command bar.
     func selectSpace(_ spaceID: UUID) {
         guard spaces.contains(where: { $0.id == spaceID }) else { return }
         cancelSpaceCreation()
