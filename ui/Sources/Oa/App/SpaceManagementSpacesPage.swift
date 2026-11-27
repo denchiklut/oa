@@ -53,6 +53,7 @@ struct SpaceManagementSpacesPage: View {
                 .padding(.horizontal, 24)
                 .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
                 .background {
+                    SpaceScroller(axis: .horizontal, insets: NSEdgeInsets(top: 0, left: 20, bottom: 8, right: 20))
                     // Only the open Library's scrolling counts: resizing the scroll view on the way in or out
                     // moves it too, and the cut must hold still.
                     ScrollTracking(offset: scroll) { offset in
@@ -245,7 +246,9 @@ private struct SpaceManagementCollectionViewItem: View {
                 .padding([.horizontal, .bottom], 8)
                 .animation(
                     .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12),
-                    value: pinnedRows.map(\.id) + unpinned.map(\.id))
+                    value: pinnedRows.map(\.id) + unpinned.map(\.id)
+                )
+                .background { SpaceScroller() }
             }
             footer(isDark: appearance == .dark)
         }
