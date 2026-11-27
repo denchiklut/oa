@@ -21,6 +21,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/unload_controller.h"
 #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
+#include "chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.h"
 #include "components/input/native_web_keyboard_event.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/web_modal/modal_dialog_host.h"
@@ -197,6 +198,15 @@ class BrowserWindowImpl::ModalDialogHost
 // static
 void BrowserWindowImpl::InstallFactory() {
   BrowserWindow::SetFactoryForEmbedder(&BrowserWindowImpl::Create);
+  webid::FedCmAccountSelectionView::SetBubbleParentCallbackForEmbedder(
+      [](gfx::NativeWindow bubble_window, gfx::NativeView page_view) {
+        NSWindow* bubble = bubble_window.GetNativeNSWindow();
+        NSWindow* parent = page_view.GetNativeNSView().window;
+        if (bubble && bubble.parentWindow != parent) {
+          [bubble.parentWindow removeChildWindow:bubble];
+          [parent addChildWindow:bubble ordered:NSWindowAbove];
+        }
+      });
 }
 
 // static
