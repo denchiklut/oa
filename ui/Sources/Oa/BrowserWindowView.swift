@@ -139,6 +139,7 @@ struct BrowserWindowView: View {
             \.theme, Theme(palette: theme.semanticColorPalette[appearance.colorScheme], appearance: appearance)
         )
         .environment(\.windowColorScheme, colorScheme)
+        .environment(\.windowTheme, theme)
         .environment(\.sidebarDrag, sidebarDrag)
         .environment(\.oaToolTipPalette, .space(theme.semanticColorPalette[colorScheme]))
         .ignoresSafeArea()
