@@ -89,9 +89,10 @@ struct MediaPage: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
                     ForEach(visible) { item in
-                        MediaTile(item: item) { model.previewMedia(item, among: visible) }
-                            .id(model.captureLibrary.revisions[item.file])
-                            .contextMenu { MediaActions(model: model, item: item) }
+                        MediaTile(item: item, revision: model.captureLibrary.revisions[item.file]) {
+                            model.previewMedia(item, among: visible)
+                        }
+                        .contextMenu { MediaActions(model: model, item: item) }
                     }
                 }.padding(.horizontal, 8)
                 if visible.isEmpty {
@@ -120,6 +121,7 @@ struct MediaPage: View {
 
 private struct MediaTile: View {
     let item: MediaItem
+    let revision: UUID?
     let open: () -> Void
     @State private var image: NSImage?
     @State private var hovered = false
@@ -140,7 +142,7 @@ private struct MediaTile: View {
             }.aspectRatio(1, contentMode: .fit).contentShape(Rectangle())
         }
         .buttonStyle(.plain).help(item.name).accessibilityLabel(item.name).onHover { hovered = $0 }
-        .task(id: item) {
+        .task(id: revision) {
             let request = QLThumbnailGenerator.Request(
                 fileAt: item.file, size: CGSize(width: 160, height: 160), scale: 2, representationTypes: .thumbnail)
             let thumbnail = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
