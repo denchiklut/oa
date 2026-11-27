@@ -30,6 +30,7 @@ struct PermissionRequestView: View {
         }
         .padding(12)
         .frame(width: 236)
+        .modifier(SiteControlsAppearance(model: model))
         .onDisappear { model.permissionPromptClosed() }
     }
 
