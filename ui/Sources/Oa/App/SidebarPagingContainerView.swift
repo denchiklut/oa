@@ -163,7 +163,7 @@ private struct SidebarSpacePage: View {
                 VStack(spacing: 1) {
                     if global {
                         SpaceNameRow(model: model, layout: layout, space: space)
-                            .sidebarDragFrame { drag?.lists[space.id, default: .init()].pinnedTop = $0.maxY + 0.5 }
+                            .sidebarDragFrame { drag?.lists[space.id, default: .init()].header = $0 }
                     } else {
                         ProfileIndicatorView(model: model, space: space)
                     }
@@ -288,6 +288,7 @@ private struct SpaceNameRow: View {
     @State private var renaming = false
     @State private var draft = ""
     @FocusState private var renameFocused: Bool
+    @Environment(\.sidebarDrag) private var drag
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -350,6 +351,11 @@ private struct SpaceNameRow: View {
         .background(
             hovering ? theme.itemFill : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
+        .background {
+            if drag?.target?.spaceHeaderID == space.id, drag?.settling == false {
+                Rectangle().fill(theme.maxContrast.opacity(0.5)).padding(.horizontal, -8)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             guard !renaming else { return }
