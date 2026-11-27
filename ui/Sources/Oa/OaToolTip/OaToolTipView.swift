@@ -13,7 +13,7 @@ struct OaToolTipView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let palette = OaToolTipPalette.resolved(for: colorScheme)
+        let palette = configuration.palette ?? OaToolTipPalette.resolved(for: colorScheme)
         let shape = UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
         let symbols = configuration.shortcut?.symbols ?? []
         HStack(spacing: 8) {

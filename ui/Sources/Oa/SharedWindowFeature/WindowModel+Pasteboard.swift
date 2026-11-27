@@ -1,6 +1,15 @@
 import AppKit
 
 extension WindowModel {
+    func copyCapture(_ png: Data?, for pageID: UUID) {
+        let copied =
+            png.map {
+                NSPasteboard.general.clearContents()
+                return NSPasteboard.general.setData($0, forType: .png)
+            } ?? false
+        present(.capture(copied ? "Capture copied" : "Couldn’t copy capture"), at: .windowContent(pageID))
+    }
+
     /// As Arc's `copyCurrentURLs`: a Peek's page first, then several selected rows together, else the page in front
     /// as it is now, without its trackers and with its toast on that page. As Markdown, as seen in Arc:
     /// `[title](URL)` as plain text alone, the title as the page has it.

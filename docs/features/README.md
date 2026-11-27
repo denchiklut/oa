@@ -343,9 +343,9 @@ Sources: Arc native Settings → Profiles; [2022][arc22], [2023][arc23],
 | --- | :---: | :---: |
 | Library | ✅ | ✅ |
 | Screenshot of the visible page | ✅ | ☐ |
-| Region capture and capture editing | ✅ | ☐ |
+| Region capture and capture editing | ✅ | Drag to copy a region with the developer toolbar camera or ⇧⌘2. Editing is pending. |
 | Capture Full Page | ✅ | ☐ |
-| Capture in Portrait Mode | ✅ | Preview, copy or save a framed PNG. Option-click the developer toolbar camera for a quick copy |
+| Capture in Portrait Mode | ✅ | Hover the Portrait button to preview the background and watermark. Click to copy, or use the preview’s context menu to save a PNG. |
 | Copy a capture's source URL † | ✅ | ☐ |
 | Easels | ✅ | ☐ |
 | Compose Easels with text, images, drawings and links † | ✅ | ☐ |

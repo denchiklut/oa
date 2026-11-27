@@ -11,6 +11,7 @@ struct OaToolTipConfiguration: Equatable {
     var delay: TimeInterval = controlDelay
     /// Higher priority wins when nested hover targets overlap (e.g. a row's close button over its row).
     var priority: Int = 0
+    var palette: OaToolTipPalette?
 }
 
 enum OaToolTipCorner: Equatable {
@@ -22,13 +23,20 @@ enum OaToolTipCorner: Equatable {
 
 /// Arc's indigo tooltip palette, measured from Arc's light and dark captures. Dark-mode keycap colours are Oa's own
 /// where Arc's dark keycaps weren't captured.
-struct OaToolTipPalette {
+struct OaToolTipPalette: Equatable {
     let background: Color
     let title: Color
     let subtitle: Color
     let keyBackground: Color
     let keyBorder: Color
     let keyForeground: Color
+
+    static func developerToolbar(_ palette: WindowTheme.SemanticColorPalette) -> Self {
+        Self(
+            background: palette.backgroundExtra.color, title: palette.maxContrastColor.color,
+            subtitle: palette.foregroundPrimary.color, keyBackground: palette.maxContrastColor.color,
+            keyBorder: palette.foregroundSecondary.color, keyForeground: palette.backgroundExtra.color)
+    }
 
     static func resolved(for colorScheme: ColorScheme) -> Self {
         if colorScheme == .dark {
