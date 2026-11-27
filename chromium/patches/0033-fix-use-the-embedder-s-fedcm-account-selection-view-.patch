@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Thu, 26 Nov 2026 20:20:18 -0700
+Subject: [PATCH] fix: use the embedder's fedcm account selection view on macos
+
+---
+ chrome/browser/ui/webid/identity_dialog_controller.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/chrome/browser/ui/webid/identity_dialog_controller.cc b/chrome/browser/ui/webid/identity_dialog_controller.cc
+index baf052ccc0c67d2b0faf49f3f9d7b58c0f5fd76a..d7643d367dce5bfa87fc36444399160acae88180 100644
+--- a/chrome/browser/ui/webid/identity_dialog_controller.cc
++++ b/chrome/browser/ui/webid/identity_dialog_controller.cc
+@@ -647,7 +647,7 @@ bool IdentityDialogController::TrySetAccountView() {
+   if (account_view_) {
+     return true;
+   }
+-#if BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_MAC)
+   account_view_ = AccountSelectionView::Create(this);
+ #else
+   tabs::TabInterface* tab =
