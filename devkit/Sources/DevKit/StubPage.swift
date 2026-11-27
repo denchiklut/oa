@@ -238,6 +238,9 @@ final class StubPage: Page, MediaSession {
         Self.arrive(self)
     }
 
+    var frameIDs: [PageFrameID] { [] }
+    func insertStyleSheet(_ css: String, in frame: PageFrameID) async -> StyleSheetResult { .unsupported }
+
     func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void) {
         let view = hostingView
         guard view.bounds.width > 0, view.bounds.height > 0,

@@ -140,6 +140,10 @@ class PageImpl : public Page,
   void ResetZoomAndScaleFactors() override;
   std::unique_ptr<Page> Clone() override;
   void MoveToWindow(const std::string& window_id) override;
+  std::vector<std::string> FrameIDs() const override;
+  void InsertStyleSheet(const std::string& frame_id,
+                        const std::string& css,
+                        StyleSheetCallback callback) override;
   void Snapshot(SnapshotCallback callback) override;
   void StartObservingThumbnails() override;
   void StopObservingThumbnails() override;

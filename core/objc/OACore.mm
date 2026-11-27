@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/memory/raw_ptr.h"
+#include "base/strings/sys_string_conversions.h"
 #include "oa/public/ad_blocker.h"
 #include "oa/public/autocomplete.h"
 #include "oa/public/browser.h"
@@ -907,6 +908,41 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
   if (_page) {
     _page->MoveToWindow(identifier.UTF8String ?: "");
   }
+}
+
+- (NSArray<NSString*>*)frameIDs {
+  NSMutableArray<NSString*>* frames = [NSMutableArray array];
+  if (_page) {
+    for (const auto& id : _page->FrameIDs()) {
+      [frames addObject:ToNSString(id)];
+    }
+  }
+  return frames;
+}
+
+- (void)insertStyleSheet:(NSString*)css
+                 inFrame:(NSString*)frameID
+              completion:(void (^)(OAStyleSheetResult))completion {
+  if (!_page) {
+    completion(OAStyleSheetResultFrameGone);
+    return;
+  }
+  _page->InsertStyleSheet(
+      base::SysNSStringToUTF8(frameID), base::SysNSStringToUTF8(css),
+      [completion](oa::StyleSheetResult result) {
+        switch (result) {
+          case oa::StyleSheetResult::kInserted:
+            return completion(OAStyleSheetResultInserted);
+          case oa::StyleSheetResult::kFrameGone:
+            return completion(OAStyleSheetResultFrameGone);
+          case oa::StyleSheetResult::kRendererCrashed:
+            return completion(OAStyleSheetResultRendererCrashed);
+          case oa::StyleSheetResult::kDisconnected:
+            return completion(OAStyleSheetResultDisconnected);
+          case oa::StyleSheetResult::kTimedOut:
+            return completion(OAStyleSheetResultTimedOut);
+        }
+      });
 }
 
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable))completion {

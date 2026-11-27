@@ -1,0 +1,8 @@
+module oa.mojom;
+
+import "mojo/public/mojom/base/unguessable_token.mojom";
+
+interface PageOperations {
+  InsertStyleSheet(mojo_base.mojom.UnguessableToken document, string css)
+      => (bool inserted);
+};

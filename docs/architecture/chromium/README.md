@@ -66,15 +66,18 @@ need renderer support. The interfaces will cover these roles:
 - **Ad blocking:** distribute rules and exclusions, reset state and request
   diagnostics.
 
-For example, inserting a stylesheet will follow this path:
+Swift can read a page's `frameIDs` and call `insertStyleSheet(_:in:)` on one of
+those documents. Core resolves the handle within the current page and sends
+the CSS and Chromium's document embedding token over the target frame's
+`PageOperations` Mojo endpoint. The renderer checks the token again before
+inserting an author stylesheet. Each call adds a separate sheet.
 
-1. Swift requests the operation through the native page interface.
-2. Core identifies the target frame and dispatches the engine operation.
-3. Browser-side engine code sends a Mojo message.
-4. The renderer-side handler resolves the frame and applies the stylesheet.
-
-The interface contracts must define what happens when a frame disappears, a
-renderer crashes or a reply never arrives. Sending a message alone will not
-establish that the operation completed.
+The Swift call returns `inserted` after the renderer acknowledges insertion.
+A missing or replaced document returns `frameGone`. An abnormal exit of the
+target renderer during a request returns `rendererCrashed`, including for a
+cross-site child frame. Oa allows five seconds for a reply or process exit
+notification. At the deadline a closed pipe returns `disconnected` and an open
+pipe returns `timedOut`. Either leaves insertion unconfirmed. The stub exposes
+no live frames and returns `unsupported`.
 
 Return to the [four-layer overview](../README.md).
