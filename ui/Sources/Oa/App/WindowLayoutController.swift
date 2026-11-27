@@ -109,7 +109,9 @@ final class WindowLayoutController: NSViewController {
             guard let self else { return }
             switch page {
             case .home:
+                guard model.library == nil else { return }
                 model.viewLibrary()
+                if model.library == .spaces { model.closeCommandBar() }
             case .space(let id):
                 guard model.spaceCreation == nil else { return pendingSpaceSelection = id }
                 model.exitLibrary()
