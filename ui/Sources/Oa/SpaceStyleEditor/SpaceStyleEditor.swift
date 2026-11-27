@@ -7,6 +7,8 @@ struct SpaceStyleEditor: Equatable {
     static let padReach = 0.99
     static let emptyStateText = "Tap to pick a color for this space"
 
+    let originalTheme: WindowTheme?
+    private let initialState: State
     private(set) var state: State
     /// Arc's `undoStack`: the state a gesture started from, until it ends.
     private var gestureStart: State?
@@ -38,18 +40,17 @@ struct SpaceStyleEditor: Equatable {
     /// Arc's `didUpdateNoiseFactor` gestures, which round, file undo and tap the trackpad differently.
     enum NoiseGesture { case drag, dialClick }
 
-    init(state: State = State()) {
-        self.state = state
+    init(theme: WindowTheme? = nil) {
+        originalTheme = theme
+        initialState = Self.controls(for: theme)
+        state = initialState
     }
 
-    /// Arc's `State(theme:)`. A Space without a theme, or with Arc's appearance-based default, opens empty; the
-    /// companions are worked out again from the key colour, never read back.
-    init(theme: WindowTheme?) {
-        guard case .single(let background)? = theme?.background, case .color(let style) = background.style else {
-            self.init()
-            return
-        }
+    private static func controls(for theme: WindowTheme?) -> State {
         var state = State()
+        guard case .single(let background)? = theme?.background, case .color(let style) = background.style else {
+            return state
+        }
         let key: ThemeColor
         switch style {
         case .basicColor(let basic):
@@ -60,10 +61,7 @@ struct SpaceStyleEditor: Equatable {
             state.numberOfColors = 1
             state.apply(single.modifiers)
         case .blendedGradient(let gradient):
-            guard let first = gradient.baseColors.first else {
-                self.init()
-                return
-            }
+            guard let first = gradient.baseColors.first else { return state }
             key = first
             state.numberOfColors = gradient.overlayColors.isEmpty ? 2 : 3
             state.wheel = gradient.wheel
@@ -73,7 +71,7 @@ struct SpaceStyleEditor: Equatable {
         state.primaryColor = color
         state.saturation = max(color.saturation, 0.01)
         state.lightnessRange = Self.automaticRange(around: color.lightness)
-        self.init(state: state)
+        return state
     }
 
     private static func automaticRange(around lightness: Double) -> ClosedRange<Double> {
@@ -93,7 +91,14 @@ struct SpaceStyleEditor: Equatable {
     }
 
     var colors: [EditorColor] {
-        state.primaryColor.map { Self.companions(of: $0, count: state.numberOfColors, wheel: state.wheel) } ?? []
+        if state.hasSameColors(as: initialState),
+            case .single(let background)? = originalTheme?.background,
+            case .color(.blendedGradient(let gradient)) = background.style
+        {
+            let saved = gradient.baseColors + gradient.overlayColors.suffix(1)
+            return saved.map { EditorColor($0.nsColor) }
+        }
+        return state.primaryColor.map { Self.companions(of: $0, count: state.numberOfColors, wheel: state.wheel) } ?? []
     }
 
     var canAddColor: Bool { state.primaryColor != nil && state.numberOfColors < Self.maxColors }
@@ -231,10 +236,37 @@ struct SpaceStyleEditor: Equatable {
     /// fades in from clear. Both palettes come from the key colour, and so does whether the sidebar's content is
     /// dark, by contrast with the two titles under Arc's default bias of 0.
     var theme: WindowTheme? {
+        theme(for: state)
+    }
+
+    func theme(for state: State) -> WindowTheme? {
+        // Saved gradients can carry colors and palettes the editor's wheel cannot reproduce.
+        if state.hasSameColors(as: initialState) {
+            guard state.modifiers != initialState.modifiers,
+                var theme = originalTheme, case .single(var background) = theme.background
+            else { return originalTheme }
+            switch background.style {
+            case .color(.blendedGradient(var gradient)):
+                gradient.modifiers = state.modifiers
+                background.style = .color(.blendedGradient(gradient))
+            case .color(.blendedSingleColor(var single)):
+                single.modifiers = state.modifiers
+                background.style = .color(.blendedSingleColor(single))
+            case .color(.basicColor(let basic)):
+                background.style = .color(
+                    .blendedSingleColor(
+                        .init(
+                            color: basic.color, translucencyStyle: basic.translucencyStyle, modifiers: state.modifiers))
+                )
+            }
+            theme.background = .single(background)
+            return theme
+        }
         guard let key = state.primaryColor else { return nil }
-        let colors = colors.map { ThemeColor($0.nsColor) }
-        let modifiers = WindowTheme.BlendedBackgroundModifiers(
-            noiseFactor: state.noiseFactor, intensityFactor: state.intensityFactor, overlay: state.overlay)
+        let colors = Self.companions(of: key, count: state.numberOfColors, wheel: state.wheel).map {
+            ThemeColor($0.nsColor)
+        }
+        let modifiers = state.modifiers
         let style: WindowTheme.ColorStyle =
             switch colors.count {
             case 1:
@@ -267,12 +299,20 @@ struct SpaceStyleEditor: Equatable {
                     contentOverBackgroundAppearance: bias + contrast(dark.title) >= contrast(light.title)
                         ? .dark : .light,
                     isVibrant: true)),
-            windowAppearance: nil, primaryColorPalette: palette,
+            windowAppearance: originalTheme?.windowAppearance, primaryColorPalette: palette,
             semanticColorPalette: .appearanceBased(light: light, dark: dark))
     }
 }
 
 extension SpaceStyleEditor.State {
+    fileprivate func hasSameColors(as other: Self) -> Bool {
+        primaryColor == other.primaryColor && numberOfColors == other.numberOfColors && wheel == other.wheel
+    }
+
+    fileprivate var modifiers: WindowTheme.BlendedBackgroundModifiers {
+        .init(noiseFactor: noiseFactor, intensityFactor: intensityFactor, overlay: overlay)
+    }
+
     fileprivate mutating func apply(_ modifiers: WindowTheme.BlendedBackgroundModifiers) {
         noiseFactor = modifiers.noiseFactor
         intensityFactor = modifiers.intensityFactor
