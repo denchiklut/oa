@@ -73,7 +73,7 @@ final class CommandBar {
     }
 
     let destination: Destination
-    let autocomplete: any Autocomplete
+    private(set) var autocomplete: any Autocomplete
     /// The page ⌘L edits, prefilled and selected as Arc does.
     let currentURL: URL?
     /// What the user typed; the field may show more.
@@ -98,41 +98,55 @@ final class CommandBar {
     /// Caret movement preserves the displayed text without changing the query, as Arc does.
     private var acceptedText: String?
     @ObservationIgnored private var lastSuggestedText: String?
-    @ObservationIgnored private let profileID: UUID
+    private var context: any BrowserContext
     @ObservationIgnored private let picks: CommandBarPicks
     /// Off in an incognito window, which neither applies the profile's picks nor records its own, as seen in Arc.
     @ObservationIgnored private let usesPicks: Bool
     @ObservationIgnored private let tabs: () -> [CommandBarRanking.Tab]
-    @ObservationIgnored private let commands: [CommandAction]
-    @ObservationIgnored private let searchEngines: () -> [SearchEngine]
-    @ObservationIgnored private let dominantColor: (_ host: String) async -> NSColor?
+    @ObservationIgnored private var commands: [CommandAction]
     @ObservationIgnored private var startedFresh = false
     /// As Arc's `pendingSelection`: Return pressed before Chromium answered the text, with its modifiers.
     @ObservationIgnored private var pendingReturn: NSEvent.ModifierFlags?
     @ObservationIgnored var perform: (Action) -> Void = { _ in }
 
     init(
-        destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, profileID: UUID,
+        destination: Destination, autocomplete: any Autocomplete, currentURL: URL?, context: any BrowserContext,
         picks: CommandBarPicks, usesPicks: Bool = true, commands: [CommandAction] = [],
-        searchEngines: @escaping () -> [SearchEngine],
-        dominantColor: @escaping (_ host: String) async -> NSColor?,
         tabs: @escaping () -> [CommandBarRanking.Tab]
     ) {
         self.destination = destination
         self.autocomplete = autocomplete
         self.currentURL = currentURL
-        self.profileID = profileID
+        self.context = context
         self.picks = picks
         self.usesPicks = usesPicks
         self.commands = commands
         self.tabs = tabs
-        self.searchEngines = searchEngines
-        self.dominantColor = dominantColor
         let text = currentURL?.absoluteString ?? ""
         self.text = text
         selection = NSRange(location: text.utf16.count, length: 0)
         if !text.isEmpty { start(preventsInlineAutocomplete: true) }
         rank()
+    }
+
+    func changeSpace(to context: any BrowserContext, autocomplete: any Autocomplete, commands: [CommandAction]) {
+        self.commands = commands
+        pendingReturn = nil
+        if self.context.id != context.id {
+            self.autocomplete.stop()
+            self.context = context
+            self.autocomplete = autocomplete
+            startedFresh = false
+            if let scope {
+                self.scope = context.preferences.activeSearchEngines.first { $0.keyword == scope.keyword }
+                scopeColorTask?.cancel()
+                scopeColor = nil
+                if let engine = self.scope { loadScopeColor(for: engine) }
+            }
+            replaceText(text, caret: min(selection.location, text.utf16.count))
+        } else {
+            rank()
+        }
     }
 
     var selectedIndex: Int {
@@ -240,7 +254,7 @@ final class CommandBar {
     var siteSearchHint: SearchEngine? {
         guard scope == nil, !text.isEmpty else { return nil }
         let typed = text.lowercased()
-        return searchEngines().filter { $0.keyword.lowercased().hasPrefix(typed) }
+        return context.preferences.activeSearchEngines.filter { $0.keyword.lowercased().hasPrefix(typed) }
             .min { $0.keyword.count < $1.keyword.count }
     }
 
@@ -265,8 +279,8 @@ final class CommandBar {
         scopeColorTask?.cancel()
         scopeColor = engine.autoActivatedColor.map { ScopeColor(color: displayP3($0), isFromTable: true) }
         guard scopeColor == nil, let host = engine.emptySearchURL?.host() else { return }
-        scopeColorTask = Task { [weak self, dominantColor] in
-            guard let color = await dominantColor(host), !Task.isCancelled else { return }
+        scopeColorTask = Task { [weak self, context] in
+            guard let color = await context.siteSearchDominantColor(host: host), !Task.isCancelled else { return }
             self?.scopeColor = ScopeColor(color: color, isFromTable: false)
         }
     }
@@ -335,11 +349,11 @@ final class CommandBar {
     private func act(_ modifiers: NSEvent.ModifierFlags) {
         guard rows.indices.contains(selectedIndex) else { return }
         let row = rows[selectedIndex]
-        if !text.isEmpty, usesPicks { picks.record(row.id, for: text, in: profileID) }
+        if !text.isEmpty, usesPicks { picks.record(row.id, for: text, in: context.id) }
         switch row.source {
         case .tab(let tab): perform(.switchTo(tab.tab.id))
         case .command(let command):
-            if usesPicks { picks.recordCommand(command.id, in: profileID) }
+            if usesPicks { picks.recordCommand(command.id, in: context.id) }
             perform(.runCommand(command))
         case .match(let match):
             guard let url = match.url else { return }
@@ -364,8 +378,8 @@ final class CommandBar {
             query: text, matches: kept(autocomplete.matches), additionalMatches: kept(autocomplete.additionalMatches),
             tabs: destination == .newTab && scope == nil ? tabs() : [],
             commands: scope == nil ? commands : [],
-            commandUsage: usesPicks ? picks.commandUsage(in: profileID) : [:],
-            lastPick: usesPicks ? picks.pick(for: text, in: profileID) : nil, now: .now)
+            commandUsage: usesPicks ? picks.commandUsage(in: context.id) : [:],
+            lastPick: usesPicks ? picks.pick(for: text, in: context.id) : nil, now: .now)
         if ranked != rows { rows = ranked }
         let output = suggestedField.string
         guard output != lastSuggestedText else { return }
