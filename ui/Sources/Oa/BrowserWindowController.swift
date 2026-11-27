@@ -360,6 +360,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func resetZoom(_ sender: Any?) { model.zoom(.reset) }
     @objc func zoomIn(_ sender: Any?) { model.zoom(.in) }
     @objc func zoomOut(_ sender: Any?) { model.zoom(.out) }
+    @objc func capturePrettyScreenshot(_ sender: Any?) {
+        if let page = model.frontPage { model.portraitCapture.capture(page: page, in: model, quick: false) }
+    }
+
     @objc func savePageAs(_ sender: Any?) { model.frontPage?.savePage() }
     @objc func printPage(_ sender: Any?) { model.frontPage?.print() }
     @objc func viewSource(_ sender: Any?) { model.viewSource() }
@@ -705,7 +709,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(resetZoom(_:)): model.canZoom(.reset)
         case #selector(zoomIn(_:)): model.canZoom(.in)
         case #selector(zoomOut(_:)): model.canZoom(.out)
-        case #selector(savePageAs(_:)), #selector(printPage(_:)): model.frontPage != nil
+        case #selector(capturePrettyScreenshot(_:)), #selector(savePageAs(_:)), #selector(printPage(_:)):
+            model.frontPage != nil
         case #selector(viewSource(_:)): model.frontPage?.url != nil
         case #selector(toggleDevTools(_:)), #selector(inspectElements(_:)), #selector(javaScriptConsole(_:)),
             #selector(networkInspector(_:)):

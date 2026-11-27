@@ -99,6 +99,10 @@ final class MainMenu {
             ).typeTravel("reopenClosedTab", icon: "arrow.uturn.backward", triggers: ["Reopen Closed Tab"]))
         file.addItem(.separator())
         file.addItem(
+            item("Capture in Portrait Mode", #selector(BrowserWindowController.capturePrettyScreenshot(_:)))
+                .typeTravel(
+                    "capturePrettyScreenshot", icon: "camera.macro", triggers: ["Capture Portrait", "Screenshot"]))
+        file.addItem(
             item(
                 "Save Page As", #selector(BrowserWindowController.savePageAs(_:)), key: "s",
                 modifiers: [.command, .shift], id: "savePageAs"

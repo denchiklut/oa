@@ -12,6 +12,7 @@ enum ToastType: Equatable {
     /// Arc's `MoveItemsToastType.navigateToMovedTab`: the first tab moved to a Space the window doesn't show.
     case itemsMoved(UUID)
     case zoomChanged(String)
+    case portraitCapture(String)
 }
 
 /// Arc's `WindowToast`: on a page, or on the window.
