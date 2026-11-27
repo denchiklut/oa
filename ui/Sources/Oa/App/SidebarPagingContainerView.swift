@@ -57,7 +57,7 @@ struct SidebarPagingContainerView: View {
                             model: model, layout: layout, space: space,
                             hidesScrollIndicators: hidesScrollIndicators, showsDownloads: showsDownloads
                         )
-                        .padding(.top, global ? trayHeight : 0)
+                        .padding(.top, global ? max(trayHeight, showsToolbar ? 0 : 8) : 0)
                         .frame(width: width)
                         .allowsHitTesting(current)
                         .accessibilityHidden(!current)
@@ -288,6 +288,7 @@ private struct SpaceNameRow: View {
     @State private var renaming = false
     @Environment(\.sidebarDrag) private var drag
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let hasPinned = model.state.hasPinnedItems(in: space.id)
@@ -322,6 +323,13 @@ private struct SpaceNameRow: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.sectionHeaderText)
                     .lineLimit(1)
+                    .onContinuousHover { phase in
+                        guard !hasPinned else { return }
+                        switch phase {
+                        case .active: NSCursor.iBeam.set()
+                        case .ended: NSCursor.arrow.set()
+                        }
+                    }
             }
             if !renaming { Spacer(minLength: 0) }
             if hovering, !renaming {
@@ -337,10 +345,12 @@ private struct SpaceNameRow: View {
             }
         }
         .padding(.leading, showsChevron || space.icon != nil ? 5 : 8)
+        .animation(reduceMotion || space.icon != nil ? nil : .easeInOut(duration: 0.15), value: showsChevron)
         .padding(.trailing, 6)
         .frame(height: 36)
         .background(
-            hovering && !renaming ? theme.itemFill : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            hasPinned && hovering && !renaming ? theme.itemFill : .clear,
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
         .background {
             if drag?.target?.spaceHeaderID == space.id, drag?.settling == false {
