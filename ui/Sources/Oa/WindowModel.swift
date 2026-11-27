@@ -85,7 +85,6 @@ final class WindowModel {
     }
     var captureLibrary: CaptureLibrary { store.captureLibrary }
     var home: StorableHome { store.home }
-    private var flyoutFiles: [FlyoutSource: [MediaItem]] = [:]
     var lastLibrarySection: LibrarySection {
         librarySections.contains(store.home.lastSelectedHomePage) ? store.home.lastSelectedHomePage : librarySections[0]
     }
@@ -1977,42 +1976,14 @@ final class WindowModel {
         previewedDownloadID.flatMap { id in downloads.entries.first { $0.id == id } }
     }
 
-    func refreshFlyoutFiles() async {
-        let directories = FlyoutDirectory.selected(home.flyoutSources)
-        await withTaskGroup(of: Void.self) { group in
-            for directory in directories {
-                group.addTask { await self.watchFlyoutDirectory(directory) }
-            }
-        }
-    }
-
-    private func watchFlyoutDirectory(_ directory: FlyoutDirectory) async {
-        let changes = MediaItem.changes(in: directory.url)
-        await readFlyoutDirectory(directory)
-        for await _ in changes { await readFlyoutDirectory(directory) }
-    }
-
-    private func readFlyoutDirectory(_ directory: FlyoutDirectory) async {
-        let found = await directory.read()
-        guard !Task.isCancelled else { return }
-        if let source = directory.files { flyoutFiles[source] = found[source] }
-        if directory.includeScreenshots { flyoutFiles[.screenshots] = found[.screenshots] }
-    }
-
     var flyoutEntries: [LibraryFile] {
         let sources = home.flyoutSources
-        let visibleDownloads = sources.contains(.downloads) ? downloads.flyoutEntries : []
-        var recent = visibleDownloads.map(LibraryFile.download)
-        var seen = Set(visibleDownloads.compactMap { $0.download.file.map(MediaItem.canonicalFile) })
-        for source in [FlyoutSource.captures, .screenshots, .desktop, .documents] where sources.contains(source) {
-            let files = source == .captures ? captureLibrary.items : flyoutFiles[source] ?? []
-            let candidates = files.lazy.filter {
-                !self.captureLibrary.hidden.contains($0.file) && !seen.contains($0.file)
-                    && FileManager.default.fileExists(atPath: $0.file.path)
+        var recent = sources.contains(.downloads) ? downloads.flyoutEntries.map(LibraryFile.download) : []
+        if sources.contains(.captures) {
+            let captures = captureLibrary.items.lazy.filter {
+                !self.captureLibrary.hidden.contains($0.file) && FileManager.default.fileExists(atPath: $0.file.path)
             }
-            let newest = Array(candidates.prefix(4))
-            seen.formUnion(newest.map(\.file))
-            recent += newest.map(LibraryFile.media)
+            recent += captures.prefix(4).map(LibraryFile.media)
         }
         return Array(recent.sorted { $0.date > $1.date }.prefix(4))
     }

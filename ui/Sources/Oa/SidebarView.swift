@@ -61,10 +61,6 @@ struct SidebarView: View {
                 if !Task.isCancelled { showingFlyout = false }
             }
         }
-        .task(id: showingFlyout ? model.home.flyoutSources : []) {
-            guard showingFlyout else { return }
-            await model.refreshFlyoutFiles()
-        }
         // The sidebar stays mounted under the Library, where the pointer's leaving isn't reported.
         .onChange(of: model.library == nil) {
             overLibraryButton = false
