@@ -563,7 +563,21 @@ private struct FavoriteTile: View {
         }
         .frame(width: width, height: 47)
         .overlay(alignment: .topTrailing) {
-            if let peek = model.peeks[tab.id] { PeekBadge(favicon: peek.favicon).offset(x: 5, y: -5) }
+            if let peek = model.peeks[tab.id] {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(theme.isDark ? Color.black : .white)
+                    .frame(width: 20, height: 20)
+                    .shadow(color: .black.opacity(0.25), radius: 4, y: 1.5)
+                    .overlay {
+                        if let favicon = peek.favicon {
+                            Image(nsImage: favicon)
+                                .resizable()
+                                .interpolation(.high)
+                                .frame(width: 16, height: 16)
+                        }
+                    }
+                    .offset(x: 4, y: -4)
+            }
         }
         // Arc's tiles carry the recording dot too (AppTray's `recordingIndicatorView`); the corner is Oa's own.
         .overlay(alignment: .topLeading) {

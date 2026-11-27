@@ -104,7 +104,7 @@ struct BrowserWindowView: View {
             if let peek = model.peek {
                 let overPage = !model.showingArchive
                 PeekView(
-                    model: model, page: peek,
+                    model: model, page: peek, swipe: layout.peekSwipe,
                     sidebarWidth: overPage && locked ? layout.sidebarWidth : 0
                 )
                 .offset(x: overPage ? (libraryWidth - lead) * progress : 0)
