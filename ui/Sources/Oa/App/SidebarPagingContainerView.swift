@@ -144,7 +144,6 @@ private struct SidebarSpacePage: View {
     let hidesScrollIndicators: Bool
     let showsDownloads: Bool
     @State private var canScrollDown = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.sidebarDrag) private var drag
     @Environment(\.sidebarRevealsControls) private var revealed
 
@@ -231,22 +230,9 @@ private struct SidebarSpacePage: View {
             }
             .overlay(alignment: .bottom) {
                 if canScrollDown, !showsDownloads, !hidesScrollIndicators {
-                    Button {
-                        // Oa's own: the recording shows the arrow at rest. A click takes this Space to its bottom.
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-                            proxy.scrollTo(space.id, anchor: .bottom)
-                        }
-                    } label: {
-                        Image(systemName: "arrow.down")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .frame(width: 28, height: 28)
-                            .background(.white.opacity(0.94), in: Circle())
-                            .shadow(color: .black.opacity(0.14), radius: 3, y: 1)
+                    ScrollToBottomButton {
+                        proxy.scrollTo(space.id, anchor: .bottom)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Scroll to Bottom")
-                    .oaToolTip("Scroll to Bottom")
                     .padding(.bottom, 8)
                 }
             }
@@ -258,6 +244,33 @@ private struct SidebarSpacePage: View {
             SpaceMenu(model: model, layout: layout, space: space)
         }
         .sidebarDragFrame { drag?.lists[space.id, default: .init()].area = $0 }
+    }
+}
+
+private struct ScrollToBottomButton: View {
+    let action: () -> Void
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2), action)
+        } label: {
+            Image(systemName: "arrow.down")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(width: 28, height: 28)
+                .background(.white.opacity(0.94), in: Circle())
+                .shadow(color: .black.opacity(0.14), radius: 3, y: 1)
+                // Arc's 28 pt button briefly reaches 31 pt before settling at 30 pt.
+                .scaleEffect(hovering ? 30.0 / 28 : 1)
+                .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.36), value: hovering)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel("Scroll to Bottom")
+        .oaToolTip("Scroll to Bottom")
     }
 }
 
