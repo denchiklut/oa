@@ -367,13 +367,13 @@ final class StubPage: Page, MediaSession {
     }
 
     fileprivate func follow(_ target: URL, crossOrigin: Bool) {
-        let shift = NSEvent.modifierFlags.intersection([.shift, .command, .control, .option]) == .shift
-        guard shift || (crossOrigin && keepsAddress) else { return load(target) }
+        let held = NSEvent.modifierFlags.intersection([.shift, .command, .control, .option])
+        guard held == .shift || held == [.command, .shift] || (crossOrigin && keepsAddress) else { return load(target) }
         let opened = StubPage(
             id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
         opened.isIncognito = isIncognito
         opened.load(target)
-        let disposition = OpenDisposition.withModifiers(shift ? .newWindow : .foregroundTab)
+        let disposition = OpenDisposition.withModifiers(held == .shift ? .newWindow : .foregroundTab)
         continuation?.yield(.opened(opened, url: target, disposition: disposition, byPage: true))
     }
 

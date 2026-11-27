@@ -44,7 +44,9 @@ struct PageContentView: View {
                 PageHostView(view: page.view, movedToWindow: movedToWindow)
                     .overlay(alignment: .bottomLeading) {
                         if let link = page.hoveredLink {
-                            LinkPreview(url: link, allowsPeek: model.canShiftClickToPeek(link, from: page.id))
+                            LinkPreview(
+                                url: link, allowsPeek: model.canShiftClickToPeek(link, from: page.id),
+                                allowsFocusedTab: !page.keepsAddress && ["http", "https", "file"].contains(link.scheme))
                         }
                     }
             }
