@@ -113,6 +113,7 @@ final class WindowModel {
     private(set) var createdDates: [UUID: Date] = [:]
     /// As Arc's `WindowState.modalItemSwitcherPresentation`: the ⌃⇥ switcher while it is up.
     private(set) var modalItemSwitcher: ModalItemSwitcher?
+    let portraitCapture = PortraitCaptureController()
     private(set) var toast: WindowToast?
     /// By page: the find bars this window has open.
     var findInPage: [UUID: FindInPage.State] = [:]

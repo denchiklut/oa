@@ -7,6 +7,7 @@ struct DeveloperToolbar<Trailing: View>: View {
     let page: any Page
     var showSidebar: (() -> Void)?
     @ViewBuilder let trailing: Trailing
+    @State private var showingSiteControls = false
     @State private var showingExtensions = false
     @Environment(\.windowColorScheme) private var scheme
     @AppStorage(PageToolbar.key) private var ordinaryToolbarShown = false
@@ -20,9 +21,20 @@ struct DeveloperToolbar<Trailing: View>: View {
                     .labelStyle(.iconOnly)
             }
             tool("Site Settings", page.securityLevel == .secure ? "lock.fill" : "info.circle") {
-                model.openAllSiteSettings()
+                showingSiteControls = true
             }
             .labelStyle(.iconOnly)
+            .onChange(of: page.url?.host()) { showingSiteControls = false }
+            .onChange(of: model.frontPage?.id) {
+                if model.frontPage?.id != page.id { showingSiteControls = false }
+            }
+            .popover(isPresented: $showingSiteControls, arrowEdge: .bottom) {
+                SiteControlsView(
+                    model: model, isSecure: page.securityLevel == .secure, isInternal: page.url?.scheme == "chrome"
+                ) {
+                    showingSiteControls = false
+                }
+            }
             .background {
                 if ordinaryToolbarShown && page.id == model.frontPage?.id {
                     Color.clear.popover(
@@ -48,6 +60,12 @@ struct DeveloperToolbar<Trailing: View>: View {
             }
             .accessibilityLabel("Edit URL")
             .accessibilityValue(page.url?.absoluteString ?? "")
+            tool("Capture in Portrait Mode", "camera.macro") {
+                model.portraitCapture.capture(
+                    page: page, in: model, quick: NSEvent.modifierFlags.contains(.option),
+                    anchorX: page.view.window?.mouseLocationOutsideOfEventStream.x)
+            }
+            .labelStyle(.iconOnly)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 2) {
                     inspectorActions
