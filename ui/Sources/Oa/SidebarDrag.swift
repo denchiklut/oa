@@ -59,6 +59,7 @@ final class SidebarDrag {
     /// A link dragged in from a page.
     @ObservationIgnored private var link = false
     var isLinkDrag: Bool { link }
+    private(set) var revealedFavoritesProfile: UUID?
     private(set) var source: Section?
     private(set) var target: Target?
     private(set) var location = CGPoint.zero
@@ -111,6 +112,16 @@ final class SidebarDrag {
             previousTabID = previous
         }
         self.location = location
+        // Arc reopens a dismissed tray when a dragged tab reaches the URL field and keeps it open for that drag.
+        if grid.width > 0, grid.height == 0, model.sidebarContext == .global,
+            CGRect(
+                x: grid.minX, y: grid.minY - SidebarAddressField.height, width: grid.width,
+                height: SidebarAddressField.height + 1
+            ).contains(location),
+            !dragsFolder(model: model)
+        {
+            revealedFavoritesProfile = model.space?.profileID
+        }
         retarget(model: model)
     }
 
@@ -161,6 +172,7 @@ final class SidebarDrag {
     /// Over a place, the item moves there at once and the copy glides onto it; elsewhere it glides back.
     func finish(model: WindowModel, layout: WindowLayoutController) {
         guard let entry, !settling else { return }
+        revealedFavoritesProfile = nil
         heldInsert = nil
         combineCandidate = nil
         // As seen in Arc: a drag ends the multi-selection however it ends.
@@ -265,10 +277,11 @@ final class SidebarDrag {
         _ entry: SidebarEntry, from section: Section, glyph: SidebarCellButton.Glyph, start: CGPoint,
         members: [UUID], model: WindowModel, layout: WindowLayoutController
     ) {
-        let others = model.state.favoriteEntries(for: model.selectedSpaceID).filter { $0.id != entry.id }.count
+        let favorites = model.state.favoriteEntries(for: model.selectedSpaceID)
+        let others = favorites.filter { $0.id != entry.id }.count
         let slots = FavoritesGrid.Layout(count: others + 1, width: layout.sidebarWidth)
         rowSize = CGSize(width: layout.sidebarWidth - 16, height: 36)
-        tileSize = CGSize(width: slots.tileWidth, height: 47)
+        tileSize = CGSize(width: favorites.isEmpty ? 47 : slots.tileWidth, height: 47)
         if section == .favorites, let rect = tiles[entry.id] {
             origin = rect
             tileAnchor = CGPoint(x: start.x - rect.minX, y: start.y - rect.minY)
