@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: denchiklut <ollylut@gmail.com>
+Date: Thu, 26 Nov 2026 20:20:18 -0700
+Subject: [PATCH] fix: let native embedders parent the fedcm account chooser
+
+---
+ .../fedcm_account_selection_view_desktop.cc      | 16 ++++++++++++++++
+ .../webid/fedcm_account_selection_view_desktop.h |  5 +++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.cc b/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.cc
+index 48b64c507e70075cf33cde8f9881f4ee3c9df074..4dcf8e6fe64b8ca2c81f25cfb2b411b7984e5ad5 100644
+--- a/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.cc
++++ b/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.cc
+@@ -69,6 +69,9 @@ namespace {
+ // Size of the account picture shown in the ambient bubble.
+ constexpr int kAmbientBubbleAvatarSize = 20;
+ 
++webid::FedCmAccountSelectionView::BubbleParentCallback
++    g_bubble_parent_callback = nullptr;
++
+ // We could have a situation where the WebContents with an actor task opens a
+ // popup which then triggers the dialog, so we need to check the opener.
+ tabs::TabInterface* InitiatingTaskTab(tabs::TabInterface* source_tab) {
+@@ -116,6 +119,12 @@ namespace webid {
+ 
+ using DismissReason = content::IdentityRequestDialogController::DismissReason;
+ 
++// static
++void FedCmAccountSelectionView::SetBubbleParentCallbackForEmbedder(
++    BubbleParentCallback callback) {
++  g_bubble_parent_callback = callback;
++}
++
+ FedCmAccountSelectionView::WithheldPopupState::WithheldPopupState() = default;
+ FedCmAccountSelectionView::WithheldPopupState::WithheldPopupState(
+     const GURL& url,
+@@ -1359,6 +1368,13 @@ void FedCmAccountSelectionView::OnWidgetVisibilityChanged(views::Widget* widget,
+   if (widget != dialog_widget_.get()) {
+     return;
+   }
++  if (g_bubble_parent_callback && dialog_type_ == DialogType::BUBBLE &&
++      !widget->parent()) {
++    g_bubble_parent_callback(widget->GetNativeWindow(),
++                             visible && web_contents()
++                                 ? web_contents()->GetNativeView()
++                                 : gfx::NativeView());
++  }
+   // TODO(crbug.com/331166928): This is only null in one test. Fix the test to
+   // match production.
+   if (input_protector_) {
+diff --git a/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.h b/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.h
+index 49f0c2e9acd852722a398e540b9432a6f146c52a..9ef3f9df5e0864e86a21ec7c053e969a06230229 100644
+--- a/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.h
++++ b/chrome/browser/ui/views/webid/fedcm_account_selection_view_desktop.h
+@@ -84,6 +84,11 @@ class FedCmAccountSelectionView : public AccountSelectionView,
+                                   public page_actions::PageActionObserver,
+                                   public views::WidgetObserver {
+  public:
++  // A native embedder parents an unanchored bubble to its page while visible.
++  // An empty page view detaches the bubble when it hides.
++  using BubbleParentCallback = void (*)(gfx::NativeWindow, gfx::NativeView);
++  static void SetBubbleParentCallbackForEmbedder(BubbleParentCallback callback);
++
+   enum class DialogType {
+     // FedCM dialog inherits a bubble dialog, which is typically shown on the
+     // top-right corner of the browser. The user can switch tabs and interact
