@@ -13,8 +13,11 @@ struct DeveloperToolbar<Trailing: View>: View {
     @AppStorage(PageToolbar.key) private var ordinaryToolbarShown = false
 
     var body: some View {
-        let palette = (model.space.map(model.theme(of:)) ?? .default).primaryColorPalette
-        let accent = scheme == .dark ? palette.tintedLight.color : palette.shaded.color
+        let palette = (model.space.map(model.theme(of:)) ?? .default).semanticColorPalette[scheme]
+        // Calibrated against Arc's orange dark toolbar and its default light toolbar.
+        let fill = scheme == .dark ? palette.focus.over(.black) : palette.maxContrastColor.opacity(0.02).over(.white)
+        let chrome = Theme(toolbarOver: fill.nsColor)
+        let accent = palette.maxContrastColor.color
         HStack(spacing: 2) {
             if let showSidebar {
                 tool("Show Sidebar", "sidebar.left", action: showSidebar)
@@ -52,7 +55,7 @@ struct DeveloperToolbar<Trailing: View>: View {
             } label: {
                 Text(page.url?.absoluteString ?? "")
                     .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(chrome.foreground)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(minWidth: 44, maxWidth: .infinity, alignment: .leading)
@@ -60,18 +63,38 @@ struct DeveloperToolbar<Trailing: View>: View {
             }
             .accessibilityLabel("Edit URL")
             .accessibilityValue(page.url?.absoluteString ?? "")
-            tool("Capture in Portrait Mode", "camera.macro") {
-                model.portraitCapture.capture(
-                    page: page, in: model, quick: NSEvent.modifierFlags.contains(.option),
-                    anchorX: page.view.window?.mouseLocationOutsideOfEventStream.x)
-            }
-            .labelStyle(.iconOnly)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 2) {
+                    tool("Copy Link", "link") { model.copyURL(of: tabID) }
+                    divider
+                    PortraitCaptureButton(model: model, page: page, tabID: tabID)
+                    Button {
+                        model.select(tabID)
+                        model.startRegionCapture(on: page)
+                    } label: {
+                        Image(systemName: "camera").frame(width: 28, height: 28).contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Capture a portion of this page")
+                    .oaToolTip(
+                        OaToolTipConfiguration(
+                            title: "Capture a portion of this page",
+                            shortcut: model.keyBindings.state.shortcut(for: "capturePage"),
+                            palette: .developerToolbar(palette))
+                    )
+                    divider
                     inspectorActions
-                        .labelStyle(.iconOnly)
+                    divider
                 }
+                .fixedSize()
+                .labelStyle(.iconOnly)
                 Menu {
+                    tool("Copy Link", "link") { model.copyURL(of: tabID) }
+                    Divider()
+                    tool("Capture in Portrait Mode", "camera.macro") {
+                        model.portraitCapture.capture(page: page, in: model, quick: false)
+                    }
+                    tool("Capture a portion of this page", "camera") { model.startRegionCapture(on: page) }
+                    Divider()
                     inspectorActions
                 } label: {
                     Image(systemName: "ellipsis").frame(width: 28, height: 28)
@@ -86,7 +109,7 @@ struct DeveloperToolbar<Trailing: View>: View {
                     ExtensionsSection(model: model) { showingExtensions = false }
                         .padding(10).frame(width: 236)
                 }
-            trailing
+            trailing.environment(\.theme, chrome)
         }
         .task(id: page.id) { model.enteredDeveloperMode(for: tabID) }
         .buttonStyle(.plain)
@@ -96,19 +119,22 @@ struct DeveloperToolbar<Trailing: View>: View {
         .background {
             Canvas { context, size in
                 var stripes = Path()
-                for x in stride(from: -size.height, to: size.width, by: 32) {
+                for x in stride(from: -size.height, through: size.width + 12, by: 45) {
                     stripes.move(to: CGPoint(x: x, y: 0))
                     stripes.addLine(to: CGPoint(x: x + size.height, y: size.height))
                 }
-                context.stroke(stripes, with: .color(accent.opacity(0.035)), lineWidth: 14)
+                context.stroke(stripes, with: .color(accent.opacity(scheme == .dark ? 0.02 : 0.015)), lineWidth: 15)
             }
-            .background(accent.opacity(0.03))
-            .background(scheme == .dark ? Color.black : .white)
+            .background(fill.color)
         }
     }
 
+    private var divider: some View {
+        Rectangle().fill(.foreground.opacity(0.15)).frame(width: 1, height: 20).padding(.horizontal, 2)
+            .accessibilityHidden(true)
+    }
+
     @ViewBuilder private var inspectorActions: some View {
-        tool("Copy Link", "link") { model.copyURL(of: tabID) }
         tool("Toggle Console", "terminal") { page.devTools.toggleConsole() }
         tool("Toggle Network Panel", "network") { page.devTools.toggleNetwork() }
         tool("Inspect Element", "scope") { page.devTools.inspect() }

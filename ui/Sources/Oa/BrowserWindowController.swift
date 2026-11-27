@@ -319,6 +319,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     /// As Arc's: a Little window that is still its bar alone closes when it stops being key, whatever took the key.
     func windowDidResignKey(_ notification: Notification) {
+        model.regionCapture.cancel()
         if model.little?.isPresented == false, !isClosing { window?.close() }
     }
 
@@ -336,6 +337,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
 
     func windowWillClose(_ notification: Notification) {
         isClosing = true
+        model.portraitCapture.cancel()
+        model.regionCapture.cancel()
         fullscreenPage?.dismiss(refocus: false)
         fullscreenPage = nil
         viewTimer?.cancel()
@@ -360,6 +363,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func resetZoom(_ sender: Any?) { model.zoom(.reset) }
     @objc func zoomIn(_ sender: Any?) { model.zoom(.in) }
     @objc func zoomOut(_ sender: Any?) { model.zoom(.out) }
+    @objc func capturePage(_ sender: Any?) {
+        if let page = model.frontPage { model.startRegionCapture(on: page) }
+    }
+
     @objc func capturePrettyScreenshot(_ sender: Any?) {
         if let page = model.frontPage { model.portraitCapture.capture(page: page, in: model, quick: false) }
     }
@@ -709,7 +716,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         case #selector(resetZoom(_:)): model.canZoom(.reset)
         case #selector(zoomIn(_:)): model.canZoom(.in)
         case #selector(zoomOut(_:)): model.canZoom(.out)
-        case #selector(capturePrettyScreenshot(_:)), #selector(savePageAs(_:)), #selector(printPage(_:)):
+        case #selector(capturePage(_:)), #selector(capturePrettyScreenshot(_:)), #selector(savePageAs(_:)),
+            #selector(printPage(_:)):
             model.frontPage != nil
         case #selector(viewSource(_:)): model.frontPage?.url != nil
         case #selector(toggleDevTools(_:)), #selector(inspectElements(_:)), #selector(javaScriptConsole(_:)),
