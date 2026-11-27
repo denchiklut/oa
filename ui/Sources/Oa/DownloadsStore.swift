@@ -96,8 +96,7 @@ final class DownloadsStore {
         downloads(in: entry.profileID, isIncognito: entry.isIncognito).cancel(entry.id)
     }
 
-    /// Arc's Hide: the row goes, from the engine's history too, and a finished file stays.
-    func hide(_ entry: Entry) {
+    func removeFromHistory(_ entry: Entry) {
         downloads(in: entry.profileID, isIncognito: entry.isIncognito).remove(entry.id)
     }
 
@@ -109,7 +108,7 @@ final class DownloadsStore {
         guard let file = entry.download.file,
             (try? FileManager.default.trashItem(at: file, resultingItemURL: nil)) != nil
         else { return }
-        hide(entry)
+        removeFromHistory(entry)
     }
 
     func share(_ entry: Entry, with service: NSSharingService.Name) {

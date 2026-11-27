@@ -749,7 +749,7 @@ struct DownloadMenu: View {
             Button("Cancel Download") { downloads.cancel(entry) }
             Divider()
         }
-        Button("Hide from \(appName)") { downloads.hide(entry) }
+        Button("Hide from \(appName)") { model.hideDownload(entry) }
         if finished { Button("Move to Trash") { downloads.trash(entry) } }
     }
 

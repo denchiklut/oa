@@ -19,7 +19,7 @@ final class CaptureLibrary {
     private(set) var hidden: Set<URL>
 
     func hide(_ file: URL) throws {
-        let next = hidden.union([file])
+        let next = hidden.union([MediaItem.canonicalFile(file)])
         try JSONEncoder().encode(next).write(to: hiddenFile, options: .atomic)
         hidden = next
     }

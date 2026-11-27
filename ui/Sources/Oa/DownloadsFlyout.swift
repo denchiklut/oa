@@ -200,7 +200,7 @@ private struct FlyoutRow: View {
             if let app = entry.application { Button("Open in \(app)") { downloads.open(entry) } }
             Button("Show in Finder") { downloads.reveal(entry) }
             Divider()
-            Button("Hide from \(appName)") { downloads.hide(entry) }
+            Button("Hide from \(appName)") { model.hideDownload(entry) }
             Button("Move to Trash") { downloads.trash(entry) }
         case .inProgress, .paused, .notStarted:
             Button("Cancel Download") { downloads.cancel(entry) }
