@@ -4,12 +4,14 @@ import SwiftUI
 
 /// Saved by Arc's `HomePageID` names.
 enum LibrarySection: String, CaseIterable, Codable {
+    case media = "MediaPage"
     case downloads = "DownloadsPage"
     case spaces = "SpacesPage"
     case archive = "ArchivePage"
 
     var title: String {
         switch self {
+        case .media: "Media"
         case .downloads: "Downloads"
         case .spaces: "Spaces"
         case .archive: "Archived Tabs"
@@ -18,6 +20,7 @@ enum LibrarySection: String, CaseIterable, Codable {
 
     var symbol: String {
         switch self {
+        case .media: "photo"
         case .downloads: "arrow.down.circle"
         case .spaces: "square.on.square"
         case .archive: "archivebox"
@@ -26,7 +29,7 @@ enum LibrarySection: String, CaseIterable, Codable {
 }
 
 /// Arc's Library in the sidebar's place, with the page still showing: its rail of sections, of which Oa has
-/// Downloads, Spaces and Archived Tabs in Arc's order, beside the section's page. The widths are Arc's.
+/// Media, Downloads, Spaces and Archived Tabs in Arc's order, beside the section's page. The widths are Arc's.
 struct LibraryView: View {
     private static let railWidth: CGFloat = 112
 
@@ -50,6 +53,7 @@ struct LibraryView: View {
             rail
             Group {
                 switch section {
+                case .media: CapturesPage(library: model.captureLibrary)
                 case .downloads: DownloadsPage(model: model)
                 case .spaces:
                     SpaceManagementSpacesPage(
@@ -408,6 +412,53 @@ private struct LibraryEmptyState: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
         .padding(.top, 64)
+    }
+}
+
+private struct CapturesPage: View {
+    let library: CaptureLibrary
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading) {
+                LibrarySectionHeader(title: "Screenshots and Captures", isFirst: true)
+                if library.files.isEmpty {
+                    LibraryEmptyState(
+                        symbol: "photo", title: "No saved captures",
+                        message: "Choose Save to Library after capturing a region.")
+                }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
+                    ForEach(library.files, id: \.self) { file in
+                        Button {
+                            NSWorkspace.shared.open(file)
+                        } label: {
+                            CaptureThumbnail(file: file).id(library.revisions[file])
+                        }
+                        .buttonStyle(.plain).accessibilityLabel("Open saved capture")
+                    }
+                }
+            }
+            .padding(10)
+        }
+    }
+}
+
+private struct CaptureThumbnail: View {
+    let file: URL
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 6).fill(.primary.opacity(0.06))
+            if let image { Image(nsImage: image).resizable().scaledToFit() }
+        }
+        .frame(height: 82)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .task(id: file) {
+            let request = QLThumbnailGenerator.Request(
+                fileAt: file, size: CGSize(width: 180, height: 82), scale: 2, representationTypes: .thumbnail)
+            image = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
+        }
     }
 }
 

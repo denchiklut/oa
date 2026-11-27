@@ -7,7 +7,7 @@ extension WindowModel {
                 NSPasteboard.general.clearContents()
                 return NSPasteboard.general.setData($0, forType: .png)
             } ?? false
-        present(.capture(copied ? "Capture copied" : "Couldn’t copy capture"), at: .windowContent(pageID))
+        present(.capture(copied ? "Copied Image" : "Couldn’t copy capture"), at: .windowContent(pageID))
     }
 
     /// As Arc's `copyCurrentURLs`: a Peek's page first, then several selected rows together, else the page in front
