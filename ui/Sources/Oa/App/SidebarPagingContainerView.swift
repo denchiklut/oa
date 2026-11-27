@@ -223,7 +223,7 @@ private struct SidebarSpacePage: View {
                 // As measured on Arc: an archived row fades where it is while the rows below close up.
                 .animation(.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12), value: items.map(\.id))
                 // Oa's own: hide the scrollbar while paging between Spaces or into the Library.
-                .background { VerticalScrollerHiding(hidesScroller: hidesScrollIndicators) }
+                .background { SpaceScroller(hidesWhilePaging: hidesScrollIndicators) }
             }
             .onChange(of: model.editingFolderID) { _, id in
                 guard let id, space.id == model.selectedSpaceID else { return }
@@ -258,55 +258,6 @@ private struct SidebarSpacePage: View {
             SpaceMenu(model: model, layout: layout, space: space)
         }
         .sidebarDragFrame { drag?.lists[space.id, default: .init()].area = $0 }
-    }
-}
-
-/// Hides the enclosing scroll view's vertical scroller directly: SwiftUI's `scrollIndicators(.hidden)` leaves an
-/// always-shown AppKit scroller visible, and toggling `hasVerticalScroller` on a legacy scroller would widen the rows.
-private struct VerticalScrollerHiding: NSViewRepresentable {
-    let hidesScroller: Bool
-
-    func makeNSView(context: Context) -> ScrollerView { ScrollerView(hidesScroller: hidesScroller) }
-
-    func updateNSView(_ view: ScrollerView, context: Context) {
-        view.hidesScroller = hidesScroller
-        view.apply()
-    }
-
-    final class ScrollerView: NSView {
-        var hidesScroller: Bool
-
-        init(hidesScroller: Bool) {
-            self.hidesScroller = hidesScroller
-            super.init(frame: .zero)
-        }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) { fatalError() }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            apply()
-        }
-
-        override func layout() {
-            super.layout()
-            apply()
-        }
-
-        func apply() {
-            guard let scrollView = enclosingScrollView else { return }
-            if hidesScroller {
-                if scrollView.scrollerStyle == .overlay {
-                    if scrollView.hasVerticalScroller { scrollView.hasVerticalScroller = false }
-                } else {
-                    scrollView.verticalScroller?.alphaValue = 0
-                }
-            } else {
-                if !scrollView.hasVerticalScroller { scrollView.hasVerticalScroller = true }
-                if scrollView.scrollerStyle == .legacy { scrollView.verticalScroller?.alphaValue = 1 }
-            }
-        }
     }
 }
 
