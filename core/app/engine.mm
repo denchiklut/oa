@@ -53,6 +53,7 @@
 #include "content/public/app/content_main.h"
 #include "content/public/browser/browser_main_runner.h"
 #include "content/public/browser/storage_partition.h"
+#include "content/public/common/content_features.h"
 #include "content/public/common/main_function_params.h"
 #include "oa/browser/ad_blocker_service.h"
 #include "oa/browser/page_impl.h"
@@ -216,6 +217,9 @@ int RunEngine(int argc, const char** argv, ReadyCallback ready, void* context) {
     command_line.AppendSwitchASCII(switches::kProfileDirectory,
                                    chrome::kInitialProfile);
   }
+  // Arc disables FedCM so sites can offer their own sign-in prompt.
+  DisableFeature(command_line, features::kFedCm);
+
   // Chrome UI that CHECKs without a BrowserView.
   DisableFeature(command_line,
                  security_interstitials::features::kHttpsFirstDialogUi);
