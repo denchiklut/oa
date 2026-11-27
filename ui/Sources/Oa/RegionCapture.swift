@@ -41,8 +41,8 @@ final class RegionCapture {
                 let menu = CaptureActionMenu(result: result, model: model, pageID: page.id) {
                     [weak self, weak model, weak page] in
                     if let self, let model, let page { self.begin(on: page, in: model) }
-                } edited: { [weak view] in
-                    view?.needsDisplay = true
+                } edit: { [weak view, weak model] in
+                    if let view, let model { view.edit(result, in: model) }
                 }
                 view.show(menu)
             }
@@ -77,6 +77,7 @@ final class RegionSelectionView: NSView {
     private var selection = NSRect.zero
     private var result: CapturedRegion?
     private var actionScroll: NSScrollView?
+    private let editor = WindowPreviewPanel()
     private var escapeMonitor: Any?
     var hasResult: Bool { result != nil }
 
@@ -225,6 +226,30 @@ final class RegionSelectionView: NSView {
         needsDisplay = true
     }
 
+    private var editing = false
+
+    func edit(_ result: CapturedRegion, in model: WindowModel) {
+        guard let window, !editing else { return }
+        editing = true
+        let palette = (model.space.map(model.theme(of:)) ?? .default).primaryColorPalette
+        let dismiss = { [weak self] in
+            self?.editing = false
+            self?.editor.close()
+        }
+        editor.show(over: window, onClose: dismiss) {
+            CaptureEditor(result: result, palette: palette, cancel: dismiss) {
+                [weak self] annotations, image in
+                do {
+                    if let file = result.savedFile { try model.captureLibrary.update(file, with: result.png(image)) }
+                    result.annotations = annotations
+                    result.image = image
+                    self?.needsDisplay = true
+                    dismiss()
+                } catch { window.presentError(error) }
+            }
+        }
+    }
+
     override func cancelOperation(_ sender: Any?) { finish() }
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -235,6 +260,8 @@ final class RegionSelectionView: NSView {
     }
 
     func finish() {
+        editor.close()
+        editing = false
         let window = window
         let focus = window?.firstResponder as? NSView
         let hadFocus =

@@ -20,7 +20,7 @@ enum LibrarySection: String, CaseIterable, Codable {
 
     var symbol: String {
         switch self {
-        case .media: "photo"
+        case .media: "photo.on.rectangle.angled"
         case .downloads: "arrow.down.circle"
         case .spaces: "square.on.square"
         case .archive: "archivebox"
@@ -53,7 +53,7 @@ struct LibraryView: View {
             rail
             Group {
                 switch section {
-                case .media: CapturesPage(library: model.captureLibrary)
+                case .media: MediaPage(model: model)
                 case .downloads: DownloadsPage(model: model)
                 case .spaces:
                     SpaceManagementSpacesPage(
@@ -190,11 +190,11 @@ private struct LibraryIconButtonStyle: ButtonStyle {
 
 /// Arc's 56 pt Library list header: a 36 pt rounded translucent search field beside a Filter toggle button, with no
 /// divider beneath them.
-private struct LibrarySearchHeader: View {
+struct LibrarySearchHeader: View {
     let prompt: String
     @Binding var search: String
-    let hasFilters: Bool
-    let openFilter: () -> Void
+    var hasFilters = false
+    var openFilter: (() -> Void)? = nil
     @State private var hoveringFilter = false
 
     var body: some View {
@@ -222,25 +222,27 @@ private struct LibrarySearchHeader: View {
             .frame(height: 36)
             .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            Button(action: openFilter) {
-                HStack(spacing: 5) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.system(size: 14, weight: .medium))
-                    Text("Filter")
-                        .font(.system(size: 13.5, weight: .medium))
+            if let openFilter {
+                Button(action: openFilter) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 14, weight: .medium))
+                        Text("Filter")
+                            .font(.system(size: 13.5, weight: .medium))
+                    }
+                    .foregroundStyle(Color.primary.opacity(hasFilters || hoveringFilter ? 1 : 0.75))
+                    .padding(.horizontal, 10)
+                    .frame(height: 36)
+                    .background(
+                        Color.primary.opacity(hasFilters ? 0.16 : hoveringFilter ? 0.1 : 0.05),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-                .foregroundStyle(Color.primary.opacity(hasFilters || hoveringFilter ? 1 : 0.75))
-                .padding(.horizontal, 10)
-                .frame(height: 36)
-                .background(
-                    Color.primary.opacity(hasFilters ? 0.16 : hoveringFilter ? 0.1 : 0.05),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .buttonStyle(.plain)
+                .fixedSize()
+                .onHover { hoveringFilter = $0 }
             }
-            .buttonStyle(.plain)
-            .fixedSize()
-            .onHover { hoveringFilter = $0 }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
@@ -412,53 +414,6 @@ private struct LibraryEmptyState: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
         .padding(.top, 64)
-    }
-}
-
-private struct CapturesPage: View {
-    let library: CaptureLibrary
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading) {
-                LibrarySectionHeader(title: "Screenshots and Captures", isFirst: true)
-                if library.files.isEmpty {
-                    LibraryEmptyState(
-                        symbol: "photo", title: "No saved captures",
-                        message: "Choose Save to Library after capturing a region.")
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 8) {
-                    ForEach(library.files, id: \.self) { file in
-                        Button {
-                            NSWorkspace.shared.open(file)
-                        } label: {
-                            CaptureThumbnail(file: file).id(library.revisions[file])
-                        }
-                        .buttonStyle(.plain).accessibilityLabel("Open saved capture")
-                    }
-                }
-            }
-            .padding(10)
-        }
-    }
-}
-
-private struct CaptureThumbnail: View {
-    let file: URL
-    @State private var image: NSImage?
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 6).fill(.primary.opacity(0.06))
-            if let image { Image(nsImage: image).resizable().scaledToFit() }
-        }
-        .frame(height: 82)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .task(id: file) {
-            let request = QLThumbnailGenerator.Request(
-                fileAt: file, size: CGSize(width: 180, height: 82), scale: 2, representationTypes: .thumbnail)
-            image = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
-        }
     }
 }
 

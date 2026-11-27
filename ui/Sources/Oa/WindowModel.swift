@@ -80,6 +80,7 @@ final class WindowModel {
         didSet {
             if let library { store.home.lastSelectedHomePage = library }
             if library != .archive { closeArchivePeek() }
+            if library != .media, previewedMedia != nil { closeFilePreview() }
         }
     }
     var captureLibrary: CaptureLibrary { store.captureLibrary }
@@ -93,6 +94,8 @@ final class WindowModel {
     /// As Arc's `WindowState.sidebarMode` and width: the window's own, saved with it.
     private(set) var sidebarMode: SidebarMode
     private(set) var sidebarWidth: CGFloat
+    private var mediaOrder: [MediaItem] = []
+    var previewedMedia: MediaItem?
     private var previewedDownloadID: Download.ID?
     private(set) var dialogs: [UUID: [PageDialog]] = [:]
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
@@ -1981,7 +1984,22 @@ final class WindowModel {
         }
     }
 
-    func closeDownloadPreview() {
+    func previewMedia(_ item: MediaItem, among items: [MediaItem]) {
+        mediaOrder = items
+        previewedMedia = item
+    }
+
+    func adjacentMedia(_ offset: Int) -> MediaItem? {
+        let visible = mediaOrder.filter { !captureLibrary.hidden.contains($0.file) }
+        guard let item = previewedMedia, let index = visible.firstIndex(of: item),
+            visible.indices.contains(index + offset)
+        else { return nil }
+        return visible[index + offset]
+    }
+
+    func closeFilePreview() {
+        previewedMedia = nil
+        mediaOrder = []
         previewedDownloadID = nil
         frontPage?.activate()
     }
