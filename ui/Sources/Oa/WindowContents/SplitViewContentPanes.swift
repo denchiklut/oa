@@ -171,6 +171,9 @@ private struct SplitViewContentPane: View {
 
     var body: some View {
         let page = model.pages[tabID]
+        let developer =
+            splitID != nil && model.placeholder(for: tabID) == nil && model.developerMode.isEnabled(for: page?.url)
+        let barHeight: CGFloat = splitID == nil ? 0 : developer ? 40 : 32
         // As seen in Arc: no pane is outlined while the empty one waits for the command bar, or while a tab is
         // dragged over the page.
         let focused =
@@ -182,9 +185,11 @@ private struct SplitViewContentPane: View {
         VStack(spacing: 0) {
             // A lone page under a drop's preview has no bar yet.
             if splitID != nil {
-                ContentPanelTopBar(model: model, tabID: tabID, splitID: splitID, isFocused: focused, width: width)
-                    .id(page?.id)
-                    .zIndex(1)
+                ContentPanelTopBar(
+                    model: model, tabID: tabID, splitID: splitID, isFocused: focused, developer: developer, width: width
+                )
+                .id(page?.id)
+                .zIndex(1)
             }
             // An overlay, so a page that keeps its size under a drop's preview doesn't push its pane out.
             Color.clear.overlay(alignment: .topLeading) {
@@ -200,18 +205,20 @@ private struct SplitViewContentPane: View {
                 }
                 .frame(
                     width: isVertical ? nil : restingLength,
-                    height: isVertical ? restingLength.map { $0 - (splitID == nil ? 0 : 32) } : nil)
+                    height: isVertical ? restingLength.map { $0 - barHeight } : nil)
             }
             .windowContentGrabber(
                 model: model, hasContent: page != nil || model.placeholder(for: tabID) != nil,
-                barHeight: splitID == nil ? 0 : 32
+                enabled: !developer, barHeight: barHeight
             )
         }
         .findInPage(of: model, on: model.placeholder(for: tabID) == nil ? page : nil, hasTopBar: splitID != nil)
         .toast(of: model, on: page)
         .background(dark ? Color.black : .white)
         .clipShape(shape)
-        .onChange(of: page?.id, initial: true) { _, _ in model.trackPaneToolbarPage(tabID, shown: true) }
+        .onChange(of: developer ? nil : page?.id, initial: true) { _, _ in
+            model.trackPaneToolbarPage(tabID, shown: !developer)
+        }
         .onDisappear { model.trackPaneToolbarPage(tabID, shown: false) }
         .overlay {
             // Arc's `defaultBorderWidth` and `dropTargetBorderWidth`.
@@ -256,47 +263,48 @@ struct ContentPanelTopBar: View {
     let tabID: UUID
     let splitID: UUID?
     let isFocused: Bool
+    let developer: Bool
     let width: CGFloat
     @State private var initialColor: NSColor?
     @State private var showingSiteControls = false
     @Environment(\.theme) private var windowTheme
 
-    init(model: WindowModel, tabID: UUID, splitID: UUID?, isFocused: Bool, width: CGFloat) {
+    init(model: WindowModel, tabID: UUID, splitID: UUID?, isFocused: Bool, developer: Bool, width: CGFloat) {
         self.model = model
         self.tabID = tabID
         self.splitID = splitID
+        self.developer = developer
         self.isFocused = isFocused
         self.width = width
         _initialColor = State(initialValue: model.pages[tabID].map(model.topBarColors.startingColor))
     }
 
     var body: some View {
+        if developer, let page = model.pages[tabID] {
+            DeveloperToolbar(model: model, tabID: tabID, page: page) { paneActions }
+        } else {
+            regularToolbar
+        }
+    }
+
+    private var regularToolbar: some View {
         let page = model.pages[tabID]
         let color = page.flatMap { model.topBarColors.appliedColor(for: $0) } ?? initialColor
         let theme = color.map(Theme.init(toolbarOver:)) ?? windowTheme
         let showsReload = isFocused && width >= Self.reloadMinimumWidth
         let vertical = splitID.flatMap(model.state.splitView)?.layoutOrientation == .vertical
-        ZStack {
+        return ZStack {
             HStack(spacing: 0) {
                 NavigationButtons(
                     page: page, size: CGSize(width: 32, height: 24), spacing: 5, showsReload: showsReload)
                 Spacer()
                 if showsReload {
                     SiteControlsButton(
-                        model: model, size: CGSize(width: 32, height: 28), showingSiteControls: $showingSiteControls,
+                        model: model, size: CGSize(width: 32, height: 28),
+                        showingSiteControls: $showingSiteControls,
                         hostsPermissionPrompt: false)
                 }
-                if isFocused, let splitID { splitViewMenu(splitID, vertical: vertical) }
-                // As seen in Arc: on a pinned split it archives the pane's tab, and the other stays pinned.
-                Button {
-                    model.archivePinned(tabID)
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13))
-                        .frame(width: 32, height: 24)
-                }
-                .buttonStyle(ChromeButtonStyle())
-                .accessibilityLabel("Close Split View Pane")
+                paneActions
             }
             .padding(.horizontal, 5)
             HStack(spacing: 3) {
@@ -350,6 +358,21 @@ struct ContentPanelTopBar: View {
             (theme.isDark ? Color.white : .black).opacity(0.05).frame(height: 1).offset(y: 1)
         }
         .animation(.easeInOut(duration: 0.18), value: color)
+    }
+
+    @ViewBuilder private var paneActions: some View {
+        let vertical = splitID.flatMap(model.state.splitView)?.layoutOrientation == .vertical
+        if isFocused, let splitID { splitViewMenu(splitID, vertical: vertical) }
+        // As seen in Arc: on a pinned split it archives the pane's tab, and the other stays pinned.
+        Button {
+            model.archivePinned(tabID)
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 13))
+                .frame(width: 32, height: 24)
+        }
+        .buttonStyle(ChromeButtonStyle())
+        .accessibilityLabel("Close Split View Pane")
     }
 
     /// Arc's Split View Options, as seen: its items follow the split's orientation, a pane at an end can't move past

@@ -323,6 +323,11 @@ final class MainMenu {
             item(
                 "Network Inspector", #selector(BrowserWindowController.networkInspector(_:)), id: "networkInspector"
             ).typeTravel("networkInspector", icon: "wifi", triggers: ["Network Inspector"]))
+        developer.addItem(
+            item(
+                "Toggle Developer Mode", #selector(BrowserWindowController.toggleDeveloperMode(_:)), key: "d",
+                modifiers: [.control], id: "toggleDeveloperMode", priority: .promptAfterConsumedByWebView
+            ).typeTravel("toggleDeveloperMode", icon: "hammer.fill", triggers: ["Developer Mode"]))
         view.addItem(.separator())
         view.addItem(
             item(

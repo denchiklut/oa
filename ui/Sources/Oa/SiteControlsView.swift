@@ -72,7 +72,7 @@ private struct SiteControlsHitTestAnchor: NSViewRepresentable {
 
 /// Arc's section as measured (arc-extensions.md §8b, §9): the header, with "Manage" at its end while the pointer is
 /// over the section, then 48×32 tiles four to a row, 8 pt apart, and "+" for the Chrome Web Store.
-private struct ExtensionsSection: View {
+struct ExtensionsSection: View {
     let model: WindowModel
     let dismiss: () -> Void
     @State private var hovering = false
@@ -167,8 +167,13 @@ private struct SettingsSection: View {
                     }.buttonStyle(.plain).padding(.horizontal, 10)
                 }
             }
-            // Developer Mode is its own feature; the row stands as Arc's, off, until it lands.
-            SiteSettingRow(title: "Developer Mode", value: "Off", symbol: "hammer.fill", isOn: false) {}
+            if let url = model.developerModeURL {
+                let on = model.developerMode.isEnabled(for: url)
+                SiteSettingRow(title: "Developer Mode", value: on ? "On" : "Off", symbol: "hammer.fill", isOn: on) {
+                    dismiss()
+                    model.developerMode.toggle(for: url)
+                }
+            }
             if let setting = settings.first(where: { $0.type == .automaticPictureInPicture }) {
                 SiteSettingRow(setting: setting) { toggle(setting) }
             }

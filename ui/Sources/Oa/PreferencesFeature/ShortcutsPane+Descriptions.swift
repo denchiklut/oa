@@ -59,6 +59,7 @@ extension ShortcutsPane {
         case "zoomOut": "Decreases the magnification of the current website."
         case "viewSource": "Opens the page’s source in a new tab."
         case "developerTools", "developerTools_Alternate": "Opens the developer tools window."
+        case "toggleDeveloperMode": "Toggles developer mode on or off for the current site."
         case "inspectElements": "Opens the element inspector."
         case "javaScriptConsole": "Opens the JavaScript console."
         case "networkInspector": "Opens the network inspector developer tool."

@@ -97,11 +97,15 @@ final class WindowContentGrabber: NSView {
 extension View {
     /// Arc's grabber frame: from the content's top edge to 60 pt below it, the bar of `barHeight` over the page left
     /// out, and short of the 14 pt the scroll bar takes. No window drag while a Peek is up, as Arc's.
-    func windowContentGrabber(model: WindowModel, hasContent: Bool, barHeight: CGFloat) -> some View {
+    func windowContentGrabber(model: WindowModel, hasContent: Bool, enabled: Bool = true, barHeight: CGFloat)
+        -> some View
+    {
         overlay(alignment: .topLeading) {
-            WindowContentGrabberStrip(model: model, hasContent: hasContent)
-                .frame(height: max(0, 60 - barHeight))
-                .padding(.trailing, 14)
+            if enabled {
+                WindowContentGrabberStrip(model: model, hasContent: hasContent)
+                    .frame(height: max(0, 60 - barHeight))
+                    .padding(.trailing, 14)
+            }
         }
     }
 }

@@ -858,6 +858,8 @@ struct TabRow: View {
         let inCard = place == .card
         let indent = CGFloat(depth) * 16
         let pinned = model.state.isPinned(tab.id)
+        let url = inCard ? nil : model.liveURL(of: tab.id)
+        let developer = model.developerMode.isEnabled(for: url)
         let current = !inCard && model.selectedTabIDs[spaceID] == tab.id
         // As Arc: the New Tab row takes the selected look while the bar makes a tab.
         let selected = current && (spaceID != model.selectedSpaceID || model.commandBar?.destination != .newTab)
@@ -884,9 +886,16 @@ struct TabRow: View {
                 if renaming {
                     renameField
                 } else {
-                    Text(inCard ? tab.displayTitle : model.title(for: tab))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(inCard ? tab.displayTitle : model.title(for: tab))
+                        if developer, let host = url?.host(percentEncoded: true) {
+                            Text(host + (url?.port.map { ":\($0)" } ?? ""))
+                                .font(.system(size: 11))
+                                .foregroundStyle(theme.addressText)
+                        }
+                    }
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 }
             }
             .font(.system(size: 14))
@@ -903,6 +912,12 @@ struct TabRow: View {
                     ? theme.selectedCard : multiSelected ? theme.multiSelectedCard : hovering ? theme.itemFill : .clear
             )
             .shadow(color: selected ? theme.selectedShadow : .clear, radius: 1, y: 1)
+        }
+        .overlay {
+            if selected && developer {
+                card.strokeBorder(.black, lineWidth: 2)
+                card.strokeBorder(.yellow, style: StrokeStyle(lineWidth: 2, dash: [6, 6]))
+            }
         }
         .opacity(combining ? 0 : 1)
         .overlay {

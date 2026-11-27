@@ -188,6 +188,15 @@ final class WindowModel {
     private var archivePeekID: UUID?
 
     var state: SidebarState { store.state }
+    var developerMode: DeveloperModeClient { store.developerMode }
+
+    var developerModeURL: URL? {
+        guard !isLittle, peek == nil, placeholder == nil, let url = page?.url, let host = url.host(), !host.isEmpty
+        else {
+            return nil
+        }
+        return url
+    }
     /// The Spaces the window pages through: the global sidebar's, or the one of its own container.
     var spaces: [SidebarSpace] {
         guard let container = style.container(of: id) else { return state.spaces }
