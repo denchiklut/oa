@@ -110,7 +110,7 @@ final class StubBrowserContext: BrowserContext {
         isIncognito = false
         stubDownloads = StubDownloads()
         preferences = StubPreferences()
-        stubExtensions = StubExtensions()
+        stubExtensions = StubExtensions(profileID: id)
     }
 
     /// An incognito context, on its profile's preferences and extensions. Its downloads are its own, and the stub

@@ -44,6 +44,7 @@ class Extensions {
 
   virtual ~Extensions() = default;
 
+  virtual void InstallJsonFormatter() = 0;
   virtual void SetEnabled(const std::string& id, bool enabled) = 0;
   // Without asking; Chromium's own removal paths ask through the page.
   virtual void Uninstall(const std::string& id) = 0;

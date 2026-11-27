@@ -503,6 +503,7 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // Setting it the first time loads the profile and starts the events.
 @property(nonatomic, weak, nullable) id<OAExtensionsDelegate> delegate;
 - (instancetype)init NS_UNAVAILABLE;
+- (void)installJSONFormatter;
 - (void)setExtensionWithIdentifier:(NSString*)identifier enabled:(BOOL)enabled;
 // Without asking; Chromium's own removal paths ask through the page.
 - (void)uninstallExtensionWithIdentifier:(NSString*)identifier;

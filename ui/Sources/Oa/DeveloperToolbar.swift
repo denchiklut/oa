@@ -70,6 +70,7 @@ struct DeveloperToolbar<Trailing: View>: View {
                 }
             trailing
         }
+        .task(id: page.id) { model.enteredDeveloperMode(for: tabID) }
         .buttonStyle(.plain)
         .foregroundStyle(accent)
         .padding(.horizontal, 5)

@@ -144,6 +144,7 @@ import AppKit
 
 @MainActor @objc protocol CoreExtensions: NSObjectProtocol {
     var delegate: CoreExtensionsDelegate? { get set }
+    func installJSONFormatter()
     @objc(setExtensionWithIdentifier:enabled:) func setExtension(identifier: String, enabled: Bool)
     @objc(uninstallExtensionWithIdentifier:) func uninstallExtension(identifier: String)
 }

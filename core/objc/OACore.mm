@@ -1753,6 +1753,12 @@ class ExtensionsObserverBridge : public oa::Extensions::Observer {
   }
 }
 
+- (void)installJSONFormatter {
+  if (_extensions) {
+    _extensions->InstallJsonFormatter();
+  }
+}
+
 - (void)setExtensionWithIdentifier:(NSString*)identifier enabled:(BOOL)enabled {
   if (_extensions) {
     _extensions->SetEnabled(identifier.UTF8String ?: "", enabled);
