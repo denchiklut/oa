@@ -3,14 +3,74 @@ From: denchiklut <ollylut@gmail.com>
 Date: Wed, 4 Nov 2026 00:54:57 -0700
 Subject: [PATCH] oa: let an embedder replace AppController and the main menu
 
-Adds ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder(). After it, PreCreateThreads creates neither AppController nor Chrome's main menu, and DidEndMainMessageLoop doesn't message AppController, so NSApp's delegate stays the embedder's.
+Skip Chrome's delegate and main menu setup when the embedder owns them. As in Arc, callers can still obtain the shared AppController without replacing the embedder's delegate.
 ---
+ chrome/browser/app_controller_mac.h       |  9 +++------
+ chrome/browser/app_controller_mac.mm      |  9 +++++++--
  chrome/browser/chrome_browser_main_mac.h  |  6 ++++++
- chrome/browser/chrome_browser_main_mac.mm | 15 +++++++++++++++
- 2 files changed, 21 insertions(+)
+ chrome/browser/chrome_browser_main_mac.mm | 20 ++++++++++++++++++++
+ 4 files changed, 36 insertions(+), 8 deletions(-)
 
+diff --git a/chrome/browser/app_controller_mac.h b/chrome/browser/app_controller_mac.h
+index 62f68487c9a3ebca32c4100ceceec7f74e90c586..7ccd3875f72bc11000bd93c65947e8904470e3c3 100644
+--- a/chrome/browser/app_controller_mac.h
++++ b/chrome/browser/app_controller_mac.h
+@@ -42,9 +42,8 @@ class ColorProvider;
+                 NSApplicationDelegate,
+                 ASWebAuthenticationSessionWebBrowserSessionHandling>
+ 
+-// The app-wide singleton AppController. Guaranteed to be the delegate of NSApp
+-// inside of Chromium (not inside of app shims; see AppShimDelegate). Guaranteed
+-// to not be nil.
++// The non-nil app-wide singleton. It is the delegate of NSApp in Chromium
++// unless an embedder supplies its own delegate. App shims use AppShimDelegate.
+ @property(readonly, nonatomic, class) AppController* sharedController;
+ 
+ @property(readonly, nonatomic) BOOL startupComplete;
+@@ -55,9 +54,7 @@ class ColorProvider;
+ // |-lastProfileIfLoaded|.
+ @property(readonly, nonatomic) Profile* lastProfile;
+ 
+-// Do not create new instances of AppController; use the `sharedController`
+-// property so that the invariants of there always being exactly one
+-// AppController and that that instance is the NSApp delegate always hold true.
++// Use sharedController to preserve the single instance.
+ - (instancetype)init NS_UNAVAILABLE;
+ 
+ // This method is called very early in application startup after the main menu
+diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
+index ead883ef957da19dd88cfb75e85be72a5c31918c..fc766f5722483f31bd80d62fd6862ce263728282 100644
+--- a/chrome/browser/app_controller_mac.mm
++++ b/chrome/browser/app_controller_mac.mm
+@@ -45,6 +45,7 @@
+ #include "chrome/browser/browser_features.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/browser_process_platform_part.h"
++#include "chrome/browser/chrome_browser_main_mac.h"
+ #include "chrome/browser/command_updater_impl.h"
+ #include "chrome/browser/download/download_core_service.h"
+ #include "chrome/browser/download/download_core_service_factory.h"
+@@ -795,12 +796,16 @@ @implementation AppController {
+ + (AppController*)sharedController {
+   static AppController* sharedController = [] {
+     AppController* sharedController = [[AppController alloc] init];
+-    NSApp.delegate = sharedController;
++    if (ChromeBrowserMainPartsMac::AppControllerOwnsAppDelegate()) {
++      NSApp.delegate = sharedController;
++    }
+     return sharedController;
+   }();
+ 
+   CHECK_NE(nil, sharedController);
+-  CHECK_EQ(NSApp.delegate, sharedController);
++  if (ChromeBrowserMainPartsMac::AppControllerOwnsAppDelegate()) {
++    CHECK_EQ(NSApp.delegate, sharedController);
++  }
+   return sharedController;
+ }
+ 
 diff --git a/chrome/browser/chrome_browser_main_mac.h b/chrome/browser/chrome_browser_main_mac.h
-index 35bec6d86b33bf4be8df95f962a5398784db44fe..861dcd997c415a78006b0a172b0ceb0cf4acba0d 100644
+index 35bec6d86b33bf4be8df95f962a5398784db44fe..f479440de4a1429d2c50fb1ede6c24999b0cfc54 100644
 --- a/chrome/browser/chrome_browser_main_mac.h
 +++ b/chrome/browser/chrome_browser_main_mac.h
 @@ -37,6 +37,12 @@ class ChromeBrowserMainPartsMac : public ChromeBrowserMainPartsPosix {
@@ -18,16 +78,16 @@ index 35bec6d86b33bf4be8df95f962a5398784db44fe..861dcd997c415a78006b0a172b0ceb0c
    static void DidEndMainMessageLoop();
  
 +  // For an embedder that brings its own NSApplicationDelegate, main menu and
-+  // quit handling. Call it before the browser starts: Chrome then creates
-+  // neither AppController nor its main menu, so NSApp's delegate stays the
-+  // embedder's.
++  // quit handling. Call before startup to keep Chrome from installing its
++  // delegate and main menu.
 +  static void DisableAppControllerForEmbedder();
++  static bool AppControllerOwnsAppDelegate();
 +
   private:
    // Records mac related metrics. Some metrics are recorded on startup, some
    // are recorded later in response to an events.
 diff --git a/chrome/browser/chrome_browser_main_mac.mm b/chrome/browser/chrome_browser_main_mac.mm
-index b269f1610a55d31aa58beab694fa7cbb214b58d1..23a0d7892ed78a4dd358982a97816af4ab039e66 100644
+index b269f1610a55d31aa58beab694fa7cbb214b58d1..770f53f916d6d6fdf874c264f2e4934c38a889dc 100644
 --- a/chrome/browser/chrome_browser_main_mac.mm
 +++ b/chrome/browser/chrome_browser_main_mac.mm
 @@ -54,6 +54,9 @@
@@ -51,7 +111,7 @@ index b269f1610a55d31aa58beab694fa7cbb214b58d1..23a0d7892ed78a4dd358982a97816af4
    // Create the app delegate by requesting the shared AppController.
    CHECK_EQ(nil, NSApp.delegate);
    AppController* app_controller = AppController.sharedController;
-@@ -182,5 +189,13 @@
+@@ -182,5 +189,18 @@
  }
  
  void ChromeBrowserMainPartsMac::DidEndMainMessageLoop() {
@@ -64,4 +124,9 @@ index b269f1610a55d31aa58beab694fa7cbb214b58d1..23a0d7892ed78a4dd358982a97816af4
 +// static
 +void ChromeBrowserMainPartsMac::DisableAppControllerForEmbedder() {
 +  g_app_controller_disabled = true;
++}
++
++// static
++bool ChromeBrowserMainPartsMac::AppControllerOwnsAppDelegate() {
++  return !g_app_controller_disabled;
 +}
