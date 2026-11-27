@@ -38,7 +38,7 @@ final class RegionCapture {
                     view.finish()
                     return
                 }
-                let menu = CaptureActionMenu(result: result, model: model, pageID: page.id) {
+                let menu = CaptureActionMenu(result: result, model: model, source: url, pageID: page.id) {
                     [weak self, weak model, weak page] in
                     if let self, let model, let page { self.begin(on: page, in: model) }
                 } edit: { [weak view, weak model] in

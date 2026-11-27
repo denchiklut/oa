@@ -13,7 +13,7 @@ struct SidebarView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let recent = showingFlyout ? model.downloads.flyoutEntries : []
+        let recent = showingFlyout ? model.flyoutEntries : []
         let flyoutVisible = !recent.isEmpty
         VStack(spacing: 0) {
             VStack(spacing: 0) {

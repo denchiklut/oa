@@ -7,6 +7,8 @@ struct MediaItem: Identifiable, Hashable {
     let file: URL
     let date: Date
     let isMovie: Bool
+    var captureTitle: String?
+    var title: String { captureTitle ?? name }
     var id: URL { file }
     var name: String { file.lastPathComponent }
 
@@ -35,7 +37,15 @@ struct MediaItem: Identifiable, Hashable {
         }
     }
 
-    static func discover(files: [URL], screenshots: URL) -> [Self] {
+    static func canonicalFile(_ file: URL) -> URL {
+        file.absoluteURL.resolvingSymlinksInPath().standardizedFileURL
+    }
+
+    static func newestFirst(_ lhs: Self, _ rhs: Self) -> Bool {
+        lhs.date == rhs.date ? lhs.file.path < rhs.file.path : lhs.date > rhs.date
+    }
+
+    static func discover(files: [URL], screenshots: URL, saved: [MediaItem]) -> [Self] {
         let keys: Set<URLResourceKey> = [
             .isRegularFileKey, .creationDateKey, .contentModificationDateKey, .contentTypeKey,
         ]
@@ -48,15 +58,18 @@ struct MediaItem: Identifiable, Hashable {
             return ["cleanshot ", "screenshot ", "screen shot ", "screen recording "].contains(where: name.hasPrefix)
                 || getxattr(file.path, "com.apple.metadata:kMDItemIsScreenCapture", nil, 0, 0, 0) >= 0
         }
-        return Set((files + captures).map { $0.resolvingSymlinksInPath().standardizedFileURL }).compactMap { file in
-            guard let values = try? file.resourceValues(forKeys: keys), values.isRegularFile == true,
-                let type = values.contentType ?? UTType(filenameExtension: file.pathExtension),
-                type.conforms(to: .image) || type.conforms(to: .movie)
-            else { return nil }
-            return Self(
-                file: file, date: values.creationDate ?? values.contentModificationDate ?? .distantPast,
-                isMovie: type.conforms(to: .movie))
-        }.sorted { $0.date == $1.date ? $0.file.path < $1.file.path : $0.date > $1.date }
+        let library = Dictionary(uniqueKeysWithValues: saved.map { ($0.file, $0) })
+        return Set((files + captures + library.keys).map(canonicalFile))
+            .compactMap { file in
+                guard let values = try? file.resourceValues(forKeys: keys), values.isRegularFile == true,
+                    let type = values.contentType ?? UTType(filenameExtension: file.pathExtension),
+                    type.conforms(to: .image) || type.conforms(to: .movie)
+                else { return nil }
+                return library[file]
+                    ?? Self(
+                        file: file, date: values.creationDate ?? values.contentModificationDate ?? .distantPast,
+                        isMovie: type.conforms(to: .movie))
+            }.sorted(by: newestFirst)
     }
 }
 
@@ -67,19 +80,20 @@ struct MediaPage: View {
     @State private var search = ""
 
     private var files: [URL] {
-        model.captureLibrary.files
-            + model.downloads.entries.compactMap { $0.download.status == .finished ? $0.download.file : nil }
+        model.downloads.entries.compactMap { $0.download.status == .finished ? $0.download.file : nil }
     }
 
     private struct MediaSources: Equatable {
         let files: [URL]
+        let captures: [MediaItem]
         let refresh: Int
     }
 
     private var visible: [MediaItem] {
         items.filter {
             !model.captureLibrary.hidden.contains($0.file)
-                && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search))
+                && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)
+                    || $0.title.localizedCaseInsensitiveContains(search))
         }
     }
 
@@ -101,7 +115,9 @@ struct MediaPage: View {
                 }
             }
         }
-        .task(id: MediaSources(files: files, refresh: refresh)) { await load(files) }
+        .task(id: MediaSources(files: files, captures: model.captureLibrary.items, refresh: refresh)) {
+            await load(files)
+        }
         .task(id: MediaItem.screenshotDirectory) {
             for await _ in MediaItem.changes(in: MediaItem.screenshotDirectory) { refresh += 1 }
         }
@@ -113,8 +129,11 @@ struct MediaPage: View {
 
     private func load(_ files: [URL]) async {
         let directory = MediaItem.screenshotDirectory
-        let found = await Task.detached(priority: .utility) { MediaItem.discover(files: files, screenshots: directory) }
-            .value
+        let captures = model.captureLibrary.items
+        let found = await Task.detached(priority: .utility) {
+            MediaItem.discover(files: files, screenshots: directory, saved: captures)
+        }
+        .value
         if !Task.isCancelled { items = found }
     }
 }
@@ -123,28 +142,39 @@ private struct MediaTile: View {
     let item: MediaItem
     let revision: UUID?
     let open: () -> Void
-    @State private var image: NSImage?
     @State private var hovered = false
 
     var body: some View {
         Button(action: open) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10).fill(.primary.opacity(hovered ? 0.12 : 0.035))
-                if let image {
-                    Image(nsImage: image).resizable().scaledToFit()
-                        .padding(3).background(.white, in: RoundedRectangle(cornerRadius: 2))
-                        .shadow(color: .black.opacity(0.24), radius: 4, y: 2)
-                        .padding(10)
+                MediaThumbnail(file: item.file, revision: revision) { image in
+                    if let image {
+                        Image(nsImage: image).resizable().scaledToFit()
+                            .padding(3).background(.white, in: RoundedRectangle(cornerRadius: 2))
+                            .shadow(color: .black.opacity(0.24), radius: 4, y: 2)
+                            .padding(10)
+                    }
                 }
                 if item.isMovie {
                     Image(systemName: "play.fill").font(.system(size: 23)).foregroundStyle(.white).shadow(radius: 3)
                 }
             }.aspectRatio(1, contentMode: .fit).contentShape(Rectangle())
         }
-        .buttonStyle(.plain).help(item.name).accessibilityLabel(item.name).onHover { hovered = $0 }
-        .task(id: revision) {
+        .buttonStyle(.plain).help(item.title).accessibilityLabel(item.title).onHover { hovered = $0 }
+    }
+}
+
+struct MediaThumbnail<Content: View>: View {
+    let file: URL
+    let revision: UUID?
+    @ViewBuilder let content: (NSImage?) -> Content
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack { content(image) }.task(id: revision) {
             let request = QLThumbnailGenerator.Request(
-                fileAt: item.file, size: CGSize(width: 160, height: 160), scale: 2, representationTypes: .thumbnail)
+                fileAt: file, size: CGSize(width: 160, height: 160), scale: 2, representationTypes: .thumbnail)
             let thumbnail = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).nsImage
             if !Task.isCancelled { image = thumbnail }
         }
@@ -181,18 +211,11 @@ struct MediaPreview: View {
     let item: MediaItem
 
     var body: some View {
-        FilePreviewCard(file: item.file, close: model.closeFilePreview) {
+        FilePreviewCard(file: item.file, captureTitle: item.captureTitle, close: model.closeFilePreview) {
             HStack(spacing: 12) {
                 Button(action: model.closeFilePreview) { Image(systemName: "xmark") }.accessibilityLabel("Close")
-                ForEach([-1, 1], id: \.self) { offset in
-                    let next = model.adjacentMedia(offset)
-                    Button {
-                        model.previewedMedia = next
-                    } label: {
-                        Image(systemName: offset < 0 ? "chevron.left" : "chevron.right")
-                    }.disabled(next == nil).accessibilityLabel(offset < 0 ? "Previous" : "Next")
-                }
-                Text(item.name).lineLimit(1).truncationMode(.middle).fontWeight(.semibold)
+                FilePreviewNavigation(model: model)
+                Text(item.title).lineLimit(1).truncationMode(.middle).fontWeight(.semibold)
                 Text(DownloadText.age(item.date)).lineLimit(1).foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 Menu {

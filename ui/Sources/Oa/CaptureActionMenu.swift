@@ -25,6 +25,7 @@ final class CapturedRegion {
 struct CaptureActionMenu: View {
     let result: CapturedRegion
     let model: WindowModel
+    let source: URL?
     let pageID: UUID
     let retake: () -> Void
     let edit: () -> Void
@@ -109,7 +110,7 @@ struct CaptureActionMenu: View {
                     try model.captureLibrary.remove(file)
                     result.savedFile = nil
                 } else {
-                    result.savedFile = try model.captureLibrary.save(result.png())
+                    result.savedFile = try model.captureLibrary.save(result.png(), from: source)
                 }
             case .copy: model.copyCapture(try result.png(), for: pageID)
             case .save:
