@@ -145,6 +145,7 @@ struct BrowserWindowView: View {
         )
         .environment(\.windowColorScheme, colorScheme)
         .environment(\.sidebarDrag, sidebarDrag)
+        .environment(\.oaToolTipPalette, .space(theme.semanticColorPalette[colorScheme]))
         .environment(\.oaToolTipController, layout.toolTipController)
         .ignoresSafeArea()
         .animation(WindowLayoutController.lockAnimation, value: locked)

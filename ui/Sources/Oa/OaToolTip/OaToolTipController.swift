@@ -15,6 +15,7 @@ final class OaToolTipController {
     private struct Entry {
         let id: UUID
         var configuration: OaToolTipConfiguration
+        var palette: OaToolTipPalette
         let order: UInt64
     }
 
@@ -28,15 +29,15 @@ final class OaToolTipController {
     private var lastPointerLocation = NSEvent.mouseLocation
     private var panel: NSWindow?
 
-    func register(_ id: UUID, configuration: OaToolTipConfiguration) {
+    func register(_ id: UUID, configuration: OaToolTipConfiguration, palette: OaToolTipPalette) {
         if let index = entries.firstIndex(where: { $0.id == id }) {
-            let changed = entries[index].configuration != configuration
+            guard entries[index].configuration != configuration || entries[index].palette != palette else { return }
             entries[index].configuration = configuration
-            guard changed else { return }
+            entries[index].palette = palette
             if presentedID == id { dismiss() }
         } else {
             nextOrder += 1
-            entries.append(Entry(id: id, configuration: configuration, order: nextOrder))
+            entries.append(Entry(id: id, configuration: configuration, palette: palette, order: nextOrder))
         }
         lastPointerLocation = NSEvent.mouseLocation
         if presentedID != activeEntry?.id { hidePanel() }
@@ -105,18 +106,18 @@ final class OaToolTipController {
             lastPointerLocation = pointer
             return reschedule()
         }
-        show(entry.configuration, for: targetID, at: pointer, over: parent)
+        show(entry, at: pointer, over: parent)
     }
 
-    private func show(_ configuration: OaToolTipConfiguration, for id: UUID, at pointer: NSPoint, over parent: NSWindow)
-    {
+    private func show(_ entry: Entry, at pointer: NSPoint, over parent: NSWindow) {
         let panel = self.panel ?? makePanel()
         self.panel = panel
         panel.appearance = parent.effectiveAppearance
 
         let insets = OaToolTipView.shadowInsets
         let hosting = NSHostingController(
-            rootView: OaToolTipView(configuration: configuration, pinchedCorner: .topLeading))
+            rootView: OaToolTipView(
+                configuration: entry.configuration, pinchedCorner: .topLeading, palette: entry.palette))
         let maxProposal = CGSize(
             width: OaToolTipView.maxWidth + insets.left + insets.right,
             height: CGFloat.greatestFiniteMagnitude
@@ -130,7 +131,8 @@ final class OaToolTipController {
         let screenFrame = (parent.screen ?? NSScreen.main)?.visibleFrame ?? parent.frame
         let placement = place(bubbleSize: bubbleSize, pointer: pointer, in: screenFrame)
         if placement.corner != .topLeading {
-            hosting.rootView = OaToolTipView(configuration: configuration, pinchedCorner: placement.corner)
+            hosting.rootView = OaToolTipView(
+                configuration: entry.configuration, pinchedCorner: placement.corner, palette: entry.palette)
         }
 
         let windowOrigin = NSPoint(
@@ -147,7 +149,7 @@ final class OaToolTipController {
         } else {
             panel.orderFront(nil)
         }
-        presentedID = id
+        presentedID = entry.id
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Self.fadeInDuration
