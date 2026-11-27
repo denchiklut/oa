@@ -144,7 +144,7 @@ struct SplitViewCellView: View {
         .onHover { hovering = $0 }
         .sidebarDragFrame { drag?.rows[splitID] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) }
         .onDisappear { drag?.rows[splitID] = nil }
-        .spaceMenuExclusion()
+        .sidebarMenuExclusion()
         .contextMenu {
             Button("Share Split View…") {}.disabled(true)
             Divider()

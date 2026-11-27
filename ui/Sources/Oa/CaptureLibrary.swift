@@ -10,6 +10,7 @@ final class CaptureLibrary {
     private struct Metadata: Codable {
         let date: Date
         let address: String?
+        let sourceURL: URL?
     }
 
     private(set) var revisions: [URL: UUID] = [:]
@@ -41,8 +42,8 @@ final class CaptureLibrary {
                 try? JSONDecoder().decode(Metadata.self, from: $0)
             }
             return MediaItem(
-                file: file, date: metadata?.date ?? values.creationDate ?? .distantPast, isMovie: false,
-                captureTitle: metadata?.address ?? file.lastPathComponent)
+                file: file, date: metadata?.date ?? values.creationDate ?? .distantPast, kind: .image,
+                captureTitle: metadata?.address ?? file.lastPathComponent, sourceURL: metadata?.sourceURL)
         }.sorted(by: MediaItem.newestFirst)
     }
 
@@ -56,9 +57,11 @@ final class CaptureLibrary {
         var components = source.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: true) }
         components?.user = nil
         components?.password = nil
-        let address = components?.url.map { CommandBarRanking.readable($0) }
+        let sourceURL = components?.url
+        let address = sourceURL.map { CommandBarRanking.readable($0) }
         let metadataFile = file.appendingPathExtension("json")
-        try JSONEncoder().encode(Metadata(date: date, address: address)).write(to: metadataFile, options: .atomic)
+        try JSONEncoder().encode(Metadata(date: date, address: address, sourceURL: sourceURL)).write(
+            to: metadataFile, options: .atomic)
         do {
             try png.write(to: file, options: .atomic)
         } catch {
@@ -66,7 +69,9 @@ final class CaptureLibrary {
             throw error
         }
         items.insert(
-            MediaItem(file: file, date: date, isMovie: false, captureTitle: address ?? file.lastPathComponent), at: 0)
+            MediaItem(
+                file: file, date: date, kind: .image, captureTitle: address ?? file.lastPathComponent,
+                sourceURL: sourceURL), at: 0)
         return file
     }
 

@@ -34,6 +34,7 @@ struct SidebarView: View {
             .overlay(alignment: .bottom) {
                 if flyoutVisible {
                     DownloadsFlyout(model: model, entries: recent)
+                        .sidebarMenuExclusion(includingItemMenus: true)
                         .onGeometryChange(for: CGFloat.self) {
                             $0.size.height
                         } action: {
@@ -59,6 +60,10 @@ struct SidebarView: View {
                 try? await Task.sleep(for: .milliseconds(300))
                 if !Task.isCancelled { showingFlyout = false }
             }
+        }
+        .task(id: showingFlyout ? model.home.flyoutSources : []) {
+            guard showingFlyout else { return }
+            await model.refreshFlyoutFiles()
         }
         // The sidebar stays mounted under the Library, where the pointer's leaving isn't reported.
         .onChange(of: model.library == nil) {

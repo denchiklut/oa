@@ -33,6 +33,43 @@ enum LibraryFile: Identifiable {
     }
 }
 
+struct FlyoutDirectory: Sendable {
+    let url: URL
+    var files: FlyoutSource?
+    let screenshotFolder: Bool
+    var includeScreenshots = false
+
+    static func selected(
+        _ sources: Set<FlyoutSource>, documents: URL = .documentsDirectory,
+        desktop: URL = .desktopDirectory, screenshots: URL = MediaItem.screenshotDirectory
+    ) -> [Self] {
+        let screenshots = MediaItem.canonicalFile(screenshots)
+        var directories: [URL: Self] = [:]
+        for (source, folder) in [(FlyoutSource.documents, documents), (.desktop, desktop), (.screenshots, screenshots)]
+        where sources.contains(source) {
+            let url = MediaItem.canonicalFile(folder)
+            var entry = directories[url] ?? Self(url: url, screenshotFolder: url == screenshots)
+            if source == .screenshots { entry.includeScreenshots = true } else { entry.files = source }
+            directories[url] = entry
+        }
+        return Array(directories.values)
+    }
+
+    @concurrent func read() async -> [FlyoutSource: [MediaItem]] {
+        var found: [FlyoutSource: [MediaItem]] = [:]
+        for file in MediaItem.contents(of: url) {
+            if Task.isCancelled { break }
+            guard let item = MediaItem.localFile(file) else { continue }
+            if screenshotFolder && item.kind != .file && MediaItem.isScreenshot(file) {
+                if includeScreenshots { found[.screenshots, default: []].append(item) }
+            } else if let files {
+                found[files, default: []].append(item)
+            }
+        }
+        return found.mapValues { $0.sorted(by: MediaItem.newestFirst) }
+    }
+}
+
 struct DownloadsFlyout: View {
     let model: WindowModel
     let entries: [LibraryFile]
@@ -42,7 +79,7 @@ struct DownloadsFlyout: View {
             ForEach(entries.reversed()) { file in
                 switch file {
                 case .download(let entry): FlyoutRow(model: model, entry: entry)
-                case .media(let item): CaptureFlyoutRow(model: model, item: item)
+                case .media(let item): MediaFlyoutRow(model: model, item: item)
                 }
             }
         }
@@ -52,7 +89,7 @@ struct DownloadsFlyout: View {
     }
 }
 
-private struct CaptureFlyoutRow: View {
+private struct MediaFlyoutRow: View {
     let model: WindowModel
     let item: MediaItem
     @Environment(\.theme) private var theme
@@ -80,7 +117,7 @@ private struct CaptureFlyoutRow: View {
         }
         .buttonStyle(.plain).onHover { hovering = $0 }
         .onDrag { NSItemProvider(contentsOf: item.file) ?? NSItemProvider() }
-        .contextMenu { MediaActions(model: model, item: item) }
+        .contextMenu { MediaActions(model: model, item: item, inFlyout: true) }
     }
 }
 
