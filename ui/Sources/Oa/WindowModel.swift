@@ -2024,6 +2024,15 @@ final class WindowModel {
         showFilePreview(file)
     }
 
+    func hideDownload(_ entry: DownloadsStore.Entry) {
+        do {
+            if entry.download.status == .finished, let file = entry.download.file, entry.fileExists {
+                try captureLibrary.hide(file)
+            }
+            downloads.removeFromHistory(entry)
+        } catch { window?.presentError(error) }
+    }
+
     func activate(_ entry: DownloadsStore.Entry) {
         if entry.isRunning {
             downloads.toggleOpenWhenFinished(entry)
