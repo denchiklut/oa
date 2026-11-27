@@ -127,12 +127,14 @@ struct PinnedExtensionButton: View {
     let action: ExtensionAction
     let size: CGSize
     let cornerRadius: CGFloat
+    var selectTab: (() -> Void)? = nil
     @State private var hovering = false
     @Environment(\.theme) private var theme
 
     var body: some View {
         let ink: Color = theme.isDark ? .white : .black
         Button {
+            selectTab?()
             model.runExtension(action.id)
         } label: {
             ExtensionActionIcon(action: action)
@@ -146,7 +148,12 @@ struct PinnedExtensionButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.14), value: hovering)
-        .overlay { SecondaryClick { model.showExtensionMenu(for: action.id) } }
+        .overlay {
+            SecondaryClick {
+                selectTab?()
+                model.showExtensionMenu(for: action.id)
+            }
+        }
         .oaToolTip(action.tooltip.isEmpty ? action.name : action.tooltip)
         .accessibilityLabel(action.name)
     }
