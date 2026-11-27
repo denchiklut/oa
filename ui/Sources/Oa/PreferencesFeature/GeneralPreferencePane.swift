@@ -43,7 +43,7 @@ struct GeneralPreferencePane: View {
                         Button("Previews Settings…") {}
                             .disabled(true)
                     }
-                    .help("Favorites previews are unavailable in this build of Oa.")
+                    .oaToolTip("Favorites previews are unavailable in this build of Oa.")
                     PreferenceRowDivider()
                     PreferenceRow(height: 48) {
                         Text("Manage your default search engine, Auto-Archive, and downloads in Profile Settings.")

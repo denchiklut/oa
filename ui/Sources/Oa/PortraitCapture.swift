@@ -242,7 +242,7 @@ private struct PortraitCaptureEditor: View {
                         .background(.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
                 }
                 .buttonStyle(.plain)
-                .help(settings.hidesWatermark ? "Show watermark" : "Hide watermark")
+                .oaToolTip(settings.hidesWatermark ? "Show watermark" : "Hide watermark")
                 .accessibilityLabel("Watermark")
                 .accessibilityValue(settings.hidesWatermark ? "Off" : "On")
                 .padding(4)
@@ -304,7 +304,7 @@ private struct PortraitCaptureEditor: View {
             label().frame(width: 16, height: 16).clipShape(Circle())
                 .overlay { if selected { Circle().strokeBorder(.white, lineWidth: 2) } }
         }
-        .buttonStyle(.plain).accessibilityLabel(title).help(title)
+        .buttonStyle(.plain).accessibilityLabel(title).oaToolTip(title)
     }
 }
 

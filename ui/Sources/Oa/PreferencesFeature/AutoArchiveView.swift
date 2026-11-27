@@ -32,7 +32,7 @@ struct AutoArchiveView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("Learn more about auto-archiving")
+                .oaToolTip("Learn more about auto-archiving")
             }
         } control: {
             Picker("Archive tabs after", selection: $threshold) {

@@ -105,7 +105,7 @@ struct DownloadPreviewView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Button(action: model.closeFilePreview) { Image(systemName: "xmark") }
-                .help("Close")
+                .oaToolTip("Close")
             FilePreviewNavigation(model: model)
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name)

@@ -60,7 +60,7 @@ struct SpaceManagementCardHeader: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Edit Space theme")
+        .oaToolTip("Edit Space theme")
         .accessibilityLabel("Edit Space theme")
     }
 
@@ -85,7 +85,7 @@ struct SpaceManagementCardHeader: View {
         .buttonStyle(.plain)
         .focused($isIconFocused)
         .onHover { isIconHovered = $0 }
-        .help("Edit Space icon")
+        .oaToolTip("Edit Space icon")
         .accessibilityLabel("Edit Space icon")
         .popover(isPresented: $isPickingIcon, arrowEdge: .bottom) {
             SpaceIconPicker(selection: space.icon) { icon in
@@ -119,7 +119,7 @@ struct SpaceManagementCardHeader: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Rename Space")
+            .oaToolTip("Rename Space")
         }
     }
 
@@ -160,7 +160,7 @@ struct SpaceManagementCardHeader: View {
             reduceMotion ? nil : .interpolatingSpring(mass: 0.25, stiffness: 75, damping: 35, initialVelocity: 30),
             value: isProfileHovered
         )
-        .help("Change Profile")
+        .oaToolTip("Change Profile")
     }
 }
 
@@ -280,7 +280,7 @@ struct SpaceIconPicker: View {
                     Image(systemName: "trash")
                 }
                 .disabled(selection == nil)
-                .help("Remove Space icon")
+                .oaToolTip("Remove Space icon")
                 .accessibilityLabel("Remove Space icon")
             }
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(28), spacing: 4), count: 7), spacing: 4) {

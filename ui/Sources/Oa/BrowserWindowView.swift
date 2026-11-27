@@ -33,6 +33,7 @@ struct BrowserWindowView: View {
                     background: background, next: next, windowSize: layout.size, isFloating: !locked, isPanel: floats
                 ) {
                     SidebarView(model: model, layout: layout)
+                        .environment(\.sidebarToolTips, true)
                         .environment(\.colorScheme, appearance.colorScheme)
                 }
                 .modifier(SidebarHomeTransition(progress: floats ? 0 : min(progress, 1)))
@@ -41,18 +42,12 @@ struct BrowserWindowView: View {
                 .zIndex(floats ? 3 : 0)
             }
             if progress > 0 {
-                let libraryAppearance = layout.libraryTheme.background[colorScheme].contentOverBackgroundAppearance
                 LibraryView(
                     model: model, layout: layout, section: section, width: libraryWidth, progress: progress,
                     pageInset: lead
                 )
-                .environment(\.colorScheme, libraryAppearance.colorScheme)
-                .environment(
-                    \.theme,
-                    Theme(
-                        palette: layout.libraryTheme.semanticColorPalette[libraryAppearance.colorScheme],
-                        appearance: libraryAppearance)
-                )
+                .environment(\.sidebarToolTips, true)
+                .environment(\.colorScheme, appearance.colorScheme)
                 .offset(x: -libraryWidth * (1 - progress))
                 .allowsHitTesting(model.library != nil)
                 .zIndex(1)
@@ -146,7 +141,6 @@ struct BrowserWindowView: View {
         .environment(\.windowColorScheme, colorScheme)
         .environment(\.sidebarDrag, sidebarDrag)
         .environment(\.oaToolTipPalette, .space(theme.semanticColorPalette[colorScheme]))
-        .environment(\.oaToolTipController, layout.toolTipController)
         .ignoresSafeArea()
         .animation(WindowLayoutController.lockAnimation, value: locked)
     }

@@ -304,7 +304,7 @@ private struct SpaceManagementCollectionViewItem: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(SpaceManagementControlStyle())
-            .help("More options")
+            .oaToolTip("More options")
             .accessibilityLabel("More options")
         }
         // As measured on Arc over three themes.
@@ -332,7 +332,7 @@ private struct SpaceManagementDraggerView: View {
                 isHovered = inside
                 if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
             }
-            .help("Drag to Reorder Space")
+            .oaToolTip("Drag to Reorder Space")
             .accessibilityLabel("Drag to Reorder Space")
     }
 }
@@ -371,7 +371,7 @@ private struct SpaceManagementAddSpaceView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("New Space")
+        .oaToolTip("New Space")
         .accessibilityLabel("New Space")
         .onHover { isActivated = $0 }
     }

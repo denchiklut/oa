@@ -164,7 +164,7 @@ private struct ModalButton: View {
         .offset(y: hovering ? -1 : 0)
         .animation(.spring(response: 0.15, dampingFraction: 0.95), value: hovering)
         .onHover { hovering = $0 }
-        .help(help)
+        .oaToolTip(help)
     }
 }
 

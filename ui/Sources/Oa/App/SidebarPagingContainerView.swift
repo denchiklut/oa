@@ -246,7 +246,7 @@ private struct SidebarSpacePage: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Scroll to Bottom")
-                    .help("Scroll to Bottom")
+                    .oaToolTip("Scroll to Bottom")
                     .padding(.bottom, 8)
                 }
             }
@@ -326,7 +326,7 @@ private struct SpaceNameRow: View {
                         .foregroundStyle(theme.tertiaryText)
                 }
                 .buttonStyle(CellButtonStyle())
-                .help("More")
+                .oaToolTip("More")
             }
         }
         .padding(.leading, showsChevron || space.icon != nil ? 5 : 8)
@@ -461,7 +461,7 @@ private struct MoveToMainWindowButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("Move to main window")
+        .oaToolTip("Move to main window")
     }
 }
 

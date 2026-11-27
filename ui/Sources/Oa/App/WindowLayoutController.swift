@@ -91,11 +91,11 @@ final class WindowLayoutController: NSViewController {
         sidebarPresentation = model.sidebarMode == .anchored ? .locked : .hidden
         super.init(nibName: nil, bundle: nil)
         hover.needsUpdate = { [weak self] in self?.updatePresentation() }
-        toolTipController.canPresent = { [weak self] in
+        toolTipController.canPresent = { [weak self] inSidebar in
             guard let self else { return false }
             let transitioningLibrary = libraryProgress > 0 && libraryProgress < 1
             return !isPaging && !transitioningLibrary && spaceCreationFade == nil && resizingWidth == nil
-                && (sidebarPresentation != .hidden || libraryProgress >= 1) && holds.isEmpty
+                && (!inSidebar || ((sidebarPresentation != .hidden || libraryProgress >= 1) && holds.isEmpty))
                 && model.commandBar == nil && model.dialog == nil && model.extensionRequest == nil
         }
         pager.windowProvider = { [weak self] in self?.viewIfLoaded?.window }
@@ -265,10 +265,6 @@ final class WindowLayoutController: NSViewController {
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
     var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
 
-    /// Oa's own, by the author's decision, after open-arch: the Library is in the first Space's theme, blended in
-    /// with the Library's progress. Arc's is the window's Space's.
-    var libraryTheme: WindowTheme { model.spaces.first.map(model.theme(of:)) ?? .default }
-
     private var spaceTheme: WindowTheme { model.space.map(model.theme(of:)) ?? .default }
 
     /// As Arc: the Create a Space panel shows the theme chosen for it, else the default.
@@ -322,13 +318,8 @@ final class WindowLayoutController: NSViewController {
 
     var backgroundThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {
         if let fade = spaceCreationFade { return (fade.themes.from, (fade.themes.to, fade.theme)) }
-        let spaces = model.spaces
-        guard restingSpaceID != nil, !spaces.isEmpty else { return (spaceTheme, nil) }
-        let progress = min(libraryProgress, 1)
-        guard progress > 0 else { return spaceThemes }
-        let beside = spaces[min(leadingSpace, spaces.count - 1)]
-        if progress == 1 || beside.id == spaces[0].id { return (libraryTheme, nil) }
-        return (model.theme(of: beside), (libraryTheme, progress))
+        if libraryProgress > 0 { return (spaceTheme, nil) }
+        return spaceThemes
     }
 
     private var spaceThemes: (base: WindowTheme, blend: (theme: WindowTheme, progress: CGFloat)?) {

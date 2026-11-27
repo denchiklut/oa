@@ -26,7 +26,7 @@ final class PictureInPictureWindow {
     private let content: PictureInPictureContentView
     private var videoView: NSView?
 
-    init(onBackToTab: @escaping () -> Void, onClose: @escaping () -> Void) {
+    init(sourceWindow: @escaping () -> NSWindow?, onBackToTab: @escaping () -> Void, onClose: @escaping () -> Void) {
         panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: Self.minimumSize), styleMask: [.nonactivatingPanel, .resizable],
             backing: .buffered, defer: false)
@@ -40,7 +40,7 @@ final class PictureInPictureWindow {
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.acceptsMouseMovedEvents = true
-        content = PictureInPictureContentView(onBackToTab: onBackToTab, onClose: onClose)
+        content = PictureInPictureContentView(sourceWindow: sourceWindow, onBackToTab: onBackToTab, onClose: onClose)
         panel.contentView = content
     }
 
@@ -61,6 +61,7 @@ final class PictureInPictureWindow {
         if let data = try? JSONEncoder().encode(WindowPosition.absolute(panel.frame)) {
             UserDefaults.standard.set(String(decoding: data, as: UTF8.self), forKey: Self.positionKey)
         }
+        content.dismissToolTip()
         panel.orderOut(nil)
         videoView?.removeFromSuperview()
         videoView = nil
@@ -97,15 +98,19 @@ final class PictureInPictureWindow {
 /// playback controls aren't here yet.
 private final class PictureInPictureContentView: NSView {
     private let backToTab = PictureInPictureContentView.button(
-        symbol: "arrow.up.left", label: "Back to Tab", hasToolTip: true)
-    private let close = PictureInPictureContentView.button(symbol: "xmark", label: "Close", hasToolTip: false)
+        symbol: "arrow.up.left", label: "Back to Tab")
+    private let close = PictureInPictureContentView.button(symbol: "xmark", label: "Close")
+    private let sourceWindow: () -> NSWindow?
+    private var toolTipController: OaToolTipController?
+    private let toolTipID = UUID()
     private let scrim = NSView()
     private var controls: [NSView] { [scrim, backToTab, close] }
     private let onBackToTab: () -> Void
     private let onClose: () -> Void
     private var hidesControls: Task<Void, Never>?
 
-    init(onBackToTab: @escaping () -> Void, onClose: @escaping () -> Void) {
+    init(sourceWindow: @escaping () -> NSWindow?, onBackToTab: @escaping () -> Void, onClose: @escaping () -> Void) {
+        self.sourceWindow = sourceWindow
         self.onBackToTab = onBackToTab
         self.onClose = onClose
         super.init(frame: .zero)
@@ -113,6 +118,7 @@ private final class PictureInPictureContentView: NSView {
         layer?.cornerRadius = 6
         layer?.masksToBounds = true
         layer?.backgroundColor = NSColor.black.cgColor
+        backToTab.setAccessibilityHelp("Back to Tab")
         backToTab.target = self
         backToTab.action = #selector(pressBackToTab)
         close.target = self
@@ -159,9 +165,29 @@ private final class PictureInPictureContentView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
-    override func mouseEntered(with event: NSEvent) { revealControls() }
+    override func mouseEntered(with event: NSEvent) {
+        revealControls()
+        updateToolTip(event)
+    }
+    override func mouseExited(with event: NSEvent) { dismissToolTip() }
     override func mouseMoved(with event: NSEvent) {
         if hypot(event.deltaX, event.deltaY) >= 3 { revealControls() }
+        updateToolTip(event)
+    }
+
+    private func updateToolTip(_ event: NSEvent) {
+        guard let window, !backToTab.isHidden, backToTab.frame.contains(convert(event.locationInWindow, from: nil))
+        else { return dismissToolTip() }
+        let host = OaToolTipController.host(for: window)
+        toolTipController = host
+        host.register(
+            toolTipID, configuration: .init(title: "Back to Tab"),
+            palette: .forWindow(sourceWindow() ?? window))
+    }
+
+    func dismissToolTip() {
+        toolTipController?.unregister(toolTipID)
+        toolTipController = nil
     }
 
     private func revealControls() {
@@ -177,6 +203,7 @@ private final class PictureInPictureContentView: NSView {
     }
 
     private func fadeControls() {
+        dismissToolTip()
         let controls = controls
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.12
@@ -190,7 +217,7 @@ private final class PictureInPictureContentView: NSView {
     @objc private func pressClose() { onClose() }
 
     /// Arc's buttons carry no accessibility labels; Oa's do.
-    private static func button(symbol: String, label: String, hasToolTip: Bool) -> NSButton {
+    private static func button(symbol: String, label: String) -> NSButton {
         let configuration = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
             .withSymbolConfiguration(configuration)
@@ -199,7 +226,6 @@ private final class PictureInPictureContentView: NSView {
         button.imagePosition = .imageLeading
         button.font = .systemFont(ofSize: 13, weight: .semibold)
         button.contentTintColor = .white
-        button.toolTip = hasToolTip ? label : nil
         button.setAccessibilityLabel(label)
         button.wantsLayer = true
         button.layer?.cornerRadius = 8

@@ -153,7 +153,7 @@ private struct SettingsSection: View {
                     offersReload = true
                 }
                 .disabled(!blocker.isEnabled)
-                .help(
+                .oaToolTip(
                     !blocker.isEnabled
                         ? "The built-in ad blocker is off. You can change this in Settings."
                         : on
@@ -236,7 +236,7 @@ private struct ExtensionTile<Label: View>: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .overlay { if let menu { SecondaryClick(action: menu) } }
-        .help(help)
+        .oaToolTip(help)
     }
 }
 
@@ -254,7 +254,7 @@ private struct PinBadge: View {
                 .background(Color.accentColor.opacity(pinned ? 1 : 0.4), in: Circle())
         }
         .buttonStyle(.plain)
-        .help(pinned ? "Unpin" : "Pin")
+        .oaToolTip(pinned ? "Unpin" : "Pin")
     }
 }
 

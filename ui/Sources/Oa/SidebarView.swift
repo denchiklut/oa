@@ -265,7 +265,7 @@ private struct SidebarDockItem: View {
                     content(icon: space.icon, tint: tint(space))
                 }
                 .buttonStyle(PressStyle())
-                .help(space.name)
+                .oaToolTip(space.name)
                 .accessibilityLabel(space.name)
                 .spaceContextMenu(isEnabled: !model.coversWindow) {
                     SpaceMenu(model: model, layout: layout, space: space)
@@ -410,7 +410,7 @@ private struct PinnedExtensionTile: View {
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
         .overlay { SecondaryClick { model.showExtensionMenu(for: action.id) } }
-        .help(action.tooltip.isEmpty ? action.name : action.tooltip)
+        .oaToolTip(action.tooltip.isEmpty ? action.name : action.tooltip)
         .accessibilityLabel(action.name)
     }
 }
@@ -769,7 +769,7 @@ private struct RecordingDot: View {
             .fill(Color.red)
             .overlay(Circle().strokeBorder(.white.opacity(0.85), lineWidth: 1.5))
             .frame(width: 8, height: 8)
-            .help("This tab is using your camera or microphone")
+            .oaToolTip("This tab is using your camera or microphone", priority: 1)
     }
 }
 

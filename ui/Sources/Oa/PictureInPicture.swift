@@ -26,6 +26,10 @@ final class PictureInPicture {
     private var shownPageID: UUID?
     private var changedPages: [UUID: any Page] = [:]
     private lazy var window = PictureInPictureWindow(
+        sourceWindow: { [weak self] in
+            guard let self, let shownPageID else { return nil }
+            return store.windows.first { $0.page(id: shownPageID) != nil }?.window
+        },
         onBackToTab: { [weak self] in self?.backToTab() }, onClose: { [weak self] in self?.close() })
 
     init(store: SidebarStore) {

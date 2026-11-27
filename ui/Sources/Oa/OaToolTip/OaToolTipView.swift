@@ -44,7 +44,7 @@ struct OaToolTipView: View {
         .background {
             shape
                 .fill(palette.background)
-                .shadow(color: Color(.sRGB, red: 0.443, green: 0.329, blue: 0.165, opacity: 0.15), radius: 14, y: 8)
+                .shadow(color: .black.opacity(0.15), radius: 14, y: 8)
                 .shadow(color: Color(white: 0.18, opacity: 0.15), radius: 4, y: 2)
         }
         .padding(.top, Self.shadowInsets.top)
@@ -82,33 +82,61 @@ struct OaToolTipView: View {
 
 private struct OaToolTipModifier: ViewModifier {
     let configuration: OaToolTipConfiguration?
-    @Environment(\.oaToolTipController) private var controller
-    @Environment(\.oaToolTipPalette) private var palette
-    @State private var id = UUID()
     @State private var hovered = false
 
     func body(content: Content) -> some View {
         content
-            .onHover { inside in
-                hovered = inside
-                sync()
-            }
-            .onChange(of: configuration) { _, _ in
-                sync()
-            }
-            .onChange(of: palette) { sync() }
-            .onDisappear {
-                hovered = false
-                controller?.unregister(id)
+            .accessibilityHint(configuration?.title ?? "")
+            .onHover { hovered = $0 }
+            .background {
+                if hovered, let configuration, !configuration.title.isEmpty {
+                    OaToolTipAnchor(configuration: configuration).allowsHitTesting(false).accessibilityHidden(true)
+                }
             }
     }
+}
 
-    private func sync() {
-        guard let controller else { return }
-        if hovered, let configuration {
-            controller.register(id, configuration: configuration, palette: palette)
-        } else {
-            controller.unregister(id)
+// AppKit popovers and preview panels can host the same controls in a different window.
+private struct OaToolTipAnchor: NSViewRepresentable {
+    let configuration: OaToolTipConfiguration
+    @Environment(\.oaToolTipPalette) private var palette
+    @Environment(\.sidebarToolTips) private var inSidebar
+
+    func makeNSView(context: Context) -> Anchor { Anchor() }
+
+    func updateNSView(_ view: Anchor, context: Context) {
+        view.configuration = configuration
+        view.palette = palette
+        view.inSidebar = inSidebar
+        view.update()
+    }
+
+    final class Anchor: NSView {
+        let id = UUID()
+        var configuration: OaToolTipConfiguration?
+        var palette: OaToolTipPalette?
+        var inSidebar = false
+        private var host: OaToolTipController?
+
+        override func viewWillMove(toWindow newWindow: NSWindow?) {
+            if newWindow !== window {
+                host?.unregister(id)
+                host = nil
+            }
+            super.viewWillMove(toWindow: newWindow)
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            update()
+        }
+
+        func update() {
+            guard let window, let configuration else { return }
+            let controller = OaToolTipController.host(for: window)
+            host = controller
+            controller.register(
+                id, configuration: configuration, palette: palette ?? .forWindow(window), inSidebar: inSidebar)
         }
     }
 }
@@ -129,6 +157,6 @@ extension View {
 }
 
 extension EnvironmentValues {
-    @Entry var oaToolTipPalette = OaToolTipPalette.space(WindowTheme.default.semanticColorPalette[.light])
-    @Entry var oaToolTipController: OaToolTipController?
+    @Entry var oaToolTipPalette: OaToolTipPalette?
+    @Entry var sidebarToolTips = false
 }

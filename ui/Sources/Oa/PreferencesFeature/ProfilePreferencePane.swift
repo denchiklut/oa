@@ -186,7 +186,7 @@ struct EditProfilesFooterView: View {
             Button(action: delete) { Image(systemName: "minus").padding(8).contentShape(Rectangle()) }
                 .disabled(inUse || selectedProfile == SidebarProfile.defaultID)
                 // As Arc's: on a disabled button the text is never drawn and reaches only accessibility.
-                .help(
+                .accessibilityHint(
                     selectedProfile == SidebarProfile.defaultID
                         ? "The Default Profile cannot be deleted."
                         : inUse ? "Only Profiles not assigned to any Spaces can be deleted." : "")

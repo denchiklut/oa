@@ -153,6 +153,6 @@ struct DeveloperToolbar<Trailing: View>: View {
             }
         }
         .accessibilityLabel(title)
-        .help(title)
+        .oaToolTip(title)
     }
 }

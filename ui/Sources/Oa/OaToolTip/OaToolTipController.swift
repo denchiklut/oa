@@ -1,11 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Per-window tooltip controller, owned by `WindowLayoutController`. Tracks hovered targets in priority order, waits
-/// for the pointer to sit idle for the target's delay, presents a borderless child window above the browser window,
-/// and dismisses immediately on any cursor movement or layout transition.
 @MainActor
 final class OaToolTipController {
+    private static let auxiliaryHosts = NSMapTable<NSWindow, OaToolTipController>.weakToWeakObjects()
     private static let fadeInDuration: TimeInterval = 0.05
     private static let cursorOffset = CGPoint(x: 8, y: 16)
     private static let screenMargin: CGFloat = 8
@@ -16,11 +14,49 @@ final class OaToolTipController {
         let id: UUID
         var configuration: OaToolTipConfiguration
         var palette: OaToolTipPalette
+        var inSidebar: Bool
         let order: UInt64
     }
 
     weak var window: NSWindow?
-    var canPresent: () -> Bool = { true }
+    var canPresent: (Bool) -> Bool = { _ in true }
+    private var monitor: Any?
+
+    static func host(for window: NSWindow) -> OaToolTipController {
+        if let layout = window.contentViewController as? WindowLayoutController { return layout.toolTipController }
+        if let host = auxiliaryHosts.object(forKey: window) { return host }
+        let host = OaToolTipController()
+        host.window = window
+        auxiliaryHosts.setObject(host, forKey: window)
+        host.observeAuxiliaryWindow(window)
+        return host
+    }
+
+    // Popovers and floating panels have their own event window, outside the browser layout controller.
+    private func observeAuxiliaryWindow(_ window: NSWindow) {
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [
+            .mouseMoved, .leftMouseDragged, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel, .keyDown,
+        ]) { [weak self] event in
+            if event.type == .mouseMoved { self?.handlePointerMoved() } else { self?.dismiss() }
+            return event
+        }
+        let center = NotificationCenter.default
+        for name in [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification, NSWindow.willMoveNotification] {
+            center.addObserver(self, selector: #selector(dismissOnNotification(_:)), name: name, object: window)
+        }
+        center.addObserver(
+            self, selector: #selector(dismissOnNotification(_:)), name: NSApplication.didResignActiveNotification,
+            object: nil)
+        center.addObserver(
+            self, selector: #selector(dismissOnNotification(_:)), name: NSMenu.didBeginTrackingNotification, object: nil
+        )
+    }
+
+    @objc private func dismissOnNotification(_ notification: Notification) { dismiss() }
+
+    isolated deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+    }
 
     private var entries: [Entry] = []
     private var nextOrder: UInt64 = 0
@@ -29,15 +65,21 @@ final class OaToolTipController {
     private var lastPointerLocation = NSEvent.mouseLocation
     private var panel: NSWindow?
 
-    func register(_ id: UUID, configuration: OaToolTipConfiguration, palette: OaToolTipPalette) {
+    func register(_ id: UUID, configuration: OaToolTipConfiguration, palette: OaToolTipPalette, inSidebar: Bool = false)
+    {
         if let index = entries.firstIndex(where: { $0.id == id }) {
-            guard entries[index].configuration != configuration || entries[index].palette != palette else { return }
+            guard
+                entries[index].configuration != configuration || entries[index].palette != palette
+                    || entries[index].inSidebar != inSidebar
+            else { return }
             entries[index].configuration = configuration
             entries[index].palette = palette
+            entries[index].inSidebar = inSidebar
             if presentedID == id { dismiss() }
         } else {
             nextOrder += 1
-            entries.append(Entry(id: id, configuration: configuration, palette: palette, order: nextOrder))
+            entries.append(
+                Entry(id: id, configuration: configuration, palette: palette, inSidebar: inSidebar, order: nextOrder))
         }
         lastPointerLocation = NSEvent.mouseLocation
         if presentedID != activeEntry?.id { hidePanel() }
@@ -87,7 +129,7 @@ final class OaToolTipController {
     private func reschedule() {
         timer?.invalidate()
         timer = nil
-        guard presentedID == nil, let entry = activeEntry, canPresent() else { return }
+        guard presentedID == nil, let entry = activeEntry, canPresent(entry.inSidebar) else { return }
         let targetID = entry.id
         timer = Timer.scheduledTimer(withTimeInterval: entry.configuration.delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.presentIfEligible(targetID) }
@@ -96,9 +138,10 @@ final class OaToolTipController {
 
     private func presentIfEligible(_ targetID: UUID) {
         timer = nil
-        guard let parent = window, parent.isKeyWindow, NSApplication.shared.isActive,
-            NSEvent.pressedMouseButtons == 0, canPresent(),
-            let entry = activeEntry, entry.id == targetID
+        guard let parent = window, parent.isVisible,
+            parent.isKeyWindow || monitor != nil, NSApp.isActive || parent.styleMask.contains(.nonactivatingPanel),
+            NSWindow.windowNumber(at: NSEvent.mouseLocation, belowWindowWithWindowNumber: 0) == parent.windowNumber,
+            NSEvent.pressedMouseButtons == 0, let entry = activeEntry, entry.id == targetID, canPresent(entry.inSidebar)
         else { return }
         let pointer = NSEvent.mouseLocation
         guard hypot(pointer.x - lastPointerLocation.x, pointer.y - lastPointerLocation.y) <= Self.movementThreshold
