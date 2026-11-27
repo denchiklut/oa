@@ -98,9 +98,10 @@ enum PinnedExtensionLayout {
     }
 }
 
-/// An extension's 16 pt action icon, dimmed when disabled on the current page.
+/// The engine supplies the icon with the extension's badge already drawn.
 struct ExtensionActionIcon: View {
     let action: ExtensionAction
+    var size: CGFloat = 16
 
     var body: some View {
         Group {
@@ -109,12 +110,12 @@ struct ExtensionActionIcon: View {
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 16, height: 16)
             } else {
                 Image(systemName: "puzzlepiece.extension.fill")
-                    .font(.system(size: 13))
+                    .font(.system(size: size * 0.8125))
             }
         }
+        .frame(width: size, height: size)
         .opacity(action.isEnabled ? 1 : 0.4)
     }
 }

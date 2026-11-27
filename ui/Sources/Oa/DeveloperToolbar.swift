@@ -104,9 +104,11 @@ struct DeveloperToolbar<Trailing: View>: View {
             tool("Extensions Menu", "puzzlepiece.extension") { showingExtensions = true }
                 .labelStyle(.iconOnly)
                 .popover(isPresented: $showingExtensions, arrowEdge: .bottom) {
-                    ExtensionsSection(model: model) { showingExtensions = false }
-                        .padding(10).frame(width: 236)
-                        .modifier(SiteControlsAppearance(model: model))
+                    DeveloperExtensionsPopover(
+                        model: model, profileName: model.profileName(page.profileID), palette: palette
+                    ) {
+                        showingExtensions = false
+                    }
                 }
             trailing.environment(\.theme, chrome)
         }
