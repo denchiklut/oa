@@ -22,10 +22,7 @@ struct SpaceStyleEditor: Equatable {
         var wheel = WindowTheme.Wheel.complimentary
         var saturation = 1.0
         var lightnessRange: ClosedRange<Double> = 0.01...0.97
-        /// The app's appearance, which the Automatic, Light and Dark buttons show. As Arc's, unread until the editor
-        /// has appeared, and again after an undo rebuilds the state.
-        var appearance: NSAppearance.Name?
-        var hasAppeared = false
+        var windowAppearance: WindowTheme.AppearanceBased<WindowTheme.Appearance>?
     }
 
     /// Arc's `SpaceStyleEditorColorSet`.
@@ -47,7 +44,7 @@ struct SpaceStyleEditor: Equatable {
     }
 
     private static func controls(for theme: WindowTheme?) -> State {
-        var state = State()
+        var state = State(windowAppearance: theme?.windowAppearance)
         guard case .single(let background)? = theme?.background, case .color(let style) = background.style else {
             return state
         }
@@ -207,9 +204,12 @@ struct SpaceStyleEditor: Equatable {
         return old
     }
 
-    mutating func onAppearanceUpdated(_ appearance: NSAppearance.Name?) {
-        state.appearance = appearance
-        state.hasAppeared = true
+    @MainActor
+    mutating func selectAppearance(_ name: NSAppearance.Name?) -> State? {
+        let old = state
+        state.windowAppearance = nil
+        AppAppearance.set(name)
+        return old.windowAppearance == nil ? nil : old
     }
 
     private mutating func beginGesture() {
@@ -217,9 +217,7 @@ struct SpaceStyleEditor: Equatable {
     }
 
     private mutating func reset() {
-        let appearance = (state.appearance, state.hasAppeared)
-        state = State()
-        (state.appearance, state.hasAppeared) = appearance
+        state = State(windowAppearance: state.windowAppearance)
     }
 
     /// As Arc: one tap each time a move crosses a multiple of the step, ends included.
@@ -242,9 +240,10 @@ struct SpaceStyleEditor: Equatable {
     func theme(for state: State) -> WindowTheme? {
         // Saved gradients can carry colors and palettes the editor's wheel cannot reproduce.
         if state.hasSameColors(as: initialState) {
-            guard state.modifiers != initialState.modifiers,
-                var theme = originalTheme, case .single(var background) = theme.background
-            else { return originalTheme }
+            guard var theme = originalTheme else { return nil }
+            theme.windowAppearance = state.windowAppearance
+            guard state.modifiers != initialState.modifiers, case .single(var background) = theme.background
+            else { return theme }
             switch background.style {
             case .color(.blendedGradient(var gradient)):
                 gradient.modifiers = state.modifiers
@@ -299,7 +298,7 @@ struct SpaceStyleEditor: Equatable {
                     contentOverBackgroundAppearance: bias + contrast(dark.title) >= contrast(light.title)
                         ? .dark : .light,
                     isVibrant: true)),
-            windowAppearance: originalTheme?.windowAppearance, primaryColorPalette: palette,
+            windowAppearance: state.windowAppearance, primaryColorPalette: palette,
             semanticColorPalette: .appearanceBased(light: light, dark: dark))
     }
 }
