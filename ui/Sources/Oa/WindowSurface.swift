@@ -164,29 +164,46 @@ private struct ThemeColors: NSViewRepresentable, Equatable {
 
     final class Bitmap: NSView {
         var colors: ThemeColors?
-        private var drawn: (colors: ThemeColors, size: CGSize)?
+        private let gradient = CALayer()
+        private var drawn: ThemeColors?
 
         override func layout() {
             super.layout()
-            guard let colors, let layer, bounds.width > 0, bounds.height > 0 else { return }
-            if let drawn, drawn.colors == colors, drawn.size == bounds.size { return }
-            layer.contentsGravity = .resize
-            layer.contents = Self.image(of: colors, size: bounds.size)
-            drawn = (colors, bounds.size)
+            let size = bounds.size
+            guard let colors, let layer, size.width > 0, size.height > 0 else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            defer { CATransaction.commit() }
+            if gradient.superlayer !== layer {
+                layer.masksToBounds = true
+                gradient.anchorPoint = .zero
+                layer.addSublayer(gradient)
+            }
+            if drawn != colors {
+                gradient.contents = Self.image(of: colors)
+                drawn = colors
+            }
+            // The bitmap's x axis is distance along the base gradient, its y axis the vertical overlay.
+            // Shear it into the window so a live resize only moves the layer; its colours stay the same.
+            let skew = colors.renderer == .metal ? 1 : size.height / size.width
+            let offset = size.height * skew
+            gradient.bounds = CGRect(x: 0, y: 0, width: size.width + offset, height: size.height)
+            gradient.position = CGPoint(x: layer.isGeometryFlipped ? 0 : -offset, y: 0)
+            gradient.setAffineTransform(
+                CGAffineTransform(a: 1, b: 0, c: layer.isGeometryFlipped ? -skew : skew, d: 1, tx: 0, ty: 0))
         }
 
-        /// The last few bitmaps, so the Library's cards, all one size and often one theme, compute theirs once.
-        private static var recent: [(colors: ThemeColors, size: CGSize, image: CGImage?)] = []
+        private static var recent: [(colors: ThemeColors, image: CGImage?)] = []
 
-        private static func image(of colors: ThemeColors, size: CGSize) -> CGImage? {
-            if let cached = recent.first(where: { $0.colors == colors && $0.size == size }) { return cached.image }
-            let image = colors.image(size: size)
-            recent = Array((recent + [(colors, size, image)]).suffix(8))
+        private static func image(of colors: ThemeColors) -> CGImage? {
+            if let cached = recent.first(where: { $0.colors == colors }) { return cached.image }
+            let image = colors.image()
+            recent = Array((recent + [(colors, image)]).suffix(8))
             return image
         }
     }
 
-    private func image(size: CGSize) -> CGImage? {
+    private func image() -> CGImage? {
         let base: [ThemeColor]
         let overlay: [ThemeColor]
         switch style {
@@ -195,25 +212,19 @@ private struct ThemeColors: NSViewRepresentable, Equatable {
         case .color(.basicColor(let basic)): (base, overlay) = ([basic.color], [])
         }
         guard let first = base.first, let last = base.last else { return nil }
-        let side = base.count + overlay.count > 1 ? 256 : 1
+        let width = base.count > 1 ? 256 : 1
+        let height = overlay.isEmpty ? 1 : 256
         let ends = (first.oklab, last.oklab)
         // As Arc: a clear overlay colour takes the other's hue, so the ramp fades in rather than through grey.
         let over = overlay.first.flatMap { top in overlay.last.map { (top.alpha == 0 ? $0 : top, top.alpha, $0) } }
-        var pixels = [Float](repeating: 0, count: side * side * 4)
-        for row in 0..<side {
-            let v = (Double(row) + 0.5) / Double(side)
+        var pixels = [Float](repeating: 0, count: width * height * 4)
+        for row in 0..<height {
+            let v = (Double(row) + 0.5) / Double(height)
             let above = over.map { ThemeColor.linear(oklab: $0.0.oklab + ($0.2.oklab - $0.0.oklab) * v) } ?? .zero
             let cover = over.map { ($0.1 + ($0.2.alpha - $0.1) * v) * alpha } ?? 0
             let rest = alpha * (1 - cover)
-            for column in 0..<side {
-                let u = (Double(column) + 0.5) / Double(side)
-                let along =
-                    switch renderer {
-                    case .metal: (u * size.width + v * size.height) / (size.width + size.height)
-                    case .swiftUI:
-                        (u * size.width * size.width + v * size.height * size.height)
-                            / (size.width * size.width + size.height * size.height)
-                    }
+            for column in 0..<width {
+                let along = (Double(column) + 0.5) / Double(width)
                 let below = ThemeColor.linear(oklab: ends.0 + (ends.1 - ends.0) * min(along * 4 / 3, 1))
                 let layer = ThemeColor(linear: (above * cover + below * rest) / (cover + rest))
                     .opacity(cover + rest).over(underlay)
@@ -221,15 +232,15 @@ private struct ThemeColors: NSViewRepresentable, Equatable {
                 // which Arc's theme colours are picked in.
                 let color = ThemeColor.displayP3 * layer.linear
                 for channel in 0..<3 {
-                    pixels[(row * side + column) * 4 + channel] = Float(
+                    pixels[(row * width + column) * 4 + channel] = Float(
                         ThemeColor.encoded(color[channel]) * layer.alpha)
                 }
-                pixels[(row * side + column) * 4 + 3] = Float(layer.alpha)
+                pixels[(row * width + column) * 4 + 3] = Float(layer.alpha)
             }
         }
         return pixels.withUnsafeBytes { bytes in
             CGImage(
-                width: side, height: side, bitsPerComponent: 32, bitsPerPixel: 128, bytesPerRow: side * 16,
+                width: width, height: height, bitsPerComponent: 32, bitsPerPixel: 128, bytesPerRow: width * 16,
                 space: CGColorSpace(name: CGColorSpace.displayP3)!,
                 bitmapInfo: CGBitmapInfo(
                     rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.floatComponents.rawValue
