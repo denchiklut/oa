@@ -162,7 +162,7 @@ final class ChromiumBrowserContext: BrowserContext {
     var downloads: any Downloads { chromiumDownloads }
     private lazy var chromiumPreferences = ChromiumPreferences(core: profile()?.preferences)
     var preferences: any BrowserContextPreferences { chromiumPreferences }
-    private lazy var chromiumExtensions = ChromiumExtensions(core: profile()?.extensions)
+    private lazy var chromiumExtensions = ChromiumExtensions(core: profile()?.extensions, profileID: id)
     var extensions: any Extensions { chromiumExtensions }
     /// Weakly, as ADK's `browsers`: the window that asked holds its browser.
     private var browsers: [UUID: WeakBrowser] = [:]

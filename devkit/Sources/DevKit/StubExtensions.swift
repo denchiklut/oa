@@ -24,6 +24,26 @@ final class StubExtensions: Extensions {
     private(set) var items = [StubExtensions.catalog[0].item]
     private(set) var pinned = [StubExtensions.catalog[0].item.id]
 
+    private let formatterPreference: String
+    private static let formatter = BrowserExtension(
+        id: BrowserExtension.jsonFormatterID, name: "JSON Formatter", version: "0.10.2")
+
+    init(profileID: UUID) {
+        formatterPreference = "stubJSONFormatter.\(profileID.uuidString)"
+        let state = UserDefaults.standard.string(forKey: formatterPreference)
+        if state == "enabled" || state == "disabled" {
+            var formatter = Self.formatter
+            formatter.isEnabled = state == "enabled"
+            install(formatter)
+        }
+    }
+
+    func installJSONFormatterIfNeeded() {
+        guard UserDefaults.standard.object(forKey: formatterPreference) == nil else { return }
+        install(Self.formatter)
+        UserDefaults.standard.set("enabled", forKey: formatterPreference)
+    }
+
     var nextToInstall: Entry? {
         Self.catalog.first { entry in !items.contains { $0.id == entry.item.id } }
     }
@@ -31,9 +51,13 @@ final class StubExtensions: Extensions {
     func setEnabled(_ enabled: Bool, id: BrowserExtension.ID) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].isEnabled = enabled
+        if id == Self.formatter.id {
+            UserDefaults.standard.set(enabled ? "enabled" : "disabled", forKey: formatterPreference)
+        }
     }
 
     func uninstall(_ id: BrowserExtension.ID) {
+        if id == Self.formatter.id { UserDefaults.standard.set("removed", forKey: formatterPreference) }
         items.removeAll { $0.id == id }
         pinned.removeAll { $0 == id }
     }

@@ -4,11 +4,13 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/one_shot_event.h"
 #include "base/scoped_observation.h"
 #include "base/task/single_thread_task_runner.h"
+#include "chrome/browser/extensions/webstore_install_with_prompt.h"
 #include "chrome/browser/profiles/profile.h"
 #include "extensions/browser/disable_reason.h"
 #include "extensions/browser/extension_action_manager.h"
@@ -26,6 +28,35 @@
 
 namespace oa {
 namespace {
+
+constexpr char kJsonFormatterId[] = "bcjindcccaagfpapjjmafapmmgkkhgoa";
+
+class JsonFormatterInstaller : public extensions::WebstoreInstallWithPrompt {
+ public:
+  explicit JsonFormatterInstaller(Profile* profile)
+      : WebstoreInstallWithPrompt(
+            kJsonFormatterId,
+            profile,
+            gfx::NativeWindow(),
+            base::BindOnce([](bool success,
+                              const std::string& error,
+                              extensions::webstore_install::Result result) {
+              if (!success &&
+                  result != extensions::webstore_install::INSTALL_IN_PROGRESS) {
+                LOG(WARNING) << "JSON Formatter installation failed: " << error;
+              }
+            })) {
+    set_show_post_install_ui(false);
+  }
+
+ private:
+  ~JsonFormatterInstaller() override = default;
+
+  std::unique_ptr<extensions::InstallPromptData> CreateInstallPrompt()
+      const override {
+    return nullptr;
+  }
+};
 
 // Oa's own: what chrome://extensions lists. Arc's filter isn't traced; its
 // menu leaves out the component extensions, as this does.
@@ -61,6 +92,15 @@ class ExtensionsImpl : public Extensions,
   }
 
   // Extensions:
+  void InstallJsonFormatter() override {
+    if (profile_ && !profile_->IsOffTheRecord() &&
+        !extensions::ExtensionRegistry::Get(profile_.get())
+             ->GetInstalledExtension(kJsonFormatterId)) {
+      base::MakeRefCounted<JsonFormatterInstaller>(profile_.get())
+          ->BeginInstall();
+    }
+  }
+
   void SetEnabled(const std::string& id, bool enabled) override {
     if (!profile_) {
       return;

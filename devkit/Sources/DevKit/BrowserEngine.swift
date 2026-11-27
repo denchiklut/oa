@@ -131,6 +131,8 @@ public struct HistoryEntry: Sendable, Equatable {
 public protocol Extensions: AnyObject, Observable {
     /// By name; empty until the profile's extension system is ready.
     var items: [BrowserExtension] { get }
+    /// Installs JSON Formatter on first Developer Mode entry in this profile.
+    func installJSONFormatterIfNeeded()
     func setEnabled(_ enabled: Bool, id: BrowserExtension.ID)
     /// Without asking. The engine's own removal paths ask through the page.
     func uninstall(_ id: BrowserExtension.ID)
@@ -138,6 +140,8 @@ public protocol Extensions: AnyObject, Observable {
 
 /// As ADK's `BrowserExtension`.
 public struct BrowserExtension: Identifiable, Sendable, Equatable {
+    public static let jsonFormatterID = "bcjindcccaagfpapjjmafapmmgkkhgoa"
+
     public let id: String
     public var name: String
     public var description: String

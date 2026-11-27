@@ -271,7 +271,7 @@ Sources: Arc native Settings → Links and [2023 release notes][arc23].
 | Arc Developer Mode tabs | ✅ | Developer toolbar and sidebar tab styling |
 | Developer Mode for localhost and its subdomains † | ✅ | ✅ |
 | Toggle Developer Mode by shortcut † | ✅ | Control-D bound to the per-site toggle |
-| Developer Mode JSON formatter installation † | ✅ | ☐ |
+| Developer Mode JSON formatter installation † | ✅ | Installs JSON Formatter from the Chrome Web Store once per regular profile |
 | Browser task manager | ✅ | ☐ |
 | End a tab process from Task Manager | ✅ | ☐ |
 | Record diagnostic performance traces | ✅ | ☐ |

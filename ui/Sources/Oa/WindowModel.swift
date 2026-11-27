@@ -247,6 +247,11 @@ final class WindowModel {
     /// The engine's profiles in its order, read when asked, as Arc's menus list them.
     var profiles: [ProfileState] { engine.allProfiles().map { ProfileState(id: $0, name: profileName($0)) } }
     var extensions: [BrowserExtension] { profileID.map { engine.browserContext(id: $0).extensions.items } ?? [] }
+    func enteredDeveloperMode(for tabID: UUID) {
+        guard sidebarContext != .incognito, let profile = profile(containing: tabID) else { return }
+        context(for: profile.id).extensions.installJSONFormatterIfNeeded()
+    }
+
     var extensionActions: [ExtensionAction] { browser?.extensionActions ?? [] }
     var pinnedExtensionActions: [ExtensionAction] { pinnedExtensionActions(for: profileID) }
 
