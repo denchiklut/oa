@@ -155,12 +155,7 @@ private struct MediaTile: View {
                         let thumbnail = Image(nsImage: image).resizable().scaledToFit().padding(3)
                         if item.captureTitle != nil {
                             thumbnail
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .strokeBorder(
-                                            theme.maxContrast.opacity(0.48),
-                                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 3]))
-                                }
+                                .overlay { captureBorder }
                                 .scaleEffect(hovered && !reduceMotion ? 1.055 : 1)
                                 .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: hovered)
                                 .padding(10)
@@ -177,6 +172,18 @@ private struct MediaTile: View {
             }.aspectRatio(1, contentMode: .fit).contentShape(Rectangle())
         }
         .buttonStyle(.plain).oaToolTip(item.title).accessibilityLabel(item.title).onHover { hovered = $0 }
+    }
+
+    private var captureBorder: some View {
+        let moving = hovered && !reduceMotion
+        return TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !moving)) { tick in
+            let cycle = tick.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 0.5) / 0.5
+            RoundedRectangle(cornerRadius: 2)
+                .strokeBorder(
+                    theme.maxContrast.opacity(0.48),
+                    style: StrokeStyle(
+                        lineWidth: 1.5, lineCap: .round, dash: [4, 3], dashPhase: moving ? -7 * cycle : 0))
+        }
     }
 }
 
