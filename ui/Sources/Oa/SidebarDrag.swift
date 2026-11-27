@@ -21,6 +21,7 @@ final class SidebarDrag {
         /// Among `parentID`'s children (or among Favorites without the lifted tile).
         var index: Int
         var line: CGRect?
+        var spaceHeaderID: UUID?
         /// Folder being hovered directly onto (tilts icon open, fills `maxContrast @ 0.5`, appends on drop).
         var dropFolderID: UUID?
         /// The row whose middle the tab is held on, which it would make a split with or join, last when held on the
@@ -36,7 +37,8 @@ final class SidebarDrag {
 
     struct ListFrame {
         var area = CGRect.zero
-        var pinnedTop: CGFloat = 0
+        var header = CGRect.zero
+        var pinnedTop: CGFloat { header.maxY + 0.5 }
         var divider: CGRect?
         var newTab = CGRect.zero
     }
@@ -146,7 +148,7 @@ final class SidebarDrag {
     private func retarget(model: WindowModel) {
         let next = target(at: location, model: model)
         if next != target { target = next }
-        if let next, next.combine == nil, next.dropFolderID == nil { tick(at: next, in: model.selectedSpaceID) }
+        if let next, next.line != nil || next.section == .favorites { tick(at: next, in: model.selectedSpaceID) }
         let dropTarget = next == nil ? splitViewDropTarget(at: location, model: model) : nil
         if dropTarget != model.proposedSplitViewDropTarget { model.proposedSplitViewDropTarget = dropTarget }
         // As measured on Arc: AppKit turns the drag image into the card over about 0.2 s.
@@ -467,6 +469,13 @@ final class SidebarDrag {
         -> Target?
     {
         guard let pinnedRootID = model.state.space(model.selectedSpaceID)?.pinnedRootID else { return nil }
+        // Arc highlights the full Space row and inserts at the root's first position.
+        if point.y >= list.header.minY, point.y < list.header.maxY {
+            combineCandidate = nil
+            guard canMoveDragged(into: pinnedRootID, model: model) else { return nil }
+            return Target(section: .pinned, parentID: pinnedRootID, index: 0, spaceHeaderID: model.selectedSpaceID)
+        }
+        guard model.state.hasPinnedItems(in: model.selectedSpaceID) else { return nil }
         // Drop directly onto a folder's middle band: tilts its icon open and fills `maxContrast @ 0.5`.
         for row in pinnedRows where row.entry.folder != nil {
             guard let rect = rows[row.id]?.rect, rect.contains(point),
