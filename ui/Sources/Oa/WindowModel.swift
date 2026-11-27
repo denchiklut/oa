@@ -1782,14 +1782,15 @@ final class WindowModel {
         guard var presentation = spaceStyleEditor else { return }
         let old = change(&presentation.editor)
         spaceStyleEditor = presentation
-        if let old { registerThemeUndo(SpaceStyleEditor(state: old).theme, for: presentation.spaceID) }
+        if let old { registerThemeUndo(presentation.editor.theme(for: old), for: presentation.spaceID) }
     }
 
     /// As Arc: the theme is written as the editor closes, however it closes, and there is no Cancel.
     func dismissSpaceStyleEditor() {
         guard let presentation = spaceStyleEditor else { return }
         spaceStyleEditor = nil
-        setSpaceTheme(presentation.editor.theme, for: presentation.spaceID)
+        let theme = presentation.editor.theme
+        if theme != presentation.editor.originalTheme { setSpaceTheme(theme, for: presentation.spaceID) }
     }
 
     private func setSpaceTheme(_ theme: WindowTheme?, for spaceID: UUID) {
