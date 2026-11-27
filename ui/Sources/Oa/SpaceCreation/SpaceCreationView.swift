@@ -95,6 +95,7 @@ struct SpaceCreationView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(theme.foreground)
                         .focused($nameFocused)
+                        .onSubmit { model.triggerSpaceCreation() }
                 }
                 card {
                     icon { Image(systemName: "face.smiling") }
