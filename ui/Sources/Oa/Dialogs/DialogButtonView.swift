@@ -63,7 +63,7 @@ struct DialogButtonView: View {
 
 /// The dialogs' text as Arc sets it: a 17 pt bold title over 14 pt body text.
 struct DialogText: View {
-    let title: String
+    let title: LocalizedStringKey
     let message: LocalizedStringKey
 
     var body: some View {

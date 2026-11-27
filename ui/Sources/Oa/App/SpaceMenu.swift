@@ -78,7 +78,7 @@ extension SpaceMenu {
             model.selectSpace(space.id)
             layout.iconPickerSpaceID = space.id
         } rename: {
-            if let name = NamePrompt.run("Rename Space", name: space.name) { model.renameSpace(space.id, to: name) }
+            TextInputDialog.renameSpace(space, in: model)
         } editTheme: {
             model.presentSpaceStyleEditor(for: space.id, from: .sidebar)
         }
