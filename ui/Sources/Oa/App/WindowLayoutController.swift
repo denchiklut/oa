@@ -265,7 +265,13 @@ final class WindowLayoutController: NSViewController {
     /// Arc's progress into the Library: 0 among the Spaces, 1 with the Library open, more past it.
     var libraryProgress: CGFloat { max(Self.homeWidth - pagerPosition, 0) / Self.homeWidth }
 
-    private var spaceTheme: WindowTheme { model.space.map(model.theme(of:)) ?? .default }
+    private var spaceTheme: WindowTheme {
+        // The Spaces list opens beside the selected Space. Reordering puts the first Space beside it.
+        if model.library == .spaces, homeOrder != nil, let beside = model.spaces.dropFirst(leadingSpace).first {
+            return model.theme(of: beside)
+        }
+        return model.space.map(model.theme(of:)) ?? .default
+    }
 
     /// As Arc: the Create a Space panel shows the theme chosen for it, else the default.
     private func spaceCreationTheme(_ creation: SpaceCreationState?) -> WindowTheme {
