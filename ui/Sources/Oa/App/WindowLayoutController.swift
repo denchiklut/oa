@@ -99,11 +99,18 @@ final class WindowLayoutController: NSViewController {
                 && model.commandBar == nil && model.dialog == nil && model.extensionRequest == nil
         }
         pager.windowProvider = { [weak self] in self?.viewIfLoaded?.window }
-        pager.positionUpdateHandler = { [weak self] in
-            self?.toolTipController.dismiss()
-            self?.pagerPosition = $0
-            self?.updatePull()
-            self?.updateDock()
+        pager.positionUpdateHandler = { [weak self] position in
+            guard let self else { return }
+            toolTipController.dismiss()
+            let previousProgress = libraryProgress
+            pagerPosition = position
+            if pager.isTracking, model.commandBar != nil, libraryProgress > previousProgress,
+                model.library == nil, model.lastLibrarySection == .spaces
+            {
+                model.closeCommandBar()
+            }
+            updatePull()
+            updateDock()
         }
         pager.pageSelectionHandler = { [weak self] page in
             guard let self else { return }
