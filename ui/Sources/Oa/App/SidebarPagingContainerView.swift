@@ -286,8 +286,6 @@ private struct SpaceNameRow: View {
     @State private var over = false
     @State private var hovering = false
     @State private var renaming = false
-    @State private var draft = ""
-    @FocusState private var renameFocused: Bool
     @Environment(\.sidebarDrag) private var drag
     @Environment(\.theme) private var theme
 
@@ -315,24 +313,17 @@ private struct SpaceNameRow: View {
                 .padding(.trailing, 5)
             }
             if renaming {
-                TextField("", text: $draft)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13, weight: .semibold))
-                    .focused($renameFocused)
-                    .onSubmit(commitRename)
-                    .onExitCommand { renaming = false }
-                    .onAppear { renameFocused = true }
-                Button("Done", action: commitRename)
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(theme.secondaryText)
+                InlineRenameField(
+                    layout: layout, text: space.name, placeholder: "", weight: .semibold, showsDoneButton: true,
+                    onCommit: commitRename, onCancel: { _ in renaming = false }
+                )
             } else {
                 Text(space.name)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.sectionHeaderText)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            if !renaming { Spacer(minLength: 0) }
             if hovering, !renaming {
                 PointerMenuButton {
                     SpaceMenu(model: model, layout: layout, space: space).make()
@@ -349,7 +340,7 @@ private struct SpaceNameRow: View {
         .padding(.trailing, 6)
         .frame(height: 36)
         .background(
-            hovering ? theme.itemFill : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            hovering && !renaming ? theme.itemFill : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
         .background {
             if drag?.target?.spaceHeaderID == space.id, drag?.settling == false {
@@ -362,7 +353,6 @@ private struct SpaceNameRow: View {
             if hasPinned {
                 model.togglePinnedSection(of: space.id)
             } else {
-                draft = space.name
                 renaming = true
             }
         }
@@ -387,7 +377,7 @@ private struct SpaceNameRow: View {
         .frame(height: 38, alignment: .top)
     }
 
-    private func commitRename() {
+    private func commitRename(_ draft: String) {
         let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         if !name.isEmpty { model.renameSpace(space.id, to: name) }
         renaming = false

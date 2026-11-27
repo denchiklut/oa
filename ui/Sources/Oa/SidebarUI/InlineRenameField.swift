@@ -18,12 +18,13 @@ struct InlineRenameField: NSViewRepresentable {
     let text: String
     var placeholder = "Title"
     var weight: NSFont.Weight = .regular
+    var showsDoneButton = false
     let onCommit: (String) -> Void
     let onCancel: (NSEvent?) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(layout: layout, onCommit: onCommit, onCancel: onCancel) }
 
-    func makeNSView(context: Context) -> InlineRenameTextField {
+    func makeNSView(context: Context) -> NSView {
         let field = InlineRenameTextField(string: text)
         field.isBordered = false
         field.drawsBackground = false
@@ -42,18 +43,30 @@ struct InlineRenameField: NSViewRepresentable {
         field.onDidMoveToWindow = { [weak coordinator = context.coordinator] in
             coordinator?.attach()
         }
-        return field
+        guard showsDoneButton else { return field }
+
+        let done = NSButton(title: "Done", target: context.coordinator, action: #selector(Coordinator.commit))
+        done.isBordered = false
+        done.refusesFirstResponder = true
+        done.font = .systemFont(ofSize: 11, weight: .semibold)
+        done.setContentHuggingPriority(.required, for: .horizontal)
+        let stack = NSStackView(views: [field, done])
+        stack.spacing = 4
+        context.coordinator.doneButton = done
+        return stack
     }
 
-    func updateNSView(_ field: InlineRenameTextField, context: Context) {
-        field.textColor = NSColor(context.environment.theme.foreground)
-        context.coordinator.onCommit = onCommit
-        context.coordinator.onCancel = onCancel
+    func updateNSView(_ view: NSView, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.field?.textColor = NSColor(context.environment.theme.foreground)
+        coordinator.doneButton?.contentTintColor = NSColor(context.environment.theme.secondaryText)
+        coordinator.onCommit = onCommit
+        coordinator.onCancel = onCancel
     }
 
-    static func dismantleNSView(_ field: InlineRenameTextField, coordinator: Coordinator) {
-        field.onDidMoveToWindow = nil
-        field.delegate = nil
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
+        coordinator.field?.onDidMoveToWindow = nil
+        coordinator.field?.delegate = nil
         coordinator.teardown()
     }
 
@@ -62,6 +75,9 @@ struct InlineRenameField: NSViewRepresentable {
         var onCommit: (String) -> Void
         var onCancel: (NSEvent?) -> Void
         weak var field: InlineRenameTextField?
+        weak var doneButton: NSButton?
+        private weak var styledEditor: NSTextView?
+        private var originalSelection: [NSAttributedString.Key: Any]?
         private weak var layout: WindowLayoutController?
         private var finished = false
         private var clickMonitor: Any?
@@ -97,6 +113,9 @@ struct InlineRenameField: NSViewRepresentable {
 
         func teardown() {
             guard let clickMonitor else { return }
+            if let styledEditor, let originalSelection { styledEditor.selectedTextAttributes = originalSelection }
+            styledEditor = nil
+            originalSelection = nil
             NSEvent.removeMonitor(clickMonitor)
             self.clickMonitor = nil
             if let menuObserver { NotificationCenter.default.removeObserver(menuObserver) }
@@ -107,15 +126,27 @@ struct InlineRenameField: NSViewRepresentable {
         private func focus() {
             guard !finished, let field, let window = field.window, field.currentEditor() == nil else { return }
             window.makeFirstResponder(field)
-            field.currentEditor()?.selectAll(nil)
+            guard let editor = field.currentEditor() as? NSTextView else { return }
+            if doneButton != nil, let ink = field.textColor {
+                // The Space name has a neutral selection in Arc. AppKit shares this editor across the window.
+                styledEditor = editor
+                originalSelection = editor.selectedTextAttributes
+                editor.selectedTextAttributes = [.backgroundColor: ink.withAlphaComponent(0.15), .foregroundColor: ink]
+            }
+            editor.selectAll(nil)
         }
 
         private func handleClick(_ event: NSEvent) {
             guard !finished, let field, let window = field.window else { return }
-            let inside =
-                event.window === window
-                && window.contentView?.hitTest(event.locationInWindow)?.isDescendant(of: field) == true
-            if !inside { finish(event: event) }
+            if event.window === window, let hit = window.contentView?.hitTest(event.locationInWindow) {
+                if hit.isDescendant(of: field) { return }
+                if let doneButton, hit.isDescendant(of: doneButton) { return }
+            }
+            finish(event: event)
+        }
+
+        @objc func commit() {
+            if let field { finish(text: field.stringValue) }
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
