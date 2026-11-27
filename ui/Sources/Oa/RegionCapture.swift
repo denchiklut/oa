@@ -32,7 +32,8 @@ final class RegionCapture {
                 model.present(.capture("Couldn’t capture this page"), at: .windowContent(page.id))
                 return
             }
-            let view = RegionSelectionView(image: bitmap, frame: page.view.bounds) {
+            let colors = OaToolTipPalette.forWindow(window)
+            let view = RegionSelectionView(image: bitmap, frame: page.view.bounds, palette: colors) {
                 [weak self, weak model, weak page] result, view in
                 guard let model, let page, model.frontPage?.id == page.id, page.url == url else {
                     view.finish()
@@ -60,11 +61,13 @@ final class RegionCapture {
 }
 
 private struct CaptureDragHint: View {
+    let palette: OaToolTipPalette
+
     var body: some View {
         Text("Drag to capture a portion of this page")
-            .font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.indigo)
+            .font(.system(size: 14, weight: .semibold)).foregroundStyle(palette.title)
             .padding(.horizontal, 28).frame(height: 46)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+            .background(palette.background, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -81,7 +84,7 @@ final class RegionSelectionView: NSView {
     private var escapeMonitor: Any?
     var hasResult: Bool { result != nil }
 
-    private let hint = NSHostingView(rootView: CaptureDragHint())
+    private let hint: NSHostingView<CaptureDragHint>
 
     private static let cameraCursor: NSCursor = {
         let cross = NSCursor.crosshair
@@ -101,7 +104,11 @@ final class RegionSelectionView: NSView {
             hotSpot: NSPoint(x: cross.hotSpot.x, y: size.height - cross.image.size.height + cross.hotSpot.y))
     }()
 
-    init(image: CGImage, frame: NSRect, onSelect: @escaping (CapturedRegion, RegionSelectionView) -> Void) {
+    init(
+        image: CGImage, frame: NSRect, palette: OaToolTipPalette,
+        onSelect: @escaping (CapturedRegion, RegionSelectionView) -> Void
+    ) {
+        hint = NSHostingView(rootView: CaptureDragHint(palette: palette))
         self.image = image
         self.onSelect = onSelect
         super.init(frame: frame)

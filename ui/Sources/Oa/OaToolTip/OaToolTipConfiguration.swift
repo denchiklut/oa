@@ -28,6 +28,23 @@ struct OaToolTipPalette: Equatable {
     let keyBorder: Color
     let keyForeground: Color
 
+    @MainActor
+    static func forWindow(_ window: NSWindow) -> Self {
+        var owner: NSWindow? = window
+        var theme = WindowTheme.default
+        var appearance = window.effectiveAppearance
+        while let current = owner {
+            if let layout = current.contentViewController as? WindowLayoutController {
+                theme = layout.chromeTheme
+                appearance = current.effectiveAppearance
+                break
+            }
+            owner = current.parent ?? current.sheetParent
+        }
+        let scheme: ColorScheme = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light
+        return .space(theme.semanticColorPalette[scheme])
+    }
+
     static func developerToolbar(_ palette: WindowTheme.SemanticColorPalette) -> Self {
         Self(
             background: palette.backgroundExtra.color, title: palette.maxContrastColor.color,

@@ -60,7 +60,7 @@ struct PageToolbar: View {
                                 .frame(width: navigationSize.width, height: navigationSize.height)
                         }
                         .buttonStyle(ChromeButtonStyle())
-                        .help("Show Sidebar")
+                        .oaToolTip("Show Sidebar")
                         .accessibilityLabel("Show Sidebar")
                         .padding(.trailing, navigationSpacing)
                     }
@@ -159,7 +159,7 @@ struct SplitViewMenuButton: View {
         }
         .buttonStyle(Style())
         .disabled(!model.canAddSplitViewPane)
-        .help("Split View Options")
+        .oaToolTip("Split View Options")
         .accessibilityLabel("Split View Menu")
     }
 

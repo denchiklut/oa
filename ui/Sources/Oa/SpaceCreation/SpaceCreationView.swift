@@ -107,7 +107,8 @@ struct SpaceCreationView: View {
                     Image(systemName: "info.circle")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(theme.foreground.opacity(0.8))
-                        .help("You can use a Profile to give this Space its own logins, history, and browsing data.")
+                        .oaToolTip(
+                            "You can use a Profile to give this Space its own logins, history, and browsing data.")
                 }
                 Button {
                     choosingTheme = true

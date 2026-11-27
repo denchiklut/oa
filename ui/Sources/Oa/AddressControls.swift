@@ -146,7 +146,7 @@ struct PinnedExtensionButton: View {
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.14), value: hovering)
         .overlay { SecondaryClick { model.showExtensionMenu(for: action.id) } }
-        .help(action.tooltip.isEmpty ? action.name : action.tooltip)
+        .oaToolTip(action.tooltip.isEmpty ? action.name : action.tooltip)
         .accessibilityLabel(action.name)
     }
 }

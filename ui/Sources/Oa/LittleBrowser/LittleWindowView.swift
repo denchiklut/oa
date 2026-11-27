@@ -187,7 +187,7 @@ struct LittleBrowserToolbar: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Copy Current URL")
-            .help("Copy URL")
+            .oaToolTip("Copy URL")
             .opacity(model.address == nil ? 0 : 1)
             .padding(.trailing, 7)
         }
@@ -227,7 +227,7 @@ struct LittleBrowserToolbar: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
-        .help("Change profile")
+        .oaToolTip("Change profile")
         .padding(.leading, 7.5)
     }
 
@@ -274,7 +274,7 @@ struct LittleBrowserToolbar: View {
                     .background(ink(0.04, 0.07).opacity(hoveredSegment == .menu ? 1 : 0))
                     .contentShape(Rectangle())
             }
-            .help("More Spaces")
+            .oaToolTip("More Spaces")
             .accessibilityLabel("More Spaces")
             .onHover { hoveredSegment = $0 ? .menu : hoveredSegment == .menu ? nil : hoveredSegment }
         }

@@ -145,7 +145,7 @@ struct CaptureEditor: View {
                         .frame(width: 36, height: 36)
                         .background(tool == item ? active : .clear, in: RoundedRectangle(cornerRadius: 6))
                         .contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityLabel(item.rawValue).help(item.rawValue)
+                }.buttonStyle(.plain).accessibilityLabel(item.rawValue).oaToolTip(item.rawValue)
             }
         }
         .foregroundStyle(palette.tintedLight.color).padding(4)

@@ -184,7 +184,7 @@ private struct PadButton: View {
         .foregroundStyle(.primary.opacity(isEnabled ? 0.8 : 0.25))
         .disabled(!isEnabled)
         .onHover { isHovered = $0 }
-        .help(help)
+        .oaToolTip(help)
         .accessibilityLabel(label ?? help)
     }
 }
@@ -300,7 +300,7 @@ private struct IntensityWave: View {
                 .onEnded { _ in update { $0.didEndGesture() } }
         )
         .allowsHitTesting(hasColor)
-        .help("Intensity")
+        .oaToolTip("Intensity")
         .accessibilityElement()
         .accessibilityLabel("Intensity")
         .accessibilityValue("\(Int((value * 100).rounded()))%")
@@ -388,7 +388,7 @@ private struct NoiseDial: View {
                 }
         )
         .allowsHitTesting(hasColor)
-        .help("Cycle noise texture")
+        .oaToolTip("Cycle noise texture")
         .accessibilityElement()
         .accessibilityLabel("Cycle noise texture")
         .accessibilityValue("\(Int((noise * 100).rounded()))%")
