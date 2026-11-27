@@ -6,7 +6,7 @@ enum FlyoutSource: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .captures: "Oa Captures"
+        case .captures: "Captures"
         case .downloads: "Downloads"
         }
     }
