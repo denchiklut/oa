@@ -65,6 +65,8 @@ struct BrowserWindowView: View {
                     x: fadesCard ? 1 - 18 / max(cardSize.width, 18) : 1,
                     y: fadesCard ? 1 - 18 / max(cardSize.height, 18) : 1
                 )
+                // A newly selected tab starts at its own Peek scale.
+                .animation(nil, value: model.selectedTabID)
                 .animation(.easeInOut(duration: 0.12), value: fadesCard)
                 .opacity(fadesCard ? 0.3 : 1)
                 .padding([.top, .trailing, .bottom], 10)
