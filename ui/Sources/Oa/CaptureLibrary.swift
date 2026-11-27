@@ -42,7 +42,7 @@ final class CaptureLibrary {
                 try? JSONDecoder().decode(Metadata.self, from: $0)
             }
             return MediaItem(
-                file: file, date: metadata?.date ?? values.creationDate ?? .distantPast, kind: .image,
+                file: file, date: metadata?.date ?? values.creationDate ?? .distantPast, isMovie: false,
                 captureTitle: metadata?.address ?? file.lastPathComponent, sourceURL: metadata?.sourceURL)
         }.sorted(by: MediaItem.newestFirst)
     }
@@ -70,7 +70,7 @@ final class CaptureLibrary {
         }
         items.insert(
             MediaItem(
-                file: file, date: date, kind: .image, captureTitle: address ?? file.lastPathComponent,
+                file: file, date: date, isMovie: false, captureTitle: address ?? file.lastPathComponent,
                 sourceURL: sourceURL), at: 0)
         return file
     }

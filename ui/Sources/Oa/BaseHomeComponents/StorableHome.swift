@@ -1,14 +1,11 @@
 import Foundation
 import Observation
 
-enum FlyoutSource: String, CaseIterable, Codable {
-    case documents, desktop, screenshots, captures, downloads
+enum FlyoutSource: String, CaseIterable {
+    case captures, downloads
 
     var title: String {
         switch self {
-        case .documents: "Documents"
-        case .desktop: "Desktop"
-        case .screenshots: "Screenshots"
         case .captures: "Oa Captures"
         case .downloads: "Downloads"
         }
@@ -21,7 +18,7 @@ enum FlyoutSource: String, CaseIterable, Codable {
 final class StorableHome {
     private struct Stored: Codable {
         var lastSelectedHomePage: LibrarySection
-        var flyoutSources: Set<FlyoutSource>?
+        var flyoutSources: [String]?
     }
 
     @ObservationIgnored private let url: URL
@@ -36,7 +33,9 @@ final class StorableHome {
     private func save() {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let stored = Stored(lastSelectedHomePage: lastSelectedHomePage, flyoutSources: flyoutSources)
+        let stored = Stored(
+            lastSelectedHomePage: lastSelectedHomePage,
+            flyoutSources: FlyoutSource.allCases.filter(flyoutSources.contains).map(\.rawValue))
         try? encoder.encode(stored).write(to: url, options: .atomic)
     }
 
@@ -44,6 +43,7 @@ final class StorableHome {
         url = directory.appendingPathComponent("home.json")
         let stored = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
         lastSelectedHomePage = stored?.lastSelectedHomePage ?? .downloads
-        flyoutSources = stored?.flyoutSources ?? Set(FlyoutSource.allCases)
+        flyoutSources =
+            stored?.flyoutSources.map { Set($0.compactMap(FlyoutSource.init(rawValue:))) } ?? Set(FlyoutSource.allCases)
     }
 }

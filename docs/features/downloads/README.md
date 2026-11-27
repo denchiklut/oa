@@ -47,8 +47,9 @@ name and age. A running download shows its own progress ring, "32.6/94.4 MB ·
 finished row drags out as a file.
 
 Right-click or Control-click the Library button to choose which sources appear in
-the flyout. Documents, Desktop, Screenshots, Oa Captures and Downloads start
-enabled. The selection applies across windows and persists across launches.
+the flyout. Oa only includes captures saved to its Library and downloads started
+in Oa, wherever the download is saved. Both sources start enabled. The selection
+applies across windows and persists across launches.
 Right-click a saved capture to copy the image, send it via iMessage or AirDrop,
 or delete it. Captures saved with a full source URL also offer Open Source URL
 and Copy Source URL.
