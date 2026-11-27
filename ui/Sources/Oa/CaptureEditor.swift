@@ -16,6 +16,8 @@ struct CaptureEditor: View {
     @State private var textID: UUID?
     @FocusState private var typing: Bool
     @State private var importing = false
+    @State private var viewport = CaptureViewport()
+    @State private var panStart: CaptureViewport?
 
     init(
         result: CapturedRegion, palette: WindowTheme.PrimaryColorPalette, cancel: @escaping () -> Void,
@@ -41,18 +43,20 @@ struct CaptureEditor: View {
         GeometryReader { geometry in
             let rect = AVMakeRect(
                 aspectRatio: pixels, insideRect: CGRect(origin: .zero, size: geometry.size).insetBy(dx: 20, dy: 20))
-            let scale = rect.width / pixels.width
+            let transform = viewport.transform(image: pixels, in: rect.size)
+            let scale = transform.a
             ZStack(alignment: .topLeading) {
                 Backdrop(onClick: finish, color: .black.withAlphaComponent(0.72))
                 KeyTrap(onReturn: finish, onEscape: cancel)
                 ZStack(alignment: .topLeading) {
                     AnnotatedCapture(
-                        image: result.original, annotations: marks, selected: selected, editingText: textID
+                        image: result.original, annotations: marks, viewport: viewport, selected: selected,
+                        editingText: textID
                     )
-                    .contentShape(Rectangle()).gesture(gesture(scale: scale))
+                    .contentShape(Rectangle()).gesture(gesture(transform: transform, size: rect.size))
                     .simultaneousGesture(
                         SpatialTapGesture(count: 2).onEnded { tap in
-                            let point = CGPoint(x: tap.location.x / scale, y: tap.location.y / scale)
+                            let point = tap.location.applying(transform.inverted())
                             if let mark = marks.last(where: {
                                 $0.tool == .text && $0.contains(point, tolerance: 3 / scale)
                             }) {
@@ -63,6 +67,7 @@ struct CaptureEditor: View {
                         })
                     if let i = marks.firstIndex(where: { $0.id == textID }) {
                         let mark = marks[i]
+                        let frame = mark.bounds.applying(transform)
                         TextField(
                             "Text",
                             text: Binding(
@@ -75,12 +80,15 @@ struct CaptureEditor: View {
                         )
                         .textFieldStyle(.plain).font(.system(size: mark.width * 6 * scale, weight: .semibold))
                         .foregroundStyle(mark.color).focused($typing)
-                        .frame(width: max(90, mark.bounds.width * scale + 16), alignment: .leading)
-                        .offset(x: mark.bounds.minX * scale, y: mark.bounds.minY * scale)
+                        .frame(width: max(90, frame.width + 16), alignment: .leading)
+                        .offset(x: frame.minX, y: frame.minY)
                         .onAppear { typing = true }.onSubmit { endText() }
                     }
                 }
                 .frame(width: rect.width, height: rect.height)
+                .scaleEffect(viewport.pinchScale)
+                .background(.white)
+                .background { CaptureViewportGestures(viewport: $viewport, enabled: drag == nil && panStart == nil) }
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .position(x: rect.midX, y: rect.midY)
                 toolbar
@@ -88,10 +96,13 @@ struct CaptureEditor: View {
                         x: min(rect.minX + 12, max(4, geometry.size.width - 280)), y: max(4, rect.maxY - 56))
                 if let mark = marks.first(where: { $0.id == selected }), mark.tool != .image, textID == nil, drag == nil
                 {
-                    palette(mark: mark)
-                        .position(
-                            x: min(max(96, rect.minX + mark.bounds.midX * scale), geometry.size.width - 96),
-                            y: max(40, rect.minY + mark.bounds.minY * scale - 48))
+                    let frame = mark.bounds.applying(transform)
+                    if CGRect(origin: .zero, size: rect.size).intersects(frame.insetBy(dx: -1, dy: -1)) {
+                        palette(mark: mark)
+                            .position(
+                                x: min(max(96, rect.minX + frame.midX), geometry.size.width - 96),
+                                y: max(40, rect.minY + frame.minY - 48))
+                    }
                 }
             }
             .fileImporter(isPresented: $importing, allowedContentTypes: [.image]) { response in
@@ -100,10 +111,10 @@ struct CaptureEditor: View {
                 defer { if scoped { file.stopAccessingSecurityScopedResource() } }
                 guard let image = NSImage(contentsOf: file)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
                 else { tool = .select; return }
+                let visible = CGRect(origin: .zero, size: rect.size).applying(transform.inverted())
                 let frame = AVMakeRect(
                     aspectRatio: CGSize(width: image.width, height: image.height),
-                    insideRect: CGRect(origin: .zero, size: pixels).insetBy(
-                        dx: pixels.width * 0.2, dy: pixels.height * 0.2))
+                    insideRect: visible.insetBy(dx: visible.width * 0.2, dy: visible.height * 0.2))
                 remember()
                 let mark = CaptureAnnotation(
                     tool: .image, points: [frame.origin, CGPoint(x: frame.maxX, y: frame.maxY)], color: color,
@@ -192,11 +203,18 @@ struct CaptureEditor: View {
         }.fixedSize()
     }
 
-    private func gesture(scale: CGFloat) -> some Gesture {
+    private func gesture(transform: CGAffineTransform, size: CGSize) -> some Gesture {
         let pixels = self.pixels
+        let scale = transform.a
         return DragGesture(minimumDistance: 0).onChanged { value in
             func point(_ p: CGPoint) -> CGPoint {
-                CGPoint(x: min(pixels.width, max(0, p.x / scale)), y: min(pixels.height, max(0, p.y / scale)))
+                let imagePoint = p.applying(transform.inverted())
+                return CGPoint(x: min(pixels.width, max(0, imagePoint.x)), y: min(pixels.height, max(0, imagePoint.y)))
+            }
+            if var start = panStart {
+                start.pan(by: value.translation, in: size)
+                viewport = start
+                return
             }
             let start = point(value.startLocation), current = point(value.location)
             if drag == nil {
@@ -212,7 +230,12 @@ struct CaptureEditor: View {
                         drag = Drag(index: arrow, original: marks[arrow].points, endpoint: handle)
                     } else {
                         guard let i = marks.lastIndex(where: { $0.contains(start, tolerance: 6 / scale) }) else {
-                            selected = nil; return
+                            selected = nil
+                            if viewport.zoom > 1 {
+                                panStart = viewport
+                                viewport.pan(by: value.translation, in: size)
+                            }
+                            return
                         }
                         selected = marks[i].id
                         remember()
@@ -241,6 +264,7 @@ struct CaptureEditor: View {
                 }
             }
         }.onEnded { _ in
+            panStart = nil
             guard let drag else { return }
             if drag.creating {
                 selected = marks[drag.index].id

@@ -89,13 +89,15 @@ struct AnnotatedCapture: View {
     let image: CGImage
     var showsOriginal = true
     let annotations: [CaptureAnnotation]
+    var viewport = CaptureViewport()
     var selected: UUID?
     var editingText: UUID?
 
     var body: some View {
         Canvas { context, size in
-            let scale = size.width / CGFloat(image.width)
-            context.scaleBy(x: scale, y: size.height / CGFloat(image.height))
+            let transform = viewport.transform(image: CGSize(width: image.width, height: image.height), in: size)
+            let scale = transform.a
+            context.concatenate(transform)
             if showsOriginal {
                 context.draw(
                     Image(decorative: image, scale: 1), in: CGRect(x: 0, y: 0, width: image.width, height: image.height)
