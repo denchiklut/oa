@@ -12,7 +12,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     private let didClose: (BrowserWindowController) -> Void
     private var asking = false
     private var isClosing = false
-    private let downloadPreview = DownloadPreviewWindow()
+    private let filePreview = WindowPreviewPanel()
     private let extensionPopup = ExtensionPopupWindow()
     private var modalItemSwitcher: (state: ModalItemSwitcher, controller: ModalItemSwitcherWindowController)?
     private var fullscreenPage: FullscreenPage?
@@ -124,7 +124,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             }
         }
         observeTitle()
-        observeDownloadPreview()
+        observeFilePreview()
         observeLittleMoveMenu()
         observeExtensionPopup()
         observeModalItemSwitcher()
@@ -199,14 +199,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowDidMove(_ notification: Notification) { saveLittleFrame() }
     func windowDidEndLiveResize(_ notification: Notification) { saveLittleFrame() }
 
-    private func observeDownloadPreview() {
+    private func observeFilePreview() {
         let shown = withObservationTracking {
-            model.previewedDownload != nil
+            model.previewedDownload != nil || model.previewedMedia != nil
         } onChange: { [weak self] in
-            Task { @MainActor in self?.observeDownloadPreview() }
+            Task { @MainActor in self?.observeFilePreview() }
         }
         guard let window else { return }
-        if shown { downloadPreview.show(over: window, model: model) } else { downloadPreview.close() }
+        if shown {
+            filePreview.show(over: window, onClose: model.closeFilePreview) { PreviewContent(model: model) }
+        } else {
+            filePreview.close()
+        }
     }
 
     private func observeLittleMoveMenu() {
@@ -345,7 +349,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         viewTimer?.cancel()
         model.dismissModalItemSwitcher()
         modalItemSwitcher?.controller.close()
-        downloadPreview.close()
+        filePreview.close()
         littleMoveMenu.close()
         extensionPopup.close()
         webDialog?.end()
@@ -579,7 +583,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             return model.peek != nil
         }
         if item.action == #selector(closeTab(_:)) {
-            item.isHidden = model.previewedDownload != nil
+            item.isHidden = model.previewedDownload != nil || model.previewedMedia != nil
             if item.isHidden { return false }
         }
         if model.dialog != nil || model.extensionRequest != nil { return false }

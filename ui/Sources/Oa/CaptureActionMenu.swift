@@ -6,10 +6,12 @@ import UniformTypeIdentifiers
 @MainActor
 @Observable
 final class CapturedRegion {
+    let original: CGImage
+    var annotations: [CaptureAnnotation] = []
     var image: CGImage
     var savedFile: URL?
 
-    init(image: CGImage) { self.image = image }
+    init(image: CGImage) { original = image; self.image = image }
 
     func png(_ replacement: CGImage? = nil) throws -> Data {
         guard let data = NSBitmapImageRep(cgImage: replacement ?? image).representation(using: .png, properties: [:])
@@ -25,7 +27,7 @@ struct CaptureActionMenu: View {
     let model: WindowModel
     let pageID: UUID
     let retake: () -> Void
-    let edited: () -> Void
+    let edit: () -> Void
 
     private enum Action: String, CaseIterable {
         case library = "Save to Library", copy = "Copy", save = "Save…", message = "Send via iMessage…"
@@ -46,7 +48,6 @@ struct CaptureActionMenu: View {
 
     @State private var query = ""
     @State private var hovered: Action?
-    @State private var editing = false
     @FocusState private var searching: Bool
 
     private var matches: [Action] {
@@ -98,16 +99,6 @@ struct CaptureActionMenu: View {
         .background(Color(red: 0.125, green: 0.109, blue: 0.21), in: RoundedRectangle(cornerRadius: 8))
         .environment(\.colorScheme, .dark)
         .onAppear { searching = true }
-        .sheet(isPresented: $editing) {
-            CaptureEditor(image: result.image) { image in
-                do {
-                    if let file = result.savedFile { try model.captureLibrary.update(file, with: result.png(image)) }
-                    result.image = image
-                    edited()
-                    editing = false
-                } catch { model.window?.presentError(error) }
-            }
-        }
     }
 
     private func perform(_ action: Action) {
@@ -139,7 +130,7 @@ struct CaptureActionMenu: View {
                     return
                 }
                 service.perform(withItems: items)
-            case .edit: editing = true
+            case .edit: edit()
             case .retake: retake()
             case .easel: break
             }

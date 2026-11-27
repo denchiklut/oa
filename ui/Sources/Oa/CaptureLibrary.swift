@@ -9,8 +9,19 @@ final class CaptureLibrary {
 
     private(set) var revisions: [URL: UUID] = [:]
 
+    private let hiddenFile: URL
+    private(set) var hidden: Set<URL>
+
+    func hide(_ file: URL) throws {
+        let next = hidden.union([file])
+        try JSONEncoder().encode(next).write(to: hiddenFile, options: .atomic)
+        hidden = next
+    }
+
     init(directory: URL) {
-        self.directory = directory.appendingPathComponent("Captures", isDirectory: true)
+        hiddenFile = directory.appendingPathComponent("hidden-media.json")
+        hidden = (try? JSONDecoder().decode(Set<URL>.self, from: Data(contentsOf: hiddenFile))) ?? []
+        self.directory = directory.resolvingSymlinksInPath().appendingPathComponent("Captures", isDirectory: true)
         files =
             ((try? FileManager.default.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: nil)) ?? [])
             .filter { $0.pathExtension == "png" }.sorted { $0.lastPathComponent > $1.lastPathComponent }

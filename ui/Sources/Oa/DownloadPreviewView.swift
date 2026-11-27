@@ -7,20 +7,20 @@ import UniformTypeIdentifiers
 /// Arc's preview is a borderless window of its own, the size of the browser window and above it, that takes the
 /// keyboard and never becomes main: switching apps and back returns the keyboard to it, not to the page beneath.
 @MainActor
-final class DownloadPreviewWindow {
+final class WindowPreviewPanel {
     private var panel: PreviewPanel?
     private var resizing: NSObjectProtocol?
 
-    func show(over parent: NSWindow, model: WindowModel) {
+    func show(over parent: NSWindow, onClose: @escaping () -> Void, @ViewBuilder content makeContent: () -> some View) {
         guard panel == nil else { return }
         let panel = PreviewPanel(
             contentRect: parent.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
-        panel.onCloseKey = { [weak model] in model?.closeDownloadPreview() }
+        panel.onCloseKey = onClose
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        let content = NSHostingView(rootView: PreviewContent(model: model))
+        let content = NSHostingView(rootView: makeContent())
         content.wantsLayer = true
         content.layer?.cornerRadius = Self.cornerRadius
         content.layer?.masksToBounds = true
@@ -79,11 +79,15 @@ final class DownloadPreviewWindow {
 }
 
 /// Reads the model in its own body, so the preview follows ‹ and › and closes with it.
-private struct PreviewContent: View {
+struct PreviewContent: View {
     let model: WindowModel
 
     var body: some View {
-        if let entry = model.previewedDownload { DownloadPreviewView(model: model, entry: entry) }
+        if let file = model.previewedMedia {
+            MediaPreview(model: model, item: file)
+        } else if let entry = model.previewedDownload {
+            DownloadPreviewView(model: model, entry: entry)
+        }
     }
 }
 
@@ -94,29 +98,12 @@ struct DownloadPreviewView: View {
     let entry: DownloadsStore.Entry
 
     var body: some View {
-        GeometryReader { geometry in
-            let outline = RoundedRectangle(cornerRadius: 16, style: .continuous)
-            ZStack {
-                Backdrop(onClick: model.closeDownloadPreview, color: NSColor.black.withAlphaComponent(0.7))
-                KeyTrap(onReturn: {}, onEscape: model.closeDownloadPreview)
-                // As measured in Arc, with no shadow. The strip's material is Oa's own: Arc's is unknown.
-                VStack(spacing: 0) {
-                    header.frame(height: 46).background(.regularMaterial)
-                    if let file = entry.download.file { FileView(file: file).padding(16) }
-                }
-                .background { if let file = entry.download.file { BlurredCopy(file: file) } }
-                .clipShape(outline)
-                // The enlarged blur would otherwise intercept backdrop clicks beyond the visible card.
-                .contentShape(outline)
-                .frame(
-                    width: max(geometry.size.width * 0.8 - 50, 100), height: max(geometry.size.height * 0.8 - 50, 100))
-            }
-        }
+        FilePreviewCard(file: entry.download.file, close: model.closeFilePreview) { header }
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Button(action: model.closeDownloadPreview) { Image(systemName: "xmark") }
+            Button(action: model.closeFilePreview) { Image(systemName: "xmark") }
                 .help("Close")
             Button {
                 model.previewAdjacentDownload(-1)
@@ -151,7 +138,7 @@ struct DownloadPreviewView: View {
             if let app = entry.application {
                 Button("Open in \(app)") {
                     model.downloads.open(entry)
-                    model.closeDownloadPreview()
+                    model.closeFilePreview()
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -159,6 +146,32 @@ struct DownloadPreviewView: View {
         .buttonStyle(.borderless)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+struct FilePreviewCard<Header: View>: View {
+    let file: URL?
+    let close: () -> Void
+    @ViewBuilder let header: Header
+    var body: some View {
+        GeometryReader { geometry in
+            let outline = RoundedRectangle(cornerRadius: 16, style: .continuous)
+            ZStack {
+                Backdrop(onClick: close, color: NSColor.black.withAlphaComponent(0.7))
+                KeyTrap(onReturn: {}, onEscape: close)
+                // As measured in Arc, with no shadow. The strip's material is Oa's own: Arc's is unknown.
+                VStack(spacing: 0) {
+                    header.frame(height: 46).background(.regularMaterial)
+                    if let file { FileView(file: file).padding(16) }
+                }
+                .background { if let file { BlurredCopy(file: file) } }
+                .clipShape(outline)
+                // The enlarged blur would otherwise intercept backdrop clicks beyond the visible card.
+                .contentShape(outline)
+                .frame(
+                    width: max(geometry.size.width * 0.8 - 50, 100), height: max(geometry.size.height * 0.8 - 50, 100))
+            }
+        }
     }
 }
 
