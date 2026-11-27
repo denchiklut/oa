@@ -42,6 +42,7 @@ final class SidebarStore {
     @ObservationIgnored let contentSnapshots = ContentSnapshotClient()
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored let keyBindings: KeyBindingsClient
+    @ObservationIgnored let developerMode: DeveloperModeClient
     @ObservationIgnored let linkRouting: LinkRoutingClient
     @ObservationIgnored let sessionRestoration: SessionRestorationClient
     @ObservationIgnored var didCreateProfile: (UUID) -> Void = { _ in }
@@ -54,6 +55,7 @@ final class SidebarStore {
         commandBarPicks = CommandBarPicks(directory: directory)
         home = StorableHome(directory: directory)
         keyBindings = KeyBindingsClient(directory: directory)
+        developerMode = DeveloperModeClient(directory: directory)
         linkRouting = LinkRoutingClient(directory: directory)
         sessionRestoration = SessionRestorationClient(directory: directory)
         state = persistence.loadSidebar() ?? .initial()

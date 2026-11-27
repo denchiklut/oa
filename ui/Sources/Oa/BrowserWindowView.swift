@@ -171,8 +171,16 @@ struct BrowserWindowView: View {
         let fill =
             model.placeholder == nil && model.page == nil
             ? Color.white.opacity(dark ? 0.1 : 0.666) : dark ? Color.black : .white
+        let developer = model.placeholder == nil && model.developerMode.isEnabled(for: model.page?.url)
+        let regularToolbar = showsToolbar && !developer
         return VStack(spacing: 0) {
-            if showsToolbar {
+            if developer, let page = model.page, let tabID = model.selectedTabID {
+                DeveloperToolbar(
+                    model: model, tabID: tabID, page: page,
+                    showSidebar: model.sidebarMode == .noChrome ? { layout.setSidebarMode(.anchored) } : nil
+                ) { SplitViewMenuButton(model: model) }
+                .id(page.id)
+            } else if showsToolbar {
                 // A toolbar for each page, so a tab switch shows the page's colour at once, as Arc's toolbar sets its
                 // colour without animation when its page changes.
                 PageToolbar(model: model, layout: layout)
@@ -192,14 +200,14 @@ struct BrowserWindowView: View {
             // Arc's page starts 32 pt down under its toolbar; Oa's line under the bar is left in the strip, so the
             // strip takes as much of the page as Arc's.
             .windowContentGrabber(
-                model: model, hasContent: model.placeholder != nil || model.page != nil,
+                model: model, hasContent: model.placeholder != nil || model.page != nil, enabled: !developer,
                 barHeight: showsToolbar ? 32 : 0
             )
         }
-        .findInPage(of: model, on: model.placeholder == nil ? model.page : nil, hasTopBar: showsToolbar)
+        .findInPage(of: model, on: model.placeholder == nil ? model.page : nil, hasTopBar: developer || showsToolbar)
         .toast(of: model, on: model.page)
-        .onChange(of: showsToolbar ? model.page?.id : nil, initial: true) { _, _ in
-            model.trackToolbarPage(showsToolbar)
+        .onChange(of: regularToolbar ? model.page?.id : nil, initial: true) { _, _ in
+            model.trackToolbarPage(regularToolbar)
         }
         .onDisappear { model.trackToolbarPage(false) }
         // Faded, the fill would show through the page that covers it.

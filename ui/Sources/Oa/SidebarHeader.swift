@@ -23,7 +23,9 @@ struct SidebarHeader: View {
                 .buttonStyle(ChromeButtonStyle())
                 .accessibilityLabel(layout.sidebarPresentation == .locked ? "Hide sidebar" : "Lock sidebar")
                 Spacer(minLength: 0)
-                if !showsToolbar, layout.sidebarWidth >= 215 {
+                if !showsToolbar || model.developerMode.isEnabled(for: model.developerModeURL),
+                    layout.sidebarWidth >= 215
+                {
                     NavigationButtons(page: model.frontPage, size: CGSize(width: 32, height: 32), spacing: 2)
                 }
             }

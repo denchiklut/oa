@@ -268,9 +268,9 @@ Sources: Arc native Settings → Links and [2023 release notes][arc23].
 | Browsing-history viewer | ✅ | ✅ |
 | Chromium DevTools, inspector and console | ✅ | ✅ |
 | View page source | ✅ | ✅ |
-| Arc Developer Mode tabs | ✅ | ☐ |
-| Developer Mode for localhost and its subdomains † | ✅ | ☐ |
-| Toggle Developer Mode by shortcut † | ✅ | ☐ |
+| Arc Developer Mode tabs | ✅ | Developer toolbar and sidebar tab styling |
+| Developer Mode for localhost and its subdomains † | ✅ | ✅ |
+| Toggle Developer Mode by shortcut † | ✅ | Control-D bound to the per-site toggle |
 | Developer Mode JSON formatter installation † | ✅ | ☐ |
 | Browser task manager | ✅ | ☐ |
 | End a tab process from Task Manager | ✅ | ☐ |

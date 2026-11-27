@@ -366,6 +366,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func toggleDevTools(_ sender: Any?) {
         model.frontPage.map { $0.devTools.setOpen($0.devTools.display == nil) }
     }
+    @objc func toggleDeveloperMode(_ sender: Any?) { model.developerMode.toggle(for: model.developerModeURL) }
     @objc func inspectElements(_ sender: Any?) { model.frontPage?.devTools.inspect() }
     @objc func javaScriptConsole(_ sender: Any?) { model.frontPage?.devTools.toggleConsole() }
     @objc func networkInspector(_ sender: Any?) { model.frontPage?.devTools.toggleNetwork() }
@@ -633,6 +634,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
             guard let tabID = model.selectedTabID, !model.state.isFavorite(tabID) else { return false }
             item.title = model.state.isPinned(tabID) ? "Unpin Tab" : "Pin Tab"
             return true
+        }
+        if item.action == #selector(toggleDeveloperMode(_:)) {
+            let url = model.developerModeURL
+            item.isHidden = url == nil
+            item.title =
+                model.developerMode.isEnabled(for: url)
+                ? "Turn off Developer Mode for this site" : "Turn on Developer Mode for this site"
+            return url != nil
         }
         if item.action == #selector(toggleFavorite(_:)) {
             guard let tabID = model.selectedTabID else { return false }

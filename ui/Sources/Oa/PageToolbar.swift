@@ -138,7 +138,7 @@ extension TopBarColorClient {
 
 /// As seen in Arc: a menu at the pointer that opens an empty pane on a side of the page, as Add Split View does,
 /// and off while no tab is selected. Its ink and fills were measured over white and #111111.
-private struct SplitViewMenuButton: View {
+struct SplitViewMenuButton: View {
     let model: WindowModel
 
     var body: some View {
