@@ -110,6 +110,9 @@ struct DeveloperToolbar<Trailing: View>: View {
                         showingExtensions = false
                     }
                 }
+            pinnedExtensions
+                .environment(\.theme, chrome)
+                .environment(\.oaToolTipPalette, .developerToolbar(palette))
             trailing.environment(\.theme, chrome)
         }
         .task(id: page.id) { model.enteredDeveloperMode(for: tabID) }
@@ -127,6 +130,30 @@ struct DeveloperToolbar<Trailing: View>: View {
                 context.stroke(stripes, with: .color(accent.opacity(scheme == .dark ? 0.02 : 0.015)), lineWidth: 15)
             }
             .background(fill.color)
+        }
+    }
+
+    @ViewBuilder private var pinnedExtensions: some View {
+        let pinned = model.pinnedExtensionActions(for: page.profileID)
+        let slot: CGFloat = 28
+        if !pinned.isEmpty {
+            GeometryReader { geometry in
+                let capacity = max(0, Int(geometry.size.width / slot))
+                HStack(spacing: 0) {
+                    ForEach(pinned.suffix(capacity)) { action in
+                        PinnedExtensionButton(
+                            model: model, action: action, size: CGSize(width: slot, height: slot), cornerRadius: 6
+                        ) {
+                            if model.selectedTabID != tabID {
+                                model.select(tabID)
+                                page.activate()
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: CGFloat(pinned.count) * slot)
+            .frame(height: slot)
         }
     }
 
