@@ -67,7 +67,12 @@ struct SidebarProfile: Identifiable, Hashable, Codable {
     /// A name the engine hasn't taken yet: an older sidebar.json's, or a new install's "Personal".
     var pendingName: String?
 
-    private enum CodingKeys: String, CodingKey { case id, favoritesRootID, pendingName = "name" }
+    /// Oa remembers dismissal for the profile that owns these Favorites.
+    var dismissedFavoritesHint: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, favoritesRootID, pendingName = "name", dismissedFavoritesHint
+    }
 }
 
 struct SidebarSpace: Identifiable, Hashable, Codable {

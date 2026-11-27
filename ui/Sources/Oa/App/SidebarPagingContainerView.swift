@@ -40,7 +40,9 @@ struct SidebarPagingContainerView: View {
                     if let space {
                         let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
                         let favorites = model.state.favoriteEntries(for: space.id)
-                        let tiles = FavoritesGrid.slots(favorites, drag: current ? drag : nil)
+                        let grid = FavoritesGrid(
+                            model: model, layout: layout, profileID: space.profileID, favorites: favorites,
+                            drag: current ? drag : nil)
                         let trayExtensions =
                             global && !showsToolbar
                             ? PinnedExtensionLayout.trayActions(
@@ -49,7 +51,7 @@ struct SidebarPagingContainerView: View {
                             : []
                         let extensionsHeight = PinnedExtensionsGrid.height(for: trayExtensions.count, in: width)
                         let trayHeight =
-                            FavoritesGrid.height(for: tiles.filter { !$0.isLifted }.count, in: width) + 16
+                            grid.height
                             + (extensionsHeight > 0 ? extensionsHeight + 8 : 0)
                         SidebarSpacePage(
                             model: model, layout: layout, space: space,
@@ -83,9 +85,9 @@ struct SidebarPagingContainerView: View {
                             .padding(.horizontal, 8)
                     }
                     FavoritesGrid(
-                        model: model, layout: layout, slots: FavoritesGrid.slots(favorites, drag: shown ? drag : nil)
+                        model: model, layout: layout, profileID: run.space.profileID, favorites: favorites,
+                        drag: shown ? drag : nil
                     )
-                    .padding(8)
                     .frame(width: width)
                     .sidebarDragFrame { if shown { drag?.grid = $0 } }
                 }

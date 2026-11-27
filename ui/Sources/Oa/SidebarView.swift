@@ -466,7 +466,21 @@ struct FavoritesGrid: View {
 
     let model: WindowModel
     let layout: WindowLayoutController
-    let slots: [Slot]
+    let profileID: UUID
+    let favorites: [SidebarEntry]
+    let drag: SidebarDrag?
+
+    private var showsHint: Bool {
+        favorites.isEmpty
+            && (model.state.profile(profileID)?.dismissedFavoritesHint != true
+                || drag?.revealedFavoritesProfile == profileID)
+    }
+
+    private var slots: [Slot] { Self.slots(favorites, drag: drag) }
+
+    private var grid: Layout {
+        Layout(count: slots.filter { !$0.isLifted }.count, width: layout.sidebarWidth)
+    }
 
     /// The tiles as the drag leaves them: a dragged tile has left its place, and the slot opens where it would land.
     static func slots(_ favorites: [SidebarEntry], drag: SidebarDrag?) -> [Slot] {
@@ -485,21 +499,20 @@ struct FavoritesGrid: View {
 
     /// What the grid takes of the sidebar's height, so a Space's page starts under its profile's grid. It changes at
     /// once, so the list jumps as Arc's does.
-    static func height(for count: Int, in width: CGFloat) -> CGFloat {
-        Layout(count: count, width: width).height
+    var height: CGFloat {
+        if showsHint { return 105.5 }
+        return favorites.isEmpty ? 0 : grid.height + 16
     }
 
-    @Environment(\.sidebarDrag) private var drag
-
     var body: some View {
-        let shown = slots.filter { !$0.isLifted }
-        let grid = Layout(count: shown.count, width: layout.sidebarWidth)
-        ZStack(alignment: .topLeading) {
-            if shown.isEmpty {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
-                    .foregroundStyle(.quaternary)
-                    .frame(width: 47, height: 47)
+        let slots = self.slots
+        let grid = self.grid
+        return ZStack(alignment: .topLeading) {
+            if showsHint {
+                FavoritesHint(
+                    isTargeted: drag?.target?.section == .favorites,
+                    dismiss: model.state.profile(profileID)?.dismissedFavoritesHint == true
+                        ? nil : { model.dismissFavoritesHint(for: profileID) })
             }
             ForEach(Array(slots.enumerated()), id: \.element.id) { index, slot in
                 let origin = grid.origin(of: slot.isLifted ? 0 : index)
@@ -519,9 +532,56 @@ struct FavoritesGrid: View {
                 .opacity(slot.isLifted ? 0 : 1)
             }
         }
-        .animation(.spring(response: 0.23, dampingFraction: 1), value: shown.map(\.id))
+        .animation(.spring(response: 0.23, dampingFraction: 1), value: slots.filter { !$0.isLifted }.map(\.id))
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: grid.height, alignment: .top)
+        .padding([.horizontal, .top], 8)
+        .frame(height: height, alignment: .top)
+    }
+}
+
+private struct FavoritesHint: View {
+    let isTargeted: Bool
+    let dismiss: (() -> Void)?
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        VStack(spacing: 4) {
+            Image(systemName: "star.circle.fill")
+                .font(.system(size: 17))
+                .padding(.bottom, 2)
+                .accessibilityHidden(true)
+            Text("Drag to add Favorites")
+                .font(.system(size: 13, weight: .semibold))
+            Text("Favorites keep your most used sites and apps close")
+                .font(.system(size: 12))
+                .foregroundStyle(theme.foreground.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 150)
+        }
+        .foregroundStyle(theme.foreground)
+        .frame(maxWidth: .infinity)
+        .frame(height: 94)
+        .background(theme.modalButtonFill.opacity(0.28), in: shape)
+        .overlay {
+            shape.strokeBorder(theme.folderBackFill.opacity(0.55), style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+        }
+        .overlay(alignment: .topTrailing) {
+            if let dismiss {
+                Button(action: dismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(theme.foreground.opacity(0.7))
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
+                .accessibilityIdentifier("sidebarFavoritesEmptyStateDismissButton")
+                .padding(2)
+            }
+        }
+        .opacity(isTargeted ? 0.35 : 1)
     }
 }
 

@@ -1914,6 +1914,13 @@ final class WindowModel {
         store.edit { $0.togglePin(tabID) }
     }
 
+    func dismissFavoritesHint(for profileID: UUID) {
+        store.edit { state in
+            guard let index = state.profiles.firstIndex(where: { $0.id == profileID }) else { return }
+            state.profiles[index].dismissedFavoritesHint = true
+        }
+    }
+
     func toggleFavorite() {
         guard let tabID = selectedTabID else { return }
         if state.isFavorite(tabID) { unfavorite(tabID) } else { favorite(tabID, at: nil) }
