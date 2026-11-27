@@ -5,7 +5,12 @@ import Observation
 @Observable
 final class CaptureLibrary {
     let directory: URL
-    private(set) var files: [URL]
+    private(set) var items: [MediaItem]
+
+    private struct Metadata: Codable {
+        let date: Date
+        let address: String?
+    }
 
     private(set) var revisions: [URL: UUID] = [:]
 
@@ -20,19 +25,48 @@ final class CaptureLibrary {
 
     init(directory: URL) {
         hiddenFile = directory.appendingPathComponent("hidden-media.json")
-        hidden = (try? JSONDecoder().decode(Set<URL>.self, from: Data(contentsOf: hiddenFile))) ?? []
+        let hiddenFiles = (try? JSONDecoder().decode([URL].self, from: Data(contentsOf: hiddenFile))) ?? []
+        hidden = Set(hiddenFiles.map(MediaItem.canonicalFile))
         self.directory = directory.resolvingSymlinksInPath().appendingPathComponent("Captures", isDirectory: true)
-        files =
-            ((try? FileManager.default.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == "png" }.sorted { $0.lastPathComponent > $1.lastPathComponent }
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .creationDateKey]
+        let files =
+            (try? FileManager.default.contentsOfDirectory(
+                at: self.directory, includingPropertiesForKeys: Array(keys))) ?? []
+        items = files.compactMap { entry -> MediaItem? in
+            let file = MediaItem.canonicalFile(entry)
+            guard file.pathExtension == "png", let values = try? file.resourceValues(forKeys: keys),
+                values.isRegularFile == true
+            else { return nil }
+            let metadata = (try? Data(contentsOf: file.appendingPathExtension("json"))).flatMap {
+                try? JSONDecoder().decode(Metadata.self, from: $0)
+            }
+            return MediaItem(
+                file: file, date: metadata?.date ?? values.creationDate ?? .distantPast, isMovie: false,
+                captureTitle: metadata?.address ?? file.lastPathComponent)
+        }.sorted(by: MediaItem.newestFirst)
     }
 
-    func save(_ png: Data) throws -> URL {
+    func save(_ png: Data, from source: URL?) throws -> URL {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let stamp = Date.now.ISO8601Format().replacingOccurrences(of: ":", with: "-")
-        let file = directory.appendingPathComponent("Capture \(stamp) \(UUID().uuidString).png")
-        try png.write(to: file, options: .atomic)
-        files.insert(file, at: 0)
+        let date = Date.now
+        let stamp = date.ISO8601Format().replacingOccurrences(of: ":", with: "-")
+        let file = MediaItem.canonicalFile(
+            directory.appendingPathComponent("Capture \(stamp) \(UUID().uuidString).png"))
+        // Keep the page address in the library, outside the PNG that gets shared or exported.
+        var components = source.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: true) }
+        components?.user = nil
+        components?.password = nil
+        let address = components?.url.map { CommandBarRanking.readable($0) }
+        let metadataFile = file.appendingPathExtension("json")
+        try JSONEncoder().encode(Metadata(date: date, address: address)).write(to: metadataFile, options: .atomic)
+        do {
+            try png.write(to: file, options: .atomic)
+        } catch {
+            try? FileManager.default.removeItem(at: metadataFile)
+            throw error
+        }
+        items.insert(
+            MediaItem(file: file, date: date, isMovie: false, captureTitle: address ?? file.lastPathComponent), at: 0)
         return file
     }
 
@@ -42,9 +76,10 @@ final class CaptureLibrary {
     }
 
     func remove(_ file: URL) throws {
-        guard files.contains(file) else { return }
+        guard items.contains(where: { $0.file == file }) else { return }
         try FileManager.default.removeItem(at: file)
         revisions[file] = nil
-        files.removeAll { $0 == file }
+        items.removeAll { $0.file == file }
+        try? FileManager.default.removeItem(at: file.appendingPathExtension("json"))
     }
 }

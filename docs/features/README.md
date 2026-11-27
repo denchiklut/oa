@@ -345,7 +345,7 @@ Sources: Arc native Settings → Profiles; [2022][arc22], [2023][arc23],
 | Screenshot of the visible page | ✅ | ☐ |
 | Region capture and capture editing | ✅ | Click the developer toolbar camera or use ⇧⌘2, then drag to select a region. The Send To… menu offers Copy, Save, iMessage, editing, Retake, and Save to Library (Media). New Easel is disabled. |
 | Capture annotations | ✅ | Select and move annotations, insert an image or text, draw ellipses, rectangles, arrows, and freehand strokes, and change their color. Pinch or use the mouse wheel to zoom around the pointer, and scroll with two fingers to pan. Click outside the editor to apply. |
-| Media gallery | ✅ | Search captures, screenshots, recordings, and downloaded media by filename. Click to preview, or use the context menu to copy, share, reveal, or hide a file. |
+| Media gallery | ✅ | Hover over Library for the four most recent downloads and saved captures, newest at the bottom. Click a capture for a framed preview with its source address. Search Media by filename or capture address, or use the context menu to copy, share, reveal, or hide a file. |
 | Capture Full Page | ✅ | ☐ |
 | Capture in Portrait Mode | ✅ | Hover the Portrait button to preview the background and watermark. Click to copy, or use the preview’s context menu to save a PNG. |
 | Copy a capture's source URL † | ✅ | ☐ |

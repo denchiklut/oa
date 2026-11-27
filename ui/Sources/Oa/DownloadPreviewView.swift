@@ -1,3 +1,4 @@
+import AVFoundation
 import AppKit
 import Quartz
 import QuickLookThumbnailing
@@ -105,16 +106,7 @@ struct DownloadPreviewView: View {
         HStack(spacing: 10) {
             Button(action: model.closeFilePreview) { Image(systemName: "xmark") }
                 .help("Close")
-            Button {
-                model.previewAdjacentDownload(-1)
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            Button {
-                model.previewAdjacentDownload(1)
-            } label: {
-                Image(systemName: "chevron.right")
-            }
+            FilePreviewNavigation(model: model)
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name)
                     .font(.system(size: 13, weight: .semibold))
@@ -149,8 +141,23 @@ struct DownloadPreviewView: View {
     }
 }
 
+struct FilePreviewNavigation: View {
+    let model: WindowModel
+    var body: some View {
+        ForEach([-1, 1], id: \.self) { offset in
+            let next = model.adjacentPreview(offset)
+            Button {
+                if let next { model.showFilePreview(next) }
+            } label: {
+                Image(systemName: offset < 0 ? "chevron.left" : "chevron.right")
+            }.disabled(next == nil).accessibilityLabel(offset < 0 ? "Previous" : "Next")
+        }
+    }
+}
+
 struct FilePreviewCard<Header: View>: View {
     let file: URL?
+    var captureTitle: String?
     let close: () -> Void
     @ViewBuilder let header: Header
     var body: some View {
@@ -162,15 +169,50 @@ struct FilePreviewCard<Header: View>: View {
                 // As measured in Arc, with no shadow. The strip's material is Oa's own: Arc's is unknown.
                 VStack(spacing: 0) {
                     header.frame(height: 46).background(.regularMaterial)
-                    if let file { FileView(file: file).padding(16) }
+                    if let file, let captureTitle, let image = imageFile(file) {
+                        CapturePreviewImage(image: image, title: captureTitle).padding(16)
+                    } else if let file {
+                        FileView(file: file).padding(16)
+                    }
                 }
-                .background { if let file { BlurredCopy(file: file) } }
+                .background {
+                    if captureTitle != nil { Color(white: 0.055) } else if let file { BlurredCopy(file: file) }
+                }
                 .clipShape(outline)
                 // The enlarged blur would otherwise intercept backdrop clicks beyond the visible card.
                 .contentShape(outline)
                 .frame(
                     width: max(geometry.size.width * 0.8 - 50, 100), height: max(geometry.size.height * 0.8 - 50, 100))
             }
+        }
+    }
+}
+
+private struct CapturePreviewImage: View {
+    let image: NSImage
+    let title: String
+
+    var body: some View {
+        GeometryReader { geometry in
+            let size = CGSize(width: max(1, geometry.size.width - 20), height: max(1, geometry.size.height - 64))
+            let rect = AVMakeRect(aspectRatio: image.size, insideRect: CGRect(origin: .zero, size: size))
+            VStack(spacing: 8) {
+                Image(nsImage: image).resizable().interpolation(.high)
+                    .frame(width: rect.width, height: rect.height)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                Label(title, systemImage: "link")
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1).truncationMode(.middle)
+                    .frame(width: rect.width, height: 36)
+                    .foregroundStyle(.white.opacity(0.86))
+                    .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+            }
+            .padding(9)
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .strokeBorder(.white.opacity(0.32), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

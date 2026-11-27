@@ -95,7 +95,8 @@ final class WindowModel {
     private(set) var sidebarMode: SidebarMode
     private(set) var sidebarWidth: CGFloat
     private var mediaOrder: [MediaItem] = []
-    var previewedMedia: MediaItem?
+    private var previewingFlyout = false
+    private(set) var previewedMedia: MediaItem?
     private var previewedDownloadID: Download.ID?
     private(set) var dialogs: [UUID: [PageDialog]] = [:]
     /// By page, as Arc's ADK keeps `pendingPermissionRequests`; the engine sends one at a time, while the page is front.
@@ -1974,43 +1975,75 @@ final class WindowModel {
         previewedDownloadID.flatMap { id in downloads.entries.first { $0.id == id } }
     }
 
-    /// A click on a download, as Arc: a finished one is previewed over the window; one still running opens when it
-    /// finishes.
+    var flyoutEntries: [LibraryFile] {
+        let captures = captureLibrary.items.lazy.filter {
+            !self.captureLibrary.hidden.contains($0.file) && FileManager.default.fileExists(atPath: $0.file.path)
+        }.prefix(4)
+        let recent = downloads.flyoutEntries.map(LibraryFile.download) + captures.map(LibraryFile.media)
+        return Array(recent.sorted { $0.date > $1.date }.prefix(4))
+    }
+
+    func previewFromFlyout(_ file: LibraryFile) {
+        if case .download(let entry) = file, entry.isRunning { downloads.toggleOpenWhenFinished(entry); return }
+        guard file.canPreview(in: captureLibrary) else { return }
+        previewingFlyout = true
+        showFilePreview(file)
+    }
+
     func activate(_ entry: DownloadsStore.Entry) {
         if entry.isRunning {
             downloads.toggleOpenWhenFinished(entry)
         } else if entry.download.status == .finished, entry.fileExists {
-            previewedDownloadID = entry.id
+            previewingFlyout = false
+            showFilePreview(.download(entry))
         }
     }
 
     func previewMedia(_ item: MediaItem, among items: [MediaItem]) {
+        previewingFlyout = false
         mediaOrder = items
-        previewedMedia = item
+        showFilePreview(.media(item))
     }
 
-    func adjacentMedia(_ offset: Int) -> MediaItem? {
-        let visible = mediaOrder.filter { !captureLibrary.hidden.contains($0.file) }
-        guard let item = previewedMedia, let index = visible.firstIndex(of: item),
-            visible.indices.contains(index + offset)
+    func showFilePreview(_ file: LibraryFile) {
+        switch file {
+        case .media(let item):
+            previewedDownloadID = nil
+            previewedMedia = item
+        case .download(let entry):
+            previewedMedia = nil
+            previewedDownloadID = entry.id
+        }
+    }
+
+    func adjacentPreview(_ offset: Int) -> LibraryFile? {
+        guard offset == 1 || offset == -1 else { return nil }
+        guard let current = previewedMedia.map(LibraryFile.media) ?? previewedDownload.map(LibraryFile.download)
         else { return nil }
-        return visible[index + offset]
+        let order: [LibraryFile]
+        if previewingFlyout {
+            order = flyoutEntries
+        } else if previewedMedia != nil {
+            order = mediaOrder.map(LibraryFile.media)
+        } else {
+            order = downloads.entries.map(LibraryFile.download)
+        }
+        guard let index = order.firstIndex(where: { $0.id == current.id }) else { return nil }
+        var candidate = index + offset
+        while order.indices.contains(candidate) {
+            let file = order[candidate]
+            if file.canPreview(in: captureLibrary) { return file }
+            candidate += offset
+        }
+        return nil
     }
 
     func closeFilePreview() {
         previewedMedia = nil
         mediaOrder = []
         previewedDownloadID = nil
+        previewingFlyout = false
         frontPage?.activate()
-    }
-
-    /// Arc's ‹ and ›, over the finished downloads in the Library's order.
-    func previewAdjacentDownload(_ offset: Int) {
-        let files = downloads.entries.filter { $0.download.status == .finished && $0.fileExists }
-        guard let index = files.firstIndex(where: { $0.id == previewedDownloadID }),
-            files.indices.contains(index + offset)
-        else { return }
-        previewedDownloadID = files[index + offset].id
     }
 
     /// As seen in Arc: a matching route wins; else back to the Space it came from (1.19.1), else the shown one. The
