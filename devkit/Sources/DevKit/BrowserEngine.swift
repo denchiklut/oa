@@ -634,6 +634,16 @@ public struct RestoredPage {
     }
 }
 
+/// Identifies one committed frame document for its lifetime.
+public struct PageFrameID: Hashable, Sendable {
+    package let token: String
+    package init(token: String) { self.token = token }
+}
+
+public enum StyleSheetResult: Int, Sendable {
+    case inserted, frameGone, rendererCrashed, disconnected, timedOut, unsupported
+}
+
 /// One page and its history. Observable, so views that read it update as it loads.
 @MainActor
 public protocol Page: AnyObject, Observable {
@@ -720,6 +730,10 @@ public protocol Page: AnyObject, Observable {
     func duplicate() -> (any Page)?
     /// Moves the live page into another of the app's windows. History and the engine's tab identity stay.
     func move(toWindow windowID: UUID)
+    /// Live, committed frame documents in breadth-first order, starting at the main frame.
+    var frameIDs: [PageFrameID] { get }
+    /// Inserts author CSS into this document. A timeout leaves insertion unconfirmed.
+    func insertStyleSheet(_ css: String, in frame: PageFrameID) async -> StyleSheetResult
     /// Asks now for the page's last frame, for a window it leaves, as Arc's ADK does with a completion so a move need
     /// not wait for it. Nil while it has nothing drawn.
     func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void)

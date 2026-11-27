@@ -7,6 +7,11 @@ mojom("ad_blocker_mojom") {
   public_deps = [ "//mojo/public/mojom/base" ]
 }
 
+mojom("page_operations_mojom") {
+  sources = [ "common/page_operations.mojom" ]
+  public_deps = [ "//mojo/public/mojom/base" ]
+}
+
 source_set("oa") {
   sources = [
     "app/engine.mm",
@@ -26,6 +31,7 @@ source_set("oa") {
 
     "browser/page_impl.h",
     "browser/page_impl.mm",
+    "browser/page_operations.cc",
     "browser/preferences_impl.cc",
     "browser/profile_services.cc",
     "browser/profile_services.h",
@@ -80,6 +86,7 @@ source_set("oa") {
 
   deps = [
     ":ad_blocker_mojom",
+    ":page_operations_mojom",
     "//base",
     "//chrome/browser",
     "//chrome/browser:chrome_browser_application_mac",

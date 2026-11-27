@@ -244,6 +244,9 @@ import AppKit
     func stopFinding()
     @objc(moveToWindowWithIdentifier:) func move(toWindowIdentifier identifier: String)
     func clonePage() -> CorePage?
+    var frameIDs: [String] { get }
+    @objc(insertStyleSheet:inFrame:completion:)
+    func insertStyleSheet(_ css: String, inFrame frame: String, completion: @escaping (Int) -> Void)
     @objc(snapshotWithCompletion:) func snapshot(completion: @escaping (NSImage?) -> Void)
     func startObservingThumbnails()
     func stopObservingThumbnails()

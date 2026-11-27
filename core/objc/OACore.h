@@ -222,6 +222,14 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
 - (void)page:(OAPage*)page didCloseWithSessionID:(int32_t)sessionID;
 @end
 
+typedef NS_ENUM(NSInteger, OAStyleSheetResult) {
+  OAStyleSheetResultInserted,
+  OAStyleSheetResultFrameGone,
+  OAStyleSheetResultRendererCrashed,
+  OAStyleSheetResultDisconnected,
+  OAStyleSheetResultTimedOut,
+};
+
 @interface OAPage : NSObject
 @property(nonatomic, weak, nullable) id<OAPageDelegate> delegate;
 // Nil once the page is closed or dropped.
@@ -279,6 +287,10 @@ typedef NS_ENUM(NSInteger, OAPageDevToolsDisplay) {
 - (void)stopFinding;
 - (void)moveToWindowWithIdentifier:(NSString*)identifier;
 - (nullable OAPage*)clonePage;
+@property(nonatomic, readonly) NSArray<NSString*>* frameIDs;
+- (void)insertStyleSheet:(NSString*)css
+                 inFrame:(NSString*)frameID
+              completion:(void (^)(OAStyleSheetResult result))completion;
 // Nil while the page has nothing drawn, for example when no window shows it.
 - (void)snapshotWithCompletion:(void (^)(NSImage* _Nullable image))completion;
 // As adding and removing an observer of ArcCore's thumbnails generator: while

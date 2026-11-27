@@ -7,12 +7,15 @@
 #include "chrome/common/chrome_isolated_world_ids.h"
 #include "chrome/renderer/chrome_content_renderer_client.h"
 #include "content/public/renderer/render_frame.h"
+#include "content/public/renderer/render_frame_observer.h"
 #include "content/public/renderer/render_frame_visitor.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/render_thread_observer.h"
 #include "mojo/public/cpp/bindings/associated_receiver.h"
+#include "mojo/public/cpp/bindings/associated_receiver_set.h"
 #include "oa/common/ad_block_rules.h"
 #include "oa/common/ad_blocker.mojom.h"
+#include "oa/common/page_operations.mojom.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
 #include "third_party/blink/public/platform/url_loader_throttle_provider.h"
@@ -203,6 +206,39 @@ class AdBlockerAgent : public content::RenderThreadObserver,
   std::map<std::pair<std::string, std::string>, std::string> styles_;
 };
 
+class PageOperations : public content::RenderFrameObserver,
+                       public mojom::PageOperations {
+ public:
+  explicit PageOperations(content::RenderFrame* frame)
+      : RenderFrameObserver(frame) {
+    frame->GetAssociatedInterfaceRegistry()
+        ->AddInterface<mojom::PageOperations>(
+            base::BindRepeating(&PageOperations::Bind, base::Unretained(this)));
+  }
+
+ private:
+  void Bind(mojo::PendingAssociatedReceiver<mojom::PageOperations> receiver) {
+    receivers_.Add(this, std::move(receiver));
+  }
+
+  void InsertStyleSheet(const base::UnguessableToken& document_token,
+                        const std::string& css,
+                        InsertStyleSheetCallback callback) override {
+    auto* frame = render_frame()->GetWebFrame();
+    if (!frame || frame->GetEmbeddingToken() != document_token ||
+        frame->GetDocument().IsNull()) {
+      std::move(callback).Run(false);
+      return;
+    }
+    frame->GetDocument().InsertStyleSheet(blink::WebString::FromUtf8(css));
+    std::move(callback).Run(true);
+  }
+
+  void OnDestruct() override { delete this; }
+
+  mojo::AssociatedReceiverSet<mojom::PageOperations> receivers_;
+};
+
 class ThrottleProvider : public blink::URLLoaderThrottleProvider {
  public:
   ThrottleProvider(std::unique_ptr<blink::URLLoaderThrottleProvider> chrome,
@@ -227,6 +263,10 @@ class ThrottleProvider : public blink::URLLoaderThrottleProvider {
 
 class ContentRendererClient : public ChromeContentRendererClient {
  public:
+  void RenderFrameCreated(content::RenderFrame* frame) override {
+    ChromeContentRendererClient::RenderFrameCreated(frame);
+    new PageOperations(frame);
+  }
   void RenderThreadStarted() override {
     ChromeContentRendererClient::RenderThreadStarted();
     agent_ = std::make_unique<AdBlockerAgent>(state_);

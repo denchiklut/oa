@@ -100,6 +100,17 @@ final class ChromiumPage: Page, MediaSession {
         page?.clonePage().map { ChromiumPage(id: UUID(), page: $0, delegate: PageDelegate()) }
     }
 
+    var frameIDs: [PageFrameID] { page?.frameIDs.map(PageFrameID.init(token:)) ?? [] }
+
+    func insertStyleSheet(_ css: String, in frame: PageFrameID) async -> StyleSheetResult {
+        guard let page else { return .frameGone }
+        return await withCheckedContinuation { reply in
+            page.insertStyleSheet(css, inFrame: frame.token) { result in
+                reply.resume(returning: StyleSheetResult(rawValue: result) ?? .disconnected)
+            }
+        }
+    }
+
     /// Core answers on the main thread.
     func snapshot(_ completion: @escaping @MainActor (NSImage?) -> Void) {
         guard let page else { return completion(nil) }

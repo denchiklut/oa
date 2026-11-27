@@ -50,6 +50,14 @@ enum class RendererExit {
   kEvictedForMemory,
 };
 
+enum class StyleSheetResult {
+  kInserted,
+  kFrameGone,
+  kRendererCrashed,
+  kDisconnected,
+  kTimedOut,
+};
+
 struct Dialog {
   enum class Kind {
     kAlert,
@@ -195,6 +203,7 @@ struct Color {
 
 class Page {
  public:
+  using StyleSheetCallback = std::function<void(StyleSheetResult)>;
   // The NSImage lives only for the call; null if nothing could be copied.
   using SnapshotCallback = std::function<void(void* ns_image)>;
   // Call once. `suppress` answers this page's later dialogs without asking.
@@ -357,6 +366,10 @@ class Page {
   virtual std::unique_ptr<Page> Clone() = 0;
   // The same tab, WebContents and history move; nothing happens if it is there.
   virtual void MoveToWindow(const std::string& window_id) = 0;
+  virtual std::vector<std::string> FrameIDs() const = 0;
+  virtual void InsertStyleSheet(const std::string& frame_id,
+                                const std::string& css,
+                                StyleSheetCallback callback) = 0;
   // Fails while the page has nothing drawn, for example when no window shows
   // it.
   virtual void Snapshot(SnapshotCallback callback) = 0;
