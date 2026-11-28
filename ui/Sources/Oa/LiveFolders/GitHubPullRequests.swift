@@ -6,6 +6,18 @@ struct GitHubPullRequest {
     let title: String
 }
 
+enum GitHubPullRequestFilter: String, Codable, CaseIterable {
+    case createdByMe, reviewRequests, teamReviewRequests
+
+    var title: String {
+        switch self {
+        case .createdByMe: "Created by Me"
+        case .reviewRequests: "Review Requests"
+        case .teamReviewRequests: "Team Review Requests"
+        }
+    }
+}
+
 enum GitHubFolderError: Error, Codable, Hashable {
     case signedOut, singleSignOn(URL), unavailable
 
@@ -35,17 +47,27 @@ enum GitHubPullRequests {
     private static let github = URL(string: "https://github.com")!
 
     @MainActor
-    static func fetch(in context: any BrowserContext) async throws -> [GitHubPullRequest] {
+    static func fetch(_ filters: Set<GitHubPullRequestFilter>, in context: any BrowserContext) async throws
+        -> [GitHubPullRequest]
+    {
         var seen = Set<URL>()
         var result: [GitHubPullRequest] = []
-        for (view, filter) in [("authored", "author:@me"), ("reviews", "user-review-requested:@me")] {
+        var searches: [(view: String, qualifier: String)] = []
+        if filters.contains(.createdByMe) { searches.append(("authored", "author:@me involves:@me")) }
+        switch (filters.contains(.reviewRequests), filters.contains(.teamReviewRequests)) {
+        case (true, true): searches.append(("reviews", "review-requested:@me"))
+        case (true, false): searches.append(("reviews", "user-review-requested:@me involves:@me"))
+        case (false, true): searches.append(("reviews", "team-review-requested-user:@me"))
+        case (false, false): break
+        }
+        for (view, qualifier) in searches {
             var path = "/pulls/" + view
             for number in 1...10 {
                 try Task.checkCancellation()
                 var request = URLComponents(url: github, resolvingAgainstBaseURL: false)!
                 request.path = path
                 request.queryItems = [
-                    URLQueryItem(name: "q", value: "is:pr is:open sort:updated-desc \(filter) involves:@me"),
+                    URLQueryItem(name: "q", value: "is:pr is:open sort:updated-desc \(qualifier)"),
                     URLQueryItem(name: "page", value: String(number)),
                 ]
                 guard var response = await context.loadDocument(at: request.url!) else {
@@ -118,7 +140,9 @@ enum GitHubPullRequests {
         guard response.url.scheme == "https", response.url.host == "github.com" else {
             throw GitHubFolderError.unavailable
         }
-        if response.url.path == "/login" || response.status == 401 { throw GitHubFolderError.signedOut }
+        if response.status == 401 || (response.status == 200 && response.url.path == "/login") {
+            throw GitHubFolderError.signedOut
+        }
         if let sso = ssoURL(response.url.absoluteString) { throw GitHubFolderError.singleSignOn(sso) }
         guard response.status == 200, response.url.path == path, !response.body.isEmpty else {
             throw GitHubFolderError.unavailable
@@ -152,7 +176,11 @@ enum GitHubPullRequests {
             if let route = envelope.payload.pullsDashboardSurfaceContentRoute { content = route }
         }
         let login = try document.nodes(forXPath: "//meta[@name='octolytics-actor-login']/@content").first?.stringValue
-        guard let login, !login.isEmpty else { throw GitHubFolderError.signedOut }
+        guard let login, !login.isEmpty else {
+            let signedOut = try document.nodes(
+                forXPath: "//body[contains(concat(' ',normalize-space(@class),' '),' logged-out ')]")
+            throw signedOut.isEmpty ? GitHubFolderError.unavailable : GitHubFolderError.signedOut
+        }
         if let content {
             let rows = try content.results.map {
                 try row(path: "/\($0.repoNameWithOwner)/pull/\($0.number)", title: $0.title)

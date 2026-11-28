@@ -1713,6 +1713,12 @@ final class WindowModel {
         store.liveFolderRefreshes.refresh(folder, in: store, using: engine, manual: manual)
     }
 
+    func toggleLiveFolderFilter(_ filter: GitHubPullRequestFilter, in id: UUID) {
+        guard sidebarContext == .global, state.tree.folder(id)?.gitHub != nil else { return }
+        store.edit { $0.updateLiveFolder(id) { $0.enabledFilters.formSymmetricDifference([filter]) } }
+        refreshLiveFolder(id, manual: true)
+    }
+
     @discardableResult
     func createNestedFolder(in parentID: UUID) -> UUID? {
         guard state.canCreateFolder(in: parentID), let spaceID = state.space(containingItem: parentID)?.id else {

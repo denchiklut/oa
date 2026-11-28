@@ -165,13 +165,22 @@ final class StubBrowserContext: BrowserContext {
 
     func loadDocument(at url: URL) async -> ProfileDocument? {
         guard url.host == "github.com", ["/pulls/authored", "/pulls/reviews"].contains(url.path) else { return nil }
-        let authored = url.path == "/pulls/authored"
-        let number = authored ? 1 : 2
-        let title = authored ? "Update the sidebar" : "Review the new layout"
+        let direct = #"{"repoNameWithOwner":"example/project","number":2,"title":"Review the new layout"}"#
+        let team = #"{"repoNameWithOwner":"example/project","number":3,"title":"Review team changes"}"#
+        let rows: String
+        if url.path == "/pulls/authored" {
+            rows = #"{"repoNameWithOwner":"example/project","number":1,"title":"Update the sidebar"}"#
+        } else if url.query?.contains("team-review-requested-user:") == true {
+            rows = team
+        } else if url.query?.contains("user-review-requested:") == true {
+            rows = direct
+        } else {
+            rows = direct + "," + team
+        }
         let html = """
             <html><head><meta name="octolytics-actor-login" content="example"></head>
             <body><script type="application/json">{"payload":{"pullsDashboardSurfaceContentRoute":{
-            "results":[{"repoNameWithOwner":"example/project","number":\(number),"title":"\(title)"}],
+            "results":[\(rows)],
             "pageInfo":{"totalPages":1}}}}</script></body></html>
             """
         return ProfileDocument(url: url, status: 200, body: Data(html.utf8))

@@ -22,6 +22,14 @@ struct FolderContextMenu {
             }
             options.addItem(
                 MenuActionItem("Refresh") { [model, folder] in model.refreshLiveFolder(folder.id, manual: true) })
+            options.addItem(.separator())
+            for filter in GitHubPullRequestFilter.allCases {
+                let item = MenuActionItem(filter.title) { [model, folder] in
+                    model.toggleLiveFolderFilter(filter, in: folder.id)
+                }
+                item.state = live.enabledFilters.contains(filter) ? .on : .off
+                options.addItem(item)
+            }
             menu.items = [
                 MenuActionItem("Pull Requests", submenu: options),
                 .separator(),
