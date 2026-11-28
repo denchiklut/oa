@@ -17,9 +17,15 @@ struct RecentPagesPreviewView: View {
         let chrome: CGFloat = isLinear ? 0 : 46
         let listHeight = min(CGFloat(max(pages?.count ?? 0, 1)) * rowHeight, max(0, layout.size.height - chrome - 8))
         let height = listHeight + chrome
+        let origin =
+            if model.state.isFavorite(tabID) {
+                CGPoint(x: anchor.maxX - 4, y: anchor.maxY - 4)
+            } else {
+                CGPoint(x: anchor.maxX + (isLinear ? 12 : 8), y: isLinear ? anchor.midY - height / 2 : anchor.minY)
+            }
         let frame = CGRect(
-            x: min(anchor.maxX + (isLinear ? 12 : 8), layout.size.width - width - 4),
-            y: max(4, min(isLinear ? anchor.midY - height / 2 : anchor.minY, layout.size.height - height - 4)),
+            x: max(4, min(origin.x, layout.size.width - width - 4)),
+            y: max(4, min(origin.y, layout.size.height - height - 4)),
             width: width, height: height)
         VStack(alignment: .leading, spacing: 0) {
             if !isLinear {
