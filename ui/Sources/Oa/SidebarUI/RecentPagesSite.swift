@@ -7,12 +7,17 @@ import Observation
 final class PreviewPreferences {
     private let defaults: UserDefaults
     var folders: Bool { didSet { defaults.set(folders, forKey: "folderPreviewEnabled") } }
+    var gmail: Bool { didSet { defaults.set(gmail, forKey: "gmailPreviewEnabled") } }
+    var gmailSiteEnabled: Bool { didSet { defaults.set(!gmailSiteEnabled, forKey: "gmailSitePreviewDisabled") } }
+    var gmailEnabled: Bool { gmail && gmailSiteEnabled }
     var recentPages: Bool { didSet { defaults.set(recentPages, forKey: "recentPagesPreviewEnabled") } }
     private var disabledSites: Set<String>
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         folders = defaults.object(forKey: "folderPreviewEnabled") as? Bool ?? true
+        gmail = defaults.object(forKey: "gmailPreviewEnabled") as? Bool ?? true
+        gmailSiteEnabled = !defaults.bool(forKey: "gmailSitePreviewDisabled")
         recentPages = defaults.object(forKey: "recentPagesPreviewEnabled") as? Bool ?? true
         disabledSites = Set(defaults.stringArray(forKey: "disabledRecentPagesSites") ?? [])
     }

@@ -44,6 +44,15 @@ final class SidebarStore {
     @ObservationIgnored let captureLibrary: CaptureLibrary
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored let keyBindings: KeyBindingsClient
+    @ObservationIgnored private var gmailInboxes: [UUID: [GmailAccount: GmailInbox]] = [:]
+
+    func gmailInbox(for account: GmailAccount, profile: UUID) -> GmailInbox {
+        if let inbox = gmailInboxes[profile]?[account] { return inbox }
+        let inbox = GmailInbox(account: account)
+        gmailInboxes[profile, default: [:]][account] = inbox
+        return inbox
+    }
+
     @ObservationIgnored let previewPreferences = PreviewPreferences()
     @ObservationIgnored let developerMode: DeveloperModeClient
     @ObservationIgnored let linkRouting: LinkRoutingClient
@@ -115,6 +124,7 @@ final class SidebarStore {
         }
         for window in windows { window.forgetProfile(id) }
         guard engine.deleteBrowserContext(id: id) else { return false }
+        gmailInboxes[id] = nil
         edit { $0.removeProfile(id) }
         return true
     }

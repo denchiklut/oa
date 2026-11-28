@@ -189,6 +189,14 @@ private struct SettingsSection: View {
                 }
                 .disabled(!previews.recentPages)
             }
+            if GmailAccount(url: model.frontPage?.url) != nil, model.sidebarContext == .global {
+                let previews = model.previewPreferences
+                let on = previews.gmailEnabled
+                SiteSettingRow(title: "Gmail Previews", value: on ? "On" : "Off", symbol: "eye.fill", isOn: on) {
+                    previews.gmailSiteEnabled.toggle()
+                }
+                .disabled(!previews.gmail)
+            }
             if let url = model.developerModeURL {
                 let on = model.developerMode.isEnabled(for: url)
                 SiteSettingRow(title: "Developer Mode", value: on ? "On" : "Off", symbol: "hammer.fill", isOn: on) {

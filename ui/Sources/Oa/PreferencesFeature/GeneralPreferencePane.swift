@@ -90,6 +90,7 @@ struct GeneralPreferencePane: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Show Oa Previews").font(.headline)
                 Toggle("Oa Folders", isOn: $previews.folders)
+                Toggle("Google Mail", isOn: $previews.gmail)
                 Toggle("Recent pages on Linear, Notion, and Figma", isOn: $previews.recentPages)
                 HStack {
                     Spacer()

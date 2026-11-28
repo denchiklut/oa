@@ -91,6 +91,11 @@ struct BrowserWindowView: View {
                 if model.previewPreferences.folders, let folder = model.state.tree.folder(preview.id) {
                     FolderPreviewView(model: model, layout: layout, folder: folder, anchor: preview.anchor)
                         .id(folder.id)
+                } else if let inbox = model.gmailInbox(for: preview.id) {
+                    GmailPreviewView(
+                        model: model, layout: layout, tabID: preview.id, inbox: inbox, anchor: preview.anchor
+                    )
+                    .id(preview.id)
                 } else if let site = model.recentPagesSite(for: preview.id) {
                     RecentPagesPreviewView(
                         model: model, layout: layout, tabID: preview.id, site: site, anchor: preview.anchor

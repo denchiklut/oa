@@ -216,6 +216,25 @@ final class WindowModel {
     }
     var previewPreferences: PreviewPreferences { store.previewPreferences }
 
+    func gmailInbox(for tabID: UUID) -> GmailInbox? {
+        guard sidebarContext == .global, previewPreferences.gmailEnabled,
+            state.keepsAddress(tabID), state.isSelectable(tabID, in: selectedSpaceID),
+            let account = GmailAccount(url: state.tree.tab(tabID)?.url), let profile = shownProfileID
+        else { return nil }
+        return store.gmailInbox(for: account, profile: profile)
+    }
+
+    func refreshGmail(_ inbox: GmailInbox, from tabID: UUID) async {
+        guard gmailInbox(for: tabID) === inbox, let profile = shownProfileID else { return }
+        await inbox.refresh(in: context(for: profile))
+    }
+
+    func openGmail(_ url: URL, from tabID: UUID, inbox: GmailInbox) {
+        guard gmailInbox(for: tabID) === inbox, inbox.account.messageURL(url.absoluteString) != nil else { return }
+        select(tabID)
+        load(url, in: tabID)
+    }
+
     func recentPagesSite(for tabID: UUID) -> RecentPagesSite? {
         guard sidebarContext == .global, state.keepsAddress(tabID), state.isSelectable(tabID, in: selectedSpaceID),
             let site = RecentPagesSite(url: state.tree.tab(tabID)?.url), previewPreferences.isEnabled(site)

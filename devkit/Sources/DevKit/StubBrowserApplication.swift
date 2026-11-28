@@ -104,6 +104,7 @@ final class StubBrowserContext: BrowserContext {
 
     private let parent: StubBrowserContext?
     var isIncognito: Bool { parent != nil }
+    private let gmailMessageDate = Date.now.addingTimeInterval(-300)
     private var visits: [HistoryEntry]
 
     init(id: UUID, name: @escaping (String) -> Void) {
@@ -166,6 +167,29 @@ final class StubBrowserContext: BrowserContext {
     }
 
     func loadDocument(at url: URL) async -> ProfileDocument? {
+        if url.host == "mail.google.com", url.pathComponents.starts(with: ["/", "mail", "u"]),
+            url.pathComponents.dropFirst(4).starts(with: ["feed", "atom"])
+        {
+            let account = url.pathComponents[3]
+            let social = url.lastPathComponent == "^sq_ig_i_social"
+            let promotions = url.lastPathComponent == "^sq_ig_i_promo"
+            let titles =
+                social
+                ? ["Community update"]
+                : promotions
+                    ? ["Weekly offers"]
+                    : ["Project notes", "Community update", "Weekly offers"]
+            let stamp = gmailMessageDate.ISO8601Format()
+            let entries = titles.enumerated().map { index, title in
+                """
+                <entry><id>\(title)</id><title>\(title)</title><summary>Mail for inbox \(account)</summary>
+                <issued>\(stamp)</issued><author><name>Oa Example</name></author>
+                <link href="https://mail.google.com/mail/u/\(account)/#inbox/\(index)"/></entry>
+                """
+            }.joined()
+            let xml = "<feed xmlns=\"http://purl.org/atom/ns#\">" + entries + "</feed>"
+            return ProfileDocument(url: url, status: 200, body: Data(xml.utf8))
+        }
         guard url.host == "github.com", ["/pulls/authored", "/pulls/reviews"].contains(url.path) else { return nil }
         let direct = #"{"repoNameWithOwner":"example/project","number":2,"title":"Review the new layout"}"#
         let team = #"{"repoNameWithOwner":"example/team","number":3,"title":"Review team changes"}"#
