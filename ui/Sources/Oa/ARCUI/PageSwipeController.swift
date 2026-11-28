@@ -79,10 +79,14 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
         guard animated, presentationPosition != target, let window = windowProvider() else {
             return presentationPosition = target
         }
-        spring = (presentationPosition, target, velocity ?? 0, 0, nil, shape)
+        // Draw the first spring position with the Space switch. Waiting for the display link leaves the
+        // sidebar at its last drag position while the window lays out the selected page.
+        let firstFrame = isTracking ? min(window.screen?.minimumRefreshInterval ?? 0, 1.0 / 60) : 0
+        spring = (presentationPosition, target, velocity ?? 0, firstFrame, nil, shape)
         animatedSelectionSource = source
         isAnimating = true
         ticker.start(in: window) { [weak self] in self?.step() }
+        if firstFrame > 0 { applySpring() }
     }
 
     func hold() {
@@ -194,12 +198,16 @@ final class PageSwipeController<PageID: Hashable & Sendable> {
 
     private func step() {
         guard var spring else { return }
-        // The spring's clock starts with its first frame and counts a long frame as two, so what selecting the page
-        // or drawing the Library for the first time costs delays the motion rather than skipping it.
+        // Start this clock on the first tick so a slow page or Library layout cannot skip the start of the settle.
         let now = CACurrentMediaTime()
         spring.time += min(now - (spring.last ?? now), 1.0 / 60)
         spring.last = now
         self.spring = spring
+        applySpring()
+    }
+
+    private func applySpring() {
+        guard let spring else { return }
         let time = spring.time
         let (response, damping) = spring.shape
         let omega = 2 * Double.pi / response
