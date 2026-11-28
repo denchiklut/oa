@@ -5,7 +5,10 @@ import SwiftUI
 /// primary buttons.
 @MainActor
 enum DialogSheet {
-    static func present(on parent: NSWindow, @ViewBuilder content: (_ dismiss: @escaping () -> Void) -> some View) {
+    static func present(
+        on parent: NSWindow, onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: (_ dismiss: @escaping () -> Void) -> some View
+    ) {
         let sheet = NSWindow(
             contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
         sheet.titlebarAppearsTransparent = true
@@ -15,7 +18,7 @@ enum DialogSheet {
             parent?.endSheet(sheet)
         }
         sheet.contentViewController = NSHostingController(rootView: content(dismiss).ignoresSafeArea())
-        parent.beginSheet(sheet)
+        parent.beginSheet(sheet) { _ in onDismiss?() }
     }
 }
 
