@@ -15,6 +15,7 @@
 #include "base/json/json_writer.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
@@ -53,14 +54,35 @@ bool IsCalendarEventsURL(const std::string& url_spec) {
   return url.path().find("/events") != std::string::npos;
 }
 
-bool IsSignedOutRedirect(const GURL& url) {
+bool IsSignedOutRedirect(const GURL& url, int expected_account) {
   if (!url.is_valid()) {
     return false;
   }
   std::string host = base::ToLowerASCII(url.host());
-  return host == "accounts.google.com" || host == "workspace.google.com" ||
-         (host == "www.google.com" &&
-          base::StartsWith(url.path(), "/calendar/about"));
+  if (host == "accounts.google.com" || host == "workspace.google.com" ||
+      (host == "www.google.com" &&
+       base::StartsWith(url.path(), "/calendar/about"))) {
+    return true;
+  }
+  // Google silently redirects `/calendar/u/<N>/r` to `/u/0/` when account N is
+  // not signed in; treat a mismatched `/u/<M>` as signed out so events from
+  // another account are never returned for account N.
+  if (expected_account > 0 && host == "calendar.google.com") {
+    std::string_view path = url.path();
+    constexpr std::string_view kPrefix = "/calendar/u/";
+    if (base::StartsWith(path, kPrefix)) {
+      std::string_view rest = path.substr(kPrefix.size());
+      size_t slash = rest.find('/');
+      std::string_view digits =
+          slash == std::string_view::npos ? rest : rest.substr(0, slash);
+      int redirected_account = -1;
+      if (base::StringToInt(digits, &redirected_account) &&
+          redirected_account != expected_account) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // Self-owned session for one background Google Calendar capture. Tears down its
@@ -210,7 +232,7 @@ class LiveCalendarSession : public content::DevToolsAgentHostClient,
     if (!handle->IsInPrimaryMainFrame() || !handle->HasCommitted()) {
       return;
     }
-    if (IsSignedOutRedirect(handle->GetURL())) {
+    if (IsSignedOutRedirect(handle->GetURL(), account_number_)) {
       Finish(/*signed_out=*/true);
     }
   }

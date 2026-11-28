@@ -1736,7 +1736,7 @@ final class WindowModel {
     /// Only Favorites and Pinned tabs show hover previews, as Arc's Previews Settings describes.
     func previewType(for tab: SidebarTab) -> PreviewType? {
         guard sidebarContext != .incognito, state.isFavorite(tab.id) || state.isPinned(tab.id),
-            let type = PreviewType.matching(url: tab.url), PreviewSettings.shared.isEnabled(for: type)
+            let type = PreviewType.matching(url: tab.url, tabID: tab.id), PreviewSettings.shared.isEnabled(for: type)
         else { return nil }
         return type
     }
@@ -1746,37 +1746,68 @@ final class WindowModel {
     }
 
     func previewRecord(for tab: SidebarTab) -> PreviewRecord? {
-        guard let type = PreviewType.matching(url: tab.url), let profileID = previewProfileID(for: tab) else {
-            return nil
-        }
+        guard let type = PreviewType.matching(url: tab.url, tabID: tab.id), let profileID = previewProfileID(for: tab)
+        else { return nil }
         return store.previews.record(for: type, profileID: profileID)
     }
 
     func refreshPreview(for tab: SidebarTab, force: Bool = false) {
-        guard sidebarContext != .incognito, let type = PreviewType.matching(url: tab.url),
+        guard sidebarContext != .incognito, let type = PreviewType.matching(url: tab.url, tabID: tab.id),
             let profileID = previewProfileID(for: tab)
         else { return }
-        store.previews.refresh(type, profileID: profileID, using: engine, force: force)
+        store.previews.refresh(type, sourceURL: tab.url, profileID: profileID, using: engine, force: force)
     }
 
-    func showsUnreadBadge(for tab: SidebarTab) -> Bool {
-        guard sidebarContext != .incognito, let profileID = previewProfileID(for: tab) else { return false }
-        return store.previews.showsUnreadBadge(
-            for: tab, liveTitle: pages[tab.id]?.title, profileID: profileID, settings: .shared)
+    func resolvedNotionAccount(for tab: SidebarTab) -> Int? {
+        guard let profileID = previewProfileID(for: tab) else { return nil }
+        return store.previews.resolvedNotionAccount(for: tab.id, url: tab.url, profileID: profileID)
     }
 
-    func calendarSubtitle(for tab: SidebarTab, now: Date = .now) -> String? {
+    func connectNotionCalendar(for tab: SidebarTab, accountNumber: Int?) {
+        guard sidebarContext != .incognito, let profileID = previewProfileID(for: tab) else { return }
+        store.previews.connectNotionCalendar(
+            tabID: tab.id, url: tab.url, accountNumber: accountNumber, profileID: profileID, using: engine)
+    }
+
+    func openPreviewSettings() {
+        (NSApp.delegate as? ApplicationDelegate)?.showSettingsPane(.general, showPreviewSettings: true)
+    }
+
+    func unreadBadge(for tab: SidebarTab, now: Date = .now) -> FavoriteUnreadBadge? {
+        guard sidebarContext != .incognito, let profileID = previewProfileID(for: tab) else { return nil }
+        return store.previews.unreadBadge(
+            for: tab, liveTitle: pages[tab.id]?.title, profileID: profileID, settings: .shared, now: now)
+    }
+
+    func calendarSubtitle(for tab: SidebarTab, now: Date = .now) -> (text: String, isImminent: Bool)? {
         guard sidebarContext != .incognito, let profileID = previewProfileID(for: tab) else { return nil }
         return store.previews.calendarSubtitle(for: tab, profileID: profileID, settings: .shared, now: now)
+    }
+
+    func activeLiveCalendarEvent(for profileID: UUID, now: Date = .now) -> LiveCalendarActiveEvent? {
+        guard sidebarContext == .global else { return nil }
+        return store.previews.activeLiveCalendarEvent(for: profileID, in: state, settings: .shared, now: now)
+    }
+
+    func dismissLiveCalendarEvent(_ active: LiveCalendarActiveEvent) {
+        store.previews.dismissLiveCalendarEvent(active.event.id, for: active.key)
+    }
+
+    func joinLiveCalendarEvent(_ active: LiveCalendarActiveEvent) {
+        guard let joinLink = active.event.joinLink else { return }
+        store.previews.dismissLiveCalendarEvent(active.event.id, for: active.key)
+        openPreviewLink(joinLink)
     }
 
     /// Oa's own modifier routing for preview links: plain click opens a new tab in the current Space, ⌥ opens beside
     /// the current tab in Split View, and ⇧ opens in Peek over the current tab when Shift-Peek is on.
     func openPreviewLink(_ url: URL) {
         let flags = NSEvent.modifierFlags
-        if flags.contains(.option), let current = selectedTabID, canOpenInSplitView(current) {
+        let spaceID = selectedSpaceID
+        if flags.contains(.option), let current = selectedTabID,
+            state.canAddSplitViewPane(beside: current, in: spaceID)
+        {
             let tab = makeTab(url: url, opener: current)
-            let spaceID = selectedSpaceID
             editSplitView(taking: [current]) {
                 $0.openTab(tab, from: current, in: spaceID)
                 let index = $0.presentedTabIDs(with: current).firstIndex(of: current).map { $0 + 1 }

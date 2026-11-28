@@ -196,14 +196,40 @@ final class StubBrowserContext: BrowserContext {
     func fetchLiveCalendar(accountNumber: Int) async -> LiveCalendarCapture? {
         let formatter = ISO8601DateFormatter()
         let now = Date.now
-        let soonStart = formatter.string(from: now.addingTimeInterval(12 * 60))
-        let soonEnd = formatter.string(from: now.addingTimeInterval(42 * 60))
-        let laterStart = formatter.string(from: now.addingTimeInterval(2 * 3600))
-        let laterEnd = formatter.string(from: now.addingTimeInterval(2.5 * 3600))
+        if accountNumber == 1 {
+            let workStart = formatter.string(from: now.addingTimeInterval(3 * 60 + 20))
+            let workEnd = formatter.string(from: now.addingTimeInterval(33 * 60))
+            let json = """
+                {
+                  "summary": "work@example.com",
+                  "timeZone": "\(TimeZone.current.identifier)",
+                  "items": [
+                    {
+                      "id": "stub-work-sync",
+                      "summary": "Work Architecture Sync",
+                      "htmlLink": "https://calendar.google.com/calendar/u/1/r/eventedit/stub-work-sync",
+                      "hangoutLink": "https://meet.google.com/wrk-sync-001",
+                      "start": { "dateTime": "\(workStart)" },
+                      "end": { "dateTime": "\(workEnd)" },
+                      "attendees": [{ "email": "work@example.com", "self": true, "responseStatus": "accepted" }]
+                    }
+                  ]
+                }
+                """
+            return LiveCalendarCapture(isSignedOut: false, eventPayloads: [json])
+        }
+        if accountNumber >= 2 {
+            return LiveCalendarCapture(isSignedOut: true, eventPayloads: [])
+        }
+        let soonStart = formatter.string(from: now.addingTimeInterval(4 * 60 + 20))
+        let soonEnd = formatter.string(from: now.addingTimeInterval(34 * 60))
+        let secondStart = formatter.string(from: now.addingTimeInterval(8 * 60 + 20))
+        let secondEnd = formatter.string(from: now.addingTimeInterval(38 * 60))
         let tomorrowStart = formatter.string(from: now.addingTimeInterval(25 * 3600))
         let tomorrowEnd = formatter.string(from: now.addingTimeInterval(26 * 3600))
         let json = """
             {
+              "summary": "you@example.com",
               "timeZone": "\(TimeZone.current.identifier)",
               "items": [
                 {
@@ -219,8 +245,9 @@ final class StubBrowserContext: BrowserContext {
                   "id": "stub-sync",
                   "summary": "1:1 Sync",
                   "htmlLink": "https://calendar.google.com/calendar/event?eid=stub-sync",
-                  "start": { "dateTime": "\(laterStart)" },
-                  "end": { "dateTime": "\(laterEnd)" }
+                  "location": "https://example.zoom.us/j/123456789",
+                  "start": { "dateTime": "\(secondStart)" },
+                  "end": { "dateTime": "\(secondEnd)" }
                 },
                 {
                   "id": "stub-tomorrow",
@@ -238,21 +265,32 @@ final class StubBrowserContext: BrowserContext {
     private func stubGmailFeed(for url: URL) -> ProfileDocument {
         let formatter = ISO8601DateFormatter()
         let recent = formatter.string(from: Date(timeIntervalSinceNow: -8 * 60))
-        let earlier = formatter.string(from: Date(timeIntervalSinceNow: -95 * 60))
+        let stale = formatter.string(from: Date(timeIntervalSinceNow: -4 * 3600))
         let promoEntry = """
             <entry>
               <title>Weekend Sale</title>
               <summary>Save 20% on storewide items</summary>
               <link rel="alternate" href="https://mail.google.com/mail?account_id=you@example.com&amp;message_id=promo1&amp;view=conv&amp;extsrc=atom" type="text/html"/>
-              <issued>\(earlier)</issued>
+              <issued>\(recent)</issued>
               <author><name>Store Deals</name><email>deals@example.com</email></author>
             </entry>
             """
+        let isSecondaryInbox = url.path.contains("/mail/u/1/")
         let entries: String
         if url.path.contains("^sq_ig_i_social") {
             entries = ""
         } else if url.path.contains("^sq_ig_i_promo") {
-            entries = promoEntry
+            entries = isSecondaryInbox ? "" : promoEntry
+        } else if isSecondaryInbox {
+            entries = """
+                <entry>
+                  <title>Older Digest</title>
+                  <summary>Sent more than two hours ago so it should not trigger the unread dot.</summary>
+                  <link rel="alternate" href="https://mail.google.com/mail/u/1/?message_id=old1&amp;view=conv" type="text/html"/>
+                  <issued>\(stale)</issued>
+                  <author><name>Daily Digest</name><email>digest@example.com</email></author>
+                </entry>
+                """
         } else {
             entries = """
                 <entry>
@@ -266,7 +304,7 @@ final class StubBrowserContext: BrowserContext {
                   <title>Build green on main</title>
                   <summary>Incremental Chromium build completed in 18 seconds.</summary>
                   <link rel="alternate" href="https://mail.google.com/mail?account_id=you@example.com&amp;message_id=msg2&amp;view=conv&amp;extsrc=atom" type="text/html"/>
-                  <issued>\(earlier)</issued>
+                  <issued>\(stale)</issued>
                   <author><name>CI Bot</name><email>ci@example.com</email></author>
                 </entry>
                 \(promoEntry)

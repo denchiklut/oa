@@ -25,6 +25,133 @@ struct SidebarPreviewOverlay: View {
     }
 }
 
+/// Arc's `AppTray.LiveCalendarItemView`: expanded inline meeting banner pinned beneath Favorites with title,
+/// countdown (`in Nm` / `Now` / `Nm ago`), Join, and Dismiss.
+struct LiveCalendarItemView: View {
+    static let cardHeight: CGFloat = 60
+    static let trayHeight: CGFloat = cardHeight + 8
+
+    let model: WindowModel
+    let active: LiveCalendarActiveEvent
+    let now: Date
+    @State private var hovering = false
+    @State private var hoveringDismiss = false
+    @State private var hoveringJoin = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let sourceTab = model.state.tree.tab(active.tabID)
+        let countdown = PreviewsStore.liveCalendarCountdown(for: active.event, now: now)
+        let isUrgent = active.event.start.timeIntervalSince(now) <= 120
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                if let sourceTab {
+                    TabFavicon(model: model, tab: sourceTab)
+                        .frame(width: 14, height: 14)
+                }
+                Text(active.event.title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(theme.foreground)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Button {
+                    model.dismissLiveCalendarEvent(active)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundStyle(hoveringDismiss ? theme.foreground : theme.secondaryGlyph)
+                        .frame(width: 18, height: 18)
+                        .background(
+                            Circle().fill(theme.foreground.opacity(hoveringDismiss ? 0.12 : 0))
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hoveringDismiss = $0 }
+                .accessibilityLabel("Dismiss")
+                .oaToolTip("Dismiss")
+            }
+            HStack(spacing: 6) {
+                Text(countdown)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isUrgent ? theme.maxContrast : theme.secondaryText)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Button {
+                    model.joinLiveCalendarEvent(active)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "video.fill")
+                            .font(.system(size: 9.5, weight: .semibold))
+                        Text("Join")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(theme.isDark ? Color.black : .white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(theme.maxContrast.opacity(hoveringJoin ? 0.85 : 1))
+                    )
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .onHover { hoveringJoin = $0 }
+                .accessibilityLabel("Join \(active.event.title)")
+                .oaToolTip("Join \(active.event.title)")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .frame(height: Self.cardHeight)
+        .background(shape.fill(hovering ? theme.itemHoveredFill : theme.itemFill))
+        .contentShape(shape)
+        .onHover { hovering = $0 }
+        .onTapGesture {
+            if let destination = active.event.permalink { model.openPreviewLink(destination) }
+        }
+        .platformContextMenu(isEnabled: model.library == nil && !model.coversWindow) {
+            contextMenu()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("liveCalendarItemView")
+    }
+
+    private func contextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        if let joinLink = active.event.joinLink {
+            menu.addItem(
+                MenuActionItem("Join Meeting") { [model, active] in model.joinLiveCalendarEvent(active) })
+            menu.addItem(
+                MenuActionItem("Copy Join Link") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(joinLink.absoluteString, forType: .string)
+                })
+        }
+        if let permalink = active.event.permalink {
+            menu.addItem(MenuActionItem("Open Event") { [model] in model.openPreviewLink(permalink) })
+        }
+        menu.addItem(.separator())
+        let intervalMenu = NSMenu()
+        intervalMenu.autoenablesItems = false
+        let profileID = active.key.profileID
+        let current = PreviewSettings.shared.liveCalendarInterval(for: profileID)
+        for interval in LiveCalendarInterval.allCases {
+            let item = MenuActionItem(interval.title) {
+                PreviewSettings.shared.setLiveCalendarInterval(interval, for: profileID)
+            }
+            item.state = interval == current ? .on : .off
+            intervalMenu.addItem(item)
+        }
+        menu.addItem(MenuActionItem("Show Next Meeting Link", submenu: intervalMenu))
+        menu.addItem(.separator())
+        menu.addItem(MenuActionItem("Dismiss") { [model, active] in model.dismissLiveCalendarEvent(active) })
+        return menu
+    }
+}
+
 /// Arc's `StandardPreviewView` + `GroupedListView` + `CalendarPreviewContentView`.
 struct TabPreviewView: View {
     let model: WindowModel
@@ -91,7 +218,7 @@ struct TabPreviewView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             TabFavicon(model: model, tab: tab).frame(width: 16, height: 16)
             Text(type.headerTitle)
                 .font(.system(size: 13, weight: .semibold))
@@ -100,12 +227,58 @@ struct TabPreviewView: View {
             PreviewHeaderButton(symbol: "arrow.clockwise", tooltip: "Refresh") {
                 model.refreshPreview(for: tab, force: true)
             }
+            PreviewHeaderMenuButton(symbol: "gearshape.fill", tooltip: "Preview Settings") {
+                settingsMenu()
+            }
             PreviewHeaderButton(symbol: "plus", tooltip: type.ctaTooltip) {
                 open(type.ctaURL)
             }
         }
         .padding(.horizontal, 12)
         .frame(height: 44)
+    }
+
+    private func settingsMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(MenuActionItem("Refresh") { [model, tab] in model.refreshPreview(for: tab, force: true) })
+        if type.isNotionCalendar {
+            menu.addItem(.separator())
+            let currentAccount = model.resolvedNotionAccount(for: tab)
+            let loadedEmail: String? =
+                if case .loaded(.calendar(_, _, let email, _)) = record?.state { email } else { nil }
+            for index in 0..<3 {
+                let label =
+                    if currentAccount == index, let loadedEmail {
+                        "Google Account \(index + 1) (\(loadedEmail))"
+                    } else {
+                        "Google Account \(index + 1) (/u/\(index))"
+                    }
+                let item = MenuActionItem(label) { [model, tab] in
+                    model.connectNotionCalendar(for: tab, accountNumber: index)
+                }
+                item.state = currentAccount == index ? .on : .off
+                menu.addItem(item)
+            }
+            if currentAccount != nil {
+                menu.addItem(
+                    MenuActionItem("Disconnect Calendar") { [model, tab] in
+                        model.connectNotionCalendar(for: tab, accountNumber: nil)
+                    })
+            }
+        }
+        menu.addItem(.separator())
+        menu.addItem(
+            MenuActionItem("Previews Settings…") { [model, layout] in
+                layout.dismissSidebarPreview(restoreFocus: false)
+                model.openPreviewSettings()
+            })
+        menu.addItem(
+            MenuActionItem(type.disableActionTitle) { [layout, type] in
+                PreviewSettings.shared.disable(for: type)
+                layout.dismissSidebarPreview()
+            })
+        return menu
     }
 
     @ViewBuilder
@@ -116,6 +289,8 @@ struct TabPreviewView: View {
                 .controlSize(.small)
                 .frame(maxWidth: .infinity)
                 .frame(height: 84)
+        case .disconnected:
+            disconnectedView
         case .signedOut:
             signedOutView
         case .failed:
@@ -136,13 +311,55 @@ struct TabPreviewView: View {
                 recentPagesList(domain: domain, items: items)
             case .gmail(_, let emails):
                 gmailList(emails)
-            case .calendar(_, _, let events):
-                calendarList(events)
+            case .calendar(_, _, let accountEmail, let events):
+                calendarList(events, accountEmail: accountEmail)
             }
         }
     }
 
+    /// Oa's own explicit disconnected state when a Notion Calendar tab has no resolved Google Calendar account for
+    /// this tab and profile.
+    private var disconnectedView: some View {
+        VStack(spacing: 10) {
+            Text("Connect a Google Calendar account in this profile to see Notion Calendar meetings.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                PointerMenuButton {
+                    notionConnectMenu()
+                } label: {
+                    Text("Connect Calendar")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                Button("Open") {
+                    if let url = type.signInURL() { open(url) }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+        .padding(.horizontal, 16)
+    }
+
+    private func notionConnectMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for index in 0..<3 {
+            menu.addItem(
+                MenuActionItem("Google Account \(index + 1) (/u/\(index))") { [model, tab] in
+                    model.connectNotionCalendar(for: tab, accountNumber: index)
+                })
+        }
+        return menu
+    }
+
     private var signedOutView: some View {
+        let resolvedAccount = type.isNotionCalendar ? model.resolvedNotionAccount(for: tab) : nil
         let message: String
         let buttonTitle: String
         switch type {
@@ -152,6 +369,9 @@ struct TabPreviewView: View {
         case .googleCalendar:
             message = "See upcoming meetings and join video calls instantly with the Calendar Preview."
             buttonTitle = "Connect Calendar"
+        case .notionCalendar:
+            message = "Sign in to your connected Google Calendar account to see upcoming meetings."
+            buttonTitle = "Sign In"
         case .recentPages(let domain):
             message = domain.emptyState
             buttonTitle = "Open"
@@ -162,10 +382,21 @@ struct TabPreviewView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            if let signInURL = type.signInURL {
-                Button(buttonTitle) { open(signInURL) }
-                    .buttonStyle(.borderedProminent)
+            HStack(spacing: 8) {
+                if let signInURL = type.signInURL(resolvedAccount: resolvedAccount) {
+                    Button(buttonTitle) { open(signInURL) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                }
+                if type.isNotionCalendar {
+                    PointerMenuButton {
+                        notionConnectMenu()
+                    } label: {
+                        Text("Switch Account")
+                    }
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -241,20 +472,21 @@ struct TabPreviewView: View {
     }
 
     @ViewBuilder
-    private func calendarList(_ events: [CalendarEventItem]) -> some View {
+    private func calendarList(_ events: [CalendarEventItem], accountEmail: String?) -> some View {
         if events.isEmpty {
             emptyState("No upcoming events")
         } else {
             let calendar = Calendar.current
-            let today = events.filter { calendar.isDateInToday($0.start) || $0.start < .now }
+            let now = Date.now
+            let today = events.filter { calendar.isDateInToday($0.start) || $0.start < now }
             let tomorrow = events.filter { calendar.isDateInTomorrow($0.start) }
             LazyVStack(alignment: .leading, spacing: 4) {
                 if !today.isEmpty {
-                    sectionHeader("Today")
+                    sectionHeader("Today", trailing: accountEmail)
                     ForEach(today) { event in calendarRow(event) }
                 }
                 if !tomorrow.isEmpty {
-                    sectionHeader("Tomorrow")
+                    sectionHeader("Tomorrow", trailing: today.isEmpty ? accountEmail : nil)
                     ForEach(tomorrow) { event in calendarRow(event) }
                 }
             }
@@ -262,17 +494,30 @@ struct TabPreviewView: View {
         }
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.top, 4)
+    private func sectionHeader(_ title: String, trailing: String? = nil) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            if let trailing {
+                Text(trailing)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 4)
     }
 
     private func calendarRow(_ event: CalendarEventItem) -> some View {
-        PreviewRowButton {
-            if let destination = event.permalink ?? type.signInURL { open(destination) }
+        let resolvedAccount = type.isNotionCalendar ? model.resolvedNotionAccount(for: tab) : nil
+        return PreviewRowButton {
+            if let destination = event.permalink ?? type.signInURL(resolvedAccount: resolvedAccount) {
+                open(destination)
+            }
         } content: {
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 1.5)
@@ -320,7 +565,7 @@ struct TabPreviewView: View {
     }
 
     private func open(_ url: URL) {
-        layout.dismissSidebarPreview()
+        layout.dismissSidebarPreview(restoreFocus: false)
         model.openPreviewLink(url)
     }
 
@@ -350,6 +595,30 @@ private struct PreviewHeaderButton: View {
 
     var body: some View {
         Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.primary.opacity(hovering ? 0.09 : 0))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .oaToolTip(tooltip)
+    }
+}
+
+private struct PreviewHeaderMenuButton: View {
+    let symbol: String
+    let tooltip: String
+    let menu: () -> NSMenu
+    @State private var hovering = false
+
+    var body: some View {
+        PointerMenuButton(menu: menu) {
             Image(systemName: symbol)
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(.secondary)

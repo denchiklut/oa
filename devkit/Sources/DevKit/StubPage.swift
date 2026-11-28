@@ -665,6 +665,9 @@ final class StubPage: Page, MediaSession {
 
     private static func title(for url: URL) -> String {
         guard let host = url.host()?.replacingOccurrences(of: "www.", with: "") else { return url.absoluteString }
+        let lowered = host.lowercased()
+        if lowered == "twitter.com" || lowered == "x.com" { return "(3) Home / X" }
+        if lowered == "web.whatsapp.com" { return "(2) WhatsApp" }
         return url.path().count > 1 ? host + url.path() : host
     }
 

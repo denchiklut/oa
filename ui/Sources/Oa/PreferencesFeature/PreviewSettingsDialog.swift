@@ -22,6 +22,7 @@ struct PreviewSettingsDialog: View {
                 Toggle("Google Calendar", isOn: $settings.calendarEnabled)
                 Toggle("Google Mail", isOn: $settings.gmailEnabled)
                 Toggle("Recent pages on Linear, Notion, and Figma", isOn: $settings.recentPagesEnabled)
+                Toggle("Notion Calendar", isOn: $settings.notionCalendarEnabled)
             }
             .toggleStyle(.checkbox)
             .font(.system(size: 13))

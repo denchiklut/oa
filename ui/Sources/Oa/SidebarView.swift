@@ -602,10 +602,8 @@ private struct FavoriteTile: View {
         let selected = model.selectedTabID == tab.id
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         let previewType = model.previewType(for: tab)
-        let isCalendarTile: Bool = {
-            if case .googleCalendar = PreviewType.matching(url: tab.url) { return true }
-            return false
-        }()
+        let isCalendarTile = PreviewType.isCalendarHost(tab.url)
+        let isGmailTile = FavoriteUnreadBadge.matching(url: tab.url) == .gmail
         let isDragActive = drag?.entry != nil || drag?.isLinkDrag == true
         let previewed = layout.sidebarPreview?.target == .tab(tab.id)
         let canPreview =
@@ -626,7 +624,7 @@ private struct FavoriteTile: View {
             shape.fill(selected ? .clear : (hovering || previewed) ? theme.itemHoveredFill : theme.itemFill)
                 .animation(.easeOut(duration: hovering ? 0.14 : 0.1), value: hovering)
             if isCalendarTile {
-                TimelineView(.periodic(from: .now, by: 30)) { context in
+                TimelineView(.periodic(from: .now, by: 15)) { context in
                     tileIconAndSubtitle(
                         favicon: favicon,
                         subtitle: model.calendarSubtitle(for: tab, now: context.date),
@@ -652,12 +650,15 @@ private struct FavoriteTile: View {
                         }
                     }
                     .offset(x: 4, y: -4)
-            } else if model.showsUnreadBadge(for: tab) {
-                // Arc's `GMailBadgeRed` / `WhatsAppBadgeRed` color asset.
-                Circle()
-                    .fill(Color(.sRGB, red: 0.918, green: 0.263, blue: 0.208))
-                    .frame(width: 7, height: 7)
-                    .padding(6)
+            } else if isGmailTile {
+                // Re-evaluates Arc's 2-hour unread threshold as time passes.
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    if let badge = model.unreadBadge(for: tab, now: context.date) {
+                        favoriteBadgeDot(for: badge)
+                    }
+                }
+            } else if let badge = model.unreadBadge(for: tab) {
+                favoriteBadgeDot(for: badge)
             }
         }
         // Arc's tiles carry the recording dot too (AppTray's `recordingIndicatorView`); the corner is Oa's own.
@@ -687,21 +688,24 @@ private struct FavoriteTile: View {
         }
         .onHover { inside in
             hovering = inside
-            if !inside { layout.leaveSidebarPreview(tab.id) }
+            if inside, canPreview, let rect = drag?.tiles[tab.id] {
+                layout.hoverSidebarPreview(.tab(tab.id), at: rect, placement: .diagonal)
+            } else if !inside {
+                layout.unhoverSidebarPreview(tab.id)
+            }
         }
-        .task(id: hovering && canPreview) {
-            guard hovering && canPreview else { return }
-            // As Arc's `PreviewsConstants.hoverTimeThreshold`: 200 ms.
-            try? await Task.sleep(for: .milliseconds(200))
-            guard !Task.isCancelled, let rect = drag?.tiles[tab.id] else { return }
-            layout.showSidebarPreview(.tab(tab.id), at: rect, placement: .diagonal)
+        .onChange(of: canPreview) {
+            if !canPreview {
+                layout.unhoverSidebarPreview(tab.id)
+                if previewed { layout.dismissSidebarPreview() }
+            }
         }
-        .onChange(of: canPreview) { if !canPreview && previewed { layout.dismissSidebarPreview() } }
         .sidebarDragFrame { rect in
             drag?.tiles[tab.id] = rect
             if previewed && layout.sidebarPreview?.anchor != rect { layout.dismissSidebarPreview() }
         }
         .onDisappear {
+            layout.unhoverSidebarPreview(tab.id)
             if layout.sidebarPreview?.target == .tab(tab.id) { layout.dismissSidebarPreview() }
         }
         .platformContextMenu(isEnabled: model.library == nil && !model.coversWindow) {
@@ -709,8 +713,25 @@ private struct FavoriteTile: View {
         }
     }
 
+    /// Arc's `ARC_AppTray.bundle` badge color assets: `GMailBadgeRed` / `WhatsAppBadgeRed` and `TwitterBadgeGray`.
+    private func favoriteBadgeDot(for badge: FavoriteUnreadBadge) -> some View {
+        let color: Color =
+            switch badge {
+            case .gmail, .whatsApp:
+                Color(.sRGB, red: 0.918, green: 0.263, blue: 0.208)
+            case .twitter:
+                theme.isDark ? .white : Color(.sRGB, red: 0.267, green: 0.267, blue: 0.267)
+            }
+        return Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+            .padding(6)
+    }
+
     @ViewBuilder
-    private func tileIconAndSubtitle(favicon: NSImage?, subtitle: String?, selected: Bool) -> some View {
+    private func tileIconAndSubtitle(
+        favicon: NSImage?, subtitle: (text: String, isImminent: Bool)?, selected: Bool
+    ) -> some View {
         VStack(spacing: 2) {
             if let favicon {
                 Image(nsImage: favicon)
@@ -720,16 +741,22 @@ private struct FavoriteTile: View {
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
             if let subtitle {
-                // Arc's `GCalSubtitle*` color assets from `ARC_AppTray.bundle`.
+                // Arc's `GCalSubtitle*` color assets from `ARC_AppTray.bundle`, using theme contrast within 10 minutes.
                 let bg: Color =
                     selected
                     ? Color(.sRGB, red: 0.963, green: 0.976, blue: 0.996, opacity: 0.9)
-                    : theme.isDark ? Color.white.opacity(0.07) : Color.black.opacity(0.07)
+                    : subtitle.isImminent
+                        ? theme.maxContrast.opacity(theme.isDark ? 0.2 : 0.14)
+                        : theme.isDark ? Color.white.opacity(0.07) : Color.black.opacity(0.07)
                 let fg: Color =
-                    selected || !theme.isDark
+                    selected
                     ? Color(.sRGB, red: 0.13, green: 0.13, blue: 0.13)
-                    : Color(.sRGB, red: 0.87, green: 0.89, blue: 0.92, opacity: 0.7)
-                Text(subtitle)
+                    : subtitle.isImminent
+                        ? theme.maxContrast
+                        : theme.isDark
+                            ? Color(.sRGB, red: 0.87, green: 0.89, blue: 0.92, opacity: 0.7)
+                            : Color(.sRGB, red: 0.13, green: 0.13, blue: 0.13)
+                Text(subtitle.text)
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundStyle(fg)
                     .lineLimit(1)
@@ -1168,21 +1195,28 @@ struct TabRow: View {
         .frame(height: 40)
         .onHover { inside in
             hovering = inside
-            if !inside && !inCard { layout.leaveSidebarPreview(tab.id) }
+            guard !inCard else { return }
+            if inside, canPreview, let rect = drag?.rows[tab.id]?.rect {
+                layout.hoverSidebarPreview(.tab(tab.id), at: rect, placement: .right)
+            } else if !inside {
+                layout.unhoverSidebarPreview(tab.id)
+            }
         }
-        .task(id: hovering && canPreview) {
-            guard hovering && canPreview else { return }
-            try? await Task.sleep(for: .milliseconds(200))
-            guard !Task.isCancelled, let rect = drag?.rows[tab.id]?.rect else { return }
-            layout.showSidebarPreview(.tab(tab.id), at: rect, placement: .right)
+        .onChange(of: canPreview) {
+            if !canPreview {
+                layout.unhoverSidebarPreview(tab.id)
+                if previewed { layout.dismissSidebarPreview() }
+            }
         }
-        .onChange(of: canPreview) { if !canPreview && previewed { layout.dismissSidebarPreview() } }
         .sidebarDragFrame { rect in
             if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: rect, spaceID: spaceID) }
             if previewed && layout.sidebarPreview?.anchor != rect { layout.dismissSidebarPreview() }
         }
         .onDisappear {
-            if !inCard { drag?.rows[tab.id] = nil }
+            if !inCard {
+                drag?.rows[tab.id] = nil
+                layout.unhoverSidebarPreview(tab.id)
+            }
             if !inCard && layout.sidebarPreview?.target == .tab(tab.id) { layout.dismissSidebarPreview() }
         }
         .platformContextMenu(

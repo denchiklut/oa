@@ -69,17 +69,97 @@ enum RecentPagesDomain: String, Hashable, Sendable, CaseIterable {
     }
 }
 
-/// Supported tab preview types, matching Arc's `BaseModels.PreviewType`.
+/// Arc's `BaseModels.LiveCalendarInterval` (`0x100c892a4`, `0x103742540`).
+enum LiveCalendarInterval: String, CaseIterable, Codable, Hashable, Sendable {
+    case never
+    case onStart
+    case twoMinutesBefore
+    case fiveMinutesBefore
+    case tenMinutesBefore
+
+    var title: String {
+        switch self {
+        case .never: "Never"
+        case .onStart: "On Start"
+        case .twoMinutesBefore: "Two Minutes Before"
+        case .fiveMinutesBefore: "Five Minutes Before"
+        case .tenMinutesBefore: "Ten Minutes Before"
+        }
+    }
+
+    var leadMinutes: Int? {
+        switch self {
+        case .never: nil
+        case .onStart: 0
+        case .twoMinutesBefore: 2
+        case .fiveMinutesBefore: 5
+        case .tenMinutesBefore: 10
+        }
+    }
+}
+
+/// Favorite unread badge sites supported in Oa. Arc's `TopApp` matches `mail.google.com`, `web.whatsapp.com`, and
+/// `twitter.com`; matching `x.com` under `twitter` is Oa's own extension.
+enum FavoriteUnreadBadge: Equatable, Sendable {
+    case gmail
+    case whatsApp
+    case twitter
+
+    var defaultsHost: String {
+        switch self {
+        case .gmail: "mail.google.com"
+        case .whatsApp: "web.whatsapp.com"
+        case .twitter: "twitter.com"
+        }
+    }
+
+    static func matching(url: URL?) -> FavoriteUnreadBadge? {
+        guard let host = url?.host()?.lowercased() else { return nil }
+        if isSubdomain(host, of: "mail.google.com") { return .gmail }
+        if isSubdomain(host, of: "web.whatsapp.com") { return .whatsApp }
+        if isSubdomain(host, of: "twitter.com") || isSubdomain(host, of: "x.com") { return .twitter }
+        return nil
+    }
+
+    private static func isSubdomain(_ host: String, of domain: String) -> Bool {
+        host == domain || host.hasSuffix("." + domain)
+    }
+}
+
+/// Supported tab preview types, matching Arc's `BaseModels.PreviewType`. Notion Calendar carries its originating
+/// tab ID so its connected calendar account is resolved per `(profileID, tabID)` rather than assuming Google `/u/0`.
 enum PreviewType: Hashable, Sendable {
     case gmail(inboxNumber: Int)
-    case googleCalendar(accountNumber: Int, isNotionCalendar: Bool)
+    case googleCalendar(accountNumber: Int)
+    case notionCalendar(tabID: UUID)
     case recentPages(RecentPagesDomain)
+
+    var isCalendar: Bool {
+        switch self {
+        case .googleCalendar, .notionCalendar: true
+        case .gmail, .recentPages: false
+        }
+    }
+
+    var isNotionCalendar: Bool {
+        if case .notionCalendar = self { return true }
+        return false
+    }
 
     var headerTitle: String {
         switch self {
         case .gmail: "Unread"
-        case .googleCalendar: "Upcoming"
+        case .googleCalendar, .notionCalendar: "Upcoming"
         case .recentPages: "Recent"
+        }
+    }
+
+    var disableActionTitle: String {
+        switch self {
+        case .gmail: "Disable Gmail Preview"
+        case .googleCalendar: "Disable Calendar Preview"
+        case .notionCalendar: "Disable Notion Calendar Preview"
+        case .recentPages: "Disable Recent Pages Preview"
         }
     }
 
@@ -87,10 +167,10 @@ enum PreviewType: Hashable, Sendable {
         switch self {
         case .gmail(let inbox):
             URL(string: "https://mail.google.com/mail/u/\(inbox)/#compose")!
-        case .googleCalendar(let account, let isNotion):
-            isNotion
-                ? URL(string: "https://calendar.notion.so/event/create")!
-                : URL(string: "https://calendar.google.com/calendar/u/\(account)/r/eventedit")!
+        case .googleCalendar(let account):
+            URL(string: "https://calendar.google.com/calendar/u/\(account)/r/eventedit")!
+        case .notionCalendar:
+            URL(string: "https://calendar.notion.so/event/create")!
         case .recentPages(let domain):
             domain.ctaURL
         }
@@ -99,19 +179,23 @@ enum PreviewType: Hashable, Sendable {
     var ctaTooltip: String {
         switch self {
         case .gmail: "New Email"
-        case .googleCalendar: "New Event"
+        case .googleCalendar, .notionCalendar: "New Event"
         case .recentPages(let domain): domain.ctaTooltip
         }
     }
 
-    var signInURL: URL? {
+    func signInURL(resolvedAccount: Int? = nil) -> URL? {
         switch self {
         case .gmail(let inbox):
             URL(string: "https://mail.google.com/mail/u/\(inbox)/")
-        case .googleCalendar(let account, let isNotion):
-            isNotion
-                ? URL(string: "https://calendar.notion.so/")
-                : URL(string: "https://calendar.google.com/calendar/u/\(account)/r")
+        case .googleCalendar(let account):
+            URL(string: "https://calendar.google.com/calendar/u/\(account)/r")
+        case .notionCalendar:
+            if let resolvedAccount {
+                URL(string: "https://calendar.google.com/calendar/u/\(resolvedAccount)/r")
+            } else {
+                URL(string: "https://calendar.notion.so/")
+            }
         case .recentPages:
             nil
         }
@@ -121,20 +205,23 @@ enum PreviewType: Hashable, Sendable {
         switch self {
         case .recentPages: 20
         case .gmail: 60
-        case .googleCalendar: 300
+        case .googleCalendar, .notionCalendar: 300
         }
     }
 
-    static func matching(url: URL?) -> PreviewType? {
+    static func matching(url: URL?, tabID: UUID? = nil) -> PreviewType? {
         guard let url, let host = url.host()?.lowercased() else { return nil }
-        if host == "mail.google.com" {
-            return .gmail(inboxNumber: googleAccountNumber(in: url.path))
+        if host == "mail.google.com" || host.hasSuffix(".mail.google.com") {
+            return .gmail(inboxNumber: explicitGoogleAccountNumber(in: url) ?? 0)
         }
-        if host == "calendar.google.com" {
-            return .googleCalendar(accountNumber: googleAccountNumber(in: url.path), isNotionCalendar: false)
+        if host == "calendar.google.com" || host.hasSuffix(".calendar.google.com") {
+            return .googleCalendar(accountNumber: explicitGoogleAccountNumber(in: url) ?? 0)
         }
-        if host == "calendar.notion.so" || host == "calendar.notion.com" {
-            return .googleCalendar(accountNumber: 0, isNotionCalendar: true)
+        if host == "calendar.notion.so" || host.hasSuffix(".calendar.notion.so")
+            || host == "calendar.notion.com" || host.hasSuffix(".calendar.notion.com")
+        {
+            guard let tabID else { return nil }
+            return .notionCalendar(tabID: tabID)
         }
         for domain in RecentPagesDomain.allCases where domain.matches(url) {
             return .recentPages(domain)
@@ -142,14 +229,40 @@ enum PreviewType: Hashable, Sendable {
         return nil
     }
 
-    private static func googleAccountNumber(in path: String) -> Int {
-        let parts = path.split(separator: "/")
+    static func isCalendarHost(_ url: URL?) -> Bool {
+        guard let host = url?.host()?.lowercased() else { return false }
+        return host == "calendar.google.com" || host.hasSuffix(".calendar.google.com")
+            || host == "calendar.notion.so" || host.hasSuffix(".calendar.notion.so")
+            || host == "calendar.notion.com" || host.hasSuffix(".calendar.notion.com")
+    }
+
+    static func calendarDefaultsHost(for url: URL?) -> String? {
+        guard let host = url?.host()?.lowercased() else { return nil }
+        if host == "calendar.google.com" || host.hasSuffix(".calendar.google.com") { return "calendar.google.com" }
+        if host == "calendar.notion.so" || host.hasSuffix(".calendar.notion.so")
+            || host == "calendar.notion.com" || host.hasSuffix(".calendar.notion.com")
+        {
+            return "calendar.notion.so"
+        }
+        return nil
+    }
+
+    /// Parses an explicit Google account index from `/u/<N>` or `?authuser=<N>`.
+    static func explicitGoogleAccountNumber(in url: URL?) -> Int? {
+        guard let url else { return nil }
+        let parts = url.path.split(separator: "/")
         if let uIndex = parts.firstIndex(of: "u"), uIndex + 1 < parts.count,
             let number = Int(parts[uIndex + 1]), number >= 0
         {
             return number
         }
-        return 0
+        if let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+            let value = queryItems.first(where: { $0.name.lowercased() == "authuser" })?.value,
+            let number = Int(value), number >= 0
+        {
+            return number
+        }
+        return nil
     }
 }
 
@@ -181,16 +294,24 @@ struct CalendarEventItem: Identifiable, Hashable, Sendable {
     let location: String?
 }
 
+struct LiveCalendarActiveEvent: Equatable, Sendable {
+    let key: PreviewsStore.Key
+    let tabID: UUID
+    let event: CalendarEventItem
+    let isNotionCalendar: Bool
+}
+
 enum SidebarPreviewContent: Equatable, Sendable {
     case recentPages(RecentPagesDomain, [RecentPageItem])
     case gmail(inboxNumber: Int, [UnreadEmailItem])
-    case calendar(accountNumber: Int, isNotionCalendar: Bool, [CalendarEventItem])
+    case calendar(accountNumber: Int, isNotionCalendar: Bool, accountEmail: String?, [CalendarEventItem])
 }
 
 enum PreviewState: Equatable, Sendable {
     case loading
     case loaded(SidebarPreviewContent)
     case signedOut
+    case disconnected
     case failed
 }
 

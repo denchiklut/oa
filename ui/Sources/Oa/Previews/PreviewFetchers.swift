@@ -180,26 +180,41 @@ enum LiveCalendarFetcher {
         var seen = Set<String>()
         var events: [CalendarEventItem] = []
         var decodedAny = false
+        var accountEmail: String?
 
         for payload in capture.eventPayloads {
             guard let data = payload.data(using: .utf8),
                 let response = try? JSONDecoder().decode(EventsResponse.self, from: data)
             else { continue }
             decodedAny = true
+            if accountEmail == nil, let summary = response.summary, summary.contains("@") {
+                accountEmail = summary
+            }
             for raw in response.items ?? [] {
+                if accountEmail == nil,
+                    let selfEmail = raw.attendees?.first(where: { $0.isSelf == true })?.email,
+                    selfEmail.contains("@")
+                {
+                    accountEmail = selfEmail
+                }
                 guard !isDeclined(raw.attendees),
                     let range = parseRange(start: raw.start, end: raw.end, calendar: calendar),
                     range.end > now, range.start < endOfTomorrow
                 else { continue }
-                let id = raw.id ?? "\(raw.summary ?? "")-\(range.start.timeIntervalSince1970)"
-                let dedupeKey = "\(id)-\(Int(range.start.timeIntervalSince1970))"
-                guard seen.insert(dedupeKey).inserted else { continue }
+                let trimmedID = raw.id?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let eventID =
+                    if let trimmedID, !trimmedID.isEmpty {
+                        trimmedID
+                    } else {
+                        "\(raw.summary ?? "")-\(Int(range.start.timeIntervalSince1970))"
+                    }
+                guard seen.insert(eventID).inserted else { continue }
                 let title = (raw.summary ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let permalink = makePermalink(raw: raw, isNotionCalendar: isNotionCalendar)
                 let joinLink = extractJoinLink(from: raw)
                 events.append(
                     CalendarEventItem(
-                        id: dedupeKey,
+                        id: eventID,
                         title: title.isEmpty ? "(No title)" : title,
                         start: range.start,
                         end: range.end,
@@ -216,10 +231,12 @@ enum LiveCalendarFetcher {
         }
         return .loaded(
             .calendar(
-                accountNumber: accountNumber, isNotionCalendar: isNotionCalendar, Array(events.prefix(12))))
+                accountNumber: accountNumber, isNotionCalendar: isNotionCalendar, accountEmail: accountEmail,
+                Array(events.prefix(12))))
     }
 
     private struct EventsResponse: Decodable {
+        let summary: String?
         let items: [RawEvent]?
     }
 
@@ -251,10 +268,12 @@ enum LiveCalendarFetcher {
     }
 
     private struct Attendee: Decodable {
+        let email: String?
         let isSelf: Bool?
         let responseStatus: String?
 
         enum CodingKeys: String, CodingKey {
+            case email
             case isSelf = "self"
             case responseStatus
         }

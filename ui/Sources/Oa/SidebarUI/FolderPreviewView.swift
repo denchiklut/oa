@@ -36,7 +36,7 @@ struct FolderPreviewView: View {
                     placeholder: "Search \(folder.displayTitle)…", query: $query,
                     move: { move($0, from: selected, in: tabs) },
                     submit: { if let selected { open(selected) } },
-                    dismiss: layout.dismissSidebarPreview)
+                    dismiss: { layout.dismissSidebarPreview() })
             }
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 12)
@@ -140,7 +140,7 @@ struct FolderPreviewView: View {
     }
 
     private func open(_ tab: SidebarTab) {
-        layout.dismissSidebarPreview()
+        layout.dismissSidebarPreview(restoreFocus: false)
         model.select(tab.id)
     }
 }

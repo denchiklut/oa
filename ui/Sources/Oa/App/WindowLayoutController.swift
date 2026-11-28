@@ -101,7 +101,14 @@ final class WindowLayoutController: NSViewController {
     @ObservationIgnored private var spaceStyleEditorPopover: (spaceID: UUID, popover: SpaceStyleEditorPopover)?
     private(set) var sidebarPreview: SidebarPreview?
     @ObservationIgnored var sidebarPreviewFrame = CGRect.zero
+    @ObservationIgnored private var sidebarPreviewHoverTask: Task<Void, Never>?
     @ObservationIgnored private var sidebarPreviewExit: Task<Void, Never>?
+    @ObservationIgnored private var hoveredPreviewCandidate: SidebarPreview?
+    @ObservationIgnored private var sidebarPreviewPointerInCard = false
+    @ObservationIgnored private var sidebarPreviewMenuID: ObjectIdentifier?
+    private var sidebarPreviewMenuOpen: Bool { sidebarPreviewMenuID != nil }
+    @ObservationIgnored private var lastSidebarPointer: CGPoint?
+    @ObservationIgnored private var movingTowardPreviewUntil: CFTimeInterval = 0
     @ObservationIgnored private weak var responderBeforeSidebarPreview: NSResponder?
     @ObservationIgnored private var monitor: Any?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -534,9 +541,15 @@ final class WindowLayoutController: NSViewController {
         ]
         monitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
             guard let self else { return event }
-            if sidebarPreview != nil, [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type) {
+            if sidebarPreview != nil, !sidebarPreviewMenuOpen,
+                [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type)
+            {
                 let point = CGPoint(x: event.locationInWindow.x, y: size.height - event.locationInWindow.y)
-                if event.window !== view.window || !sidebarPreviewFrame.contains(point) { dismissSidebarPreview() }
+                if event.window !== view.window || !sidebarPreviewFrame.contains(point) {
+                    dismissSidebarPreview()
+                } else if event.type == .rightMouseDown {
+                    sidebarPreviewExit?.cancel()
+                }
             }
             if sidebarPreview != nil, event.type == .keyDown, event.keyCode == 53, event.window === view.window {
                 dismissSidebarPreview()
@@ -546,6 +559,10 @@ final class WindowLayoutController: NSViewController {
             if event.type == .scrollWheel {
                 toolTipController.dismiss()
                 guard event.window === view.window else { return event }
+                if sidebarPreview != nil {
+                    let point = CGPoint(x: event.locationInWindow.x, y: size.height - event.locationInWindow.y)
+                    if !sidebarPreviewFrame.contains(point) { dismissSidebarPreview() }
+                }
                 if handlePeekSwipe(event) { return nil }
                 let isWheel = event.phase.isEmpty && event.momentumPhase.isEmpty
                 return isWheel && pager.scrollWheel(with: event) ? nil : event
@@ -554,6 +571,10 @@ final class WindowLayoutController: NSViewController {
                 toolTipController.handlePointerMoved()
                 // A drag from the sidebar has ended by the time the pointer moves again.
                 holds.remove(.drag)
+                if event.window === view.window {
+                    let point = CGPoint(x: event.locationInWindow.x, y: size.height - event.locationInWindow.y)
+                    handleSidebarPreviewPointerMoved(to: point)
+                }
                 trackPointer()
                 return event
             }
@@ -581,11 +602,24 @@ final class WindowLayoutController: NSViewController {
         observe(NSWindow.willStartLiveResizeNotification, window) { $0.toolTipController.dismiss() }
         observe(NSWindow.willCloseNotification, window) { $0.toolTipController.tearDown() }
         observe(NSApplication.didResignActiveNotification, nil) { $0.toolTipController.dismiss() }
-        observe(NSMenu.didBeginTrackingNotification, nil) {
-            $0.toolTipController.dismiss()
-            $0.setHold(.menu, $0.view.window?.isKeyWindow == true)
-        }
-        observe(NSMenu.didEndTrackingNotification, nil) { $0.setHold(.menu, false) }
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main
+            ) { [weak self] note in
+                let menuID = (note.object as? NSMenu).map(ObjectIdentifier.init)
+                MainActor.assumeIsolated {
+                    self?.handleMenuDidBeginTracking(menuID)
+                }
+            })
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main
+            ) { [weak self] note in
+                let menuID = (note.object as? NSMenu).map(ObjectIdentifier.init)
+                MainActor.assumeIsolated {
+                    self?.handleMenuDidEndTracking(menuID)
+                }
+            })
         observeModel()
         observeSpaceStyleEditor()
         observeWindowAppearance()
@@ -651,6 +685,37 @@ final class WindowLayoutController: NSViewController {
         model.setSidebarWidth(SidebarResizeState.resetWidth)
     }
 
+    func hoverSidebarPreview(
+        _ target: SidebarPreview.Target, at anchor: CGRect, placement: SidebarPreview.Placement = .right
+    ) {
+        let candidate = SidebarPreview(target: target, anchor: anchor, placement: placement)
+        hoveredPreviewCandidate = candidate
+        if sidebarPreview?.target == target {
+            sidebarPreviewExit?.cancel()
+            return
+        }
+        sidebarPreviewHoverTask?.cancel()
+        sidebarPreviewHoverTask = Task { [weak self] in
+            // As Arc's `PreviewsConstants.hoverTimeThreshold`: 200 ms.
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled, let self, hoveredPreviewCandidate?.target == target else { return }
+            guard !sidebarPreviewPointerInCard && !sidebarPreviewMenuOpen else { return }
+            if sidebarPreview != nil, CACurrentMediaTime() < movingTowardPreviewUntil { return }
+            showSidebarPreview(target, at: anchor, placement: placement)
+        }
+    }
+
+    func unhoverSidebarPreview(_ id: UUID) {
+        if hoveredPreviewCandidate?.itemID == id {
+            hoveredPreviewCandidate = nil
+            sidebarPreviewHoverTask?.cancel()
+        }
+        guard sidebarPreview?.itemID == id else { return }
+        guard !sidebarPreviewPointerInCard && !sidebarPreviewMenuOpen else { return }
+        let movingToward = CACurrentMediaTime() < movingTowardPreviewUntil
+        scheduleSidebarPreviewExit(for: id, delayMilliseconds: movingToward ? 250 : 75)
+    }
+
     func showSidebarPreview(
         _ target: SidebarPreview.Target, at anchor: CGRect, placement: SidebarPreview.Placement = .right
     ) {
@@ -660,47 +725,144 @@ final class WindowLayoutController: NSViewController {
         else { return }
         if sidebarPreview == nil { responderBeforeSidebarPreview = window.firstResponder }
         sidebarPreviewExit?.cancel()
+        sidebarPreviewPointerInCard = false
+        sidebarPreviewMenuID = nil
         sidebarPreview = SidebarPreview(target: target, anchor: anchor, placement: placement)
         setHold(.sidebarPreview, true)
     }
 
     func keepSidebarPreview(_ id: UUID) {
-        if sidebarPreview?.itemID == id { sidebarPreviewExit?.cancel() }
+        guard sidebarPreview?.itemID == id else { return }
+        sidebarPreviewPointerInCard = true
+        sidebarPreviewExit?.cancel()
+        sidebarPreviewHoverTask?.cancel()
     }
 
     func leaveSidebarPreview(_ id: UUID) {
         guard sidebarPreview?.itemID == id else { return }
+        sidebarPreviewPointerInCard = false
+        guard !sidebarPreviewMenuOpen else { return }
+        scheduleSidebarPreviewExit(for: id, delayMilliseconds: 120)
+    }
+
+    func dismissSidebarPreview(restoreFocus: Bool = true) {
+        sidebarPreviewHoverTask?.cancel()
+        sidebarPreviewExit?.cancel()
+        guard sidebarPreview != nil else { return }
+        sidebarPreview = nil
+        sidebarPreviewFrame = .zero
+        sidebarPreviewPointerInCard = false
+        sidebarPreviewMenuID = nil
+        movingTowardPreviewUntil = 0
+        setHold(.sidebarPreview, false)
+        if restoreFocus, let responder = responderBeforeSidebarPreview, !model.coversWindow, let window = view.window {
+            let canRestore = (responder as? NSView).map { $0.window === window } ?? true
+            if canRestore && window.firstResponder !== responder { window.makeFirstResponder(responder) }
+        }
+        responderBeforeSidebarPreview = nil
+    }
+
+    /// As Arc's `SidebarPreviewHoverTracker` (`0x10044d4ec`): keeps the active preview alive across gaps and
+    /// neighboring rows or tiles while the pointer moves toward the card.
+    private func handleSidebarPreviewPointerMoved(to point: CGPoint) {
+        let previous = lastSidebarPointer
+        lastSidebarPointer = point
+        guard let preview = sidebarPreview else { return }
+        if sidebarPreviewPointerInCard || sidebarPreviewMenuOpen
+            || sidebarPreviewFrame.contains(point)
+            || preview.anchor.contains(point)
+        {
+            sidebarPreviewExit?.cancel()
+            return
+        }
+        if let previous,
+            Self.isMovingTowardPreview(
+                from: previous, to: point, placement: preview.placement,
+                xLimit: max(sidebarPreviewFrame.maxX + 8, sidebarWidth + 250))
+        {
+            movingTowardPreviewUntil = CACurrentMediaTime() + 0.25
+            scheduleSidebarPreviewExit(for: preview.itemID, delayMilliseconds: 250)
+        } else if movingTowardPreviewUntil > 0 && CACurrentMediaTime() >= movingTowardPreviewUntil {
+            scheduleSidebarPreviewExit(for: preview.itemID, delayMilliseconds: 75)
+        }
+    }
+
+    /// Arc's `0x10044d4ec` pointer-direction check in top-left window coordinates (Y increases downward):
+    /// - `.diagonal` (Favorite tile): moving right-or-straight (`dx >= 0`) and down-or-straight (`dy >= 0`).
+    /// - `.right` (Pinned row / Folder): moving right (`dx > 0`) within slope `|dy / dx| <= 3`.
+    private static func isMovingTowardPreview(
+        from previous: CGPoint, to current: CGPoint, placement: SidebarPreview.Placement, xLimit: CGFloat
+    ) -> Bool {
+        guard current.x < xLimit else { return false }
+        let dx = current.x - previous.x
+        let dy = current.y - previous.y
+        switch placement {
+        case .diagonal:
+            return dx >= 0 && dy >= 0 && (dx > 0 || dy > 0)
+        case .right:
+            guard dx > 0 else { return false }
+            return dy == 0 || abs(dy / dx) <= 3
+        }
+    }
+
+    private func scheduleSidebarPreviewExit(for id: UUID, delayMilliseconds: Int) {
         sidebarPreviewExit?.cancel()
         sidebarPreviewExit = Task { [weak self] in
-            // Oa allows time to cross the gap between the row or tile and the panel.
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled, let self, let preview = sidebarPreview, preview.itemID == id,
-                let location = view.window?.mouseLocationOutsideOfEventStream
-            else { return }
-            let point = CGPoint(x: location.x, y: size.height - location.y)
-            if !preview.anchor.insetBy(dx: -4, dy: -4).contains(point),
-                !sidebarPreviewFrame.insetBy(dx: -4, dy: -4).contains(point)
-            {
+            try? await Task.sleep(for: .milliseconds(delayMilliseconds))
+            guard !Task.isCancelled, let self, let preview = sidebarPreview, preview.itemID == id else { return }
+            guard !sidebarPreviewPointerInCard && !sidebarPreviewMenuOpen else { return }
+            if let point = currentPointerInWindow() {
+                if preview.anchor.insetBy(dx: -4, dy: -4).contains(point)
+                    || sidebarPreviewFrame.insetBy(dx: -4, dy: -4).contains(point)
+                {
+                    return
+                }
+            }
+            if let candidate = hoveredPreviewCandidate, candidate.itemID != id {
+                showSidebarPreview(candidate.target, at: candidate.anchor, placement: candidate.placement)
+            } else {
                 dismissSidebarPreview()
             }
         }
     }
 
-    func dismissSidebarPreview() {
-        guard sidebarPreview != nil else { return }
-        sidebarPreviewExit?.cancel()
-        sidebarPreview = nil
-        sidebarPreviewFrame = .zero
-        setHold(.sidebarPreview, false)
-        if let responderBeforeSidebarPreview, !model.coversWindow {
-            view.window?.makeFirstResponder(responderBeforeSidebarPreview)
+    private func handleMenuDidBeginTracking(_ menuID: ObjectIdentifier?) {
+        toolTipController.dismiss()
+        if sidebarPreview != nil, sidebarPreviewMenuID == nil, let menuID,
+            let point = currentPointerInWindow(),
+            sidebarPreviewFrame.insetBy(dx: -8, dy: -8).contains(point)
+        {
+            sidebarPreviewMenuID = menuID
+            sidebarPreviewExit?.cancel()
         }
-        responderBeforeSidebarPreview = nil
+        setHold(.menu, view.window?.isKeyWindow == true)
+    }
+
+    private func handleMenuDidEndTracking(_ menuID: ObjectIdentifier?) {
+        let endedPreviewMenu = sidebarPreviewMenuID != nil && sidebarPreviewMenuID == menuID
+        if endedPreviewMenu { sidebarPreviewMenuID = nil }
+        if !sidebarPreviewMenuOpen { setHold(.menu, false) }
+        if endedPreviewMenu { recheckSidebarPreviewAfterMenu() }
+    }
+
+    private func recheckSidebarPreviewAfterMenu() {
+        guard let preview = sidebarPreview else { return }
+        guard let point = currentPointerInWindow() else { return dismissSidebarPreview() }
+        if !preview.anchor.insetBy(dx: -4, dy: -4).contains(point),
+            !sidebarPreviewFrame.insetBy(dx: -4, dy: -4).contains(point)
+        {
+            scheduleSidebarPreviewExit(for: preview.itemID, delayMilliseconds: 250)
+        }
+    }
+
+    private func currentPointerInWindow() -> CGPoint? {
+        guard let location = view.window?.mouseLocationOutsideOfEventStream else { return nil }
+        return CGPoint(x: location.x, y: size.height - location.y)
     }
 
     func setHold(_ hold: Hold, _ held: Bool) {
         if held {
-            if hold != .sidebarPreview { dismissSidebarPreview() }
+            if hold != .sidebarPreview && !(hold == .menu && sidebarPreviewMenuOpen) { dismissSidebarPreview() }
             holds.insert(hold)
             toolTipController.dismiss()
         } else {

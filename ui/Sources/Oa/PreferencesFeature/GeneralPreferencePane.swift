@@ -3,10 +3,10 @@ import SwiftUI
 
 struct GeneralPreferencePane: View {
     let adBlocker: AdBlocker
+    @Bindable var preferences: PreferencesState
     let showProfiles: () -> Void
     @AppStorage(QuitWarning.key) private var warnsBeforeQuitting = QuitWarning.isOnByDefault
     @State private var showsUpdateInfo = false
-    @State private var showsPreviewSettings = false
 
     var body: some View {
         ScrollView {
@@ -41,10 +41,10 @@ struct GeneralPreferencePane: View {
                     PreferenceRow {
                         Text("Previews")
                     } control: {
-                        Button("Previews Settings…") { showsPreviewSettings = true }
+                        Button("Previews Settings…") { preferences.showsPreviewSettings = true }
                     }
-                    .sheet(isPresented: $showsPreviewSettings) {
-                        PreviewSettingsDialog(settings: .shared) { showsPreviewSettings = false }
+                    .sheet(isPresented: $preferences.showsPreviewSettings) {
+                        PreviewSettingsDialog(settings: .shared) { preferences.showsPreviewSettings = false }
                     }
                     PreferenceRowDivider()
                     PreferenceRow(height: 48) {

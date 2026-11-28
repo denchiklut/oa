@@ -298,8 +298,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
 
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
-    func showSettingsPane(_ pane: SettingsPane, showAirTrafficControl: Bool = false) {
-        settings.showPane(pane, showAirTrafficControl: showAirTrafficControl)
+    func showSettingsPane(
+        _ pane: SettingsPane, showAirTrafficControl: Bool = false, showPreviewSettings: Bool = false
+    ) {
+        settings.showPane(
+            pane, showAirTrafficControl: showAirTrafficControl, showPreviewSettings: showPreviewSettings)
     }
     func openChromiumSettings(_ page: ChromiumSettings, in profileID: UUID) { openSettings(page, in: profileID) }
     @objc func toggleToolbar(_ sender: Any?) { PageToolbar.isShown.toggle() }

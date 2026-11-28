@@ -171,24 +171,30 @@ struct FolderRowView: View {
         .frame(height: 40)
         .onHover { inside in
             hovering = inside
-            if !inside && !inCard { layout.leaveSidebarPreview(folder.id) }
-        }
-        .task(id: hovering && canPreview) {
-            guard hovering && canPreview else { return }
-            // As Arc's `PreviewsConstants.hoverTimeThreshold`: 200 ms.
-            try? await Task.sleep(for: .milliseconds(200))
-            guard !Task.isCancelled, let rect = drag?.rows[folder.id]?.rect,
+            guard !inCard else { return }
+            if inside, canPreview, let rect = drag?.rows[folder.id]?.rect,
                 !model.state.tree.tabs(under: folder.id).isEmpty
-            else { return }
-            layout.showSidebarPreview(.folder(folder.id), at: rect, placement: .right)
+            {
+                layout.hoverSidebarPreview(.folder(folder.id), at: rect, placement: .right)
+            } else if !inside {
+                layout.unhoverSidebarPreview(folder.id)
+            }
         }
-        .onChange(of: canPreview) { if !canPreview && previewed { layout.dismissSidebarPreview() } }
+        .onChange(of: canPreview) {
+            if !canPreview {
+                layout.unhoverSidebarPreview(folder.id)
+                if previewed { layout.dismissSidebarPreview() }
+            }
+        }
         .sidebarDragFrame { rect in
             if !inCard { drag?.rows[folder.id] = SidebarDrag.RowFrame(rect: rect, spaceID: spaceID) }
             if previewed && layout.sidebarPreview?.anchor != rect { layout.dismissSidebarPreview() }
         }
         .onDisappear {
-            if !inCard { drag?.rows[folder.id] = nil }
+            if !inCard {
+                drag?.rows[folder.id] = nil
+                layout.unhoverSidebarPreview(folder.id)
+            }
             if !inCard && layout.sidebarPreview?.target == .folder(folder.id) { layout.dismissSidebarPreview() }
         }
         .onAppear {
