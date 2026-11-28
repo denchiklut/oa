@@ -73,7 +73,7 @@ struct SidebarSnapshot: Codable {
 
         private enum Key: String, CodingKey {
             case id, parentID, childIDs, type, title, savedTitle, url, viewedAt, openerID, activeTabBeforeCreationID
-            case container, splitView, customInfo, savedMuteStatus
+            case container, splitView, customInfo, savedMuteStatus, liveURL, gitHub
         }
 
         private struct CustomInfo: Codable { var icon: String? }
@@ -108,12 +108,14 @@ struct SidebarSnapshot: Codable {
                             UUID.self, forKey: .activeTabBeforeCreationID),
                         customTitle: savedTitle == nil || title.isEmpty ? nil : title,
                         icon: try values.decodeIfPresent(CustomInfo.self, forKey: .customInfo)?.icon,
-                        muteStatus: try values.decodeIfPresent(SidebarTab.MuteStatus.self, forKey: .savedMuteStatus)))
+                        muteStatus: try values.decodeIfPresent(SidebarTab.MuteStatus.self, forKey: .savedMuteStatus),
+                        liveURL: try values.decodeIfPresent(URL.self, forKey: .liveURL)))
             case "folder":
                 kind = .folder(
                     SidebarFolder(
                         id: id, title: title,
-                        icon: try values.decodeIfPresent(CustomInfo.self, forKey: .customInfo)?.icon))
+                        icon: try values.decodeIfPresent(CustomInfo.self, forKey: .customInfo)?.icon,
+                        gitHub: try values.decodeIfPresent(GitHubLiveFolder.self, forKey: .gitHub)))
             case "splitView":
                 var data =
                     try values.decodeIfPresent(SidebarSplitViewData.self, forKey: .splitView)
@@ -145,9 +147,11 @@ struct SidebarSnapshot: Codable {
                 try values.encodeIfPresent(tab.activeTabBeforeCreationID, forKey: .activeTabBeforeCreationID)
                 if let icon = tab.icon { try values.encode(CustomInfo(icon: icon), forKey: .customInfo) }
                 try values.encodeIfPresent(tab.muteStatus, forKey: .savedMuteStatus)
+                try values.encodeIfPresent(tab.liveURL, forKey: .liveURL)
             case .folder(let folder):
                 try values.encode("folder", forKey: .type)
                 try values.encode(folder.title, forKey: .title)
+                try values.encodeIfPresent(folder.gitHub, forKey: .gitHub)
                 if let icon = folder.icon { try values.encode(CustomInfo(icon: icon), forKey: .customInfo) }
             case .splitView(let data):
                 try values.encode("splitView", forKey: .type)

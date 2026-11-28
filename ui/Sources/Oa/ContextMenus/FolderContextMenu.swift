@@ -9,9 +9,29 @@ struct FolderContextMenu {
 
     func make() -> NSMenu {
         let selected = model.multiSelectedItemIDs
-        if selected.contains(folder.id) { return make(several: selected) }
+        if selected.contains(folder.id), selected.count > 1 || folder.gitHub == nil { return make(several: selected) }
         let menu = NSMenu()
         menu.autoenablesItems = false
+        if let live = folder.gitHub {
+            let options = NSMenu()
+            options.autoenablesItems = false
+            if live.error != nil {
+                options.addItem(MenuActionItem("Failed to update"))
+            } else if let date = live.lastFetch {
+                options.addItem(MenuActionItem("Last fetch: " + date.formatted()))
+            }
+            options.addItem(
+                MenuActionItem("Refresh") { [model, folder] in model.refreshLiveFolder(folder.id, manual: true) })
+            menu.items = [
+                MenuActionItem("Pull Requests", submenu: options),
+                .separator(),
+                MenuActionItem("Change Icon…", changeIcon),
+                MenuActionItem("Rename…", rename),
+                .separator(),
+                MenuActionItem("Delete Live Folder") { [model, folder] in FolderDeletion.confirm(folder, in: model) },
+            ]
+            return menu
+        }
         menu.items = [
             MenuActionItem("Share Folder…"),
             .separator(),

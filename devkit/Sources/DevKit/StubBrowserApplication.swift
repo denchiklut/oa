@@ -163,6 +163,19 @@ final class StubBrowserContext: BrowserContext {
         }
     }
 
+    func loadDocument(at url: URL) async -> ProfileDocument? {
+        guard url.host == "github.com", url.path == "/pulls" else { return nil }
+        let authored = url.query?.contains("author") == true
+        let path = authored ? "/example/project/pull/1" : "/example/project/pull/2"
+        let title = authored ? "Update the sidebar" : "Review the new layout"
+        let html = """
+            <html><head><meta name="octolytics-actor-login" content="example"></head>
+            <body><div class="js-navigation-container"><a data-hovercard-type="pull_request"
+            href="\(path)">\(title)</a></div></body></html>
+            """
+        return ProfileDocument(url: url, status: 200, body: Data(html.utf8))
+    }
+
     func favicon(forPageAt url: URL) async -> NSImage? { StubPage.icon(for: url) }
 
     func changedSiteSettings(for url: URL) -> [SiteSetting]? {

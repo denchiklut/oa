@@ -411,7 +411,8 @@ final class SidebarDrag {
 
     private func canMoveDragged(into parentID: UUID, model: WindowModel) -> Bool {
         if link {
-            return model.state.tree[parentID]?.container != nil || model.state.containerDepth(of: parentID) != nil
+            return model.state.tree.folder(parentID)?.gitHub == nil
+                && (model.state.tree[parentID]?.container != nil || model.state.containerDepth(of: parentID) != nil)
         }
         let ids = draggedItemIDs(model: model)
         guard !ids.isEmpty else { return false }

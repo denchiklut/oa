@@ -29,7 +29,7 @@ struct SpaceMenu {
                 model.exitLibrary()
                 model.createFolder(in: space.id, startEditing: true)
             },
-            MenuActionItem("Live Folders", submenu: NSMenu(), enabled: false),
+            MenuActionItem("Live Folders", submenu: liveFolders(), enabled: global && model.sidebarContext == .global),
             .separator(),
             MenuActionItem("Share Space…"),
         ]
@@ -48,6 +48,14 @@ struct SpaceMenu {
         let delete = MenuActionItem("Delete Space") { [model, space] in SpaceDeletion.confirm(space, in: model) }
         delete.isEnabled = global && model.state.spaces.count > 1
         menu.addItem(delete)
+        return menu
+    }
+
+    private func liveFolders() -> NSMenu {
+        let menu = NSMenu()
+        let gitHub = MenuActionItem("GitHub") { [model, space] in model.toggleGitHubFolder(in: space.id) }
+        gitHub.state = model.state.gitHubFolders(in: space.id).isEmpty ? .off : .on
+        menu.addItem(gitHub)
         return menu
     }
 

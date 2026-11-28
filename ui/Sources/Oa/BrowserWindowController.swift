@@ -310,6 +310,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     func windowWillExitFullScreen(_ notification: Notification) { windowButtons.forEach { $0.isHidden = true } }
 
     func windowDidBecomeKey(_ notification: Notification) {
+        model.refreshLiveFolders()
         model.updateLittleDestination()
         model.showSelected()
         if model.regionCapture.hasResult { return }

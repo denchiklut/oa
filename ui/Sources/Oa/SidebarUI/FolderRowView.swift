@@ -6,10 +6,15 @@ enum FolderDeletion {
     /// As Arc (`0x102ae2ddc`): empty folders delete at once; non-empty folders confirm before archiving everything
     /// inside them.
     static func confirm(_ folder: SidebarFolder, in model: WindowModel) {
-        if !(model.state.tree[folder.id]?.childIDs.isEmpty ?? true) {
+        if folder.gitHub != nil || !(model.state.tree[folder.id]?.childIDs.isEmpty ?? true) {
             let alert = NSAlert()
-            alert.messageText = "Delete your “\(folder.displayTitle)” folder?"
-            alert.informativeText = "This will archive all the tabs and folders inside it."
+            if folder.gitHub != nil {
+                alert.messageText = "Delete your GitHub Live Folder?"
+                alert.informativeText = "You can restore this folder at any time by right-clicking the sidebar."
+            } else {
+                alert.messageText = "Delete your “\(folder.displayTitle)” folder?"
+                alert.informativeText = "This will archive all the tabs and folders inside it."
+            }
             alert.addButton(withTitle: "Delete")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -19,7 +24,7 @@ enum FolderDeletion {
 }
 
 /// Arc's `ListHeaderCellView`: a 40 pt row with a 36 pt card indented 16 pt per nesting level, `FolderIcon` in the 24 pt
-/// icon slot, 14 pt semibold title, no trailing button, and `maxContrast @ 0.5` drop-on feedback.
+/// icon slot, 14 pt semibold title, and `maxContrast @ 0.5` drop-on feedback.
 struct FolderRowView: View {
     let model: WindowModel
     let layout: WindowLayoutController
@@ -79,7 +84,7 @@ struct FolderRowView: View {
             Spacer(minLength: 0)
         }
         .padding(.leading, 6)
-        .padding(.trailing, 10)
+        .padding(.trailing, folder.gitHub?.warning == nil ? 10 : 34)
         .frame(height: 36)
         .background {
             card.fill(
@@ -122,6 +127,20 @@ struct FolderRowView: View {
                 },
             including: renaming ? .subviews : .all
         )
+        .overlay(alignment: .trailing) {
+            if let warning = folder.gitHub?.warning {
+                Button {
+                    model.openRoutedLink(warning.destination, in: spaceID)
+                } label: {
+                    Image(systemName: warning.symbol).frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(theme.foreground)
+                .accessibilityLabel(warning.message)
+                .oaToolTip(warning.message, delay: OaToolTipConfiguration.controlDelay, priority: 1)
+                .padding(.trailing, 6)
+            }
+        }
         .scaleEffect(pressed ? 0.99 : 1)
         .animation(.easeOut(duration: 0.1), value: pressed)
         .opacity(!inCard && drag?.settling == true && drag?.entry?.id == folder.id ? 0 : 1)

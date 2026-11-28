@@ -20,6 +20,7 @@ final class SidebarStore {
             for window in windows { window.updateLinkRouting() }
         }
     }
+    @ObservationIgnored let liveFolderRefreshes = LiveFolderRefreshes()
     @ObservationIgnored let savedWindows: [WindowRecord]
     @ObservationIgnored var sidebarViewPreferences: SidebarViewPreferences {
         didSet { scheduleSave() }
@@ -71,6 +72,8 @@ final class SidebarStore {
         let profiles = state.profiles.map(\.id)
         change(&state)
         state.dissolveSplitViews()
+        state.resetMovedLiveFolders()
+        liveFolderRefreshes.cancelRemovedFolders(in: state)
         if state.profiles.map(\.id) != profiles { commandBarPicks.prune(keeping: state.profiles.map(\.id)) }
         for window in windows { window.reconcile() }
         scheduleSave()
