@@ -87,9 +87,8 @@ struct BrowserWindowView: View {
                 .environment(\.colorScheme, appearance.colorScheme)
         }
         .overlay(alignment: .topLeading) {
-            if let preview = layout.folderPreview, let folder = model.state.tree.folder(preview.id) {
-                FolderPreviewView(model: model, layout: layout, folder: folder, anchor: preview.anchor)
-                    .id(folder.id)
+            if let preview = layout.sidebarPreview {
+                SidebarPreviewOverlay(model: model, layout: layout, preview: preview)
             }
         }
         .background { WindowSurface(background: background, next: next) }
@@ -123,11 +122,11 @@ struct BrowserWindowView: View {
                 ExtensionRequestView(model: model, request: request).id(ObjectIdentifier(request))
             }
         }
-        .onChange(of: model.selectedTabID) { layout.dismissFolderPreview() }
+        .onChange(of: model.selectedTabID) { layout.dismissSidebarPreview() }
         .onChange(of: model.page?.id) { _, _ in
             DispatchQueue.main.async {
                 guard let page = model.page, model.dialog == nil, model.extensionRequest == nil,
-                    model.commandBar == nil, layout.folderPreview == nil
+                    model.commandBar == nil, layout.sidebarPreview == nil
                 else { return }
                 (model.peek ?? page).activate()
             }

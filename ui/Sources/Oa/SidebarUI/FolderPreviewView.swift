@@ -36,7 +36,7 @@ struct FolderPreviewView: View {
                     placeholder: "Search \(folder.displayTitle)…", query: $query,
                     move: { move($0, from: selected, in: tabs) },
                     submit: { if let selected { open(selected) } },
-                    dismiss: layout.dismissFolderPreview)
+                    dismiss: layout.dismissSidebarPreview)
             }
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 12)
@@ -67,9 +67,15 @@ struct FolderPreviewView: View {
             PopoverBackgroundView(cornerRadius: 12, shadowColor: .black.opacity(0.32), shadowRadius: 10, shadowY: 5)
         )
         .contentShape(Rectangle())
-        .onHover { if !$0 { layout.leaveFolderPreview(folder.id) } }
+        .onHover { inside in
+            if inside {
+                layout.keepSidebarPreview(folder.id)
+            } else {
+                layout.leaveSidebarPreview(folder.id)
+            }
+        }
         .offset(x: frame.minX, y: frame.minY)
-        .onChange(of: frame, initial: true) { layout.folderPreviewFrame = frame }
+        .onChange(of: frame, initial: true) { layout.sidebarPreviewFrame = frame }
     }
 
     private func resultRow(_ tab: SidebarTab, highlighted: Bool) -> some View {
@@ -104,6 +110,27 @@ struct FolderPreviewView: View {
         .buttonStyle(.plain)
         .onHover { if $0 { highlightedID = tab.id } }
         .accessibilityAddTraits(highlighted ? .isSelected : [])
+        // As Arc's `FolderPreviewAction.ContextMenuAction`: Copy URL, Open in Split View, Duplicate, Archive.
+        .contextMenu {
+            Button("Copy URL") {
+                layout.dismissSidebarPreview()
+                model.copyURL(of: tab.id)
+            }
+            Button("Open in Split View") {
+                layout.dismissSidebarPreview()
+                model.openInSplitView(tab.id)
+            }
+            .disabled(!model.canOpenInSplitView(tab.id))
+            Button("Duplicate") {
+                layout.dismissSidebarPreview()
+                model.duplicate(tab.id)
+            }
+            Divider()
+            Button("Archive") {
+                layout.dismissSidebarPreview()
+                model.archivePinned(tab.id)
+            }
+        }
     }
 
     private func move(_ delta: Int, from selected: SidebarTab?, in tabs: [SidebarTab]) {
@@ -113,7 +140,7 @@ struct FolderPreviewView: View {
     }
 
     private func open(_ tab: SidebarTab) {
-        layout.dismissFolderPreview()
+        layout.dismissSidebarPreview()
         model.select(tab.id)
     }
 }

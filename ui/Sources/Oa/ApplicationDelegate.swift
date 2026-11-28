@@ -82,6 +82,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private func finishLaunching() {
         isLaunching = false
         SiteSearchMigrations.seedOnce(in: engine)
+        store.previews.startPeriodicRefresh(in: store, using: engine)
         let saved = store.savedWindows
         let restoring = pendingRestorations
         pendingRestorations.removeAll()

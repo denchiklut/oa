@@ -28,6 +28,7 @@ source_set("oa") {
     "browser/forwarding_web_contents_delegate.h",
     "browser/history_impl.mm",
     "browser/image_handle.h",
+    "browser/live_calendar.cc",
 
     "browser/page_impl.h",
     "browser/page_impl.mm",
@@ -74,6 +75,7 @@ source_set("oa") {
     "public/engine.h",
     "public/extensions.h",
     "public/history.h",
+    "public/live_calendar.h",
     "public/page.h",
     "public/preferences.h",
     "public/profile_document.h",

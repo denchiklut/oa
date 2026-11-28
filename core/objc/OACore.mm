@@ -16,6 +16,7 @@
 #include "oa/public/engine.h"
 #include "oa/public/extensions.h"
 #include "oa/public/history.h"
+#include "oa/public/live_calendar.h"
 #include "oa/public/page.h"
 #include "oa/public/preferences.h"
 #include "oa/public/profile_document.h"
@@ -76,6 +77,10 @@
 
 @interface OAHistoryEntry ()
 - (instancetype)initWithEntry:(const oa::HistoryEntry&)entry;
+@end
+
+@interface OALiveCalendarCapture ()
+- (instancetype)initWithCapture:(const oa::LiveCalendarCapture&)capture;
 @end
 
 @interface OADownload ()
@@ -1193,11 +1198,38 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 @synthesize url = _url;
 @synthesize title = _title;
+@synthesize lastVisited = _lastVisited;
 
 - (instancetype)initWithEntry:(const oa::HistoryEntry&)entry {
   if ((self = [super init])) {
     _url = @(entry.url.c_str()) ?: @"";
     _title = @(entry.title.c_str()) ?: @"";
+    _lastVisited =
+        entry.last_visit_seconds > 0
+            ? [NSDate dateWithTimeIntervalSince1970:entry.last_visit_seconds]
+            : nil;
+  }
+  return self;
+}
+
+@end
+
+@implementation OALiveCalendarCapture
+
+@synthesize signedOut = _signedOut;
+@synthesize eventPayloads = _eventPayloads;
+
+- (instancetype)initWithCapture:(const oa::LiveCalendarCapture&)capture {
+  if ((self = [super init])) {
+    _signedOut = capture.signed_out;
+    NSMutableArray<NSString*>* payloads =
+        [NSMutableArray arrayWithCapacity:capture.event_payloads.size()];
+    for (const std::string& payload : capture.event_payloads) {
+      if (NSString* text = ToNSString(payload)) {
+        [payloads addObject:text];
+      }
+    }
+    _eventPayloads = payloads;
   }
   return self;
 }
@@ -2010,16 +2042,29 @@ class BrowserObserverBridge : public oa::Browser::Observer {
 }
 
 - (void)loadDocumentAtURL:(NSURL*)url
+                   accept:(NSString*)accept
                completion:(void (^)(NSString*, NSInteger, NSData* _Nullable))
                               completion {
   void (^handler)(NSString*, NSInteger, NSData*) = [completion copy];
   oa::LoadProfileDocument(
       _identifier.UTF8String ?: "", _type, url.absoluteString.UTF8String ?: "",
+      accept.UTF8String ?: "",
       [handler](std::string final_url, int status,
                 std::optional<std::string> body) {
         handler(ToNSString(final_url), status,
                 body ? [NSData dataWithBytes:body->data() length:body->size()]
                      : nil);
+      });
+}
+
+- (void)fetchLiveCalendarForAccountNumber:(NSInteger)accountNumber
+                               completion:(void (^)(OALiveCalendarCapture*))
+                                              completion {
+  void (^handler)(OALiveCalendarCapture*) = [completion copy];
+  oa::FetchLiveCalendar(
+      _identifier.UTF8String ?: "", static_cast<int>(accountNumber),
+      [handler](oa::LiveCalendarCapture capture) {
+        handler([[OALiveCalendarCapture alloc] initWithCapture:capture]);
       });
 }
 

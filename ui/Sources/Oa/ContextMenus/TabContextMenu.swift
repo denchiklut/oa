@@ -19,10 +19,23 @@ struct TabContextMenu {
         let current = model.selectedTabID == tab.id
         let menu = NSMenu()
         menu.autoenablesItems = false
+        if favorite, case .googleCalendar = PreviewType.matching(url: tab.url), let host = tab.url?.host()?.lowercased()
+        {
+            menu.addItem(liveCalendarMenu(host: host))
+            menu.addItem(.separator())
+        }
         let copy = MenuActionItem("Copy Link") { [model, tab] in model.copyURL(of: tab.id) }
         if current { copy.shortcut("c", [.shift, .command]) }
         menu.addItem(copy)
         if let url = model.liveURL(of: tab.id) { menu.addItem(share(url)) }
+        if favorite, let host = tab.url?.host()?.lowercased(), host == "mail.google.com" || host == "web.whatsapp.com" {
+            menu.addItem(.separator())
+            let badge = MenuActionItem("Show Unread Badge") {
+                PreviewSettings.shared.toggleBadging(forHost: host)
+            }
+            badge.state = PreviewSettings.shared.isBadgingEnabled(forHost: host) ? .on : .off
+            menu.addItem(badge)
+        }
         if let url = tab.liveURL {
             menu.addItem(
                 MenuActionItem("Copy PR #") {
@@ -132,6 +145,41 @@ struct TabContextMenu {
                 })
         }
         return menu
+    }
+
+    /// As seen in Arc (`arc-tab-context-menu-multi-live.md` §5): Live Calendar submenu at the top of a Calendar
+    /// Favorite's context menu.
+    private func liveCalendarMenu(host: String) -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let record = model.previewRecord(for: tab)
+        let status: String =
+            switch record?.state {
+            case .loaded:
+                if let date = record?.lastRefreshed {
+                    "Updated \(date.formatted(.relative(presentation: .named)))"
+                } else {
+                    "Updated"
+                }
+            case .loading: "Updating…"
+            case .signedOut: "Sign in to update"
+            case .failed: "Failed to update"
+            case nil: "Not updated yet"
+            }
+        submenu.addItem(MenuActionItem(status, enabled: false))
+        submenu.addItem(MenuActionItem("Refresh") { [model, tab] in model.refreshPreview(for: tab, force: true) })
+        submenu.addItem(.separator())
+        let hover = MenuActionItem("Show Hover Preview") {
+            PreviewSettings.shared.liveCalendarHoverEnabled.toggle()
+        }
+        hover.state = PreviewSettings.shared.liveCalendarHoverEnabled ? .on : .off
+        submenu.addItem(hover)
+        let subtitle = MenuActionItem("Show Time to Next Meeting") {
+            PreviewSettings.shared.toggleSubtitle(forHost: host)
+        }
+        subtitle.state = PreviewSettings.shared.isSubtitleEnabled(forHost: host) ? .on : .off
+        submenu.addItem(subtitle)
+        return MenuActionItem("Live Calendar", submenu: submenu)
     }
 
     private func editPinnedPage(_ url: URL) -> NSMenuItem {

@@ -14,6 +14,7 @@ void LoadProfileDocument(
     const std::string& profile_id,
     BrowserContextType type,
     const std::string& url,
+    const std::string& accept,
     std::function<void(std::string, int, std::optional<std::string>)> done);
 
 }  // namespace oa

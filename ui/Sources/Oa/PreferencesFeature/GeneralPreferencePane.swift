@@ -6,6 +6,7 @@ struct GeneralPreferencePane: View {
     let showProfiles: () -> Void
     @AppStorage(QuitWarning.key) private var warnsBeforeQuitting = QuitWarning.isOnByDefault
     @State private var showsUpdateInfo = false
+    @State private var showsPreviewSettings = false
 
     var body: some View {
         ScrollView {
@@ -40,10 +41,11 @@ struct GeneralPreferencePane: View {
                     PreferenceRow {
                         Text("Previews")
                     } control: {
-                        Button("Previews Settings…") {}
-                            .disabled(true)
+                        Button("Previews Settings…") { showsPreviewSettings = true }
                     }
-                    .oaToolTip("Favorites previews are unavailable in this build of Oa.")
+                    .sheet(isPresented: $showsPreviewSettings) {
+                        PreviewSettingsDialog(settings: .shared) { showsPreviewSettings = false }
+                    }
                     PreferenceRowDivider()
                     PreferenceRow(height: 48) {
                         Text("Manage your default search engine, Auto-Archive, and downloads in Profile Settings.")

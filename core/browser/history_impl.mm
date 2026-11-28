@@ -61,8 +61,10 @@ void QueryHistory(const std::string& profile_id,
                        history::QueryResults results) {
                       std::vector<HistoryEntry> entries;
                       for (const history::URLResult& result : results) {
-                        entries.push_back({result.url().spec(),
-                                           base::UTF16ToUTF8(result.title())});
+                        entries.push_back(
+                            {result.url().spec(),
+                             base::UTF16ToUTF8(result.title()),
+                             result.last_visit().InSecondsFSinceUnixEpoch()});
                       }
                       completion(std::move(entries));
                     },

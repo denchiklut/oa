@@ -1731,6 +1731,77 @@ final class WindowModel {
         store.edit { $0.toggleLiveFolderRepository(name, in: id) }
     }
 
+    var previews: PreviewsStore { store.previews }
+
+    /// Only Favorites and Pinned tabs show hover previews, as Arc's Previews Settings describes.
+    func previewType(for tab: SidebarTab) -> PreviewType? {
+        guard sidebarContext != .incognito, state.isFavorite(tab.id) || state.isPinned(tab.id),
+            let type = PreviewType.matching(url: tab.url), PreviewSettings.shared.isEnabled(for: type)
+        else { return nil }
+        return type
+    }
+
+    func previewProfileID(for tab: SidebarTab) -> UUID? {
+        state.profile(containing: tab.id)?.id ?? state.space(containingItem: tab.id)?.profileID ?? space?.profileID
+    }
+
+    func previewRecord(for tab: SidebarTab) -> PreviewRecord? {
+        guard let type = PreviewType.matching(url: tab.url), let profileID = previewProfileID(for: tab) else {
+            return nil
+        }
+        return store.previews.record(for: type, profileID: profileID)
+    }
+
+    func refreshPreview(for tab: SidebarTab, force: Bool = false) {
+        guard sidebarContext != .incognito, let type = PreviewType.matching(url: tab.url),
+            let profileID = previewProfileID(for: tab)
+        else { return }
+        store.previews.refresh(type, profileID: profileID, using: engine, force: force)
+    }
+
+    func showsUnreadBadge(for tab: SidebarTab) -> Bool {
+        guard sidebarContext != .incognito, let profileID = previewProfileID(for: tab) else { return false }
+        return store.previews.showsUnreadBadge(
+            for: tab, liveTitle: pages[tab.id]?.title, profileID: profileID, settings: .shared)
+    }
+
+    func calendarSubtitle(for tab: SidebarTab, now: Date = .now) -> String? {
+        guard sidebarContext != .incognito, let profileID = previewProfileID(for: tab) else { return nil }
+        return store.previews.calendarSubtitle(for: tab, profileID: profileID, settings: .shared, now: now)
+    }
+
+    /// Oa's own modifier routing for preview links: plain click opens a new tab in the current Space, ⌥ opens beside
+    /// the current tab in Split View, and ⇧ opens in Peek over the current tab when Shift-Peek is on.
+    func openPreviewLink(_ url: URL) {
+        let flags = NSEvent.modifierFlags
+        if flags.contains(.option), let current = selectedTabID, canOpenInSplitView(current) {
+            let tab = makeTab(url: url, opener: current)
+            let spaceID = selectedSpaceID
+            editSplitView(taking: [current]) {
+                $0.openTab(tab, from: current, in: spaceID)
+                let index = $0.presentedTabIDs(with: current).firstIndex(of: current).map { $0 + 1 }
+                $0.openInSplitView(tab.id, beside: current, in: spaceID, at: index)
+            }
+            createdDates[tab.id] = .now
+            select(tab.id)
+            return
+        }
+        if flags.contains(.shift), store.peekOnShiftClick, let openerID = selectedTabID,
+            let profileID = previewProfileID(for: selectedTab ?? SidebarTab(id: openerID, title: "", url: nil))
+        {
+            Task { [weak self] in
+                guard let self, let made = await context(for: profileID).makePage(windowID: id, restoring: nil) else {
+                    return
+                }
+                guard selectedTabID == openerID else { return made.page.drop() }
+                made.page.load(url)
+                peek(made.page, from: openerID)
+            }
+            return
+        }
+        newTab(url)
+    }
+
     @discardableResult
     func createNestedFolder(in parentID: UUID) -> UUID? {
         guard state.canCreateFolder(in: parentID), let spaceID = state.space(containingItem: parentID)?.id else {
