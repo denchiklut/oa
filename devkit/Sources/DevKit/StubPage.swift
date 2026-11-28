@@ -642,7 +642,7 @@ final class StubPage: Page, MediaSession {
         if let url {
             let failed = url.host()?.hasSuffix(".invalid") == true
             title = StubPage.title(for: url)
-            if !failed { context.didVisit(HistoryEntry(url: url, title: title)) }
+            if !failed { context.didVisit(HistoryEntry(url: url, title: title, visitTime: .now)) }
             favicon = failed ? nil : StubPage.icon(for: url)
             navigationResult = failed ? .failed : .loaded
             rootBackgroundColor = url.host()?.hasPrefix("orange.") == true ? .orange : .white

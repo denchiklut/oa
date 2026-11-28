@@ -223,16 +223,19 @@ final class WindowModel {
         return site
     }
 
-    func recentPages(for site: RecentPagesSite, tabID: UUID) async -> [HistoryEntry] {
+    func recentPages(for site: RecentPagesSite, tabID: UUID) async -> [RecentPage] {
         guard recentPagesSite(for: tabID) == site, let profileID = shownProfileID else { return [] }
-        let entries = await context(for: profileID).history(matching: site.rawValue, maxResults: 100)
+        let entries = await context(for: profileID).history(
+            matching: site == .linear ? "linear.app/" : site.rawValue, maxResults: 100)
         guard !Task.isCancelled, shownProfileID == profileID, recentPagesSite(for: tabID) == site else { return [] }
         return site.documents(in: entries)
     }
 
     func openRecentPage(_ url: URL, from tabID: UUID) {
         guard let site = recentPagesSite(for: tabID), RecentPagesSite(url: url) == site else { return }
-        newTab(url)
+        guard site == .linear else { return newTab(url) }
+        select(tabID)
+        load(url, in: tabID)
     }
 
     var adBlocker: AdBlocker { engine.adBlocker }
@@ -809,13 +812,17 @@ final class WindowModel {
                 peek.load(url)
                 return peek.activate()
             }
-            ensurePage(tabID)
-            if let page = pages[tabID] {
-                page.load(url)
-                page.activate()
-            } else {
-                pendingURLs[tabID] = url
-            }
+            load(url, in: tabID)
+        }
+    }
+
+    private func load(_ url: URL, in tabID: UUID) {
+        ensurePage(tabID)
+        if let page = pages[tabID] {
+            page.load(url)
+            page.activate()
+        } else {
+            pendingURLs[tabID] = url
         }
     }
 

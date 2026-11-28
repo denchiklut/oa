@@ -375,6 +375,7 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @interface OAHistoryEntry : NSObject
 @property(nonatomic, readonly) NSString* url;
 @property(nonatomic, readonly) NSString* title;
+@property(nonatomic, readonly) NSDate* visitTime;
 - (instancetype)init NS_UNAVAILABLE;
 @end
 

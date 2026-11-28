@@ -1193,11 +1193,13 @@ OAPageDialogKind ToDialogKind(oa::Dialog::Kind kind) {
 
 @synthesize url = _url;
 @synthesize title = _title;
+@synthesize visitTime = _visitTime;
 
 - (instancetype)initWithEntry:(const oa::HistoryEntry&)entry {
   if ((self = [super init])) {
     _url = @(entry.url.c_str()) ?: @"";
     _title = @(entry.title.c_str()) ?: @"";
+    _visitTime = [NSDate dateWithTimeIntervalSince1970:entry.visit_time];
   }
   return self;
 }

@@ -16,6 +16,7 @@ namespace oa {
 struct HistoryEntry {
   std::string url;
   std::string title;
+  double visit_time;
 };
 
 // Chromium's history text search in the app profile `profile_id`, newest
