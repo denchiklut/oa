@@ -170,6 +170,23 @@ Each window saves its own expanded folders in `windows.json`. Deleting a
 nonempty folder asks for confirmation and archives its tabs. **Edit ▸ Undo**
 restores the folder tree in order.
 
+### Recent-page previews
+
+Hover over a pinned Linear, Notion or Figma tab or Favorite to see recent
+documents from the current profile. The card lists Linear issues and projects,
+Notion pages, or Figma files and boards. Selecting a result opens its most
+recently visited URL in a new tab in the current Space.
+
+Oa shows up to five distinct documents from the newest 100 matching history
+entries. The limit, document grouping and choice to open a new tab are Oa
+decisions. The stub uses visits from the current run. Chromium uses the
+profile’s saved browsing history.
+
+**Settings → General → Previews Settings…** has a switch for folders and a
+shared switch for recent pages. **Site Controls** can turn an individual
+site’s previews off. Oa remembers that choice when the shared switch is
+turned off and back on.
+
 ## Window frame
 
 The window has no title bar. As in Arc, the sidebar's header has window buttons

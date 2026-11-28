@@ -59,8 +59,7 @@ final class SidebarDrag {
     /// As seen in Arc's stack: the selected tab in front when it is a member, else the dragged row.
     private(set) var stack: [SidebarEntry] = []
     /// A link dragged in from a page.
-    @ObservationIgnored private var link = false
-    var isLinkDrag: Bool { link }
+    private(set) var isLinkDrag = false
     private(set) var revealedFavoritesProfile: UUID?
     private(set) var source: Section?
     private(set) var target: Target?
@@ -129,7 +128,7 @@ final class SidebarDrag {
 
     /// As seen in Arc: a link dragged from a page over the list shows the line, and over a split's cell joins it.
     func updateLink(at point: CGPoint, model: WindowModel) {
-        link = true
+        isLinkDrag = true
         location = point
         retarget(model: model)
     }
@@ -138,11 +137,11 @@ final class SidebarDrag {
     @discardableResult
     func endLink() -> Target? {
         defer {
-            link = false
+            isLinkDrag = false
             combineCandidate = nil
             target = nil
         }
-        return link ? target : nil
+        return isLinkDrag ? target : nil
     }
 
     private func retarget(model: WindowModel) {
@@ -410,7 +409,7 @@ final class SidebarDrag {
     }
 
     private func canMoveDragged(into parentID: UUID, model: WindowModel) -> Bool {
-        if link {
+        if isLinkDrag {
             return model.state.tree.folder(parentID)?.gitHub == nil
                 && (model.state.tree[parentID]?.container != nil || model.state.containerDepth(of: parentID) != nil)
         }
@@ -422,7 +421,7 @@ final class SidebarDrag {
     /// The pointer picks the place, as AppKit's drag destinations do: among the Favorites the slot under it, in the
     /// list a folder's body or the gap between the rows around it (indented 16 pt per nesting level).
     private func target(at point: CGPoint, model: WindowModel) -> Target? {
-        guard entry != nil || link, let list = lists[model.selectedSpaceID] else { return nil }
+        guard entry != nil || isLinkDrag, let list = lists[model.selectedSpaceID] else { return nil }
         let draggingFolder = dragsFolder(model: model)
         if grid.contains(point) {
             // A link dropped on the Favorites wasn't tried in Arc; folders are pinned-section only.
@@ -569,7 +568,7 @@ final class SidebarDrag {
             if !self.memberIDs.isEmpty { return !model.combinedTabIDs(self.memberIDs, onto: id).isEmpty }
             return held.map { model.canCombineIntoSplitView($0, onto: id) } ?? model.canDropLink(inSplitView: id)
         }
-        guard held != nil || link,
+        guard held != nil || isLinkDrag,
             let id = ids.first(where: { rows[$0].map { $0.rect.contains(point) && band($0.rect) } == true }),
             canCombine(id)
         else {

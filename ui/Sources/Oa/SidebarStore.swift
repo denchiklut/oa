@@ -44,6 +44,7 @@ final class SidebarStore {
     @ObservationIgnored let captureLibrary: CaptureLibrary
     @ObservationIgnored let home: StorableHome
     @ObservationIgnored let keyBindings: KeyBindingsClient
+    @ObservationIgnored let previewPreferences = PreviewPreferences()
     @ObservationIgnored let developerMode: DeveloperModeClient
     @ObservationIgnored let linkRouting: LinkRoutingClient
     @ObservationIgnored let sessionRestoration: SessionRestorationClient

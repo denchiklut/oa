@@ -87,9 +87,16 @@ struct BrowserWindowView: View {
                 .environment(\.colorScheme, appearance.colorScheme)
         }
         .overlay(alignment: .topLeading) {
-            if let preview = layout.folderPreview, let folder = model.state.tree.folder(preview.id) {
-                FolderPreviewView(model: model, layout: layout, folder: folder, anchor: preview.anchor)
-                    .id(folder.id)
+            if let preview = layout.sidebarPreview {
+                if model.previewPreferences.folders, let folder = model.state.tree.folder(preview.id) {
+                    FolderPreviewView(model: model, layout: layout, folder: folder, anchor: preview.anchor)
+                        .id(folder.id)
+                } else if let site = model.recentPagesSite(for: preview.id) {
+                    RecentPagesPreviewView(
+                        model: model, layout: layout, tabID: preview.id, site: site, anchor: preview.anchor
+                    )
+                    .id(preview.id)
+                }
             }
         }
         .background { WindowSurface(background: background, next: next) }
@@ -123,11 +130,13 @@ struct BrowserWindowView: View {
                 ExtensionRequestView(model: model, request: request).id(ObjectIdentifier(request))
             }
         }
-        .onChange(of: model.selectedTabID) { layout.dismissFolderPreview() }
+        .onChange(of: model.selectedTabID) { layout.dismissSidebarPreview() }
+        .onChange(of: model.selectedSpaceID) { layout.dismissSidebarPreview() }
+        .onChange(of: model.shownProfileID) { layout.dismissSidebarPreview() }
         .onChange(of: model.page?.id) { _, _ in
             DispatchQueue.main.async {
                 guard let page = model.page, model.dialog == nil, model.extensionRequest == nil,
-                    model.commandBar == nil, layout.folderPreview == nil
+                    model.commandBar == nil, layout.sidebarPreview == nil
                 else { return }
                 (model.peek ?? page).activate()
             }

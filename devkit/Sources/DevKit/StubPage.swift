@@ -15,7 +15,7 @@ final class StubPage: Page, MediaSession {
     var canGoBack: Bool { position > 0 }
     var canGoForward: Bool { position < history.count - 1 }
     let tabSessionID = StubPage.nextTabSessionID()
-    let profileID: UUID
+    var profileID: UUID { context.id }
     private(set) var favicon: NSImage?
     let fullscreenOrigin: String? = nil
     func exitFullscreen() {}
@@ -92,16 +92,13 @@ final class StubPage: Page, MediaSession {
 
     var view: NSView { hostingView }
 
-    @ObservationIgnored private let downloads: StubDownloads
-    @ObservationIgnored private let extensions: StubExtensions
-    @ObservationIgnored var isIncognito = false
+    @ObservationIgnored private let context: StubBrowserContext
+    private var extensions: StubExtensions { context.stubExtensions }
 
-    init(id: UUID, windowID: UUID, profileID: UUID, downloads: StubDownloads, extensions: StubExtensions) {
+    init(id: UUID, windowID: UUID, context: StubBrowserContext) {
         self.id = id
         self.windowID = windowID
-        self.profileID = profileID
-        self.downloads = downloads
-        self.extensions = extensions
+        self.context = context
         (events, continuation) = AsyncStream<PageEvent>.makeStream()
         stubDevTools.canDock = { [weak self] in self.map { !Self.popupWindowIDs.contains($0.windowID) } ?? true }
         Self.arrive(self)
@@ -347,9 +344,7 @@ final class StubPage: Page, MediaSession {
         components.path = "/opened-\(StubPage.openedCount)"
         components.query = nil
         guard let target = components.url else { return }
-        let opened = StubPage(
-            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
-        opened.isIncognito = isIncognito
+        let opened = StubPage(id: UUID(), windowID: windowID, context: context)
         opened.load(target)
         continuation?.yield(.opened(opened, url: target, disposition: .withModifiers(disposition), byPage: byPage))
     }
@@ -369,9 +364,7 @@ final class StubPage: Page, MediaSession {
     fileprivate func follow(_ target: URL, crossOrigin: Bool) {
         let held = NSEvent.modifierFlags.intersection([.shift, .command, .control, .option])
         guard held == .shift || held == [.command, .shift] || (crossOrigin && keepsAddress) else { return load(target) }
-        let opened = StubPage(
-            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
-        opened.isIncognito = isIncognito
+        let opened = StubPage(id: UUID(), windowID: windowID, context: context)
         opened.load(target)
         let disposition = OpenDisposition.withModifiers(held == .shift ? .newWindow : .foregroundTab)
         continuation?.yield(.opened(opened, url: target, disposition: disposition, byPage: true))
@@ -390,7 +383,7 @@ final class StubPage: Page, MediaSession {
             StubMenuItem("Open Link in New Window") { [weak self] in self?.open(.newWindow, byPage: false) })
         menu.addItem(
             StubMenuItem("Open Link in Split View") { [weak self] in self?.open(.splitView, byPage: false) })
-        if !isIncognito, let url {
+        if !context.isIncognito, let url {
             menu.addItem(
                 StubMenuItem("Open Link in Little Oa") { [weak self] in
                     self?.continuation?.yield(.openLinkInLittleWindow(url.appending(path: "little")))
@@ -404,7 +397,7 @@ final class StubPage: Page, MediaSession {
     }
 
     func download(failing: Bool = false) {
-        downloads.start(from: self, failing: failing)
+        context.stubDownloads.start(from: self, failing: failing)
     }
 
     /// As the Chrome Web Store's Add button: the engine asks through the page before it installs.
@@ -454,8 +447,7 @@ final class StubPage: Page, MediaSession {
 
     func duplicate() -> (any Page)? {
         guard history.indices.contains(position) else { return nil }
-        let page = StubPage(
-            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
+        let page = StubPage(id: UUID(), windowID: windowID, context: context)
         page.history = history
         page.position = position
         page.show(history[position])
@@ -463,13 +455,11 @@ final class StubPage: Page, MediaSession {
     }
 
     static func restore(
-        _ sessionID: PageSessionID, id: UUID, windowID: UUID, profileID: UUID, downloads: StubDownloads,
-        extensions: StubExtensions
+        _ sessionID: PageSessionID, id: UUID, windowID: UUID, context: StubBrowserContext
     ) -> StubPage? {
         guard let record = records.removeValue(forKey: sessionID), record.history.indices.contains(record.position)
         else { return nil }
-        let page = StubPage(
-            id: id, windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
+        let page = StubPage(id: id, windowID: windowID, context: context)
         page.history = record.history
         page.position = record.position
         page.show(record.history[record.position])
@@ -652,6 +642,7 @@ final class StubPage: Page, MediaSession {
         if let url {
             let failed = url.host()?.hasSuffix(".invalid") == true
             title = StubPage.title(for: url)
+            if !failed { context.didVisit(HistoryEntry(url: url, title: title)) }
             favicon = failed ? nil : StubPage.icon(for: url)
             navigationResult = failed ? .failed : .loaded
             rootBackgroundColor = url.host()?.hasPrefix("orange.") == true ? .orange : .white
