@@ -7,11 +7,26 @@ struct GitHubLiveFolder: Codable, Hashable {
     var lastFetch: Date?
     var failedSince: Date?
     var error: GitHubFolderError?
+    private var filters: Set<GitHubPullRequestFilter>?
+
+    init(profileID: UUID) { self.profileID = profileID }
+
+    var enabledFilters: Set<GitHubPullRequestFilter> {
+        get { filters ?? Set(GitHubPullRequestFilter.allCases) }
+        set { filters = newValue }
+    }
+
+    var hasPersistentFailure: Bool {
+        guard let failedSince, let lastFetch else { return false }
+        return lastFetch.timeIntervalSince(failedSince) > 30
+    }
 
     var warning: GitHubFolderError? {
-        if case .singleSignOn = error { return error }
-        guard let failedSince, let lastFetch, lastFetch.timeIntervalSince(failedSince) > 30 else { return nil }
-        return error
+        switch error {
+        case .signedOut, .singleSignOn: error
+        case .unavailable: hasPersistentFailure ? error : nil
+        case nil: nil
+        }
     }
 }
 
@@ -28,6 +43,7 @@ extension SidebarState {
             else { continue }
             for child in item.childIDs where tree.tab(child)?.liveURL != nil { tree.remove(child) }
             folder.gitHub = GitHubLiveFolder(profileID: profileID)
+            folder.gitHub?.enabledFilters = live.enabledFilters
             tree.update(folder.id) { $0.kind = .folder(folder) }
         }
     }
@@ -101,12 +117,15 @@ final class LiveFolderRefreshes {
                 jobs[id]?.waitingToRetry = false
                 let result: Result<[GitHubPullRequest], GitHubFolderError>
                 do {
-                    result = .success(try await GitHubPullRequests.fetch(in: engine.browserContext(id: live.profileID)))
+                    result = .success(
+                        try await GitHubPullRequests.fetch(
+                            live.enabledFilters, in: engine.browserContext(id: live.profileID)))
                 } catch {
                     result = .failure(error as? GitHubFolderError ?? .unavailable)
                 }
                 guard !Task.isCancelled, !store.quitting,
-                    let current = store.state.tree.folder(id)?.gitHub, current.profileID == live.profileID
+                    let current = store.state.tree.folder(id)?.gitHub, current.profileID == live.profileID,
+                    current.enabledFilters == live.enabledFilters
                 else { break }
                 let now = Date.now
                 store.edit { state in
@@ -123,9 +142,12 @@ final class LiveFolderRefreshes {
                         }
                     }
                 }
-                guard attempt == 0, case .failure = result, store.state.tree.folder(id)?.gitHub?.warning == nil else {
+                guard attempt == 0, case .failure(let error) = result,
+                    store.state.tree.folder(id)?.gitHub?.hasPersistentFailure == false
+                else {
                     break
                 }
+                if case .singleSignOn = error { break }
                 jobs[id]?.waitingToRetry = true
                 try? await Task.sleep(for: .seconds(60))
             }
