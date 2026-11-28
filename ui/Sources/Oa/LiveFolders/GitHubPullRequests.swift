@@ -38,18 +38,31 @@ enum GitHubPullRequests {
     static func fetch(in context: any BrowserContext) async throws -> [GitHubPullRequest] {
         var seen = Set<URL>()
         var result: [GitHubPullRequest] = []
-        for filter in ["author:@me", "user-review-requested:@me"] {
+        for (view, filter) in [("authored", "author:@me"), ("reviews", "user-review-requested:@me")] {
+            var path = "/pulls/" + view
             for number in 1...10 {
                 try Task.checkCancellation()
-                var request = URLComponents(string: "https://github.com/pulls")!
+                var request = URLComponents(url: github, resolvingAgainstBaseURL: false)!
+                request.path = path
                 request.queryItems = [
                     URLQueryItem(name: "q", value: "is:pr is:open sort:updated-desc \(filter) involves:@me"),
                     URLQueryItem(name: "page", value: String(number)),
                 ]
-                guard let response = await context.loadDocument(at: request.url!) else {
+                guard var response = await context.loadDocument(at: request.url!) else {
                     throw GitHubFolderError.unavailable
                 }
-                let page = try await parse(response, number: number)
+                // Older dashboards serve these searches at /pulls. Reissue the query if a redirect dropped it.
+                if path != "/pulls", response.url.host == github.host,
+                    response.status == 404 || (response.status == 200 && response.url.path == "/pulls")
+                {
+                    path = "/pulls"
+                    request.path = path
+                    guard let legacy = await context.loadDocument(at: request.url!) else {
+                        throw GitHubFolderError.unavailable
+                    }
+                    response = legacy
+                }
+                let page = try await parse(response, path: path, number: number)
                 result.append(contentsOf: page.items.filter { seen.insert($0.url).inserted })
                 if !page.hasNext { break }
                 guard number < 10 else { throw GitHubFolderError.unavailable }
@@ -69,6 +82,9 @@ enum GitHubPullRequests {
 
         struct Layout: Decodable {
             var sso_organizations: [Organization]?
+            var sso: SSO?
+
+            struct SSO: Decodable { var sso_organizations: [Organization]? }
 
             struct Organization: Decodable {
                 let login: String
@@ -98,13 +114,13 @@ enum GitHubPullRequests {
 
     private struct Embedded: Decodable { var payload: Payload }
 
-    private static func parse(_ response: ProfileDocument, number: Int) async throws -> Page {
+    private static func parse(_ response: ProfileDocument, path: String, number: Int) async throws -> Page {
         guard response.url.scheme == "https", response.url.host == "github.com" else {
             throw GitHubFolderError.unavailable
         }
         if response.url.path == "/login" || response.status == 401 { throw GitHubFolderError.signedOut }
         if let sso = ssoURL(response.url.absoluteString) { throw GitHubFolderError.singleSignOn(sso) }
-        guard response.status == 200, response.url.path == "/pulls", !response.body.isEmpty else {
+        guard response.status == 200, response.url.path == path, !response.body.isEmpty else {
             throw GitHubFolderError.unavailable
         }
         let document = try XMLDocument(
@@ -119,13 +135,16 @@ enum GitHubPullRequests {
         let next = try document.nodes(
             forXPath: "//a[@rel='next' or contains(concat(' ',normalize-space(@class),' '),' next_page ')][@href]")
         var content: Payload.Content?
+        var hasDashboardLayout = false
         for script in try document.nodes(forXPath: "//script[@type='application/json']") {
             guard let json = script.stringValue,
                 json.contains("\"pullsDashboardSurfaceContentRoute\"")
                     || json.contains("\"pullsDashboardSurfaceLayoutRoute\"")
             else { continue }
             let envelope = try JSONDecoder().decode(Embedded.self, from: Data(json.utf8))
-            if let org = envelope.payload.pullsDashboardSurfaceLayoutRoute?.sso_organizations?.first,
+            let layout = envelope.payload.pullsDashboardSurfaceLayoutRoute
+            if layout != nil { hasDashboardLayout = true }
+            if let org = layout?.sso?.sso_organizations?.first ?? layout?.sso_organizations?.first,
                 let sso = ssoURL("/orgs/\(org.login)/sso")
             {
                 throw GitHubFolderError.singleSignOn(sso)
@@ -141,6 +160,8 @@ enum GitHubPullRequests {
             guard let total = content.pageInfo?.totalPages, total >= 0 else { throw GitHubFolderError.unavailable }
             return Page(items: rows, hasNext: total > number || !next.isEmpty)
         }
+        // The Inbox also renders a blankslate. Only a legacy results page can use it as an empty search.
+        guard !hasDashboardLayout, path == "/pulls" else { throw GitHubFolderError.unavailable }
         let links = try document.nodes(
             forXPath: "//a[@data-hovercard-type='pull_request' or starts-with(@id,'issue_')][@href]")
         let items = try links.compactMap { node -> GitHubPullRequest? in
@@ -153,7 +174,13 @@ enum GitHubPullRequests {
         if items.isEmpty {
             let empty = try document.nodes(
                 forXPath: "//*[contains(concat(' ',normalize-space(@class),' '),' blankslate ')]")
-            guard !empty.isEmpty, next.isEmpty else { throw GitHubFolderError.unavailable }
+            let list = try document.nodes(
+                forXPath: """
+                    //*[@id='js-issues-toolbar' or contains(concat(' ',normalize-space(@class),' '),' js-navigation-container ')
+                    or contains(concat(' ',normalize-space(@class),' '),' js-active-navigation-container ')
+                    or contains(concat(' ',normalize-space(@class),' '),' table-list-header-toggle ')]
+                    """)
+            guard !list.isEmpty, !empty.isEmpty, next.isEmpty else { throw GitHubFolderError.unavailable }
         }
         return Page(items: items, hasNext: !next.isEmpty)
     }
