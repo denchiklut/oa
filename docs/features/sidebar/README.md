@@ -173,14 +173,15 @@ restores the folder tree in order.
 ### Recent-page previews
 
 Hover over a pinned Linear, Notion or Figma tab or Favorite to see recent
-documents from the current profile. The card lists Linear issues and projects,
-Notion pages, or Figma files and boards. Selecting a result opens its most
-recently visited URL in a new tab in the current Space.
+pages from its profile. Linear shows visits from the last 30 days, including
+chats, and skips pages titled exactly `Inbox` or `Linear`. Each row shows
+the visit age. Issues also show their ID. Selecting a row opens it in the
+hovered tab. The **+** button opens Linear’s New Issue page there.
 
-Oa shows up to five distinct documents from the newest 100 matching history
-entries. The limit, document grouping and choice to open a new tab are Oa
-decisions. The stub uses visits from the current run. Chromium uses the
-profile’s saved browsing history.
+Notion and Figma show recent documents and open the selected URL in a new
+tab in the current Space. Oa shows up to five results from the newest 100
+matching history entries. The stub uses visits from the current run.
+Chromium uses the profile’s saved browsing history.
 
 **Settings → General → Previews Settings…** has a switch for folders and a
 shared switch for recent pages. **Site Controls** can turn an individual

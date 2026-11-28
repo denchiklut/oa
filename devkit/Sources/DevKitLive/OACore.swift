@@ -34,6 +34,7 @@ import AppKit
 @MainActor @objc protocol CoreHistoryEntry: NSObjectProtocol {
     var url: String { get }
     var title: String { get }
+    @objc optional var visitTime: Date { get }
 }
 
 @MainActor @objc protocol CoreDownload: NSObjectProtocol {

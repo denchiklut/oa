@@ -224,7 +224,9 @@ final class ChromiumBrowserContext: BrowserContext {
                 let entries = MainActor.assumeIsolated {
                     entries.compactMap { object -> HistoryEntry? in
                         let entry = unsafeBitCast(object, to: CoreHistoryEntry.self)
-                        return URL(string: entry.url).map { HistoryEntry(url: $0, title: entry.title) }
+                        return URL(string: entry.url).map {
+                            HistoryEntry(url: $0, title: entry.title, visitTime: entry.visitTime)
+                        }
                     }
                 }
                 continuation.resume(returning: entries)

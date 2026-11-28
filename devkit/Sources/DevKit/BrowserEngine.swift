@@ -133,10 +133,12 @@ public struct ProfileDocument: Sendable {
 public struct HistoryEntry: Sendable, Equatable {
     public let url: URL
     public let title: String
+    public let visitTime: Date?
 
-    public init(url: URL, title: String) {
+    public init(url: URL, title: String, visitTime: Date? = nil) {
         self.url = url
         self.title = title
+        self.visitTime = visitTime
     }
 }
 
