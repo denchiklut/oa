@@ -181,6 +181,14 @@ private struct SettingsSection: View {
                     }.buttonStyle(.plain).padding(.horizontal, 10)
                 }
             }
+            if let site = RecentPagesSite(url: model.frontPage?.url), model.sidebarContext == .global {
+                let previews = model.previewPreferences
+                let on = previews.isEnabled(site)
+                SiteSettingRow(title: "\(site.name) Previews", value: on ? "On" : "Off", symbol: "eye.fill", isOn: on) {
+                    previews.setEnabled(!on, for: site)
+                }
+                .disabled(!previews.recentPages)
+            }
             if let url = model.developerModeURL {
                 let on = model.developerMode.isEnabled(for: url)
                 SiteSettingRow(title: "Developer Mode", value: on ? "On" : "Off", symbol: "hammer.fill", isOn: on) {

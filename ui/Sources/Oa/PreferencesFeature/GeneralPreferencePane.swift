@@ -3,6 +3,8 @@ import SwiftUI
 
 struct GeneralPreferencePane: View {
     let adBlocker: AdBlocker
+    @Bindable var previews: PreviewPreferences
+    @State private var showsPreviews = false
     let showProfiles: () -> Void
     @AppStorage(QuitWarning.key) private var warnsBeforeQuitting = QuitWarning.isOnByDefault
     @State private var showsUpdateInfo = false
@@ -40,10 +42,8 @@ struct GeneralPreferencePane: View {
                     PreferenceRow {
                         Text("Previews")
                     } control: {
-                        Button("Previews Settings…") {}
-                            .disabled(true)
+                        Button("Previews Settings…") { showsPreviews = true }
                     }
-                    .oaToolTip("Favorites previews are unavailable in this build of Oa.")
                     PreferenceRowDivider()
                     PreferenceRow(height: 48) {
                         Text("Manage your default search engine, Auto-Archive, and downloads in Profile Settings.")
@@ -85,6 +85,19 @@ struct GeneralPreferencePane: View {
             .toggleStyle(.switch)
             .padding(.horizontal, 64)
             .padding(.vertical, 20)
+        }
+        .sheet(isPresented: $showsPreviews) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Show Oa Previews").font(.headline)
+                Toggle("Oa Folders", isOn: $previews.folders)
+                Toggle("Recent pages on Linear, Notion, and Figma", isOn: $previews.recentPages)
+                HStack {
+                    Spacer()
+                    Button("Done") { showsPreviews = false }.keyboardShortcut(.defaultAction)
+                }
+            }
+            .toggleStyle(.checkbox)
+            .padding(24)
         }
     }
 

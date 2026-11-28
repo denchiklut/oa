@@ -214,6 +214,27 @@ final class WindowModel {
         guard let container = style.container(of: id) else { return state.spaces }
         return state.containers[container].map { [$0] } ?? []
     }
+    var previewPreferences: PreviewPreferences { store.previewPreferences }
+
+    func recentPagesSite(for tabID: UUID) -> RecentPagesSite? {
+        guard sidebarContext == .global, state.keepsAddress(tabID), state.isSelectable(tabID, in: selectedSpaceID),
+            let site = RecentPagesSite(url: state.tree.tab(tabID)?.url), previewPreferences.isEnabled(site)
+        else { return nil }
+        return site
+    }
+
+    func recentPages(for site: RecentPagesSite, tabID: UUID) async -> [HistoryEntry] {
+        guard recentPagesSite(for: tabID) == site, let profileID = shownProfileID else { return [] }
+        let entries = await context(for: profileID).history(matching: site.rawValue, maxResults: 100)
+        guard !Task.isCancelled, shownProfileID == profileID, recentPagesSite(for: tabID) == site else { return [] }
+        return site.documents(in: entries)
+    }
+
+    func openRecentPage(_ url: URL, from tabID: UUID) {
+        guard let site = recentPagesSite(for: tabID), RecentPagesSite(url: url) == site else { return }
+        newTab(url)
+    }
+
     var adBlocker: AdBlocker { engine.adBlocker }
     var space: SidebarSpace? { state.space(selectedSpaceID) }
     var selectedTabID: UUID? { spaceCreation == nil ? selectedTabIDs[selectedSpaceID] : nil }

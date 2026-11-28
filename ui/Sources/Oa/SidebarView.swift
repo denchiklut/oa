@@ -518,7 +518,8 @@ struct FavoritesGrid: View {
                 let origin = grid.origin(of: slot.isLifted ? 0 : index)
                 Group {
                     if let tab = slot.tab {
-                        FavoriteTile(model: model, layout: layout, tab: tab, width: grid.tileWidth)
+                        FavoriteTile(
+                            model: model, layout: layout, tab: tab, width: grid.tileWidth, isShown: drag != nil)
                     } else if let tabs = slot.splitTabs {
                         FavoriteSplitTile(
                             model: model, layout: layout, splitID: slot.id, tabs: tabs, width: grid.tileWidth)
@@ -592,6 +593,7 @@ private struct FavoriteTile: View {
     let layout: WindowLayoutController
     let tab: SidebarTab
     let width: CGFloat
+    let isShown: Bool
     @State private var hovering = false
     @State private var pressed = false
     @State private var pickingIcon = false
@@ -665,7 +667,11 @@ private struct FavoriteTile: View {
             SpaceIconPicker(selection: tab.icon) { model.setTabIcon(tab.id, to: $0) }
         }
         .onHover { hovering = $0 }
-        .sidebarDragFrame { drag?.tiles[tab.id] = $0 }
+        .recentPagesPreviewAnchor(
+            model: model, layout: layout, tab: tab, hovering: hovering,
+            eligible: isShown && !pressed && !pickingIcon
+        )
+        .sidebarDragFrame { if isShown { drag?.tiles[tab.id] = $0 } }
         .platformContextMenu(isEnabled: model.library == nil && !model.coversWindow) {
             TabContextMenu(model: model, tab: tab) { Task { pickingIcon = true } }.make()
         }
@@ -1091,6 +1097,10 @@ struct TabRow: View {
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
+        .recentPagesPreviewAnchor(
+            model: model, layout: layout, tab: tab, hovering: hovering,
+            eligible: pinned && !inCard && spaceID == model.selectedSpaceID && !pressed && !renaming && !pickingIcon
+        )
         .sidebarDragFrame { if !inCard { drag?.rows[tab.id] = SidebarDrag.RowFrame(rect: $0, spaceID: spaceID) } }
         .onDisappear { if !inCard { drag?.rows[tab.id] = nil } }
         .platformContextMenu(

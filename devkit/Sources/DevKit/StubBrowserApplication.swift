@@ -95,19 +95,24 @@ private struct StubProfile: Codable {
 final class StubBrowserContext: BrowserContext {
     let id: UUID
     private let name: (String) -> Void
-    private let stubDownloads: StubDownloads
+    let stubDownloads: StubDownloads
     var downloads: any Downloads { stubDownloads }
     let preferences: any BrowserContextPreferences
-    private let stubExtensions: StubExtensions
+    let stubExtensions: StubExtensions
     var extensions: any Extensions { stubExtensions }
     private var browsers: [UUID: WeakBrowser] = [:]
 
-    private let isIncognito: Bool
+    private let parent: StubBrowserContext?
+    var isIncognito: Bool { parent != nil }
+    private var visits: [HistoryEntry]
 
     init(id: UUID, name: @escaping (String) -> Void) {
         self.id = id
         self.name = name
-        isIncognito = false
+        parent = nil
+        visits = StubAutocomplete.history.compactMap { page in
+            URL(string: page.url).map { HistoryEntry(url: $0, title: page.title) }
+        }
         stubDownloads = StubDownloads()
         preferences = StubPreferences()
         stubExtensions = StubExtensions(profileID: id)
@@ -118,7 +123,8 @@ final class StubBrowserContext: BrowserContext {
     init(sharingWith parent: StubBrowserContext) {
         id = parent.id
         name = parent.name
-        isIncognito = true
+        self.parent = parent
+        visits = []
         stubDownloads = StubDownloads()
         preferences = parent.preferences
         stubExtensions = parent.stubExtensions
@@ -127,24 +133,16 @@ final class StubBrowserContext: BrowserContext {
     func setUserVisibleName(_ name: String) { self.name(name) }
 
     func makePage(windowID: UUID, restoring sessionID: PageSessionID?) async -> (page: any Page, restored: Bool)? {
-        if let sessionID,
-            let page = StubPage.restore(
-                sessionID, id: UUID(), windowID: windowID, profileID: id, downloads: stubDownloads,
-                extensions: stubExtensions)
-        {
+        if let sessionID, let page = StubPage.restore(sessionID, id: UUID(), windowID: windowID, context: self) {
             return (page, true)
         }
-        let page = StubPage(
-            id: UUID(), windowID: windowID, profileID: id, downloads: stubDownloads, extensions: stubExtensions)
-        page.isIncognito = isIncognito
-        return (page, false)
+        return (StubPage(id: UUID(), windowID: windowID, context: self), false)
     }
 
     func browser(windowID: UUID, type: BrowserType) -> any Browser {
         if let browser = browsers[windowID]?.browser { return browser }
         if type == .popup { StubPage.popupWindowIDs.insert(windowID) }
-        let browser = StubBrowser(
-            windowID: windowID, profileID: id, extensions: stubExtensions, downloads: stubDownloads)
+        let browser = StubBrowser(windowID: windowID, context: self)
         browsers = browsers.filter { $0.value.browser != nil }
         browsers[windowID] = WeakBrowser(browser: browser)
         return browser
@@ -152,15 +150,19 @@ final class StubBrowserContext: BrowserContext {
 
     func makeAutocomplete() -> any Autocomplete { StubAutocomplete(preferences: preferences) }
 
-    /// The stub's remembered pages whose URL or title holds every word of `text`, in their order.
+    func didVisit(_ entry: HistoryEntry) {
+        guard !isIncognito, ["https", "http"].contains(entry.url.scheme) else { return }
+        visits.removeAll { $0.url == entry.url }
+        visits.insert(entry, at: 0)
+    }
+
     func history(matching text: String, maxResults: Int) async -> [HistoryEntry] {
         let words = text.lowercased().split { !$0.isLetter && !$0.isNumber }
-        let found = StubAutocomplete.history.filter { page in
-            words.allSatisfy { (page.url + " " + page.title).lowercased().contains($0) }
+        let found = (parent?.visits ?? visits).lazy.filter { page in
+            let text = (page.url.absoluteString + " " + page.title).lowercased()
+            return words.allSatisfy { text.contains($0) }
         }
-        return found.prefix(maxResults).compactMap { page in
-            URL(string: page.url).map { HistoryEntry(url: $0, title: page.title) }
-        }
+        return Array(found.prefix(max(0, maxResults)))
     }
 
     func loadDocument(at url: URL) async -> ProfileDocument? {

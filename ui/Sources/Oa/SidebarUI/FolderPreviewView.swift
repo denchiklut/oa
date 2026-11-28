@@ -36,7 +36,7 @@ struct FolderPreviewView: View {
                     placeholder: "Search \(folder.displayTitle)…", query: $query,
                     move: { move($0, from: selected, in: tabs) },
                     submit: { if let selected { open(selected) } },
-                    dismiss: layout.dismissFolderPreview)
+                    dismiss: layout.dismissSidebarPreview)
             }
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 12)
@@ -67,9 +67,10 @@ struct FolderPreviewView: View {
             PopoverBackgroundView(cornerRadius: 12, shadowColor: .black.opacity(0.32), shadowRadius: 10, shadowY: 5)
         )
         .contentShape(Rectangle())
-        .onHover { if !$0 { layout.leaveFolderPreview(folder.id) } }
+        .onHover { if !$0 { layout.leaveSidebarPreview(folder.id) } }
         .offset(x: frame.minX, y: frame.minY)
-        .onChange(of: frame, initial: true) { layout.folderPreviewFrame = frame }
+        .onChange(of: frame, initial: true) { layout.sidebarPreviewFrame = frame }
+        .onDisappear { if layout.sidebarPreview?.id == folder.id { layout.dismissSidebarPreview() } }
     }
 
     private func resultRow(_ tab: SidebarTab, highlighted: Bool) -> some View {
@@ -113,7 +114,7 @@ struct FolderPreviewView: View {
     }
 
     private func open(_ tab: SidebarTab) {
-        layout.dismissFolderPreview()
+        layout.dismissSidebarPreview()
         model.select(tab.id)
     }
 }

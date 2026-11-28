@@ -23,7 +23,9 @@ final class SettingsWindowController: NSWindowController {
         super.init(window: nil)
         tabs.tabStyle = .toolbar
         add("General", symbol: "gearshape") {
-            GeneralPreferencePane(adBlocker: engine.adBlocker) { [weak tabs] in tabs?.selectedTabViewItemIndex = 1 }
+            GeneralPreferencePane(adBlocker: engine.adBlocker, previews: store.previewPreferences) { [weak tabs] in
+                tabs?.selectedTabViewItemIndex = 1
+            }
         }
         add("Profiles", symbol: "person") {
             ProfilePreferencePane(

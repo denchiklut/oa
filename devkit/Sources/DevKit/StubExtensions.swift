@@ -92,16 +92,13 @@ final class StubBrowser: Browser {
     private(set) var extensionPopup: ExtensionPopup?
     let events: AsyncStream<BrowserEvent>
     @ObservationIgnored private let continuation: AsyncStream<BrowserEvent>.Continuation
-    @ObservationIgnored private let extensions: StubExtensions
-    @ObservationIgnored private let downloads: StubDownloads
+    @ObservationIgnored private let context: StubBrowserContext
     @ObservationIgnored private let windowID: UUID
-    @ObservationIgnored private let profileID: UUID
+    private var extensions: StubExtensions { context.stubExtensions }
 
-    init(windowID: UUID, profileID: UUID, extensions: StubExtensions, downloads: StubDownloads) {
+    init(windowID: UUID, context: StubBrowserContext) {
         self.windowID = windowID
-        self.profileID = profileID
-        self.extensions = extensions
-        self.downloads = downloads
+        self.context = context
         (events, continuation) = AsyncStream<BrowserEvent>.makeStream()
         // The stub keeps no session.
         continuation.yield(.restoredPages([]))
@@ -147,8 +144,7 @@ final class StubBrowser: Browser {
 
     private func openTab(_ path: String, of id: String) {
         guard let url = URL(string: "https://\(id).stub\(path)") else { return }
-        let page = StubPage(
-            id: UUID(), windowID: windowID, profileID: profileID, downloads: downloads, extensions: extensions)
+        let page = StubPage(id: UUID(), windowID: windowID, context: context)
         page.load(url)
         continuation.yield(.opened(page, isActive: true))
     }
