@@ -54,20 +54,9 @@ struct RecentPagesPreviewView: View {
         .frame(width: width, alignment: .leading)
         .overlay(alignment: .bottomTrailing) {
             if isLinear {
-                Button {
+                SidebarPreviewCreateButton(title: "New Issue") {
                     open(URL(string: "https://linear.app/new")!)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .medium))
-                        .frame(width: 32, height: 32)
-                        .background(.background, in: Circle())
-                        .overlay { Circle().strokeBorder(.primary.opacity(0.12)) }
-                        .contentShape(Circle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("New Issue")
-                .help("New Issue")
-                .padding(10)
             }
         }
         .modifier(

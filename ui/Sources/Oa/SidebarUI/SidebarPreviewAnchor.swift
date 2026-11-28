@@ -62,3 +62,23 @@ extension WindowLayoutController {
             y: max(4, min(origin.y, size.height - height - 4)), width: width, height: height)
     }
 }
+
+struct SidebarPreviewCreateButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "plus")
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 32, height: 32)
+                .background(.background, in: Circle())
+                .overlay { Circle().strokeBorder(.primary.opacity(0.12)) }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .help(title)
+        .padding(10)
+    }
+}

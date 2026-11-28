@@ -7,60 +7,42 @@ struct GmailPreviewView: View {
     let inbox: GmailInbox
     let anchor: CGRect
     @State private var highlighted: String?
+    @State private var listHeight: CGFloat = 70
 
     var body: some View {
-        let rows = if case .loaded(let messages) = inbox.state { messages.count } else { 0 }
-        let width = min(300, max(0, layout.size.width - 8))
-        let height = min(38 + CGFloat(max(1, min(rows, 5))) * 62, max(0, layout.size.height - 8))
+        let width = min(240, max(0, layout.size.width - 8))
+        let hasRows = if case .loaded(let messages) = inbox.state { !messages.isEmpty } else { false }
+        let height = min(hasRows ? listHeight : 62, 350, max(0, layout.size.height - 8))
         let frame = layout.tabPreviewFrame(
             anchor: anchor, width: width, height: height,
             favorite: model.state.isFavorite(tabID), centered: true)
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Unread").font(.headline)
-                Spacer()
-                Button {
-                    open(inbox.account.compose)
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                }
-                .buttonStyle(.plain).accessibilityLabel("New Email").help("New Email")
-            }
-            .padding(.horizontal, 12).frame(height: 37)
-            Divider()
+        Group {
             switch inbox.state {
             case .loading: status("Loading…")
             case .unavailable: status("Couldn’t load this inbox.")
             case .loaded(let messages) where messages.isEmpty: status("No unread emails, you can exhale! 🍃")
             case .loaded(let messages):
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    VStack(spacing: 0) {
                         ForEach(messages) { message in
-                            Button {
-                                open(message.url)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack {
-                                        Text(message.senders).fontWeight(.medium)
-                                        Spacer()
-                                        Text(message.date, style: .relative).font(.caption2).foregroundStyle(.secondary)
-                                    }
-                                    Text(message.subject)
-                                    Text(message.summary).font(.caption).foregroundStyle(.secondary)
-                                }
-                                .lineLimit(1).padding(.horizontal, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading).frame(height: 62)
-                                .background(.primary.opacity(highlighted == message.id ? 0.08 : 0))
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .onHover { highlighted = $0 ? message.id : nil }
+                            if message.id != messages.first?.id { Divider() }
+                            row(message)
                         }
                     }
-                }.scrollBounceBehavior(.basedOnSize)
+                    .onGeometryChange(for: CGFloat.self) {
+                        $0.size.height
+                    } action: {
+                        listHeight = $0
+                    }
+                }
+                .scrollBounceBehavior(.basedOnSize)
             }
         }
-        .frame(width: width, height: height, alignment: .topLeading)
+        .frame(width: width, height: height, alignment: .leading)
+        .accessibilityLabel("Unread")
+        .overlay(alignment: .bottomTrailing) {
+            SidebarPreviewCreateButton(title: "New Email") { open(inbox.account.compose) }
+        }
         .modifier(
             PopoverBackgroundView(cornerRadius: 12, shadowColor: .black.opacity(0.32), shadowRadius: 10, shadowY: 5)
         )
@@ -72,8 +54,43 @@ struct GmailPreviewView: View {
         .task(id: ObjectIdentifier(inbox)) { await model.refreshGmail(inbox, from: tabID) }
     }
 
+    private func row(_ message: GmailMessage) -> some View {
+        Button {
+            open(message.url)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(message.senders).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                    Spacer(minLength: 4)
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        let age = Duration.seconds(max(0, context.date.timeIntervalSince(message.date)))
+                        Text(
+                            age.formatted(
+                                .units(
+                                    allowed: [.days, .hours, .minutes], width: .narrow,
+                                    maximumUnitCount: 1, fractionalPart: .hide(rounded: .toNearestOrAwayFromZero))))
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .fixedSize()
+                }
+                Text(message.subject).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                if !message.summary.isEmpty {
+                    Text(message.summary).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.primary.opacity(highlighted == message.id ? 0.08 : 0))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { highlighted = $0 ? message.id : nil }
+    }
+
     private func status(_ text: String) -> some View {
-        Text(text).font(.callout).foregroundStyle(.secondary).padding(.horizontal, 12).frame(height: 62)
+        Text(text).font(.callout).foregroundStyle(.secondary).padding(.leading, 12).padding(.trailing, 52)
     }
 
     private func open(_ url: URL) {
