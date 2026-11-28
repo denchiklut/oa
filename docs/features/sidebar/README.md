@@ -170,6 +170,12 @@ Each window saves its own expanded folders in `windows.json`. Deleting a
 nonempty folder asks for confirmation and archives its tabs. **Edit ▸ Undo**
 restores the folder tree in order.
 
+### Gmail previews
+
+Hover a pinned Gmail tab or Favorite to see unread messages for its account. The list excludes Social and Promotions. Select a message or **New Email** to open it in the same tab. A red dot on a Gmail Favorite means a message arrived after you last viewed that Favorite. Opening it clears the dot while the messages stay unread in Gmail.
+
+Turn **Google Mail** on or off in **Settings → General → Previews Settings…**, or use **Gmail Previews** in Site Controls. If Oa cannot load the feed, the card shows an unavailable message.
+
 ### Recent-page previews
 
 Hover over a pinned Linear, Notion or Figma tab or Favorite to see recent

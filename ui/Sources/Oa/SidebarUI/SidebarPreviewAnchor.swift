@@ -34,16 +34,31 @@ struct SidebarPreviewAnchor: ViewModifier {
 
 extension View {
     @ViewBuilder
-    func recentPagesPreviewAnchor(
+    func tabPreviewAnchor(
         model: WindowModel, layout: WindowLayoutController, tab: SidebarTab, hovering: Bool, eligible: Bool
     ) -> some View {
-        if let site = RecentPagesSite(url: tab.url), model.sidebarContext == .global {
+        if model.sidebarContext == .global, GmailAccount(url: tab.url) != nil || RecentPagesSite(url: tab.url) != nil {
+            let enabled =
+                RecentPagesSite(url: tab.url).map(model.previewPreferences.isEnabled)
+                ?? model.previewPreferences.gmailEnabled
             modifier(
                 SidebarPreviewAnchor(
                     layout: layout, id: tab.id, hovering: hovering,
-                    enabled: eligible && model.previewPreferences.isEnabled(site) && layout.allowsTabPreview))
+                    enabled: eligible && enabled && layout.allowsTabPreview))
         } else {
             self
         }
+    }
+}
+
+extension WindowLayoutController {
+    func tabPreviewFrame(anchor: CGRect, width: CGFloat, height: CGFloat, favorite: Bool, centered: Bool) -> CGRect {
+        let origin =
+            favorite
+            ? CGPoint(x: anchor.maxX - 4, y: anchor.maxY - 4)
+            : CGPoint(x: anchor.maxX + (centered ? 12 : 8), y: centered ? anchor.midY - height / 2 : anchor.minY)
+        return CGRect(
+            x: max(4, min(origin.x, size.width - width - 4)),
+            y: max(4, min(origin.y, size.height - height - 4)), width: width, height: height)
     }
 }

@@ -602,6 +602,7 @@ private struct FavoriteTile: View {
 
     var body: some View {
         let selected = model.selectedTabID == tab.id
+        let gmail = isShown ? model.gmailInbox(for: tab.id) : nil
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         // As seen in Arc: the icon takes the favicon's place, and the selected tile's tint and ring follow its colour.
         let favicon = tab.icon.map(TabIconImage.image(for:)) ?? model.favicon(for: tab)
@@ -642,6 +643,21 @@ private struct FavoriteTile: View {
                     .offset(x: 4, y: -4)
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            if gmail?.hasUnread(since: tab.viewedAt) == true {
+                Circle().fill(Color(red: 0.918, green: 0.263, blue: 0.208))
+                    .frame(width: 7, height: 7)
+                    .padding(6)
+                    .accessibilityLabel("Unread Gmail")
+            }
+        }
+        .task(id: gmail.map(ObjectIdentifier.init)) {
+            guard let gmail else { return }
+            while !Task.isCancelled {
+                await model.refreshGmail(gmail, from: tab.id)
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
         // Arc's tiles carry the recording dot too (AppTray's `recordingIndicatorView`); the corner is Oa's own.
         .overlay(alignment: .topLeading) {
             if model.isRecording(tab) { RecordingDot().padding(6) }
@@ -667,7 +683,7 @@ private struct FavoriteTile: View {
             SpaceIconPicker(selection: tab.icon) { model.setTabIcon(tab.id, to: $0) }
         }
         .onHover { hovering = $0 }
-        .recentPagesPreviewAnchor(
+        .tabPreviewAnchor(
             model: model, layout: layout, tab: tab, hovering: hovering,
             eligible: isShown && !pressed && !pickingIcon
         )
@@ -1097,7 +1113,7 @@ struct TabRow: View {
         }
         .frame(height: 40)
         .onHover { hovering = $0 }
-        .recentPagesPreviewAnchor(
+        .tabPreviewAnchor(
             model: model, layout: layout, tab: tab, hovering: hovering,
             eligible: pinned && !inCard && spaceID == model.selectedSpaceID && !pressed && !renaming && !pickingIcon
         )

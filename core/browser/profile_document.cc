@@ -33,27 +33,31 @@ void LoadProfileDocument(
               done({}, 0, std::nullopt);
               return;
             }
-            constexpr auto annotation = net::DefineNetworkTrafficAnnotation(
-                "oa_live_folder_document", R"(
+            constexpr auto annotation =
+                net::DefineNetworkTrafficAnnotation("oa_sidebar_document", R"(
             semantics {
-              sender: "Oa Live Folders"
-              description: "Reads the GitHub pull request dashboard for a pinned folder."
-              trigger: "Enabling or refreshing the folder, or focusing its Space."
-              data: "GitHub pull request query and the profile's GitHub session cookies."
+              sender: "Oa Sidebar"
+              description: "Reads GitHub pull requests for Live Folders or Gmail unread feeds for sidebar previews."
+              trigger: "Showing or refreshing an enabled Live Folder or Gmail preview or Favorite."
+              data: "The requested dashboard or inbox URL and the profile's session cookies for the destination."
               destination: WEBSITE
             }
             policy {
               cookies_allowed: YES
               cookies_store: "user"
-              setting: "Removing the GitHub Live Folder stops its refreshes."
-              policy_exception_justification: "Opt-in sidebar feature."
+              setting: "Remove the Live Folder or disable Google Mail in Previews Settings."
+              policy_exception_justification: "Controlled by sidebar items and preview preferences."
             })");
             auto request = std::make_unique<network::ResourceRequest>();
             request->url = url;
             request->site_for_cookies = net::SiteForCookies::FromUrl(url);
             request->credentials_mode =
                 network::mojom::CredentialsMode::kInclude;
-            request->headers.SetHeader("Accept", "text/html");
+            request->headers.SetHeader(
+                "Accept",
+                url.host() == "mail.google.com"
+                    ? "application/atom+xml, application/xml, text/xml"
+                    : "text/html");
             auto loader = network::SimpleURLLoader::Create(std::move(request),
                                                            annotation);
             loader->SetTimeoutDuration(base::Seconds(20));

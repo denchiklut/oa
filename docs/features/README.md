@@ -384,13 +384,13 @@ The Settings → General → Previews switches below were observed individually.
 | --- | :---: | :---: |
 | [Folder hover previews (Arc Folders)](sidebar/README.md#folders) | ✅ | ✅ |
 | Google Calendar previews | ✅ | ☐ |
-| Google Mail previews | ✅ | ☐ |
+| [Google Mail previews and Favorite unread badge](sidebar/README.md#gmail-previews) | ✅ | ✅ |
 | Outlook Calendar previews | ✅ | ☐ |
 | Outlook Mail previews | ✅ | ☐ |
 | [Recent-page previews for Linear, Notion and Figma](sidebar/README.md#recent-page-previews) | ✅ | ✅ |
 | Notion Calendar previews | ✅ | ☐ |
-| Enable/disable each supported preview integration | ✅ | Folders and the recent-pages group |
-| Toggle site previews from Site Controls † | ✅ | Linear, Notion and Figma |
+| Enable/disable each supported preview integration | ✅ | Folders, Google Mail and the recent-pages group |
+| Toggle site previews from Site Controls † | ✅ | Gmail, Linear, Notion and Figma |
 | Live Calendar: upcoming meeting and join action † | ✅ | ☐ |
 | Configure Live Calendar updates † | ✅ | ☐ |
 | Join an active meeting by shortcut † | ✅ | ☐ |
