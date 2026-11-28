@@ -13,7 +13,7 @@ struct TabContextMenu {
 
     func make() -> NSMenu {
         let selected = model.multiSelectedItemIDs
-        if selected.contains(tab.id) { return make(several: selected) }
+        if selected.contains(tab.id), selected.count > 1 || tab.liveURL == nil { return make(several: selected) }
         let state = model.state
         let favorite = state.isFavorite(tab.id)
         let current = model.selectedTabID == tab.id
@@ -23,6 +23,16 @@ struct TabContextMenu {
         if current { copy.shortcut("c", [.shift, .command]) }
         menu.addItem(copy)
         if let url = model.liveURL(of: tab.id) { menu.addItem(share(url)) }
+        if let url = tab.liveURL {
+            menu.addItem(
+                MenuActionItem("Copy PR #") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(url.lastPathComponent, forType: .string)
+                })
+            menu.addItem(.separator())
+            menu.addItem(MenuActionItem("Archive Item") { [model, tab] in model.archivePinned(tab.id) })
+            return menu
+        }
         menu.addItem(.separator())
         menu.addItem(MenuActionItem("Change Icon…", changeIcon))
         menu.addItem(

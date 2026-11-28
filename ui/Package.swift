@@ -13,7 +13,7 @@ let package = Package(
                 .product(name: "DevKit", package: "devkit"),
                 .product(name: "DevKitLive", package: "devkit"),
             ],
-            resources: [.copy("Resources/ThemeTextures")]
+            resources: [.copy("Resources/ThemeTextures"), .copy("Resources/mark-github.svg")]
         )
     ]
 )

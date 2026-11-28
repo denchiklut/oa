@@ -120,6 +120,7 @@ struct SidebarTab: Identifiable, Hashable {
     var icon: String?
     /// Arc's `savedMuteStatus`, given to the tab's next page.
     var muteStatus: MuteStatus?
+    var liveURL: URL?
 
     var displayTitle: String { customTitle ?? (title.isEmpty ? url?.host() ?? "Untitled" : title) }
 
@@ -183,6 +184,8 @@ struct SidebarFolder: Identifiable, Hashable {
     var title: String
     /// Arc's `customInfo.iconType`, rendered as a monochrome mask on the folder's front flap.
     var icon: String?
+
+    var gitHub: GitHubLiveFolder?
 
     var displayTitle: String { title.isEmpty ? "Untitled" : title }
 }
@@ -302,6 +305,10 @@ struct SidebarTree {
         guard id != parentID, !isDescendant(parentID, of: id), let oldParentID = items[id]?.parentID,
             items[parentID] != nil
         else { return }
+        if oldParentID != parentID, var tab = items[id]?.tab, tab.liveURL != nil {
+            tab.liveURL = nil
+            items[id]?.kind = .tab(tab)
+        }
         let from = detach(id) ?? 0
         var at = index ?? Int.max
         if oldParentID == parentID, from < at { at -= 1 }
@@ -414,7 +421,8 @@ struct SidebarState {
     }
 
     func canCreateFolder(in parentID: UUID) -> Bool {
-        containerDepth(of: parentID).map { $0 < Self.maxFolderDepth } ?? false
+        guard tree.folder(parentID)?.gitHub == nil else { return false }
+        return containerDepth(of: parentID).map { $0 < Self.maxFolderDepth } ?? false
     }
 
     /// As Arc's `SidebarData.item(_:canHaveContext:)` and `canMoveItems`: folders live only in pinned sections at
@@ -423,7 +431,7 @@ struct SidebarState {
         guard let item = tree[itemID], let parent = tree[parentID], itemID != parentID,
             !tree.isDescendant(parentID, of: itemID)
         else { return false }
-        guard item.container == nil else { return false }
+        guard item.container == nil, parent.folder?.gitHub == nil else { return false }
         if item.folder != nil {
             guard let targetDepth = containerDepth(of: parentID) else { return false }
             return targetDepth + subtreeFolderDepth(of: itemID) <= Self.maxFolderDepth
@@ -614,6 +622,7 @@ struct SidebarState {
     /// As Arc: the next tab below with the same opener, else the nearest above, else the opener.
     mutating func archiveTab(_ id: UUID, reason: SidebarArchivedTab.Reason, at date: Date = .now) {
         guard let tab = tree.tab(id) else { return }
+        if let url = tab.liveURL, let parent = tree[id]?.parentID { updateLiveFolder(parent) { $0.hidden.insert(url) } }
         let source = archiveSource(space(containing: id)?.id)
         tree.remove(id)
         archive.append(
@@ -651,9 +660,17 @@ struct SidebarState {
     /// Archive if it is still there.
     mutating func reopenTab(_ tab: SidebarTab, in parentID: UUID, at index: Int, else fallbackSpaceID: UUID) {
         archive.removeAll { $0.id == tab.id }
+        var tab = tab
+        if let url = tab.liveURL, tree.folder(parentID)?.gitHub?.hidden.contains(url) == true {
+            updateLiveFolder(parentID) { $0.hidden.remove(url) }
+        } else {
+            tab.liveURL = nil
+        }
         let item = SidebarItem(id: tab.id, kind: .tab(tab))
         let isFull = (tree[parentID]?.childIDs.count ?? 0) >= SidebarSplitViewData.maxNumberSplit
-        if tree[parentID] != nil, splitView(parentID) == nil || !isFull {
+        if tree[parentID] != nil, tree.folder(parentID)?.gitHub == nil || tab.liveURL != nil,
+            splitView(parentID) == nil || !isFull
+        {
             tree.insert(item, into: parentID, at: index)
         } else if let space = space(fallbackSpaceID) {
             tree.insert(item, into: space.unpinnedRootID, at: 0)
@@ -756,7 +773,7 @@ struct SidebarState {
             copy.title = leftAddress.title
             copy.customTitle = nil
         }
-        if isFavorite(tabID) {
+        if isFavorite(tabID) || tab.liveURL != nil {
             insertTab(copy, atTopOf: shownSpaceID)
         } else if let place = tree.location(of: tabID) {
             tree.insert(SidebarItem(id: copy.id, kind: .tab(copy)), into: place.parentID, at: place.index + 1)
@@ -806,10 +823,12 @@ struct SidebarState {
     /// Appends to the end of `parentID` when `index` is nil, as Arc's `SidebarContainer.insertItems` resolves `-1`.
     @discardableResult
     mutating func createFolder(
-        title: String = "", icon: String? = nil, in parentID: UUID, at index: Int? = nil
+        title: String = "", icon: String? = nil, gitHub: GitHubLiveFolder? = nil, in parentID: UUID,
+        at index: Int? = nil
     ) -> SidebarFolder? {
         guard canCreateFolder(in: parentID) else { return nil }
-        let folder = SidebarFolder(id: UUID(), title: title.trimmingCharacters(in: .whitespacesAndNewlines), icon: icon)
+        let folder = SidebarFolder(
+            id: UUID(), title: title.trimmingCharacters(in: .whitespacesAndNewlines), icon: icon, gitHub: gitHub)
         let item = SidebarItem(id: folder.id, kind: .folder(folder))
         if let index { tree.insert(item, into: parentID, at: index) } else { tree.append(item, to: parentID) }
         return folder

@@ -580,6 +580,10 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 // Nil until the profile has loaded.
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url;
+- (void)loadDocumentAtURL:(NSURL*)url
+               completion:(void (^)(NSString* finalURL,
+                                    NSInteger status,
+                                    NSData* _Nullable body))completion;
 // Chromium's history text search, newest first, as ArcCore's history query
 // options ask it. Loads the profile if needed.
 - (void)queryHistoryWithSearchText:(NSString*)searchText

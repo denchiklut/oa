@@ -301,7 +301,11 @@ final class FolderIconNSView: NSView {
     private static func customIconImage(for icon: String) -> CGImage? {
         if let cached = iconCache[icon] { return cached }
         let image: CGImage?
-        if icon.allSatisfy(\.isASCII) {
+        if icon == "github", let url = Bundle.module.url(forResource: "mark-github", withExtension: "svg"),
+            let mark = NSImage(contentsOf: url)
+        {
+            image = renderMask(from: mark, size: CGSize(width: 16, height: 16))
+        } else if icon.allSatisfy(\.isASCII) {
             let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
             if let symbol = NSImage(systemSymbolName: icon, accessibilityDescription: nil)?
                 .withSymbolConfiguration(config)

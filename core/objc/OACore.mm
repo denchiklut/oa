@@ -18,6 +18,7 @@
 #include "oa/public/history.h"
 #include "oa/public/page.h"
 #include "oa/public/preferences.h"
+#include "oa/public/profile_document.h"
 #include "oa/public/profiles.h"
 #include "oa/public/site_settings.h"
 
@@ -2006,6 +2007,20 @@ class BrowserObserverBridge : public oa::Browser::Observer {
                      url.absoluteString.UTF8String ?: "",
                      static_cast<oa::SiteSettingType>(type),
                      static_cast<oa::SiteSettingValue>(value));
+}
+
+- (void)loadDocumentAtURL:(NSURL*)url
+               completion:(void (^)(NSString*, NSInteger, NSData* _Nullable))
+                              completion {
+  void (^handler)(NSString*, NSInteger, NSData*) = [completion copy];
+  oa::LoadProfileDocument(
+      _identifier.UTF8String ?: "", _type, url.absoluteString.UTF8String ?: "",
+      [handler](std::string final_url, int status,
+                std::optional<std::string> body) {
+        handler(ToNSString(final_url), status,
+                body ? [NSData dataWithBytes:body->data() length:body->size()]
+                     : nil);
+      });
 }
 
 - (void)queryHistoryWithSearchText:(NSString*)searchText

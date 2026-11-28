@@ -25,6 +25,7 @@ final class WindowModel {
     }
     private(set) var selectedSpaceID: UUID {
         didSet {
+            refreshLiveFolders()
             dismissSpaceStyleEditor()
             updateCommandBarForSelection()
             loadExtensions()
@@ -1120,7 +1121,9 @@ final class WindowModel {
 
     /// As seen in Arc: a link dropped in the list is a tab at the line, its page loaded in the background.
     func openDroppedLink(_ url: URL, into parentID: UUID, at index: Int?) {
-        guard let spaceID = state.space(containingItem: parentID)?.id else { return }
+        guard state.tree.folder(parentID)?.gitHub == nil, let spaceID = state.space(containingItem: parentID)?.id else {
+            return
+        }
         let tab = makeTab(url: url)
         store.edit {
             $0.appendTab(tab, in: spaceID)
@@ -1682,6 +1685,34 @@ final class WindowModel {
         return revealCreatedFolder(created, startEditing: startEditing)
     }
 
+    func toggleGitHubFolder(in spaceID: UUID) {
+        guard sidebarContext == .global, state.isGlobal(spaceID), let space = state.space(spaceID),
+            let root = space.pinnedRootID
+        else { return }
+        if let folder = state.gitHubFolders(in: spaceID).first {
+            FolderDeletion.confirm(folder, in: self)
+            return
+        }
+        exitLibrary()
+        if spaceID != selectedSpaceID { selectSpace(spaceID) }
+        var created: SidebarFolder?
+        store.edit {
+            created = $0.createFolder(
+                title: "Pull Requests", icon: "github", gitHub: GitHubLiveFolder(profileID: space.profileID), in: root)
+        }
+        if let id = revealCreatedFolder(created, startEditing: false) { refreshLiveFolder(id, manual: true) }
+    }
+
+    func refreshLiveFolders() {
+        guard sidebarContext == .global, state.isGlobal(selectedSpaceID) else { return }
+        for folder in state.gitHubFolders(in: selectedSpaceID) { refreshLiveFolder(folder.id, manual: false) }
+    }
+
+    func refreshLiveFolder(_ id: UUID, manual: Bool) {
+        guard sidebarContext == .global, let folder = state.tree.folder(id) else { return }
+        store.liveFolderRefreshes.refresh(folder, in: store, using: engine, manual: manual)
+    }
+
     @discardableResult
     func createNestedFolder(in parentID: UUID) -> UUID? {
         guard state.canCreateFolder(in: parentID), let spaceID = state.space(containingItem: parentID)?.id else {
@@ -1822,6 +1853,7 @@ final class WindowModel {
         for window in store.windows { window.dropPages(of: tabIDs) }
         store.edit { $0.setProfile(profileID, forSpaces: spaceIDs) }
         for window in store.windows.filter({ $0 !== self }) + [self] where spaceIDs.contains(window.selectedSpaceID) {
+            window.refreshLiveFolders()
             window.closeCommandBar()
             window.selectedTabIDs[window.selectedSpaceID] = nil
             if let bottom = state.tabs(in: window.selectedSpaceID, pinned: false).last { window.select(bottom.id) }

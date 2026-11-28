@@ -232,6 +232,19 @@ final class ChromiumBrowserContext: BrowserContext {
         }
     }
 
+    func loadDocument(at url: URL) async -> ProfileDocument? {
+        guard let profile = profile() else { return nil }
+        return await withCheckedContinuation { continuation in
+            profile.loadDocument(at: url) { finalURL, status, body in
+                guard let url = URL(string: finalURL), status > 0 else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: ProfileDocument(url: url, status: status, body: body ?? Data()))
+            }
+        }
+    }
+
     func favicon(forPageAt url: URL) async -> NSImage? {
         guard let profile = profile() else { return nil }
         let icon = FoundIcon()

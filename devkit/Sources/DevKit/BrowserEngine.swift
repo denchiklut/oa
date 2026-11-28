@@ -82,6 +82,8 @@ public protocol BrowserContext: AnyObject {
     /// The engine's history text search, newest first, as ADK's history query with a search text and a result limit.
     /// It matches words of a page's URL and title, so a host can find another site's page.
     func history(matching text: String, maxResults: Int) async -> [HistoryEntry]
+    /// An HTTPS document loaded with this profile's browser session. The response includes the final URL after redirects.
+    func loadDocument(at url: URL) async -> ProfileDocument?
     /// The icon the profile's favicon service keeps for a page, nil when it has none.
     func favicon(forPageAt url: URL) async -> NSImage?
     /// As ADK's download manager for the context: one per profile, alive as long as it.
@@ -113,6 +115,18 @@ extension BrowserContext {
             let icon = await favicon(forPageAt: entry.url)
         else { return nil }
         return DominantColor.color(of: icon)?.darkened(byLightness: 0.15)
+    }
+}
+
+public struct ProfileDocument: Sendable {
+    public let url: URL
+    public let status: Int
+    public let body: Data
+
+    public init(url: URL, status: Int, body: Data) {
+        self.url = url
+        self.status = status
+        self.body = body
     }
 }
 

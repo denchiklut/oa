@@ -189,6 +189,8 @@ import AppKit
     /// `OASiteSetting`s, which Swift can't check against `CoreSiteSetting`.
     @objc(changedSiteSettingsForURL:) func changedSiteSettings(for url: URL) -> [NSObject]?
     @objc(setSiteSetting:to:forURL:) func setSiteSetting(_ type: Int, to value: Int, for url: URL)
+    @objc(loadDocumentAtURL:completion:)
+    func loadDocument(at url: URL, completion: @escaping (String, Int, Data?) -> Void)
     /// `OAHistoryEntry`s, which Swift can't check against `CoreHistoryEntry`.
     @objc(queryHistoryWithSearchText:maxResults:completion:)
     func queryHistory(searchText: String, maxResults: Int, completion: @escaping ([NSObject]) -> Void)

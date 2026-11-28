@@ -147,7 +147,8 @@ extension SidebarState {
 
     /// The Space a tab goes into a split in: its own, or for a Favorite the one shown.
     private func splitViewSpace(of tabID: UUID, shown spaceID: UUID) -> UUID? {
-        isFavorite(tabID) ? (isSelectable(tabID, in: spaceID) ? spaceID : nil) : space(containing: tabID)?.id
+        guard tree.tab(tabID)?.liveURL == nil else { return nil }
+        return isFavorite(tabID) ? (isSelectable(tabID, in: spaceID) ? spaceID : nil) : space(containing: tabID)?.id
     }
 
     /// As seen in Arc: a Favorite split takes no pane, its Add Tab… off.
@@ -170,7 +171,8 @@ extension SidebarState {
     /// As seen in Arc: a lone pinned tab or Favorite goes into a split as its own item, at the top of the Space's
     /// list, and a copy of it keeps its place. Returns the copy's ID.
     mutating func takeIntoSplitView(_ tabID: UUID, in spaceID: UUID) -> UUID? {
-        guard keepsAddress(tabID), splitViewID(containing: tabID) == nil, let tab = tree.tab(tabID),
+        guard tree.tab(tabID)?.liveURL == nil, keepsAddress(tabID), splitViewID(containing: tabID) == nil,
+            let tab = tree.tab(tabID),
             let place = tree.location(of: tabID), let space = space(containing: tabID) ?? space(spaceID)
         else { return nil }
         let copy = SidebarTab(id: UUID(), title: tab.title, url: tab.url, viewedAt: .now)
