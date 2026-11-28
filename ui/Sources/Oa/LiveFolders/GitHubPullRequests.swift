@@ -1,9 +1,13 @@
 import DevKit
 import Foundation
 
-struct GitHubPullRequest {
+struct GitHubPullRequest: Codable, Hashable {
     let url: URL
     let title: String
+
+    static func repository(of url: URL) -> String {
+        url.path.split(separator: "/").prefix(2).joined(separator: "/")
+    }
 }
 
 enum GitHubPullRequestFilter: String, Codable, CaseIterable {

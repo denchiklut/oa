@@ -8,8 +8,20 @@ struct GitHubLiveFolder: Codable, Hashable {
     var failedSince: Date?
     var error: GitHubFolderError?
     private var filters: Set<GitHubPullRequestFilter>?
+    fileprivate var fetchedRequests: [GitHubPullRequest]?
+    private var hiddenRepositories: Set<String>?
 
     init(profileID: UUID) { self.profileID = profileID }
+
+    func includesRepository(_ name: String) -> Bool {
+        hiddenRepositories?.contains(name.lowercased()) != true
+    }
+
+    fileprivate mutating func toggleRepository(_ name: String) {
+        var hidden = hiddenRepositories ?? []
+        hidden.formSymmetricDifference([name.lowercased()])
+        hiddenRepositories = hidden
+    }
 
     var enabledFilters: Set<GitHubPullRequestFilter> {
         get { filters ?? Set(GitHubPullRequestFilter.allCases) }
@@ -57,13 +69,50 @@ extension SidebarState {
         }
     }
 
+    private func cachedPullRequests(in folderID: UUID) -> [GitHubPullRequest] {
+        if let cached = tree.folder(folderID)?.gitHub?.fetchedRequests { return cached }
+        // Older snapshots hold the last results only in the managed tabs.
+        return tree.tabs(under: folderID).compactMap { tab in
+            tab.liveURL.map { GitHubPullRequest(url: $0, title: tab.title) }
+        }
+    }
+
+    func liveFolderRepositories(in folderID: UUID) -> [String] {
+        var seen = Set<String>()
+        return cachedPullRequests(in: folderID).map { GitHubPullRequest.repository(of: $0.url) }
+            .filter { seen.insert($0.lowercased()).inserted }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    mutating func toggleLiveFolderRepository(_ name: String, in folderID: UUID) {
+        let requests = cachedPullRequests(in: folderID)
+        updateLiveFolder(folderID) {
+            $0.fetchedRequests = requests
+            $0.toggleRepository(name)
+        }
+        reconcilePullRequests(requests, in: folderID, repository: name)
+    }
+
     mutating func applyPullRequests(_ requests: [GitHubPullRequest], to folderID: UUID) {
+        updateLiveFolder(folderID) { $0.fetchedRequests = requests }
+        reconcilePullRequests(requests, in: folderID)
+    }
+
+    private mutating func reconcilePullRequests(
+        _ requests: [GitHubPullRequest], in folderID: UUID, repository: String? = nil
+    ) {
         guard let live = tree.folder(folderID)?.gitHub else { return }
-        let visible = requests.filter { !live.hidden.contains($0.url) }
+        func inScope(_ url: URL) -> Bool {
+            repository.map { GitHubPullRequest.repository(of: url).caseInsensitiveCompare($0) == .orderedSame } ?? true
+        }
+        let visible = requests.filter {
+            inScope($0.url) && live.includesRepository(GitHubPullRequest.repository(of: $0.url))
+                && !live.hidden.contains($0.url)
+        }
         let urls = Set(visible.map(\.url))
         var existing: [URL: UUID] = [:]
         for id in tree[folderID]?.childIDs ?? [] {
-            guard let url = tree.tab(id)?.liveURL else { continue }
+            guard let url = tree.tab(id)?.liveURL, inScope(url) else { continue }
             if urls.contains(url), existing[url] == nil { existing[url] = id } else { tree.remove(id) }
         }
         for request in visible {
