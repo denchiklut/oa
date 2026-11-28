@@ -24,28 +24,30 @@ void LoadProfileDocument(
     const std::string& profile_id,
     BrowserContextType type,
     const std::string& url,
+    const std::string& accept,
     std::function<void(std::string, int, std::optional<std::string>)> done) {
   LoadBrowserContext(
       profile_id, type,
       base::BindOnce(
-          [](GURL url, decltype(done) done, Profile* profile) {
+          [](GURL url, std::string accept, decltype(done) done,
+             Profile* profile) {
             if (!profile || !url.SchemeIs("https")) {
               done({}, 0, std::nullopt);
               return;
             }
-            constexpr auto annotation = net::DefineNetworkTrafficAnnotation(
-                "oa_live_folder_document", R"(
+            constexpr auto annotation =
+                net::DefineNetworkTrafficAnnotation("oa_profile_document", R"(
             semantics {
-              sender: "Oa Live Folders"
-              description: "Reads the GitHub pull request dashboard for a pinned folder."
-              trigger: "Enabling or refreshing the folder, or focusing its Space."
-              data: "GitHub pull request query and the profile's GitHub session cookies."
+              sender: "Oa Sidebar Previews and Live Folders"
+              description: "Reads a site document or feed for a sidebar preview or live folder."
+              trigger: "Hovering a preview-enabled tab, enabling a live folder, or refreshing it."
+              data: "The site request URL and the profile's session cookies."
               destination: WEBSITE
             }
             policy {
               cookies_allowed: YES
               cookies_store: "user"
-              setting: "Removing the GitHub Live Folder stops its refreshes."
+              setting: "Disabling the preview in Settings or removing the live folder stops requests."
               policy_exception_justification: "Opt-in sidebar feature."
             })");
             auto request = std::make_unique<network::ResourceRequest>();
@@ -53,7 +55,8 @@ void LoadProfileDocument(
             request->site_for_cookies = net::SiteForCookies::FromUrl(url);
             request->credentials_mode =
                 network::mojom::CredentialsMode::kInclude;
-            request->headers.SetHeader("Accept", "text/html");
+            request->headers.SetHeader("Accept",
+                                       accept.empty() ? "*/*" : accept);
             auto loader = network::SimpleURLLoader::Create(std::move(request),
                                                            annotation);
             loader->SetTimeoutDuration(base::Seconds(20));
@@ -75,7 +78,7 @@ void LoadProfileDocument(
                     std::move(loader), std::move(done)),
                 4 * 1024 * 1024);
           },
-          GURL(url), std::move(done)));
+          GURL(url), accept, std::move(done)));
 }
 
 }  // namespace oa

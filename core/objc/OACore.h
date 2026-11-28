@@ -375,6 +375,13 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 @interface OAHistoryEntry : NSObject
 @property(nonatomic, readonly) NSString* url;
 @property(nonatomic, readonly) NSString* title;
+@property(nonatomic, readonly, nullable) NSDate* lastVisited;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+@interface OALiveCalendarCapture : NSObject
+@property(nonatomic, readonly, getter=isSignedOut) BOOL signedOut;
+@property(nonatomic, readonly) NSArray<NSString*>* eventPayloads;
 - (instancetype)init NS_UNAVAILABLE;
 @end
 
@@ -581,9 +588,14 @@ typedef NS_ENUM(NSInteger, OADownloadState) {
 - (nullable NSArray<OASiteSetting*>*)changedSiteSettingsForURL:(NSURL*)url;
 - (void)setSiteSetting:(NSInteger)type to:(NSInteger)value forURL:(NSURL*)url;
 - (void)loadDocumentAtURL:(NSURL*)url
+                   accept:(NSString*)accept
                completion:(void (^)(NSString* finalURL,
                                     NSInteger status,
                                     NSData* _Nullable body))completion;
+- (void)fetchLiveCalendarForAccountNumber:(NSInteger)accountNumber
+                               completion:
+                                   (void (^)(OALiveCalendarCapture* capture))
+                                       completion;
 // Chromium's history text search, newest first, as ArcCore's history query
 // options ask it. Loads the profile if needed.
 - (void)queryHistoryWithSearchText:(NSString*)searchText

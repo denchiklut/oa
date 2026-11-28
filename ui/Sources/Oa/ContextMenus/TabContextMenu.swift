@@ -19,10 +19,24 @@ struct TabContextMenu {
         let current = model.selectedTabID == tab.id
         let menu = NSMenu()
         menu.autoenablesItems = false
+        if favorite, let type = PreviewType.matching(url: tab.url, tabID: tab.id), type.isCalendar,
+            let host = PreviewType.calendarDefaultsHost(for: tab.url)
+        {
+            menu.addItem(liveCalendarMenu(host: host, type: type))
+            menu.addItem(.separator())
+        }
         let copy = MenuActionItem("Copy Link") { [model, tab] in model.copyURL(of: tab.id) }
         if current { copy.shortcut("c", [.shift, .command]) }
         menu.addItem(copy)
         if let url = model.liveURL(of: tab.id) { menu.addItem(share(url)) }
+        if favorite, let badge = FavoriteUnreadBadge.matching(url: tab.url) {
+            menu.addItem(.separator())
+            let item = MenuActionItem("Show Unread Badge") {
+                PreviewSettings.shared.toggleBadging(forHost: badge.defaultsHost)
+            }
+            item.state = PreviewSettings.shared.isBadgingEnabled(forHost: badge.defaultsHost) ? .on : .off
+            menu.addItem(item)
+        }
         if let url = tab.liveURL {
             menu.addItem(
                 MenuActionItem("Copy PR #") {
@@ -132,6 +146,87 @@ struct TabContextMenu {
                 })
         }
         return menu
+    }
+
+    /// As seen in Arc (`arc-tab-context-menu-multi-live.md` §5, `0x102f4f500`): Live Calendar submenu at the top of a
+    /// Calendar Favorite's context menu.
+    private func liveCalendarMenu(host: String, type: PreviewType) -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let record = model.previewRecord(for: tab)
+        let status: String =
+            switch record?.state {
+            case .loaded:
+                if let date = record?.lastRefreshed {
+                    "Updated \(date.formatted(.relative(presentation: .named)))"
+                } else {
+                    "Updated"
+                }
+            case .loading: "Updating…"
+            case .signedOut: "Sign in to update"
+            case .disconnected: "Calendar not connected"
+            case .failed: "Failed to update"
+            case nil: "Not updated yet"
+            }
+        submenu.addItem(MenuActionItem(status, enabled: false))
+        submenu.addItem(MenuActionItem("Refresh") { [model, tab] in model.refreshPreview(for: tab, force: true) })
+        if type.isNotionCalendar {
+            submenu.addItem(notionAccountMenu(record: record))
+        }
+        submenu.addItem(.separator())
+        let hover = MenuActionItem("Show Hover Preview") {
+            PreviewSettings.shared.liveCalendarHoverEnabled.toggle()
+        }
+        hover.state = PreviewSettings.shared.liveCalendarHoverEnabled ? .on : .off
+        submenu.addItem(hover)
+        let subtitle = MenuActionItem("Show Time to Next Meeting") {
+            PreviewSettings.shared.toggleSubtitle(forHost: host)
+        }
+        subtitle.state = PreviewSettings.shared.isSubtitleEnabled(forHost: host) ? .on : .off
+        submenu.addItem(subtitle)
+        if let profileID = model.previewProfileID(for: tab) {
+            let intervalMenu = NSMenu()
+            intervalMenu.autoenablesItems = false
+            let current = PreviewSettings.shared.liveCalendarInterval(for: profileID)
+            for interval in LiveCalendarInterval.allCases {
+                let item = MenuActionItem(interval.title) {
+                    PreviewSettings.shared.setLiveCalendarInterval(interval, for: profileID)
+                }
+                item.state = interval == current ? .on : .off
+                intervalMenu.addItem(item)
+            }
+            submenu.addItem(MenuActionItem("Show Next Meeting Link", submenu: intervalMenu))
+        }
+        return MenuActionItem("Live Calendar", submenu: submenu)
+    }
+
+    /// Oa's own: selects which Google Calendar account in this profile backs a Notion Calendar tab.
+    private func notionAccountMenu(record: PreviewRecord?) -> NSMenuItem {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        let currentAccount = model.resolvedNotionAccount(for: tab)
+        let loadedEmail: String? =
+            if case .loaded(.calendar(_, _, let email, _)) = record?.state { email } else { nil }
+        let disconnect = MenuActionItem("Not Connected") { [model, tab] in
+            model.connectNotionCalendar(for: tab, accountNumber: nil)
+        }
+        disconnect.state = currentAccount == nil ? .on : .off
+        submenu.addItem(disconnect)
+        submenu.addItem(.separator())
+        for index in 0..<3 {
+            let label =
+                if currentAccount == index, let loadedEmail {
+                    "Google Account \(index + 1) (\(loadedEmail))"
+                } else {
+                    "Google Account \(index + 1) (/u/\(index))"
+                }
+            let item = MenuActionItem(label) { [model, tab] in
+                model.connectNotionCalendar(for: tab, accountNumber: index)
+            }
+            item.state = currentAccount == index ? .on : .off
+            submenu.addItem(item)
+        }
+        return MenuActionItem("Google Account", submenu: submenu)
     }
 
     private func editPinnedPage(_ url: URL) -> NSMenuItem {

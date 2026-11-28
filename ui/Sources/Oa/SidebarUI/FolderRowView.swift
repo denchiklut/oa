@@ -60,14 +60,14 @@ struct FolderRowView: View {
         let dragged = !inCard && drag?.entry?.id == folder.id
         let isDropTarget = !inCard && drag?.target?.dropFolderID == folder.id
         let isDragActive = !inCard && (drag?.entry != nil || drag?.isLinkDrag == true)
-        let previewed = !inCard && layout.folderPreview?.id == folder.id
+        let previewed = !inCard && layout.sidebarPreview?.target == .folder(folder.id)
         let warning = folder.gitHub?.warning
         let canShowHoverContent =
             !inCard && !isDragActive && !pressed && !renaming && !pickingIcon
             && spaceID == model.selectedSpaceID && model.library == nil && model.spaceCreation == nil
             && model.peek == nil && !model.coversWindow
             && !layout.isPaging && layout.sidebarPresentation != .hidden
-        let canPreview = canShowHoverContent && !isExpanded && warning == nil
+        let canPreview = canShowHoverContent && !isExpanded && warning == nil && PreviewSettings.shared.folderEnabled
         let multiSelected =
             !inCard && spaceID == model.selectedSpaceID && model.multiSelectedItemIDs.contains(folder.id)
         let iconState = Self.iconState(
@@ -171,25 +171,31 @@ struct FolderRowView: View {
         .frame(height: 40)
         .onHover { inside in
             hovering = inside
-            if !inside && !inCard { layout.leaveFolderPreview(folder.id) }
-        }
-        .task(id: hovering && canPreview) {
-            guard hovering && canPreview else { return }
-            // Oa's dwell for a deliberate hover. Arc's exact delay is unknown.
-            try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled, let rect = drag?.rows[folder.id]?.rect,
+            guard !inCard else { return }
+            if inside, canPreview, let rect = drag?.rows[folder.id]?.rect,
                 !model.state.tree.tabs(under: folder.id).isEmpty
-            else { return }
-            layout.showFolderPreview(folder.id, at: rect)
+            {
+                layout.hoverSidebarPreview(.folder(folder.id), at: rect, placement: .right)
+            } else if !inside {
+                layout.unhoverSidebarPreview(folder.id)
+            }
         }
-        .onChange(of: canPreview) { if !canPreview && previewed { layout.dismissFolderPreview() } }
+        .onChange(of: canPreview) {
+            if !canPreview {
+                layout.unhoverSidebarPreview(folder.id)
+                if previewed { layout.dismissSidebarPreview() }
+            }
+        }
         .sidebarDragFrame { rect in
             if !inCard { drag?.rows[folder.id] = SidebarDrag.RowFrame(rect: rect, spaceID: spaceID) }
-            if previewed && layout.folderPreview?.anchor != rect { layout.dismissFolderPreview() }
+            if previewed && layout.sidebarPreview?.anchor != rect { layout.dismissSidebarPreview() }
         }
         .onDisappear {
-            if !inCard { drag?.rows[folder.id] = nil }
-            if !inCard && layout.folderPreview?.id == folder.id { layout.dismissFolderPreview() }
+            if !inCard {
+                drag?.rows[folder.id] = nil
+                layout.unhoverSidebarPreview(folder.id)
+            }
+            if !inCard && layout.sidebarPreview?.target == .folder(folder.id) { layout.dismissSidebarPreview() }
         }
         .onAppear {
             if !inCard, model.editingFolderID == folder.id { renaming = true }

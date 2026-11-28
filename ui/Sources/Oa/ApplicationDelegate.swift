@@ -82,6 +82,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     private func finishLaunching() {
         isLaunching = false
         SiteSearchMigrations.seedOnce(in: engine)
+        store.previews.startPeriodicRefresh(in: store, using: engine)
         let saved = store.savedWindows
         let restoring = pendingRestorations
         pendingRestorations.removeAll()
@@ -297,8 +298,11 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate, NSMenuItemVali
     }
 
     @objc func showSettings(_ sender: Any?) { settings.showWindow(nil) }
-    func showSettingsPane(_ pane: SettingsPane, showAirTrafficControl: Bool = false) {
-        settings.showPane(pane, showAirTrafficControl: showAirTrafficControl)
+    func showSettingsPane(
+        _ pane: SettingsPane, showAirTrafficControl: Bool = false, showPreviewSettings: Bool = false
+    ) {
+        settings.showPane(
+            pane, showAirTrafficControl: showAirTrafficControl, showPreviewSettings: showPreviewSettings)
     }
     func openChromiumSettings(_ page: ChromiumSettings, in profileID: UUID) { openSettings(page, in: profileID) }
     @objc func toggleToolbar(_ sender: Any?) { PageToolbar.isShown.toggle() }

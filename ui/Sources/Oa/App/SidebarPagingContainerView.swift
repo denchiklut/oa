@@ -34,67 +34,79 @@ struct SidebarPagingContainerView: View {
             let last = (first..<pages.count).prefix { pages[$0]?.profileID == space.profileID }.last ?? first
             return (space, first...last)
         }
-        ZStack(alignment: .topLeading) {
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Array(zip(layout.sidebarPages, pages)), id: \.0) { _, space in
-                    if let space {
-                        let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
-                        let favorites = model.state.favoriteEntries(for: space.id)
-                        let grid = FavoritesGrid(
-                            model: model, layout: layout, profileID: space.profileID, favorites: favorites,
-                            drag: current ? drag : nil)
-                        let trayExtensions =
-                            global && !showsToolbar
-                            ? PinnedExtensionLayout.trayActions(
-                                model.pinnedExtensionActions(for: space.profileID), sidebarWidth: width,
-                                hasFavorites: !favorites.isEmpty)
-                            : []
-                        let extensionsHeight = PinnedExtensionsGrid.height(for: trayExtensions.count, in: width)
-                        let trayHeight =
-                            grid.height
-                            + (extensionsHeight > 0 ? extensionsHeight + 8 : 0)
-                        SidebarSpacePage(
-                            model: model, layout: layout, space: space,
-                            hidesScrollIndicators: hidesScrollIndicators, showsDownloads: showsDownloads
+        TimelineView(.periodic(from: .now, by: 15)) { timeline in
+            let now = timeline.date
+            ZStack(alignment: .topLeading) {
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(zip(layout.sidebarPages, pages)), id: \.0) { _, space in
+                        if let space {
+                            let current = space.id == model.selectedSpaceID && model.spaceCreation == nil
+                            let favorites = model.state.favoriteEntries(for: space.id)
+                            let grid = FavoritesGrid(
+                                model: model, layout: layout, profileID: space.profileID, favorites: favorites,
+                                drag: current ? drag : nil)
+                            let trayExtensions =
+                                global && !showsToolbar
+                                ? PinnedExtensionLayout.trayActions(
+                                    model.pinnedExtensionActions(for: space.profileID), sidebarWidth: width,
+                                    hasFavorites: !favorites.isEmpty)
+                                : []
+                            let extensionsHeight = PinnedExtensionsGrid.height(for: trayExtensions.count, in: width)
+                            let hasLiveMeeting =
+                                global && model.activeLiveCalendarEvent(for: space.profileID, now: now) != nil
+                            let trayHeight =
+                                grid.height
+                                + (extensionsHeight > 0 ? extensionsHeight + 8 : 0)
+                                + (hasLiveMeeting ? LiveCalendarItemView.trayHeight : 0)
+                            SidebarSpacePage(
+                                model: model, layout: layout, space: space,
+                                hidesScrollIndicators: hidesScrollIndicators, showsDownloads: showsDownloads
+                            )
+                            .padding(.top, global ? max(trayHeight, showsToolbar ? 0 : 8) : 0)
+                            .frame(width: width)
+                            .allowsHitTesting(current)
+                            .accessibilityHidden(!current)
+                        } else {
+                            Color.clear.frame(width: width)
+                        }
+                    }
+                }
+                .offset(x: -offset)
+                ForEach(runs, id: \.space.id) { run in
+                    let (first, last) = (run.pages.lowerBound, run.pages.upperBound)
+                    let shown =
+                        model.spaceCreation == nil && pages[run.pages].contains { $0?.id == model.selectedSpaceID }
+                    let favorites = model.state.favoriteEntries(for: run.space.id)
+                    let trayExtensions =
+                        !showsToolbar
+                        ? PinnedExtensionLayout.trayActions(
+                            model.pinnedExtensionActions(for: run.space.profileID), sidebarWidth: width,
+                            hasFavorites: !favorites.isEmpty)
+                        : []
+                    let activeMeeting = model.activeLiveCalendarEvent(for: run.space.profileID, now: now)
+                    VStack(alignment: .leading, spacing: 0) {
+                        if !trayExtensions.isEmpty {
+                            PinnedExtensionsGrid(model: model, layout: layout, actions: trayExtensions)
+                                .padding(.top, 8)
+                                .padding(.horizontal, 8)
+                        }
+                        FavoritesGrid(
+                            model: model, layout: layout, profileID: run.space.profileID, favorites: favorites,
+                            drag: shown ? drag : nil
                         )
-                        .padding(.top, global ? max(trayHeight, showsToolbar ? 0 : 8) : 0)
                         .frame(width: width)
-                        .allowsHitTesting(current)
-                        .accessibilityHidden(!current)
-                    } else {
-                        Color.clear.frame(width: width)
+                        .sidebarDragFrame { if shown { drag?.grid = $0 } }
+                        if let activeMeeting {
+                            LiveCalendarItemView(model: model, active: activeMeeting, now: now)
+                                .padding(.horizontal, 8)
+                                .padding(.bottom, 8)
+                        }
                     }
-                }
-            }
-            .offset(x: -offset)
-            ForEach(runs, id: \.space.id) { run in
-                let (first, last) = (run.pages.lowerBound, run.pages.upperBound)
-                let shown =
-                    model.spaceCreation == nil && pages[run.pages].contains { $0?.id == model.selectedSpaceID }
-                let favorites = model.state.favoriteEntries(for: run.space.id)
-                let trayExtensions =
-                    !showsToolbar
-                    ? PinnedExtensionLayout.trayActions(
-                        model.pinnedExtensionActions(for: run.space.profileID), sidebarWidth: width,
-                        hasFavorites: !favorites.isEmpty)
-                    : []
-                VStack(alignment: .leading, spacing: 0) {
-                    if !trayExtensions.isEmpty {
-                        PinnedExtensionsGrid(model: model, layout: layout, actions: trayExtensions)
-                            .padding(.top, 8)
-                            .padding(.horizontal, 8)
-                    }
-                    FavoritesGrid(
-                        model: model, layout: layout, profileID: run.space.profileID, favorites: favorites,
-                        drag: shown ? drag : nil
-                    )
                     .frame(width: width)
-                    .sidebarDragFrame { if shown { drag?.grid = $0 } }
+                    .offset(x: min(max(offset, CGFloat(first) * width), CGFloat(last) * width) - offset)
+                    .allowsHitTesting(shown)
+                    .accessibilityHidden(!shown)
                 }
-                .frame(width: width)
-                .offset(x: min(max(offset, CGFloat(first) * width), CGFloat(last) * width) - offset)
-                .allowsHitTesting(shown)
-                .accessibilityHidden(!shown)
             }
         }
         .offset(y: below)

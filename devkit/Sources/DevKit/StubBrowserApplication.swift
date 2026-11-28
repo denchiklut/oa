@@ -159,11 +159,18 @@ final class StubBrowserContext: BrowserContext {
             words.allSatisfy { (page.url + " " + page.title).lowercased().contains($0) }
         }
         return found.prefix(maxResults).compactMap { page in
-            URL(string: page.url).map { HistoryEntry(url: $0, title: page.title) }
+            URL(string: page.url).map {
+                HistoryEntry(
+                    url: $0, title: page.title,
+                    lastVisited: Date(timeIntervalSinceNow: -86_400 / Double(max(page.visits, 1))))
+            }
         }
     }
 
-    func loadDocument(at url: URL) async -> ProfileDocument? {
+    func loadDocument(at url: URL, accept: String) async -> ProfileDocument? {
+        if url.host == "mail.google.com", url.path.hasPrefix("/mail/u/"), url.path.contains("/feed/atom") {
+            return stubGmailFeed(for: url)
+        }
         guard url.host == "github.com", ["/pulls/authored", "/pulls/reviews"].contains(url.path) else { return nil }
         let direct = #"{"repoNameWithOwner":"example/project","number":2,"title":"Review the new layout"}"#
         let team = #"{"repoNameWithOwner":"example/team","number":3,"title":"Review team changes"}"#
@@ -184,6 +191,134 @@ final class StubBrowserContext: BrowserContext {
             "pageInfo":{"totalPages":1}}}}</script></body></html>
             """
         return ProfileDocument(url: url, status: 200, body: Data(html.utf8))
+    }
+
+    func fetchLiveCalendar(accountNumber: Int) async -> LiveCalendarCapture? {
+        let formatter = ISO8601DateFormatter()
+        let now = Date.now
+        if accountNumber == 1 {
+            let workStart = formatter.string(from: now.addingTimeInterval(3 * 60 + 20))
+            let workEnd = formatter.string(from: now.addingTimeInterval(33 * 60))
+            let json = """
+                {
+                  "summary": "work@example.com",
+                  "timeZone": "\(TimeZone.current.identifier)",
+                  "items": [
+                    {
+                      "id": "stub-work-sync",
+                      "summary": "Work Architecture Sync",
+                      "htmlLink": "https://calendar.google.com/calendar/u/1/r/eventedit/stub-work-sync",
+                      "hangoutLink": "https://meet.google.com/wrk-sync-001",
+                      "start": { "dateTime": "\(workStart)" },
+                      "end": { "dateTime": "\(workEnd)" },
+                      "attendees": [{ "email": "work@example.com", "self": true, "responseStatus": "accepted" }]
+                    }
+                  ]
+                }
+                """
+            return LiveCalendarCapture(isSignedOut: false, eventPayloads: [json])
+        }
+        if accountNumber >= 2 {
+            return LiveCalendarCapture(isSignedOut: true, eventPayloads: [])
+        }
+        let soonStart = formatter.string(from: now.addingTimeInterval(4 * 60 + 20))
+        let soonEnd = formatter.string(from: now.addingTimeInterval(34 * 60))
+        let secondStart = formatter.string(from: now.addingTimeInterval(8 * 60 + 20))
+        let secondEnd = formatter.string(from: now.addingTimeInterval(38 * 60))
+        let tomorrowStart = formatter.string(from: now.addingTimeInterval(25 * 3600))
+        let tomorrowEnd = formatter.string(from: now.addingTimeInterval(26 * 3600))
+        let json = """
+            {
+              "summary": "you@example.com",
+              "timeZone": "\(TimeZone.current.identifier)",
+              "items": [
+                {
+                  "id": "stub-standup",
+                  "summary": "Design Review",
+                  "htmlLink": "https://calendar.google.com/calendar/event?eid=stub-standup",
+                  "hangoutLink": "https://meet.google.com/abc-defg-hij",
+                  "start": { "dateTime": "\(soonStart)" },
+                  "end": { "dateTime": "\(soonEnd)" },
+                  "attendees": [{ "email": "you@example.com", "self": true, "responseStatus": "accepted" }]
+                },
+                {
+                  "id": "stub-sync",
+                  "summary": "1:1 Sync",
+                  "htmlLink": "https://calendar.google.com/calendar/event?eid=stub-sync",
+                  "location": "https://example.zoom.us/j/123456789",
+                  "start": { "dateTime": "\(secondStart)" },
+                  "end": { "dateTime": "\(secondEnd)" }
+                },
+                {
+                  "id": "stub-tomorrow",
+                  "summary": "Weekly Planning",
+                  "htmlLink": "https://calendar.google.com/calendar/event?eid=stub-tomorrow",
+                  "start": { "dateTime": "\(tomorrowStart)" },
+                  "end": { "dateTime": "\(tomorrowEnd)" }
+                }
+              ]
+            }
+            """
+        return LiveCalendarCapture(isSignedOut: false, eventPayloads: [json])
+    }
+
+    private func stubGmailFeed(for url: URL) -> ProfileDocument {
+        let formatter = ISO8601DateFormatter()
+        let recent = formatter.string(from: Date(timeIntervalSinceNow: -8 * 60))
+        let stale = formatter.string(from: Date(timeIntervalSinceNow: -4 * 3600))
+        let promoEntry = """
+            <entry>
+              <title>Weekend Sale</title>
+              <summary>Save 20% on storewide items</summary>
+              <link rel="alternate" href="https://mail.google.com/mail?account_id=you@example.com&amp;message_id=promo1&amp;view=conv&amp;extsrc=atom" type="text/html"/>
+              <issued>\(recent)</issued>
+              <author><name>Store Deals</name><email>deals@example.com</email></author>
+            </entry>
+            """
+        let isSecondaryInbox = url.path.contains("/mail/u/1/")
+        let entries: String
+        if url.path.contains("^sq_ig_i_social") {
+            entries = ""
+        } else if url.path.contains("^sq_ig_i_promo") {
+            entries = isSecondaryInbox ? "" : promoEntry
+        } else if isSecondaryInbox {
+            entries = """
+                <entry>
+                  <title>Older Digest</title>
+                  <summary>Sent more than two hours ago so it should not trigger the unread dot.</summary>
+                  <link rel="alternate" href="https://mail.google.com/mail/u/1/?message_id=old1&amp;view=conv" type="text/html"/>
+                  <issued>\(stale)</issued>
+                  <author><name>Daily Digest</name><email>digest@example.com</email></author>
+                </entry>
+                """
+        } else {
+            entries = """
+                <entry>
+                  <title>Previews spec ready for review</title>
+                  <summary>Left a few comments on the hover timing and Gmail feed parsing.</summary>
+                  <link rel="alternate" href="https://mail.google.com/mail?account_id=you@example.com&amp;message_id=msg1&amp;view=conv&amp;extsrc=atom" type="text/html"/>
+                  <issued>\(recent)</issued>
+                  <author><name>Alex Rivera</name><email>alex@example.com</email></author>
+                </entry>
+                <entry>
+                  <title>Build green on main</title>
+                  <summary>Incremental Chromium build completed in 18 seconds.</summary>
+                  <link rel="alternate" href="https://mail.google.com/mail?account_id=you@example.com&amp;message_id=msg2&amp;view=conv&amp;extsrc=atom" type="text/html"/>
+                  <issued>\(stale)</issued>
+                  <author><name>CI Bot</name><email>ci@example.com</email></author>
+                </entry>
+                \(promoEntry)
+                """
+        }
+        let xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <feed version="0.3" xmlns="http://purl.org/atom/ns#">
+              <title>Gmail - Inbox for you@example.com</title>
+              <fullcount>2</fullcount>
+              \(entries)
+            </feed>
+            """
+        return ProfileDocument(url: url, status: 200, body: Data(xml.utf8))
     }
 
     func favicon(forPageAt url: URL) async -> NSImage? { StubPage.icon(for: url) }
@@ -250,6 +385,16 @@ final class StubAutocomplete: Autocomplete {
             ("GitHub", "https://github.com/", 30),
             ("Hacker News", "https://news.ycombinator.com/", 4),
             ("Example Domain", "https://example.com/", 1),
+            ("Product Roadmap | Notion", "https://www.notion.so/Product-Roadmap-1234567890", 96),
+            ("Release Checklist | Notion", "https://www.notion.so/Release-Checklist-0987654321", 24),
+            ("Sidebar Redesign – Figma", "https://www.figma.com/design/abc123/Sidebar-Redesign", 72),
+            ("Icon Library – Figma", "https://www.figma.com/file/def456/Icon-Library", 18),
+            ("OA-42 Sidebar previews — Linear", "https://linear.app/oa/issue/OA-42/sidebar-previews", 120),
+            ("OA-39 Live folder polish — Linear", "https://linear.app/oa/issue/OA-39/live-folder-polish", 36),
+            (
+                "Architecture Notes - Confluence",
+                "https://example.atlassian.net/wiki/spaces/ENG/pages/101/Architecture+Notes", 48
+            ),
         ] + (1...12).map { ("Field Notes \($0)", "https://notes.example/\($0)", $0) }
 
     init(preferences: any BrowserContextPreferences) { self.preferences = preferences }

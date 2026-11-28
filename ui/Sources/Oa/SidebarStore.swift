@@ -21,6 +21,7 @@ final class SidebarStore {
         }
     }
     @ObservationIgnored let liveFolderRefreshes = LiveFolderRefreshes()
+    @ObservationIgnored let previews = PreviewsStore()
     @ObservationIgnored let savedWindows: [WindowRecord]
     @ObservationIgnored var sidebarViewPreferences: SidebarViewPreferences {
         didSet { scheduleSave() }

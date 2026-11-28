@@ -83,7 +83,10 @@ public protocol BrowserContext: AnyObject {
     /// It matches words of a page's URL and title, so a host can find another site's page.
     func history(matching text: String, maxResults: Int) async -> [HistoryEntry]
     /// An HTTPS document loaded with this profile's browser session. The response includes the final URL after redirects.
-    func loadDocument(at url: URL) async -> ProfileDocument?
+    func loadDocument(at url: URL, accept: String) async -> ProfileDocument?
+    /// Loads Google Calendar in a temporary cookie-seeded off-the-record page and returns its captured event JSON
+    /// payloads, as Arc's `LiveCalendarClient`.
+    func fetchLiveCalendar(accountNumber: Int) async -> LiveCalendarCapture?
     /// The icon the profile's favicon service keeps for a page, nil when it has none.
     func favicon(forPageAt url: URL) async -> NSImage?
     /// As ADK's download manager for the context: one per profile, alive as long as it.
@@ -108,6 +111,10 @@ public enum BrowserType: Sendable {
 }
 
 extension BrowserContext {
+    public func loadDocument(at url: URL) async -> ProfileDocument? {
+        await loadDocument(at: url, accept: "text/html")
+    }
+
     /// As Arc's `siteSearchDominantColor`: the dominant colour of the favicon of the newest page the history search
     /// finds for `host`, darkened. Nil without such a page, icon or colour. Asked each time, as Arc keeps no cache.
     public func siteSearchDominantColor(host: String) async -> NSColor? {
@@ -130,13 +137,25 @@ public struct ProfileDocument: Sendable {
     }
 }
 
+public struct LiveCalendarCapture: Sendable, Equatable {
+    public let isSignedOut: Bool
+    public let eventPayloads: [String]
+
+    public init(isSignedOut: Bool, eventPayloads: [String]) {
+        self.isSignedOut = isSignedOut
+        self.eventPayloads = eventPayloads
+    }
+}
+
 public struct HistoryEntry: Sendable, Equatable {
     public let url: URL
     public let title: String
+    public let lastVisited: Date?
 
-    public init(url: URL, title: String) {
+    public init(url: URL, title: String, lastVisited: Date? = nil) {
         self.url = url
         self.title = title
+        self.lastVisited = lastVisited
     }
 }
 

@@ -23,7 +23,9 @@ final class SettingsWindowController: NSWindowController {
         super.init(window: nil)
         tabs.tabStyle = .toolbar
         add("General", symbol: "gearshape") {
-            GeneralPreferencePane(adBlocker: engine.adBlocker) { [weak tabs] in tabs?.selectedTabViewItemIndex = 1 }
+            GeneralPreferencePane(adBlocker: engine.adBlocker, preferences: state) { [weak tabs] in
+                tabs?.selectedTabViewItemIndex = 1
+            }
         }
         add("Profiles", symbol: "person") {
             ProfilePreferencePane(
@@ -72,10 +74,11 @@ final class SettingsWindowController: NSWindowController {
         state.selectedKeyBindableActionIdentifier = identifier
     }
 
-    func showPane(_ pane: SettingsPane, showAirTrafficControl: Bool = false) {
+    func showPane(_ pane: SettingsPane, showAirTrafficControl: Bool = false, showPreviewSettings: Bool = false) {
         showWindow(nil)
         tabs.selectedTabViewItemIndex = pane.rawValue
         if showAirTrafficControl { state.showsAirTrafficControl = true }
+        if showPreviewSettings { state.showsPreviewSettings = true }
     }
 
     /// As Arc: an open Settings comes back in front, key, once a create sheet ends with no question about Spaces
@@ -161,6 +164,8 @@ final class PreferencesState {
     var selectedKeyBindableActionIdentifier: String?
     /// Arc's `isLinkRoutingPresented` when Air Traffic Control is opened from the command bar.
     var showsAirTrafficControl = false
+    /// Presents `PreviewSettingsDialog` on the General pane when opened from a preview card.
+    var showsPreviewSettings = false
     private(set) var profiles: [ProfileState] = []
     @ObservationIgnored private let engine: any BrowserApplication
 

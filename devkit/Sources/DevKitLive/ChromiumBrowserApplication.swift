@@ -224,7 +224,9 @@ final class ChromiumBrowserContext: BrowserContext {
                 let entries = MainActor.assumeIsolated {
                     entries.compactMap { object -> HistoryEntry? in
                         let entry = unsafeBitCast(object, to: CoreHistoryEntry.self)
-                        return URL(string: entry.url).map { HistoryEntry(url: $0, title: entry.title) }
+                        return URL(string: entry.url).map {
+                            HistoryEntry(url: $0, title: entry.title, lastVisited: entry.lastVisited)
+                        }
                     }
                 }
                 continuation.resume(returning: entries)
@@ -232,15 +234,28 @@ final class ChromiumBrowserContext: BrowserContext {
         }
     }
 
-    func loadDocument(at url: URL) async -> ProfileDocument? {
+    func loadDocument(at url: URL, accept: String) async -> ProfileDocument? {
         guard let profile = profile() else { return nil }
         return await withCheckedContinuation { continuation in
-            profile.loadDocument(at: url) { finalURL, status, body in
+            profile.loadDocument(at: url, accept: accept) { finalURL, status, body in
                 guard let url = URL(string: finalURL), status > 0 else {
                     continuation.resume(returning: nil)
                     return
                 }
                 continuation.resume(returning: ProfileDocument(url: url, status: status, body: body ?? Data()))
+            }
+        }
+    }
+
+    func fetchLiveCalendar(accountNumber: Int) async -> LiveCalendarCapture? {
+        guard let profile = profile() else { return nil }
+        return await withCheckedContinuation { continuation in
+            profile.fetchLiveCalendar(accountNumber: accountNumber) { object in
+                let capture = MainActor.assumeIsolated {
+                    let core = unsafeBitCast(object, to: CoreLiveCalendarCapture.self)
+                    return LiveCalendarCapture(isSignedOut: core.isSignedOut, eventPayloads: core.eventPayloads)
+                }
+                continuation.resume(returning: capture)
             }
         }
     }
