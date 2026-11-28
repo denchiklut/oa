@@ -51,11 +51,13 @@ struct FolderRowView: View {
         let isDropTarget = !inCard && drag?.target?.dropFolderID == folder.id
         let isDragActive = !inCard && (drag?.entry != nil || drag?.isLinkDrag == true)
         let previewed = !inCard && layout.folderPreview?.id == folder.id
-        let canPreview =
-            !inCard && !isExpanded && !isDragActive && !pressed && !renaming && !pickingIcon
+        let warning = folder.gitHub?.warning
+        let canShowHoverContent =
+            !inCard && !isDragActive && !pressed && !renaming && !pickingIcon
             && spaceID == model.selectedSpaceID && model.library == nil && model.spaceCreation == nil
             && model.peek == nil && !model.coversWindow
             && !layout.isPaging && layout.sidebarPresentation != .hidden
+        let canPreview = canShowHoverContent && !isExpanded && warning == nil
         let multiSelected =
             !inCard && spaceID == model.selectedSpaceID && model.multiSelectedItemIDs.contains(folder.id)
         let iconState = Self.iconState(
@@ -84,7 +86,7 @@ struct FolderRowView: View {
             Spacer(minLength: 0)
         }
         .padding(.leading, 6)
-        .padding(.trailing, folder.gitHub?.warning == nil ? 10 : 34)
+        .padding(.trailing, warning == nil ? 10 : 34)
         .frame(height: 36)
         .background {
             card.fill(
@@ -127,8 +129,12 @@ struct FolderRowView: View {
                 },
             including: renaming ? .subviews : .all
         )
+        .oaToolTip(
+            canShowHoverContent && warning != nil && !previewed
+                ? OaToolTipConfiguration(title: folder.displayTitle, delay: OaToolTipConfiguration.rowDelay) : nil
+        )
         .overlay(alignment: .trailing) {
-            if let warning = folder.gitHub?.warning {
+            if let warning {
                 Button {
                     model.openRoutedLink(warning.destination, in: spaceID)
                 } label: {
