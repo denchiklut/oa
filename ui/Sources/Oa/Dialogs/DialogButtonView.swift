@@ -7,6 +7,8 @@ struct DialogButtonView: View {
     let title: String
     let kind: Kind
     var isEnabled = true
+    var fillColor: Color?
+    var borderColor: Color?
     let action: () -> Void
 
     var body: some View {
@@ -23,9 +25,10 @@ struct DialogButtonView: View {
             .frame(height: 39)
             .foregroundStyle(text)
             .background(
-                fill.shadow(.drop(color: .black.opacity(isEnabled ? 0.18 : 0.05), radius: 0, y: 1.5)), in: shape(8)
+                (fillColor ?? fill).shadow(.drop(color: .black.opacity(isEnabled ? 0.18 : 0.05), radius: 0, y: 1.5)),
+                in: shape(8)
             )
-            .overlay(shape(8).strokeBorder(kind == .cancel ? DialogColor.secondaryBorder : .clear))
+            .overlay(shape(8).strokeBorder(borderColor ?? (kind == .cancel ? DialogColor.secondaryBorder : .clear)))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

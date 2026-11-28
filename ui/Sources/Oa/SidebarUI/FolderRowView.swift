@@ -3,23 +3,33 @@ import SwiftUI
 
 @MainActor
 enum FolderDeletion {
-    /// As Arc (`0x102ae2ddc`): empty folders delete at once; non-empty folders confirm before archiving everything
-    /// inside them.
     static func confirm(_ folder: SidebarFolder, in model: WindowModel) {
-        if folder.gitHub != nil || !(model.state.tree[folder.id]?.childIDs.isEmpty ?? true) {
-            let alert = NSAlert()
+        confirm([folder.id], in: model)
+    }
+
+    static func confirm(_ ids: ArraySlice<UUID>, in model: WindowModel) {
+        for index in ids.indices {
+            guard let folder = model.state.tree.folder(ids[index]) else { continue }
             if folder.gitHub != nil {
-                alert.messageText = "Delete your GitHub Live Folder?"
-                alert.informativeText = "You can restore this folder at any time by right-clicking the sidebar."
-            } else {
+                guard let window = model.window else { return }
+                DialogSheet.present(on: window, onDismiss: { confirm(ids[(index + 1)...], in: model) }) { dismiss in
+                    DeleteLiveFolderDialog(title: folder.displayTitle, cancel: dismiss) {
+                        model.deleteFolder(folder.id)
+                        dismiss()
+                    }
+                }
+                return
+            }
+            if !(model.state.tree[folder.id]?.childIDs.isEmpty ?? true) {
+                let alert = NSAlert()
                 alert.messageText = "Delete your “\(folder.displayTitle)” folder?"
                 alert.informativeText = "This will archive all the tabs and folders inside it."
+                alert.addButton(withTitle: "Delete")
+                alert.addButton(withTitle: "Cancel")
+                guard alert.runModal() == .alertFirstButtonReturn else { continue }
             }
-            alert.addButton(withTitle: "Delete")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            model.deleteFolder(folder.id)
         }
-        model.deleteFolder(folder.id)
     }
 }
 
@@ -79,6 +89,7 @@ struct FolderRowView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
                         .truncationMode(.tail)
+                        .modifier(LiveFolderReveal(start: revealStart))
                 }
             }
             .foregroundStyle(theme.foreground)
@@ -208,6 +219,12 @@ struct FolderRowView: View {
             return leadingHovered ? .peekedOpen : .peekedClosed
         }
         return .collapsed
+    }
+
+    private var revealStart: Date? {
+        guard place == .sidebar, folder.gitHub != nil, let reveal = model.liveFolderReveal, reveal.id == folder.id
+        else { return nil }
+        return reveal.start
     }
 
     private func press() {

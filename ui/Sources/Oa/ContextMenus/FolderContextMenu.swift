@@ -92,9 +92,7 @@ struct FolderContextMenu {
         menu.addItem(
             MenuActionItem("Delete Folders", enabled: itemIDs.allSatisfy { model.state.tree.folder($0) != nil }) {
                 [model] in
-                for id in model.state.topLevelItemIDs(in: itemIDs) {
-                    if let folder = model.state.tree.folder(id) { FolderDeletion.confirm(folder, in: model) }
-                }
+                FolderDeletion.confirm(model.state.topLevelItemIDs(in: itemIDs)[...], in: model)
             })
         return menu
     }

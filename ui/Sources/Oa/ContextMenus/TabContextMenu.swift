@@ -128,9 +128,7 @@ struct TabContextMenu {
                     let roots = model.state.topLevelItemIDs(in: itemIDs)
                     let standaloneTabs = roots.filter { model.state.tree.tab($0) != nil }
                     if !standaloneTabs.isEmpty { model.archiveTabs(standaloneTabs) }
-                    for id in roots where model.state.tree.folder(id) != nil {
-                        if let folder = model.state.tree.folder(id) { FolderDeletion.confirm(folder, in: model) }
-                    }
+                    FolderDeletion.confirm(roots[...], in: model)
                 })
         }
         return menu

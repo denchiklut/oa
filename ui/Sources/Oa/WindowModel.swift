@@ -72,6 +72,7 @@ final class WindowModel {
     private(set) var expandedFolderIDs: Set<UUID> = []
     /// Folder currently in inline rename (set when created inline so it focuses and scrolls into view).
     var editingFolderID: UUID?
+    private(set) var liveFolderReveal: (id: UUID, start: Date)?
     /// Tabs kept peeked under collapsed folders for 100 ms after selection leaves them, as Arc's
     /// `reparentPeekingIfNecessary(for:requiresDelay:)`.
     private var departingPeekTargets: [UUID: Set<UUID>] = [:]
@@ -1700,7 +1701,13 @@ final class WindowModel {
             created = $0.createFolder(
                 title: "Pull Requests", icon: "github", gitHub: GitHubLiveFolder(profileID: space.profileID), in: root)
         }
-        if let id = revealCreatedFolder(created, startEditing: false) { refreshLiveFolder(id, manual: true) }
+        guard let id = revealCreatedFolder(created, startEditing: false) else { return }
+        liveFolderReveal = (id, .now)
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(LiveFolderReveal.duration))
+            if self?.liveFolderReveal?.id == id { self?.liveFolderReveal = nil }
+        }
+        refreshLiveFolder(id, manual: true)
     }
 
     func refreshLiveFolders() {
