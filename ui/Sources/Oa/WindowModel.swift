@@ -1719,6 +1719,11 @@ final class WindowModel {
         refreshLiveFolder(id, manual: true)
     }
 
+    func toggleLiveFolderRepository(_ name: String, in id: UUID) {
+        guard sidebarContext == .global, state.tree.folder(id)?.gitHub != nil else { return }
+        store.edit { $0.toggleLiveFolderRepository(name, in: id) }
+    }
+
     @discardableResult
     func createNestedFolder(in parentID: UUID) -> UUID? {
         guard state.canCreateFolder(in: parentID), let spaceID = state.space(containingItem: parentID)?.id else {

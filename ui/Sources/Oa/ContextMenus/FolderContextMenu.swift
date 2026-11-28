@@ -30,6 +30,22 @@ struct FolderContextMenu {
                 item.state = live.enabledFilters.contains(filter) ? .on : .off
                 options.addItem(item)
             }
+            let repositories = model.state.liveFolderRepositories(in: folder.id)
+            if !repositories.isEmpty {
+                let submenu = NSMenu()
+                submenu.autoenablesItems = false
+                for name in repositories {
+                    let item = MenuActionItem(name) { [model, folder] in
+                        model.toggleLiveFolderRepository(name, in: folder.id)
+                    }
+                    item.state = live.includesRepository(name) ? .on : .off
+                    submenu.addItem(item)
+                }
+                submenu.addItem(.separator())
+                submenu.addItem(MenuActionItem("This list is generated based on your currently active pull requests."))
+                options.addItem(.separator())
+                options.addItem(MenuActionItem("Repositories", submenu: submenu))
+            }
             menu.items = [
                 MenuActionItem("Pull Requests", submenu: options),
                 .separator(),

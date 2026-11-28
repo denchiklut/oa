@@ -661,8 +661,9 @@ struct SidebarState {
     mutating func reopenTab(_ tab: SidebarTab, in parentID: UUID, at index: Int, else fallbackSpaceID: UUID) {
         archive.removeAll { $0.id == tab.id }
         var tab = tab
-        if let url = tab.liveURL, tree.folder(parentID)?.gitHub?.hidden.contains(url) == true {
+        if let url = tab.liveURL, let live = tree.folder(parentID)?.gitHub, live.hidden.contains(url) {
             updateLiveFolder(parentID) { $0.hidden.remove(url) }
+            if !live.includesRepository(GitHubPullRequest.repository(of: url)) { tab.liveURL = nil }
         } else {
             tab.liveURL = nil
         }

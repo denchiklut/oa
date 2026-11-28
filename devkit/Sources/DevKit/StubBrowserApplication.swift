@@ -166,7 +166,7 @@ final class StubBrowserContext: BrowserContext {
     func loadDocument(at url: URL) async -> ProfileDocument? {
         guard url.host == "github.com", ["/pulls/authored", "/pulls/reviews"].contains(url.path) else { return nil }
         let direct = #"{"repoNameWithOwner":"example/project","number":2,"title":"Review the new layout"}"#
-        let team = #"{"repoNameWithOwner":"example/project","number":3,"title":"Review team changes"}"#
+        let team = #"{"repoNameWithOwner":"example/team","number":3,"title":"Review team changes"}"#
         let rows: String
         if url.path == "/pulls/authored" {
             rows = #"{"repoNameWithOwner":"example/project","number":1,"title":"Update the sidebar"}"#
