@@ -18,7 +18,7 @@ struct RecentPagesPreviewView: View {
         let listHeight = min(CGFloat(max(pages?.count ?? 0, 1)) * rowHeight, max(0, layout.size.height - chrome - 8))
         let height = listHeight + chrome
         let frame = CGRect(
-            x: min(anchor.maxX + 8, layout.size.width - width - 4),
+            x: min(anchor.maxX + (isLinear ? 12 : 8), layout.size.width - width - 4),
             y: max(4, min(isLinear ? anchor.midY - height / 2 : anchor.minY, layout.size.height - height - 4)),
             width: width, height: height)
         VStack(alignment: .leading, spacing: 0) {
